@@ -154,7 +154,7 @@ export const toolkits = <Toolkits extends ReadonlyArray<Toolkit.Any>>(...toolkit
   Effect.fn(function* <Tools extends Record<string, Tool.Any>>(
     trajectory: Trajectory.Trajectory<Tools>,
   ) {
-    const { toolkit, metadata } = trajectory;
+    const { toolkit, metadata, extensions } = trajectory;
 
     const merged = Toolkit.merge(toolkit, ...toolkits);
 
@@ -163,7 +163,7 @@ export const toolkits = <Toolkits extends ReadonlyArray<Toolkit.Any>>(...toolkit
     const encode = Schema.encodeEffect(sourceSchema);
     const decode = Schema.decodeEffect(targetSchema);
 
-    const trajPart = Trajectory.Part(merged);
+    const trajPart = Trajectory.Part(merged, extensions);
 
     const parts = trajectory.pipe(
       Stream.mapEffect((part) =>
@@ -180,12 +180,13 @@ export const toolkits = <Toolkits extends ReadonlyArray<Toolkit.Any>>(...toolkit
               return trajPart.make({ ...response, response: decoded });
             }),
           ),
+          Match.tag("Extension", (extension) => Effect.succeed(extension)),
           Match.exhaustive,
         ),
       ),
     );
 
-    return Trajectory.make(parts, merged, metadata);
+    return Trajectory.make(parts, merged, metadata, extensions);
   });
 
 /**

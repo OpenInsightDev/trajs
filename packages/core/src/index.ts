@@ -4,6 +4,7 @@
  * Every module is re-exported as a namespace and is also available as a subpath
  * import such as `trajs/Response`.
  */
+export * as Extension from "./Extension.ts";
 export * as Persist from "./Persist.ts";
 export * as Response from "./Response.ts";
 export * as Toolkit from "./Toolkit.ts";

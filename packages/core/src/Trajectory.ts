@@ -8,6 +8,7 @@
  * refers to.
  */
 
+import type * as Extension from "#/Extension.ts";
 import * as Response from "#/Response.ts";
 import type { TrajectoryError } from "#/TrajectoryError.ts";
 import { DateTime, Effect, Schema, Stream } from "effect";
@@ -201,26 +202,134 @@ export const responsePart = (response: Response.Part<any>): AnyResponsePart =>
   AnyResponsePart.make({ response });
 
 /**
- * Creates a Schema for trajectory parts based on a toolkit.
+ * Trajectory part that carries data for an extension no definition describes.
  *
  * **When to use**
  *
- * Use when decoding or encoding recorded parts with the toolkit they were
- * recorded against.
- *
- * @category constructors
- */
-export const Part = <Tools extends Record<string, Tool.Any>>(toolkit: Toolkit.Toolkit<Tools>) =>
-  Schema.Union([PromptPart, ResponsePart(toolkit)]);
-
-/**
- * Union type of the parts of a trajectory for a toolkit.
+ * Use to type or decode extension data whose definition is not available, such
+ * as when loading a recording made with extensions that are not installed.
  *
  * @category models
  */
-export type Part<Tools extends Record<string, Tool.Any>> = Schema.Schema.Type<
-  ReturnType<typeof Part<Tools>>
->;
+export const AnyExtensionPart = class AnyExtensionPart extends Schema.TaggedClass<AnyExtensionPart>()(
+  "Extension",
+  {
+    extension: Schema.String,
+    version: Schema.optional(Schema.String),
+    anchor: Schema.optional(Uuid),
+    timestamp: Timestamp,
+    data: Schema.Json,
+    ...PartMetadata.fields,
+  },
+) {};
+
+/**
+ * Type of a trajectory part that carries data for an extension no definition
+ * describes.
+ *
+ * @category models
+ */
+export type AnyExtensionPart = Schema.Schema.Type<typeof AnyExtensionPart>;
+
+/**
+ * Type guard to check if a trajectory part carries extension data.
+ *
+ * **When to use**
+ *
+ * Use to narrow a trajectory part to the extension data it carries, whether or
+ * not a definition describes it.
+ *
+ * @category guards
+ */
+export const isExtensionPart = (part: { readonly _tag: string }): part is AnyExtensionPart =>
+  part._tag === "Extension";
+
+/**
+ * Constructs a new extension part whose data no definition describes.
+ *
+ * **When to use**
+ *
+ * Use when recording extension data that the current definitions do not
+ * describe.
+ *
+ * **Example** (Recording an extension part)
+ *
+ * ```ts import.meta.vitest
+ * import { Trajectory } from "trajs"
+ *
+ * const part = Trajectory.anyExtensionPart({ extension: "dev.trajs.otel", data: { spanId: "s1" } })
+ * part.extension // => "dev.trajs.otel"
+ * ```
+ *
+ * @category constructors
+ */
+export const anyExtensionPart = (
+  params: Parameters<typeof AnyExtensionPart.make>[0],
+): AnyExtensionPart => AnyExtensionPart.make(params);
+
+/**
+ * Creates a Schema for the trajectory parts that carry extension data, based on
+ * the registered definitions.
+ *
+ * **When to use**
+ *
+ * Use when decoding or encoding recorded extension parts with the definitions
+ * they were recorded against.
+ *
+ * **Details**
+ *
+ * Each definition contributes a part whose data its schema describes. Parts that
+ * no definition matches decode to {@link AnyExtensionPart} instead of failing,
+ * so loading a recording does not depend on the definitions that are installed.
+ * A part that a definition describes is not a class, because nothing constructs
+ * it: it is only ever decoded.
+ *
+ * @category constructors
+ */
+export const ExtensionPart = (extensions: Extension.Extensions = {}) =>
+  Schema.Union([
+    ...Object.values(extensions).map((definition) =>
+      Schema.TaggedStruct("Extension", {
+        extension: Schema.Literal(definition.id),
+        version: Schema.optional(Schema.String),
+        anchor: Schema.optional(Uuid),
+        timestamp: Timestamp,
+        data: definition.schema,
+        ...PartMetadata.fields,
+      }),
+    ),
+    AnyExtensionPart,
+  ]);
+
+/**
+ * Creates a Schema for trajectory parts based on a toolkit and extension
+ * definitions.
+ *
+ * **When to use**
+ *
+ * Use when decoding or encoding recorded parts with the toolkit and extensions
+ * they were recorded against.
+ *
+ * @category constructors
+ */
+export const Part = <
+  Tools extends Record<string, Tool.Any>,
+  Exts extends Extension.Extensions = Record<string, never>,
+>(
+  toolkit: Toolkit.Toolkit<Tools>,
+  extensions?: Exts,
+) => Schema.Union([PromptPart, ResponsePart(toolkit), ExtensionPart(extensions)]);
+
+/**
+ * Union type of the parts of a trajectory for a toolkit and extension
+ * definitions.
+ *
+ * @category models
+ */
+export type Part<
+  Tools extends Record<string, Tool.Any>,
+  Exts extends Extension.Extensions = Record<string, never>,
+> = Schema.Schema.Type<ReturnType<typeof Part<Tools, Exts>>>;
 
 /**
  * Encoded representation of trajectory parts for serialization.
@@ -230,11 +339,12 @@ export type Part<Tools extends Record<string, Tool.Any>> = Schema.Schema.Type<
 export type PartEncoded = Schema.Codec.Encoded<ReturnType<typeof Part<any>>>;
 
 /**
- * Trajectory part that also accepts tools outside the provided toolkit.
+ * Trajectory part that also accepts tools outside the provided toolkit and
+ * extensions no definition describes.
  *
  * @category models
  */
-export type AnyPart = PromptPart | AnyResponsePart;
+export type AnyPart = PromptPart | AnyResponsePart | AnyExtensionPart;
 
 /**
  * Stream of the parts of a trajectory.
@@ -279,6 +389,10 @@ export type Trajectory<Tools extends Record<string, Tool.Any>, E = never, R = ne
      * The metadata of the trajectory.
      */
     metadata: Metadata;
+    /**
+     * The extension definitions used to encode and decode extension parts.
+     */
+    extensions: Extension.Extensions;
   }>;
 
 /**
@@ -333,4 +447,5 @@ export const make = <Tools extends Record<string, Tool.Any>, E, R>(
   parts: Stream.Stream<Part<Tools>, E, R>,
   toolkit: Toolkit.Toolkit<Tools>,
   metadata: Metadata = {},
-): Trajectory<Tools, E, R> => Object.assign(parts, { toolkit, metadata });
+  extensions: Extension.Extensions = {},
+): Trajectory<Tools, E, R> => Object.assign(parts, { toolkit, metadata, extensions });
