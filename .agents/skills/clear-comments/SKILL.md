@@ -1,9 +1,11 @@
 ---
 name: clear-comments
-description: Use when user asks to clear the comments in the project.
+description: Use when user asks to clear the comments in the project. Covers implementation comments only; public API documentation is kept.
 ---
 
 # Comment Rules
+
+These rules cover implementation comments. The JSDoc on public modules and exports is documentation, not implementation commentary: never delete or trim it here, and write and edit it in the Effect style described in `AGENTS.md`.
 
 - **No filler**: Do not repeat the file name, module path, or doc paths in comments (e.g. no `//! This module defines the... described in ...`).
 - **Do not explain "what"**: Structures, names, and module relationships that the code already makes self-evident need no extra comments.

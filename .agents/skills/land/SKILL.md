@@ -32,9 +32,9 @@ blockers listed under Gates and Conflicts.
 
 Before committing, apply the rules in `.agents/skills/clear-comments/SKILL.md` to
 the files being landed: delete filler comments and comments that restate what the
-code already makes clear, and keep only comments that explain why. Report what
-was removed. This runs before the checks so the verified artifact is what gets
-pushed.
+code already makes clear, keep only comments that explain why, and leave the
+public API documentation alone. Report what was removed. This runs before the
+checks so the verified artifact is what gets pushed.
 
 ## 3. Verify
 
