@@ -45,6 +45,7 @@ tests/
 - Publish only `dist`, with `publishConfig.access: "public"`.
 - Standard scripts: `build`, `dev`, `test`, `check`, `prepublishOnly`. Run them via `vp run`, never raw `node`/`vite`.
 - Never hardcode versions that exist in the catalog.
+- Add the package name to the `fixed` group in `.changeset/config.json`, so every published package releases on one version; leave it out while the package is private.
 
 ## Sync existing packages
 

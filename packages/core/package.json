@@ -27,7 +27,7 @@
     "exports": {
       ".": "./dist/index.mjs",
       "./package.json": "./package.json",
-      "./*": "./src/*.ts",
+      "./*": "./dist/*.mjs",
       "./internal/*": null,
       "./*/index": null
     },
@@ -46,7 +46,6 @@
   },
   "devDependencies": {
     "@types/node": "catalog:",
-    "bumpp": "^12.3.0",
     "typescript": "catalog:",
     "vite": "catalog:",
     "vite-plus": "catalog:"

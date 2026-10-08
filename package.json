@@ -4,11 +4,13 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "ready": "vp check && vp run -r test && vp run -r build",
+    "ready": "vp run website#sync && vp check && vp run -r test && vp run -r build",
     "dev": "vp run website#dev",
     "prepare": "vp config"
   },
   "devDependencies": {
+    "@changesets/changelog-github": "catalog:",
+    "@changesets/cli": "catalog:",
     "vite-plus": "catalog:"
   },
   "devEngines": {
