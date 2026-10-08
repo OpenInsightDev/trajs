@@ -3,9 +3,8 @@ import { defineConfig } from "astro/config";
 import starlight from "@astrojs/starlight";
 
 export default defineConfig({
-  // GitHub Pages project site: https://openinsightdev.github.io/trajs/
-  site: "https://openinsightdev.github.io",
-  base: "/trajs",
+  // Served at https://tra.js.org; the CNAME file makes the domain part of the build.
+  site: "https://tra.js.org",
   integrations: [
     starlight({
       title: "trajs",

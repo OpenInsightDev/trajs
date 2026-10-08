@@ -46,7 +46,7 @@ vp run dev
 vp run website#build
 ```
 
-The site is configured for a GitHub Pages project site at
-`https://openinsightdev.github.io/trajs/` (`site` and `base` in
-`apps/website/astro.config.mjs`), and `.github/workflows/deploy.yml` builds and
-publishes it on push to `main`.
+The site is configured for the custom domain `https://tra.js.org` (`site` in
+`apps/website/astro.config.mjs`, with `apps/website/public/CNAME` copied into the
+build), and `.github/workflows/deploy.yml` builds and publishes it on push to
+`main`.
