@@ -11,7 +11,7 @@
 import type * as Extension from "#/Extension.ts";
 import * as Response from "#/Response.ts";
 import type { TrajectoryError } from "#/TrajectoryError.ts";
-import { DateTime, Effect, Schema, Stream } from "effect";
+import { DateTime, Effect, Function, Schema, Stream } from "effect";
 import { Prompt, Tool, Toolkit } from "effect/ai";
 import * as uuid from "uuid";
 
@@ -424,7 +424,9 @@ export type TrajectoryEncoded<E = never, R = never> = Stream.Stream<
  * **Details**
  *
  * The toolkit and metadata are attached to the returned stream as additional
- * fields, so the parts and the context they were recorded in stay together.
+ * fields, so the parts and the context they were recorded in stay together. A
+ * stream that is defined elsewhere is bound by piping it into `make`, which
+ * then takes the toolkit as its first argument.
  *
  * **Example** (Creating a trajectory)
  *
@@ -441,11 +443,39 @@ export type TrajectoryEncoded<E = never, R = never> = Stream.Stream<
  * trajectory.metadata.name // => "greeting"
  * ```
  *
+ * **Example** (Binding a stream that is already defined)
+ *
+ * ```ts import.meta.vitest
+ * import { Stream } from "effect"
+ * import { Prompt, Toolkit } from "effect/ai"
+ * import { Trajectory } from "trajs"
+ *
+ * const trajectory = Stream.make(Trajectory.promptPart(Prompt.make("Hello"))).pipe(
+ *   Trajectory.make(Toolkit.empty, { name: "greeting" })
+ * )
+ * trajectory.metadata.name // => "greeting"
+ * ```
+ *
  * @category constructors
  */
-export const make = <Tools extends Record<string, Tool.Any>, E, R>(
-  parts: Stream.Stream<Part<Tools>, E, R>,
-  toolkit: Toolkit.Toolkit<Tools>,
-  metadata: Metadata = {},
-  extensions: Extension.Extensions = {},
-): Trajectory<Tools, E, R> => Object.assign(parts, { toolkit, metadata, extensions });
+export const make: {
+  <Tools extends Record<string, Tool.Any>, E, R>(
+    parts: Stream.Stream<Part<Tools>, E, R>,
+    toolkit: Toolkit.Toolkit<Tools>,
+    metadata?: Metadata,
+    extensions?: Extension.Extensions,
+  ): Trajectory<Tools, E, R>;
+  <Tools extends Record<string, Tool.Any>>(
+    toolkit: Toolkit.Toolkit<Tools>,
+    metadata?: Metadata,
+    extensions?: Extension.Extensions,
+  ): <E, R>(parts: Stream.Stream<Part<Tools>, E, R>) => Trajectory<Tools, E, R>;
+} = Function.dual(
+  (args) => Stream.isStream(args[0]),
+  <Tools extends Record<string, Tool.Any>, E, R>(
+    parts: Stream.Stream<Part<Tools>, E, R>,
+    toolkit: Toolkit.Toolkit<Tools>,
+    metadata: Metadata = {},
+    extensions: Extension.Extensions = {},
+  ): Trajectory<Tools, E, R> => Object.assign(parts, { toolkit, metadata, extensions }),
+);
