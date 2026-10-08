@@ -3,7 +3,7 @@
 **Record, version and analyze AI model sessions as trajectories.**
 
 [![Deploy docs](https://github.com/OpenInsightDev/trajs/actions/workflows/deploy.yml/badge.svg)](https://github.com/OpenInsightDev/trajs/actions/workflows/deploy.yml)
-[![Docs](https://img.shields.io/badge/docs-tra.js.org-6d5efc.svg)](https://tra.js.org)
+[![Docs](https://img.shields.io/badge/docs-openinsightdev.github.io-6d5efc.svg)](https://openinsightdev.github.io/trajs/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![status: pre-release](https://img.shields.io/badge/status-pre--release-orange.svg)](#status)
 
@@ -106,15 +106,16 @@ means "this is a part" — so the two are impossible to confuse.
 
 ## Documentation
 
-The full documentation lives at **[tra.js.org](https://tra.js.org)**:
+The full documentation lives at **[openinsightdev.github.io/trajs](https://openinsightdev.github.io/trajs/)**
+(a `tra.js.org` domain is pending approval):
 
-- [Getting started](https://tra.js.org/getting-started/)
-- [Trajectories](https://tra.js.org/concepts/trajectory/) and
-  [Extensions](https://tra.js.org/concepts/extensions/)
-- [Toolkits and recorded tools](https://tra.js.org/guides/toolkits/)
-- [The .trajs format](https://tra.js.org/guides/trajs-format/)
-- [Vision and roadmap](https://tra.js.org/vision/)
-- [API reference](https://tra.js.org/reference/core/)
+- [Getting started](https://openinsightdev.github.io/trajs/getting-started/)
+- [Trajectories](https://openinsightdev.github.io/trajs/concepts/trajectory/) and
+  [Extensions](https://openinsightdev.github.io/trajs/concepts/extensions/)
+- [Toolkits and recorded tools](https://openinsightdev.github.io/trajs/guides/toolkits/)
+- [The .trajs format](https://openinsightdev.github.io/trajs/guides/trajs-format/)
+- [Vision and roadmap](https://openinsightdev.github.io/trajs/vision/)
+- [API reference](https://openinsightdev.github.io/trajs/reference/core/)
 
 The site is built with Astro Starlight from `apps/website/src/content/docs` and
 published by `.github/workflows/deploy.yml`.
@@ -153,7 +154,7 @@ trajs is an early, pre-release project. The library lives in `packages/core`, th
 format is versioned per extension rather than per file, and the remaining design
 questions — including ATIF interoperability — are tracked in
 [RFC 0001](rfcs/0001-extension.md) and the
-[vision and roadmap](https://tra.js.org/vision/).
+[vision and roadmap](https://openinsightdev.github.io/trajs/vision/).
 
 ## License
 
