@@ -262,6 +262,17 @@ export const extension = Extension.make("org.js.tra.atif", "1.0.0", SystemStep);
 export const extensions = Extension.Extensions.make(extension);
 
 /**
+ * Parameters accepted by {@link part}, built up only with the optional fields the
+ * caller actually supplied.
+ */
+interface PartParams {
+  extension: string;
+  data: SystemStep;
+  anchor?: string;
+  session?: string;
+}
+
+/**
  * Constructs a datum of the `org.js.tra.atif` extension.
  *
  * **When to use**
@@ -270,6 +281,9 @@ export const extensions = Extension.Extensions.make(extension);
  * prompt part that carries the step's message.
  *
  * **Details**
+ *
+ * The anchor and session are added only when supplied, so a datum without them
+ * omits the fields rather than recording them as `undefined`.
  *
  * The returned part carries the extension's identifier, so it decodes with
  * {@link extension} installed and degrades to an unconstrained extension part
@@ -299,10 +313,19 @@ export const extensions = Extension.Extensions.make(extension);
 export const part = (
   data: SystemStep,
   options?: Readonly<{ anchor?: string; session?: string }>,
-): Trajectory.AnyExtensionPart =>
-  Trajectory.anyExtensionPart({
+): Trajectory.AnyExtensionPart => {
+  const params: PartParams = {
     extension: extension.id,
     data,
-    ...(options?.anchor === undefined ? {} : { anchor: options.anchor }),
-    ...(options?.session === undefined ? {} : { session: options.session }),
-  });
+  };
+
+  if (options?.anchor !== undefined) {
+    params.anchor = options.anchor;
+  }
+
+  if (options?.session !== undefined) {
+    params.session = options.session;
+  }
+
+  return Trajectory.anyExtensionPart(params);
+};

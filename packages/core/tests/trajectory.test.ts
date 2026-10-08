@@ -33,6 +33,7 @@ it("binds a stream that was defined before the toolkit", async () => {
 
 it("binds a stream with extension definitions in the pipeable form", async () => {
   const otel = Extension.make("dev.trajs.otel", "1.0.0", Schema.Number);
+
   const trajectory = parts.pipe(
     Trajectory.make(Toolkit.empty, Trajectory.Metadata.make({}), { "dev.trajs.otel": otel }),
   );

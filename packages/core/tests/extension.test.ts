@@ -11,12 +11,24 @@ const otel = Extension.make(
   Schema.Struct({ spanId: Schema.String, durationMs: Schema.Number }),
 );
 
-const span = (spanId: string, anchor?: string) =>
-  Trajectory.anyExtensionPart({
+interface SpanParams {
+  extension: string;
+  data: { spanId: string; durationMs: number };
+  anchor?: string;
+}
+
+const span = (spanId: string, anchor?: string) => {
+  const params: SpanParams = {
     extension: "dev.trajs.otel",
     data: { spanId, durationMs: 12 },
-    ...(anchor === undefined ? {} : { anchor }),
-  });
+  };
+
+  if (anchor !== undefined) {
+    params.anchor = anchor;
+  }
+
+  return Trajectory.anyExtensionPart(params);
+};
 
 it("defines an extension by id, version and schema", () => {
   expect(otel.id).toBe("dev.trajs.otel");
@@ -60,6 +72,7 @@ it("reports data the definition does not describe", async () => {
     "2.0.0",
     Schema.Struct({ spanId: Schema.String }),
   );
+
   const trajectory = Trajectory.make(
     Stream.make(Trajectory.anyExtensionPart({ extension: "dev.trajs.otel", data: { other: 1 } })),
     Toolkit.empty,
@@ -100,6 +113,7 @@ it("carries extension parts through toolkit rebinding", async () => {
   const weather = Toolkit.make(
     Tool.make("get_weather", { parameters: Schema.Struct({ city: Schema.String }) }),
   );
+
   const trajectory = Trajectory.make(
     Stream.make(span("s1")),
     Toolkit.empty,
@@ -116,6 +130,7 @@ it("carries extension parts through toolkit rebinding", async () => {
 
 it("decodes registered extension data by its definition", async () => {
   const schema = Trajectory.Part(Toolkit.empty, Extension.Extensions.make(otel));
+
   const part = Trajectory.anyExtensionPart({
     extension: "dev.trajs.otel",
     data: { spanId: "s1", durationMs: 3 },
@@ -124,7 +139,7 @@ it("decodes registered extension data by its definition", async () => {
   const encoded = await Effect.runPromise(Schema.encodeEffect(schema)(part));
   const decoded = await Effect.runPromise(Schema.decodeEffect(schema)(encoded));
 
-  if (decoded._tag !== "Extension") throw new Error("expected an extension part");
+  if (!Trajectory.isExtensionPart(decoded)) throw new Error("expected an extension part");
   expect(decoded.data).toEqual({ spanId: "s1", durationMs: 3 });
 });
 
@@ -135,6 +150,6 @@ it("decodes extension data no definition describes, instead of failing", async (
   const encoded = await Effect.runPromise(Schema.encodeEffect(schema)(part));
   const decoded = await Effect.runPromise(Schema.decodeEffect(schema)(encoded));
 
-  if (decoded._tag !== "Extension") throw new Error("expected an extension part");
+  if (!Trajectory.isExtensionPart(decoded)) throw new Error("expected an extension part");
   expect(decoded.data).toEqual({ spanId: "s1" });
 });

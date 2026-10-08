@@ -9,10 +9,13 @@ const weather = Tool.make("get_weather", {
 });
 
 const toolkit = Toolkit.make(weather);
+
 const part = Response.PartView(toolkit);
 
 const unknownCall = { type: "tool-call", id: "c1", name: "mystery_tool", params: { x: 1 } };
+
 const knownCall = { type: "tool-call", id: "c2", name: "get_weather", params: { city: "SF" } };
+
 const unknownResult = {
   type: "tool-result",
   id: "c1",
@@ -71,6 +74,7 @@ it("decodes streaming parts that are not tool parts", () => {
     id: "t1",
     delta: "hi",
   });
+
   expect(Response.isAnyToolPart(stream)).toBe(false);
 });
 
@@ -81,6 +85,7 @@ it("constructs any tool parts that are recognized by the upstream guard", () => 
     params: {},
     providerExecuted: false,
   });
+
   expect(Response.isAnyToolCallPart(constructed)).toBe(true);
   expect(Response.isPart(constructed)).toBe(true);
 });

@@ -29,6 +29,9 @@ const recordsOf = (trajectory: Trajectory.Any) =>
 
 it("writes a header record followed by one record per part", async () => {
   const records = await recordsOf(trajectory());
+
+  // SAFETY: `recordsOf` returns the encoded JSON lines; this names the header
+  // fields the assertions read.
   const header = records[0] as {
     metadata: { version: string; name: string };
     extensions: Record<string, { version: string }>;
@@ -43,6 +46,7 @@ it("writes a header record followed by one record per part", async () => {
 
 it("reads back metadata and parts, keeping the part tags", async () => {
   const records = await recordsOf(trajectory());
+
   const { metadata, parts } = await Effect.runPromise(
     Effect.scoped(
       Effect.gen(function* () {
@@ -61,6 +65,7 @@ it("reads back metadata and parts, keeping the part tags", async () => {
 
 it("keeps extension data whose definition the reader does not have", async () => {
   const records = await recordsOf(trajectory());
+
   const parts = await Effect.runPromise(
     Effect.scoped(
       Effect.gen(function* () {
@@ -70,16 +75,19 @@ it("keeps extension data whose definition the reader does not have", async () =>
       }),
     ),
   );
+
   const extension = parts[2];
 
   expect(extension._tag).toBe("Extension");
-  expect(extension._tag === "Extension" && extension.data).toEqual({ spanId: "s1" });
+  expect(Trajectory.isExtensionPart(extension) && extension.data).toEqual({ spanId: "s1" });
 });
 
 it("decodes the header without pulling the parts", async () => {
   const records = Stream.fromIterable([
     { metadata: { version: Trajectory.version, name: "greeting" } },
-    { _tag: "Prompt", messages: "not-an-array" },
+    // A part record that cannot decode, so reading the parts instead of peeling
+    // off the header would fail.
+    JSON.parse('{"_tag":"Prompt","messages":"not-an-array"}'),
   ]);
 
   const name = await Effect.runPromise(
@@ -109,6 +117,7 @@ it("fails when the header does not state the specification version", async () =>
       Effect.scoped(Persist.decode()(Stream.fromIterable([{ metadata: { name: "greeting" } }]))),
     ),
   );
+
   const withoutMetadata = await Effect.runPromise(
     Effect.exit(Effect.scoped(Persist.decode()(Stream.fromIterable([{ toolkit: {} }])))),
   );
@@ -121,6 +130,8 @@ it("writes and reads a trajectory through the stream services", async () => {
   const files = new Map<string, Uint8Array>();
 
   const fileSystem = FileSystem.layerNoop({
+    // SAFETY: `layerNoop` describes FileSystem's full member signatures; this stub
+    // only needs to capture what `Persist.write` sends.
     sink: ((path: string) =>
       Sink.fold<Array<Uint8Array>, Uint8Array>(
         () => [],
@@ -142,6 +153,8 @@ it("writes and reads a trajectory through the stream services", async () => {
           }),
         ),
       )) as never,
+    // SAFETY: `layerNoop` describes FileSystem's full member signatures; this stub
+    // only needs to serve the bytes the sink captured.
     stream: ((path: string) =>
       Stream.fromIterable(files.has(path) ? [files.get(path)!] : [])) as never,
   });

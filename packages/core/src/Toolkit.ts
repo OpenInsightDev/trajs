@@ -8,7 +8,7 @@
  * their exact names, parameters and results.
  */
 
-import { Effect, JsonSchema, Match, Schema, Stream } from "effect";
+import { Effect, JsonSchema, Match, Predicate, Schema, Stream } from "effect";
 import { Tool, Toolkit } from "effect/ai";
 import * as Trajectory from "#/Trajectory.ts";
 import * as Response from "#/Response.ts";
@@ -151,9 +151,7 @@ export const encode = (toolkit: Toolkit.Any): ToolkitEncoded =>
  * @category combinators
  */
 export const toolkits = <Toolkits extends ReadonlyArray<Toolkit.Any>>(...toolkits: Toolkits) =>
-  Effect.fn(function* <Tools extends Record<string, Tool.Any>>(
-    trajectory: Trajectory.Trajectory<Tools>,
-  ) {
+  Effect.fn(<Tools extends Record<string, Tool.Any>>(trajectory: Trajectory.Trajectory<Tools>) => {
     const { toolkit, metadata, extensions } = trajectory;
 
     const merged = Toolkit.merge(toolkit, ...toolkits);
@@ -175,9 +173,11 @@ export const toolkits = <Toolkits extends ReadonlyArray<Toolkit.Any>>(...toolkit
               const encoded = yield* encode(response.response).pipe(
                 Effect.mapError(TrajectoryError.encode(toolkit)),
               );
+
               const decoded = yield* decode(encoded).pipe(
                 Effect.mapError(TrajectoryError.decode(merged)),
               );
+
               return trajPart.make({ ...response, response: decoded });
             }),
           ),
@@ -187,7 +187,7 @@ export const toolkits = <Toolkits extends ReadonlyArray<Toolkit.Any>>(...toolkit
       ),
     );
 
-    return Trajectory.make(parts, merged, metadata, extensions);
+    return Effect.succeed(Trajectory.make(parts, merged, metadata, extensions));
   });
 
 /**
@@ -239,6 +239,7 @@ export const toolTurn = <Tools extends Record<string, Tool.Any>>(
   if (call.name !== result.name) {
     return undefined;
   }
+
   // SAFETY: Equal tool names correlate both union members to the same toolkit entry.
   return { call, result } as ToolTurn<Tools>;
 };
@@ -303,7 +304,7 @@ export const toolTurns = <Tools extends Record<string, Tool.Any>>(
     Stream.mapAccum(
       () => new Map<string, Response.ToolCallParts<Tools>>(),
       (calls, part) => {
-        if (part._tag !== "Response") {
+        if (!Predicate.isTagged("Response")(part)) {
           return [calls, []] as const;
         }
 

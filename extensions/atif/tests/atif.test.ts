@@ -1,5 +1,5 @@
 import { expect, it } from "vite-plus/test";
-import { Effect, Schema, Stream } from "effect";
+import { Effect, JsonSchema, Schema, Stream } from "effect";
 import { Prompt, Toolkit } from "effect/ai";
 import { Extension, Persist, Trajectory } from "@trajs/core";
 import * as Atif from "#/Atif.ts";
@@ -40,6 +40,7 @@ const partsOf = (extensions: Extension.Extensions, records: ReadonlyArray<unknow
     Effect.scoped(
       Effect.gen(function* () {
         const decoded = yield* Persist.decode(extensions)(Stream.fromIterable(records));
+
         return Array.from(yield* Stream.runCollect(decoded));
       }),
     ),
@@ -83,15 +84,24 @@ it("constructs a datum that carries the extension identifier and its anchor", ()
 
 it("encodes a system step as an extension record", async () => {
   const records = await recordsOf();
+
+  // SAFETY: `recordsOf` returns the encoded JSON lines; this names the header
+  // fields the assertions read.
   const header = records[0] as {
     extensions: Record<
       string,
       {
         version: string;
-        schema: { dialect: string; schema: { properties: Record<string, unknown> } };
+        schema: {
+          dialect: string;
+          schema: { properties: Record<string, JsonSchema.JsonSchema> };
+        };
       }
     >;
   };
+
+  // SAFETY: `recordsOf` returns the encoded JSON lines; this names the last
+  // record, the extension part `part` appended.
   const datum = records[records.length - 1] as { _tag: string; data: Atif.SystemStep };
   const definition = header.extensions["org.js.tra.atif"];
 
@@ -108,6 +118,7 @@ it("encodes a system step as an extension record", async () => {
 
 it("reads a system step back, typed by the definition", async () => {
   const parts = await partsOf(Atif.extensions, await recordsOf());
+
   const trajectoryParts = Trajectory.make(
     Stream.fromIterable(parts),
     Toolkit.empty,
@@ -124,7 +135,7 @@ it("reads a system step back, typed by the definition", async () => {
 
 it("reads a system step without its definition as an unconstrained part", async () => {
   const parts = await partsOf(Extension.Extensions.empty, await recordsOf());
-  const datum = parts.find((part) => part._tag === "Extension");
+  const datum = parts.find(Trajectory.isExtensionPart);
 
   expect(datum).toBeDefined();
   expect(datum?.extension).toBe("org.js.tra.atif");

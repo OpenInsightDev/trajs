@@ -13,7 +13,9 @@
  */
 
 import { Effect, identity, Predicate, Schema, SchemaTransformation } from "effect";
+
 export * from "effect/ai/Response";
+
 import type { Tool, Toolkit } from "effect/ai";
 import {
   AllParts,
@@ -425,6 +427,8 @@ export const AnyToolResultPart: Schema.Codec<AnyToolResultPart, ToolResultPartEn
     )
     .annotate({ identifier: "AnyToolResultPart" });
 
+// SAFETY: `Schema.Union` widens the encoded and service type parameters of its
+// members; the union of the three codecs is exactly the declared contract.
 const withAnyToolParts = <Value, Encoded, DecodingServices, EncodingServices>(
   schema: Schema.Codec<Value, Encoded, DecodingServices, EncodingServices>,
 ): Schema.Codec<

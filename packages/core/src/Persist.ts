@@ -42,14 +42,6 @@ const Header = Schema.Struct({
 });
 
 /**
- * Reads a header record as the header of a recording.
- *
- * @category decoding
- */
-const decodeHeader = (record: unknown) =>
-  Schema.decodeUnknownEffect(Header)(record).pipe(Effect.mapError(TrajectoryError.parse));
-
-/**
  * Encodes a trajectory as the records of a `.trajs` file.
  *
  * **When to use**
@@ -73,7 +65,7 @@ export const encode = <Tools extends Record<string, Tool.Any>>(
     Trajectory.Part(trajectory.toolkit, trajectory.extensions),
   );
 
-  const header: unknown = {
+  const header = {
     metadata: trajectory.metadata,
     toolkit: TrajectoryToolkit.encode(trajectory.toolkit),
     extensions: Extension.encode(trajectory.extensions),
@@ -122,7 +114,10 @@ export const decode = (extensions: Extension.Extensions = {}) =>
       return yield* Effect.fail(TrajectoryError.parse("missing trajectory header"));
     }
 
-    const decodedHeader = yield* decodeHeader(header.value);
+    const decodedHeader = yield* Schema.decodeUnknownEffect(Header)(header.value).pipe(
+      Effect.mapError(TrajectoryError.parse),
+    );
+
     const decodePart = Schema.decodeUnknownEffect(Trajectory.Part(Toolkit.empty, extensions));
 
     return Trajectory.make(

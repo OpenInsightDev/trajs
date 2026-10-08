@@ -11,6 +11,8 @@
   "devDependencies": {
     "@changesets/changelog-github": "catalog:",
     "@changesets/cli": "catalog:",
+    "@oxlint/plugins": "1.85.0",
+    "oxlint": "1.85.0",
     "vite-plus": "catalog:"
   },
   "devEngines": {

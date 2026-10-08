@@ -11,7 +11,7 @@
 import type * as Extension from "#/Extension.ts";
 import * as Response from "#/Response.ts";
 import type { TrajectoryError } from "#/TrajectoryError.ts";
-import { DateTime, Effect, Function, Schema, Stream } from "effect";
+import { DateTime, Effect, Function, Predicate, Schema, Stream } from "effect";
 import { Prompt, Tool, Toolkit } from "effect/ai";
 import * as uuid from "uuid";
 import pkg from "../package.json" with { type: "json" };
@@ -242,7 +242,7 @@ export const sessionPart = (params: Parameters<typeof SessionPart.make>[0]): Ses
  * @category guards
  */
 export const isSessionPart = (part: { readonly _tag: string }): part is SessionPart =>
-  part._tag === "Session";
+  Predicate.isTagged("Session")(part);
 
 /**
  * Creates a Schema for a response part based on a toolkit.
@@ -350,7 +350,7 @@ export type AnyExtensionPart = Schema.Schema.Type<typeof AnyExtensionPart>;
  * @category guards
  */
 export const isExtensionPart = (part: { readonly _tag: string }): part is AnyExtensionPart =>
-  part._tag === "Extension";
+  Predicate.isTagged("Extension")(part);
 
 /**
  * Constructs a new extension part whose data no definition describes.

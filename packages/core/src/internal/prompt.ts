@@ -1,4 +1,4 @@
-import { Option, Stream } from "effect";
+import { Option, Predicate, Stream } from "effect";
 import { Prompt, type Tool } from "effect/ai";
 import { type Part, type PartStream, type PromptTurn } from "#/Trajectory.ts";
 import type { TrajectoryError } from "#/TrajectoryError.ts";
@@ -34,7 +34,7 @@ export const promptTurns = <Tools extends Record<string, Tool.Any>, E, R>(
 
         const value = part.value;
 
-        if (value._tag === "Prompt") {
+        if (Predicate.isTagged("Prompt")(value)) {
           const opened: PromptTurn<Tools> = {
             prompt: Prompt.fromMessages(value.messages),
             response: [],
@@ -46,7 +46,7 @@ export const promptTurns = <Tools extends Record<string, Tool.Any>, E, R>(
         // Appended in place: a turn holds every response recorded for it, and
         // copying the list on each part would make holding quadratic in its
         // length.
-        if (value._tag === "Response" && Option.isSome(assembling)) {
+        if (Predicate.isTagged("Response")(value) && Option.isSome(assembling)) {
           assembling.value.response.push(value.response);
         }
 

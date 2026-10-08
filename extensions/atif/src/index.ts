@@ -5,4 +5,5 @@
  * `@trajs/extension-atif/Atif`.
  */
 export * as Atif from "./Atif.ts";
+
 export * as Load from "./Load.ts";

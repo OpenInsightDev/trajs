@@ -146,6 +146,9 @@ export type Merged<Collections extends ReadonlyArray<Record<string, Any>>> = {
   readonly [Key in keyof Collections[number]]: Collections[number][Key];
 };
 
+// SAFETY: `empty` has no entries by construction, and `make`/`merge` derive their key
+// and value types from generic inputs whose precision `Object.fromEntries` and
+// `Object.assign` erase.
 /**
  * Collects extension definitions into a set.
  *
@@ -344,7 +347,7 @@ export const attach =
       const anchored = new Map<string, Array<Data>>();
 
       for (const part of parts) {
-        if (part._tag !== "Extension" || part.extension !== definition.id) {
+        if (!Predicate.isTagged("Extension")(part) || part.extension !== definition.id) {
           continue;
         }
 
@@ -355,6 +358,7 @@ export const attach =
         const data = yield* decodeDatum(part.data).pipe(
           Effect.mapError(TrajectoryError.decodeExtension(definition.id)),
         );
+
         const list = anchored.get(part.anchor);
 
         if (list === undefined) {
@@ -367,7 +371,7 @@ export const attach =
       const attached: Array<Attached<Tools, Data>> = [];
 
       for (const part of parts) {
-        if (part._tag === "Extension") {
+        if (Predicate.isTagged("Extension")(part)) {
           continue;
         }
 

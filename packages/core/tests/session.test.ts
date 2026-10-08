@@ -43,6 +43,7 @@ it("reads the parent of a forked session off the part it continues from", async 
 
 it("inherits the parent's parts up to and including the fork point", async () => {
   const hello = prompt("Hello", "a");
+
   const trajectory = make(
     declaration("a"),
     hello,
@@ -56,6 +57,7 @@ it("inherits the parent's parts up to and including the fork point", async () =>
 
 it("reads the children of a session from the edges", async () => {
   const hello = prompt("Hello", "a");
+
   const trajectory = make(
     declaration("a"),
     hello,
@@ -78,6 +80,7 @@ it("inherits nothing from a fork that names a part the recording does not have",
 it("reports a cycle instead of following it", async () => {
   const helloA = prompt("Hello", "a");
   const helloB = prompt("Hi", "b");
+
   // Each edge's target precedes its declaration, so both are resolvable and the
   // cycle between them is what the walk has to reject.
   const trajectory = make(
@@ -94,8 +97,11 @@ it("reports a cycle instead of following it", async () => {
 
 it("reads a session without draining the rest of the recording", async () => {
   const hello = prompt("Hello", "a");
+
   const trajectory = Trajectory.make(
     Stream.concat(
+      // SAFETY: The literal mixes concrete part classes; `AnyPart` is their common
+      // recorded type and every element is one of its members.
       Stream.fromIterable([
         declaration("a"),
         hello,
@@ -116,8 +122,11 @@ it("reads a session without draining the rest of the recording", async () => {
 
 it("reads a parent without draining the rest of the recording", async () => {
   const hello = prompt("Hello", "a");
+
   const trajectory = Trajectory.make(
     Stream.concat(
+      // SAFETY: The literal mixes concrete part classes; `AnyPart` is their common
+      // recorded type and every element is one of its members.
       Stream.fromIterable([
         hello,
         declaration("b", hello.uuid),
@@ -148,6 +157,7 @@ it("selects the parts recorded under one session", async () => {
 
 it("streams the session declarations of a trajectory", async () => {
   const trajectory = make(declaration("a"), declaration("b"));
+
   const declared = Array.from(
     await Effect.runPromise(Stream.runCollect(Session.parts(trajectory))),
   );
@@ -158,9 +168,11 @@ it("streams the session declarations of a trajectory", async () => {
 it("round-trips a session part through the .trajs codec", async () => {
   const hello = prompt("Hello", "a");
   const trajectory = make(declaration("a"), hello, declaration("b", hello.uuid));
+
   const records = Array.from(
     await Effect.runPromise(Stream.runCollect(Persist.encode(trajectory))),
   );
+
   const decoded = await Effect.runPromise(
     Effect.scoped(
       Effect.gen(function* () {
@@ -172,5 +184,5 @@ it("round-trips a session part through the .trajs codec", async () => {
   );
 
   expect(tags(decoded)).toEqual(["Session", "Prompt", "Session"]);
-  expect(decoded[2]._tag === "Session" && decoded[2].fork).toBe(hello.uuid);
+  expect(Trajectory.isSessionPart(decoded[2]) && decoded[2].fork).toBe(hello.uuid);
 });
