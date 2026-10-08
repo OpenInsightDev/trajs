@@ -169,6 +169,7 @@ export const toolkits = <Toolkits extends ReadonlyArray<Toolkit.Any>>(...toolkit
       Stream.mapEffect((part) =>
         Match.value(part).pipe(
           Match.tag("Prompt", (prompt) => Effect.succeed(trajPart.make(prompt))),
+          Match.tag("Session", (session) => Effect.succeed(trajPart.make(session))),
           Match.tag("Response", (response) =>
             Effect.gen(function* () {
               const encoded = yield* encode(response.response).pipe(

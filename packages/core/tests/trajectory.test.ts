@@ -31,3 +31,10 @@ it("binds a stream with extension definitions in the pipeable form", async () =>
   expect(trajectory.extensions["dev.trajs.otel"]).toBe(otel);
   expect(Array.from(await collect(trajectory))).toHaveLength(1);
 });
+
+it("gives each part its own identifier", () => {
+  const first = Trajectory.promptPart(Prompt.make("Hello"));
+  const second = Trajectory.promptPart(Prompt.make("Hello"));
+
+  expect(first.uuid).not.toBe(second.uuid);
+});

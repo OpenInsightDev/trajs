@@ -52,6 +52,16 @@ export class ExtensionDecodeError extends Data.TaggedError("ExtensionDecodeError
 }> {}
 
 /**
+ * Failure to walk the sessions of a trajectory.
+ *
+ * @category errors
+ */
+export class SessionError extends Data.TaggedError("SessionError")<{
+  session: string;
+  reason: "cycle";
+}> {}
+
+/**
  * Failure to read a recorded trajectory.
  *
  * @category errors
@@ -70,6 +80,7 @@ export type TrajectoryErrorReason =
   | DecodeError
   | ExtensionEncodeError
   | ExtensionDecodeError
+  | SessionError
   | ParseError;
 
 /**
@@ -113,6 +124,14 @@ export class TrajectoryError extends Data.TaggedError("TrajectoryError")<{
    */
   static decodeExtension = (id: string) => (cause: Schema.SchemaError) =>
     new TrajectoryError({ reason: new ExtensionDecodeError({ id, cause }) });
+
+  /**
+   * Wraps a failure to walk the sessions of a trajectory.
+   *
+   * @category constructors
+   */
+  static session = (session: string, reason: "cycle") =>
+    new TrajectoryError({ reason: new SessionError({ session, reason }) });
 
   /**
    * Wraps a failure to read a recorded trajectory.

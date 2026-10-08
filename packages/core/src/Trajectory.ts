@@ -57,7 +57,7 @@ export type MetadataEncoded = Schema.Codec.Encoded<typeof Metadata>;
  * @category schemas
  */
 export const Uuid = Schema.String.check(Schema.isUUID(7)).pipe(
-  Schema.withConstructorDefault(Effect.succeed(uuid.v7())),
+  Schema.withConstructorDefault(Effect.sync(() => uuid.v7())),
 );
 
 /**
@@ -135,6 +135,85 @@ export type PromptPartEncoded = Schema.Codec.Encoded<typeof PromptPart>;
  * @category constructors
  */
 export const promptPart = (prompt: Prompt.Prompt) => PromptPart.make({ messages: prompt.content });
+
+/**
+ * Trajectory part that declares a session and, optionally, the part of another
+ * session it continues from.
+ *
+ * **When to use**
+ *
+ * Use to mark the start of a session and, when it continues from an earlier one,
+ * to record where it continues from: a fork, a resumed session, or a sub-agent
+ * spawned by a parent.
+ *
+ * **Details**
+ *
+ * The part's own `session` is the session it declares. `fork` names the part of
+ * another session the new session continues from, and the parent session is not
+ * stored because it is that part's `session`. A part with no `fork` starts a
+ * session that inherits nothing. Facts about the agent itself, such as its name
+ * or role, are recorded as an extension anchored to this part's `uuid`.
+ *
+ * @see {@link sessionPart} for constructing one.
+ * @category models
+ */
+export class SessionPart extends Schema.TaggedClass<SessionPart>()("Session", {
+  ...PartMetadata.fields,
+  /**
+   * Identifier of the session this part declares.
+   */
+  session: Schema.String,
+  /**
+   * Identifier of the part of another session this one continues from.
+   */
+  fork: Schema.optional(Uuid),
+  /**
+   * Time the session was declared.
+   */
+  timestamp: Timestamp,
+}) {}
+
+/**
+ * Encoded representation of session parts for serialization.
+ *
+ * @category models
+ */
+export type SessionPartEncoded = Schema.Codec.Encoded<typeof SessionPart>;
+
+/**
+ * Constructs a session part that declares a session.
+ *
+ * **When to use**
+ *
+ * Use when recording the start of a session, and where a session continues from
+ * an earlier one.
+ *
+ * **Example** (Declaring a forked session)
+ *
+ * ```ts import.meta.vitest
+ * import { Trajectory } from "@trajs/core"
+ *
+ * const part = Trajectory.sessionPart({ session: "agent-b", fork: "0192..." })
+ * part.session // => "agent-b"
+ * part._tag // => "Session"
+ * ```
+ *
+ * @category constructors
+ */
+export const sessionPart = (params: Parameters<typeof SessionPart.make>[0]): SessionPart =>
+  SessionPart.make(params);
+
+/**
+ * Type guard to check if a trajectory part declares a session.
+ *
+ * **When to use**
+ *
+ * Use to narrow a trajectory part to the session it declares.
+ *
+ * @category guards
+ */
+export const isSessionPart = (part: { readonly _tag: string }): part is SessionPart =>
+  part._tag === "Session";
 
 /**
  * Creates a Schema for a response part based on a toolkit.
@@ -318,7 +397,7 @@ export const Part = <
 >(
   toolkit: Toolkit.Toolkit<Tools>,
   extensions?: Exts,
-) => Schema.Union([PromptPart, ResponsePart(toolkit), ExtensionPart(extensions)]);
+) => Schema.Union([PromptPart, SessionPart, ResponsePart(toolkit), ExtensionPart(extensions)]);
 
 /**
  * Union type of the parts of a trajectory for a toolkit and extension
@@ -344,7 +423,7 @@ export type PartEncoded = Schema.Codec.Encoded<ReturnType<typeof Part<any>>>;
  *
  * @category models
  */
-export type AnyPart = PromptPart | AnyResponsePart | AnyExtensionPart;
+export type AnyPart = PromptPart | SessionPart | AnyResponsePart | AnyExtensionPart;
 
 /**
  * Stream of the parts of a trajectory.
