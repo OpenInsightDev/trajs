@@ -3,7 +3,7 @@ title: Vision and roadmap
 description: Where trajs is going, and how it relates to the Agent Trajectory Interchange Format.
 ---
 
-trajs exists to make recorded AI sessions **durable and analysable**. A recording
+trajs exists to make recorded AI sessions **durable and analyzable**. A recording
 should still load years later, without the schemas it was written with; the data
 recorded around a conversation should be as first-class as the conversation; and
 that data should support typed cross-extension queries instead of being JSON you

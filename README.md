@@ -1,52 +1,160 @@
-# Vite+ Monorepo Starter
+# trajs
 
-A starter for creating a Vite+ monorepo.
+**Record, version and analyze AI model sessions as trajectories.**
 
-## Development
+[![Deploy docs](https://github.com/OpenInsightDev/trajs/actions/workflows/deploy.yml/badge.svg)](https://github.com/OpenInsightDev/trajs/actions/workflows/deploy.yml)
+[![Docs](https://img.shields.io/badge/docs-tra.js.org-6d5efc.svg)](https://tra.js.org)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![status: pre-release](https://img.shields.io/badge/status-pre--release-orange.svg)](#status)
 
-- Check everything is ready:
+A session with an AI model is recorded for evaluation, debugging and analysis, but
+the conversation alone is rarely enough: you also want the OpenTelemetry spans,
+the per-call token and cost metrics, the retrieval scores and the judge outputs.
+trajs gives that data a home next to the conversation.
 
-```bash
-vp run ready
+A trajectory is a **stream of parts** — the messages sent to a model, the
+responses it returned, and **extension** data such as spans and metrics — that
+stays attached to the toolkit, metadata and extension definitions it was recorded
+with. trajs is built on [Effect](https://effect.website) and reuses the vocabulary
+of `effect/ai`: a `Trajectory` is a `Stream`, tools are `Tool`s collected into a
+`Toolkit`, and extensions mirror that shape with `Extension` and `Extensions`.
+
+trajs targets the same problem as [ATIF](https://github.com/harbor-framework/harbor/blob/main/rfcs/0001-trajectory-format.md),
+the Agent Trajectory Interchange Format, and aims to be a strict superset. Where
+ATIF scatters untyped `extra: {}` bags across the document, trajs makes extension
+data a first-class part with an identity, a version, a schema and an anchor.
+
+## Highlights
+
+- **A trajectory is a stream, not a document.** Prompt parts, response parts and
+  extension parts share one total order, so extension data cannot be dropped by a
+  combinator that only knows about messages.
+- **Extensions are first-class.** An extension is a namespaced identifier, a
+  semantic version and a schema, collected into an `Extensions` set like tools in
+  a toolkit; each datum carries its version and an optional anchor to the part it
+  is about.
+- **Tolerant by design.** Tools outside the toolkit and extensions without an
+  installed definition decode to unconstrained parts instead of failing, so
+  loading recorded history never depends on the definitions installed today.
+- **Toolkits round-trip.** A toolkit serializes to draft-07 JSON Schema, and a
+  recording made against an empty or older toolkit is decoded again against the
+  tools it actually refers to, regaining their exact names, parameters and results.
+- **Tool calls come with their results.** `Toolkit.toolTurns` correlates each
+  recorded tool call with the result that answers it, narrowed to the tool's types.
+- **One interchange format.** A `.trajs` file is newline-delimited JSON with the
+  header first, so definitions always precede the data they describe.
+
+## Install
+
+> [!IMPORTANT]
+> trajs is pre-release: the packages are not on npm yet and the API can still
+> change. The package will be installed with:
+>
+> ```bash
+> pnpm add trajs effect
+> ```
+
+Until then, work in this repository and import the package from the workspace.
+
+## Quick start
+
+Record a prompt, attach an extension datum and encode the trajectory as a `.trajs`
+file:
+
+```ts
+import { Effect, Schema, Stream } from "effect";
+import { Prompt, Toolkit } from "effect/ai";
+import { Extension, Persist, Trajectory } from "trajs";
+
+const otel = Extension.make(
+  "dev.trajs.otel",
+  "1.0.0",
+  Schema.Struct({ spanId: Schema.String, durationMs: Schema.Number }),
+);
+
+const trajectory = Trajectory.make(
+  Stream.make(
+    Trajectory.promptPart(Prompt.make("Hello")),
+    Trajectory.anyExtensionPart({
+      extension: "dev.trajs.otel",
+      data: { spanId: "s1", durationMs: 42 },
+    }),
+  ),
+  Toolkit.empty,
+  { name: "greeting" },
+  Extension.Extensions.make(otel),
+);
+
+const records = await Effect.runPromise(Stream.runCollect(Persist.encode(trajectory)));
 ```
 
-- Run the tests:
+Read the data back with `Extension.select` and `Extension.attach`, and load a
+recording with `Persist.decode`, `Persist.read` or `Persist.encode`.
 
-```bash
-vp run -r test
-```
+## The .trajs format
 
-- Build the monorepo:
+A recording is plain JSONL: line 1 is a header carrying the format `version`, the
+`metadata`, the serialized `toolkit` and the `extensions` registry; every later
+line is a part, discriminated by `_tag`. The header carries no `_tag` — `_tag`
+means "this is a part" — so the two are impossible to confuse.
 
-```bash
-vp run -r build
-```
-
-- Run the development server:
-
-```bash
-vp run dev
+```jsonl
+{"version":1,"metadata":{},"toolkit":{},"extensions":{"dev.trajs.otel":{"version":"1.0.0","schema":{}}}}
+{"_tag":"Prompt","uuid":"0192...","timestamp":"...","messages":[]}
+{"_tag":"Extension","extension":"dev.trajs.otel","version":"1.0.0","uuid":"0192...","timestamp":"...","anchor":"0192...","data":{}}
 ```
 
 ## Documentation
 
-The docs site in `apps/website` presents the project's features and vision. It is
-built with [Astro Starlight](https://starlight.astro.build) and lives in
-`apps/website/src/content/docs`.
+The full documentation lives at **[tra.js.org](https://tra.js.org)**:
 
-- Start it at the repository root (equivalent to `vp run website#dev`):
+- [Getting started](https://tra.js.org/getting-started/)
+- [Trajectories](https://tra.js.org/concepts/trajectory/) and
+  [Extensions](https://tra.js.org/concepts/extensions/)
+- [Toolkits and recorded tools](https://tra.js.org/guides/toolkits/)
+- [The .trajs format](https://tra.js.org/guides/trajs-format/)
+- [Vision and roadmap](https://tra.js.org/vision/)
+- [API reference](https://tra.js.org/reference/core/)
+
+The site is built with Astro Starlight from `apps/website/src/content/docs` and
+published by `.github/workflows/deploy.yml`.
+
+## Repository layout
+
+| Path             | Description                                                                                 |
+| :--------------- | :------------------------------------------------------------------------------------------ |
+| `packages/core`  | The `trajs` library: trajectories, responses, toolkits, extensions and the `.trajs` codec.  |
+| `apps/website`   | The Astro Starlight documentation site.                                                     |
+| `rfcs`           | Design records, including [RFC 0001: Extension API for Trajectory](rfcs/0001-extension.md). |
+| `extensions`     | Reserved for extension packages.                                                            |
+| `packages/utils` | Placeholder package from the monorepo scaffold.                                             |
+
+Each public module of `packages/core` is a namespace and a subpath import, such as
+`trajs/Trajectory` or `trajs/Persist`; everything under `trajs/internal/*` is
+private.
+
+## Development
+
+Requires Node.js `>=22.18.0`. The repository uses [Vite+](https://viteplus.dev)
+(`vp`) with pnpm; run `vp install` once after cloning.
 
 ```bash
-vp run dev
+vp install        # install dependencies
+vp check          # format, lint and type-check
+vp run -r test    # run the test suites
+vp run -r build   # build every package and the docs site
+vp run ready      # check + tests + builds, the aggregate gate
+vp run dev        # docs dev server (vp run website#dev)
 ```
 
-- Build the static site into `apps/website/dist`:
+## Status
 
-```bash
-vp run website#build
-```
+trajs is an early, pre-release project. The library lives in `packages/core`, the
+format is versioned per extension rather than per file, and the remaining design
+questions — including ATIF interoperability — are tracked in
+[RFC 0001](rfcs/0001-extension.md) and the
+[vision and roadmap](https://tra.js.org/vision/).
 
-The site is configured for the custom domain `https://tra.js.org` (`site` in
-`apps/website/astro.config.mjs`, with `apps/website/public/CNAME` copied into the
-build), and `.github/workflows/deploy.yml` builds and publishes it on push to
-`main`.
+## License
+
+[MIT](LICENSE).
