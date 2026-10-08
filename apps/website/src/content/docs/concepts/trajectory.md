@@ -13,7 +13,7 @@ Trajectory = Stream<Part> + { toolkit, metadata, extensions }
 ```ts
 import { Stream } from "effect";
 import { Prompt, Toolkit } from "effect/ai";
-import { Trajectory } from "trajs";
+import { Trajectory } from "@trajs/core";
 
 const trajectory = Trajectory.make(
   Stream.make(Trajectory.promptPart(Prompt.make("Hello"))),

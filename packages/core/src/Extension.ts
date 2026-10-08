@@ -92,7 +92,7 @@ export const isExtension = (u: unknown): u is Any => Predicate.hasProperty(u, Ex
  *
  * ```ts import.meta.vitest
  * import { Schema } from "effect"
- * import { Extension } from "trajs"
+ * import { Extension } from "@trajs/core"
  *
  * const otel = Extension.make(
  *   "dev.trajs.otel",
@@ -256,7 +256,7 @@ export const parts = <Tools extends Record<string, Tool.Any>>(
  * ```ts import.meta.vitest
  * import { Effect, Schema, Stream } from "effect"
  * import { Toolkit } from "effect/ai"
- * import { Extension, Trajectory } from "trajs"
+ * import { Extension, Trajectory } from "@trajs/core"
  *
  * const otel = Extension.make(
  *   "dev.trajs.otel",

@@ -16,7 +16,7 @@ built from:
 
 ```ts
 import { Toolkit } from "effect/ai";
-import { Toolkit as TrajectoryToolkit } from "trajs";
+import { Toolkit as TrajectoryToolkit } from "@trajs/core";
 
 const encoded = TrajectoryToolkit.encode(toolkit);
 // { get_weather: { id, name, description?, parameters, success, failure } }
@@ -57,7 +57,7 @@ parameters and results:
 
 ```ts
 import { Effect } from "effect";
-import { Toolkit as TrajectoryToolkit } from "trajs";
+import { Toolkit as TrajectoryToolkit } from "@trajs/core";
 
 const rebound = await Effect.runPromise(TrajectoryToolkit.toolkits(weather)(recorded));
 ```
@@ -76,7 +76,7 @@ and narrows both to the tool's types:
 
 ```ts
 import { Effect, Stream } from "effect";
-import { Toolkit as TrajectoryToolkit } from "trajs";
+import { Toolkit as TrajectoryToolkit } from "@trajs/core";
 
 const turns = await Effect.runPromise(Stream.runCollect(TrajectoryToolkit.toolTurns(rebound)));
 

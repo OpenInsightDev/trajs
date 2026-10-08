@@ -10,11 +10,11 @@ and encodes the result to the `.trajs` interchange format.
 ## Install
 
 ```bash
-pnpm add trajs effect
+pnpm add @trajs/core effect
 ```
 
 trajs reuses `effect` and `effect/ai`, so a project already using them only needs
-the `trajs` package.
+the `@trajs/core` package.
 
 ## Record a trajectory
 
@@ -25,7 +25,7 @@ to the stream.
 ```ts
 import { Stream } from "effect";
 import { Prompt, Toolkit } from "effect/ai";
-import { Trajectory } from "trajs";
+import { Trajectory } from "@trajs/core";
 
 const trajectory = Trajectory.make(
   Stream.make(Trajectory.promptPart(Prompt.make("Hello"))),
@@ -45,7 +45,7 @@ a namespaced identifier, a version and a schema for its payload.
 
 ```ts
 import { Schema } from "effect";
-import { Extension } from "trajs";
+import { Extension } from "@trajs/core";
 
 const otel = Extension.make(
   "dev.trajs.otel",
@@ -61,7 +61,7 @@ An optional `anchor` points at the `uuid` of the part the datum is about.
 ```ts
 import { Stream } from "effect";
 import { Toolkit } from "effect/ai";
-import { Extension, Trajectory } from "trajs";
+import { Extension, Trajectory } from "@trajs/core";
 
 const extensions = Extension.Extensions.make(otel);
 
@@ -88,7 +88,7 @@ not describe as a typed error.
 
 ```ts
 import { Effect, Stream } from "effect";
-import { Extension, Trajectory } from "trajs";
+import { Extension, Trajectory } from "@trajs/core";
 
 const spans = await Effect.runPromise(Stream.runCollect(Extension.select(otel)(recorded)));
 
@@ -103,7 +103,7 @@ file system:
 
 ```ts
 import { Effect, Stream } from "effect";
-import { Persist } from "trajs";
+import { Persist } from "@trajs/core";
 
 const records = await Effect.runPromise(Stream.runCollect(Persist.encode(trajectory)));
 

@@ -51,7 +51,7 @@ data a first-class part with an identity, a version, a schema and an anchor.
 > change. The package will be installed with:
 >
 > ```bash
-> pnpm add trajs effect
+> pnpm add @trajs/core effect
 > ```
 
 Until then, work in this repository and import the package from the workspace.
@@ -64,7 +64,7 @@ file:
 ```ts
 import { Effect, Schema, Stream } from "effect";
 import { Prompt, Toolkit } from "effect/ai";
-import { Extension, Persist, Trajectory } from "trajs";
+import { Extension, Persist, Trajectory } from "@trajs/core";
 
 const otel = Extension.make(
   "dev.trajs.otel",
@@ -122,16 +122,16 @@ published by `.github/workflows/deploy.yml`.
 
 ## Repository layout
 
-| Path             | Description                                                                                 |
-| :--------------- | :------------------------------------------------------------------------------------------ |
-| `packages/core`  | The `trajs` library: trajectories, responses, toolkits, extensions and the `.trajs` codec.  |
-| `apps/website`   | The Astro Starlight documentation site.                                                     |
-| `rfcs`           | Design records, including [RFC 0001: Extension API for Trajectory](rfcs/0001-extension.md). |
-| `extensions`     | Reserved for extension packages.                                                            |
-| `packages/utils` | Placeholder package from the monorepo scaffold.                                             |
+| Path             | Description                                                                                      |
+| :--------------- | :----------------------------------------------------------------------------------------------- |
+| `packages/core`  | The `@trajs/core` library: trajectories, responses, toolkits, extensions and the `.trajs` codec. |
+| `apps/website`   | The Astro Starlight documentation site.                                                          |
+| `rfcs`           | Design records, including [RFC 0001: Extension API for Trajectory](rfcs/0001-extension.md).      |
+| `extensions`     | Reserved for extension packages.                                                                 |
+| `packages/utils` | Placeholder package from the monorepo scaffold.                                                  |
 
 Each public module of `packages/core` is a namespace and a subpath import, such as
-`trajs/Trajectory` or `trajs/Persist`; everything under `trajs/internal/*` is
+`@trajs/core/Trajectory` or `@trajs/core/Persist`; everything under `@trajs/core/internal/*` is
 private.
 
 ## Development

@@ -57,7 +57,7 @@ a key.
 
 ```ts
 import { Effect, Stream } from "effect";
-import { Persist } from "trajs";
+import { Persist } from "@trajs/core";
 
 const records = await Effect.runPromise(Stream.runCollect(Persist.encode(trajectory)));
 

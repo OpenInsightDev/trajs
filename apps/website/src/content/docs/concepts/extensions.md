@@ -32,7 +32,7 @@ An extension is an identifier, a semantic version and a schema:
 
 ```ts
 import { Schema } from "effect";
-import { Extension } from "trajs";
+import { Extension } from "@trajs/core";
 
 const otel = Extension.make(
   "dev.trajs.otel",
@@ -52,7 +52,7 @@ Definitions are collected into an `Extensions` set, keyed by identifier, exactly
 as tools are collected into a toolkit by name:
 
 ```ts
-import { Extension } from "trajs";
+import { Extension } from "@trajs/core";
 
 const extensions = Extension.Extensions.make(otel);
 
@@ -106,7 +106,7 @@ bag cannot:
 
 ```ts
 import { Effect, Stream } from "effect";
-import { Extension } from "trajs";
+import { Extension } from "@trajs/core";
 
 const spans = await Effect.runPromise(Stream.runCollect(Extension.select(otel)(trajectory)));
 ```

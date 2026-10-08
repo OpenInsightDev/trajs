@@ -1,5 +1,5 @@
 {
-  "name": "trajs",
+  "name": "@trajs/core",
   "version": "0.0.0",
   "description": "Core package for trajs.",
   "homepage": "https://github.com/OpenInsightDev/trajs",

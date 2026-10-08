@@ -131,7 +131,7 @@ export const encode = (toolkit: Toolkit.Any): ToolkitEncoded =>
  * ```ts import.meta.vitest
  * import { Effect, Schema, Stream } from "effect"
  * import { Tool, Toolkit } from "effect/ai"
- * import { Response, Trajectory, Toolkit as TrajectoryToolkit } from "trajs"
+ * import { Response, Trajectory, Toolkit as TrajectoryToolkit } from "@trajs/core"
  *
  * const weather = Toolkit.make(
  *   Tool.make("get_weather", { parameters: Schema.Struct({ city: Schema.String }) })
@@ -268,7 +268,7 @@ export const toolTurn = <Tools extends Record<string, Tool.Any>>(
  * ```ts import.meta.vitest
  * import { Effect, Schema, Stream } from "effect"
  * import { Tool, Toolkit } from "effect/ai"
- * import { Response, Trajectory, Toolkit as TrajectoryToolkit } from "trajs"
+ * import { Response, Trajectory, Toolkit as TrajectoryToolkit } from "@trajs/core"
  *
  * const weather = Toolkit.make(
  *   Tool.make("get_weather", { parameters: Schema.Struct({ city: Schema.String }) })

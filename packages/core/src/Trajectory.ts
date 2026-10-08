@@ -126,7 +126,7 @@ export type PromptPartEncoded = Schema.Codec.Encoded<typeof PromptPart>;
  *
  * ```ts import.meta.vitest
  * import { Prompt } from "effect/ai"
- * import { Trajectory } from "trajs"
+ * import { Trajectory } from "@trajs/core"
  *
  * const part = Trajectory.promptPart(Prompt.make("What is 2 + 2?"))
  * part._tag // => "Prompt"
@@ -190,7 +190,7 @@ export type AnyResponsePart = Schema.Schema.Type<typeof AnyResponsePart>;
  * **Example** (Recording a response part)
  *
  * ```ts import.meta.vitest
- * import { Response, Trajectory } from "trajs"
+ * import { Response, Trajectory } from "@trajs/core"
  *
  * const part = Trajectory.responsePart(Response.makePart("text", { text: "Hello" }))
  * part._tag // => "Response"
@@ -255,7 +255,7 @@ export const isExtensionPart = (part: { readonly _tag: string }): part is AnyExt
  * **Example** (Recording an extension part)
  *
  * ```ts import.meta.vitest
- * import { Trajectory } from "trajs"
+ * import { Trajectory } from "@trajs/core"
  *
  * const part = Trajectory.anyExtensionPart({ extension: "dev.trajs.otel", data: { spanId: "s1" } })
  * part.extension // => "dev.trajs.otel"
@@ -433,7 +433,7 @@ export type TrajectoryEncoded<E = never, R = never> = Stream.Stream<
  * ```ts import.meta.vitest
  * import { Stream } from "effect"
  * import { Prompt, Toolkit } from "effect/ai"
- * import { Trajectory } from "trajs"
+ * import { Trajectory } from "@trajs/core"
  *
  * const trajectory = Trajectory.make(
  *   Stream.make(Trajectory.promptPart(Prompt.make("Hello"))),
@@ -448,7 +448,7 @@ export type TrajectoryEncoded<E = never, R = never> = Stream.Stream<
  * ```ts import.meta.vitest
  * import { Stream } from "effect"
  * import { Prompt, Toolkit } from "effect/ai"
- * import { Trajectory } from "trajs"
+ * import { Trajectory } from "@trajs/core"
  *
  * const trajectory = Stream.make(Trajectory.promptPart(Prompt.make("Hello"))).pipe(
  *   Trajectory.make(Toolkit.empty, { name: "greeting" })

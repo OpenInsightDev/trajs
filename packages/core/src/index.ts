@@ -2,7 +2,7 @@
  * Records AI model sessions as trajectories.
  *
  * Every module is re-exported as a namespace and is also available as a subpath
- * import such as `trajs/Response`.
+ * import such as `@trajs/core/Response`.
  */
 export * as Extension from "./Extension.ts";
 export * as Persist from "./Persist.ts";
