@@ -1,1 +1,11 @@
-export {};
+/**
+ * Records AI model sessions as trajectories.
+ *
+ * Every module is re-exported as a namespace and is also available as a subpath
+ * import such as `trajs/Response`.
+ */
+export * as Persist from "./Persist.ts";
+export * as Response from "./Response.ts";
+export * as Toolkit from "./Toolkit.ts";
+export * as Trajectory from "./Trajectory.ts";
+export * as TrajectoryError from "./TrajectoryError.ts";

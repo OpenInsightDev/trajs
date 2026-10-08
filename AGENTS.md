@@ -25,3 +25,7 @@ release. Add a tool name to select part of the graph. For example, run
 - [ ] If setup, runtime, or package-manager behavior looks wrong, run `vp env doctor` and include its output when asking for help.
 
 <!--VITE PLUS END-->
+
+## Comment Style
+
+Public API comments strictly follow the [Effect](https://github.com/Effect-TS/effect) documentation style: every public module and export has a JSDoc block with a description, optional `**When to use**`, `**Details**` and `**Example**` sections in that order, and `@see` and `@category` tags.

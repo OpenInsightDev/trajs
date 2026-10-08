@@ -51,6 +51,11 @@ const AnyToolResultPartTypeId = "~effect/ai/Content/AnyToolResultPart" as const;
  * Union type for all response parts that also accepts tools outside the
  * provided toolkit.
  *
+ * **When to use**
+ *
+ * Use when a response part may name a tool that the provided toolkit does not
+ * define.
+ *
  * @see {@link AllParts} for toolkit-specific response parts.
  * @category models
  */
@@ -62,6 +67,11 @@ export type AllPartsView<Tools extends Record<string, Tool.Any>> =
 /**
  * Creates a Schema for all response parts, including tools outside the provided
  * toolkit.
+ *
+ * **When to use**
+ *
+ * Use when decoding or encoding recorded response parts that may contain tools
+ * the provided toolkit does not define.
  *
  * @see {@link AllParts} for a Schema restricted to the provided toolkit.
  * @category schemas
@@ -79,6 +89,11 @@ export const AllPartsView = <T extends Toolkit.Any | Toolkit.WithHandler<any>>(
  * Union type for non-streaming response parts that also accepts tools outside
  * the provided toolkit.
  *
+ * **When to use**
+ *
+ * Use when a single response part may name a tool that the provided toolkit
+ * does not define.
+ *
  * @see {@link Part} for toolkit-specific non-streaming response parts.
  * @category models
  */
@@ -90,6 +105,11 @@ export type PartView<
 /**
  * Creates a Schema for non-streaming response parts, including tools outside the
  * provided toolkit.
+ *
+ * **When to use**
+ *
+ * Use when decoding or encoding a recorded response part that may contain tools
+ * the provided toolkit does not define.
  *
  * @see {@link Part} for a Schema restricted to the provided toolkit.
  * @category schemas
@@ -107,6 +127,11 @@ export const PartView = <T extends Toolkit.Any | Toolkit.WithHandler<any>>(
  * Union type for streaming response parts that also accepts tools outside the
  * provided toolkit.
  *
+ * **When to use**
+ *
+ * Use when a streaming response part may name a tool that the provided toolkit
+ * does not define.
+ *
  * @see {@link StreamPart} for toolkit-specific streaming response parts.
  * @category models
  */
@@ -118,6 +143,11 @@ export type StreamPartView<
 /**
  * Creates a Schema for streaming response parts, including tools outside the
  * provided toolkit.
+ *
+ * **When to use**
+ *
+ * Use when decoding or encoding a recorded stream part that may contain tools
+ * the provided toolkit does not define.
  *
  * @see {@link StreamPart} for a Schema restricted to the provided toolkit.
  * @category schemas
@@ -135,6 +165,11 @@ export const StreamPartView = <T extends Toolkit.Any | Toolkit.WithHandler<any>>
  * Union type for tool call parts that also accepts tools outside the provided
  * toolkit.
  *
+ * **When to use**
+ *
+ * Use when a tool call part may name a tool that the provided toolkit does not
+ * define.
+ *
  * @see {@link ToolCallParts} for toolkit-specific tool call parts.
  * @category utility types
  */
@@ -147,6 +182,11 @@ export type ToolCallPartsView<
  * Union type for tool result parts that also accepts tools outside the provided
  * toolkit.
  *
+ * **When to use**
+ *
+ * Use when a tool result part may name a tool that the provided toolkit does not
+ * define.
+ *
  * @see {@link ToolResultParts} for toolkit-specific tool result parts.
  * @category utility types
  */
@@ -156,6 +196,10 @@ export type ToolResultPartsView<Tools extends Record<string, Tool.Any>> =
 
 /**
  * Union of toolkit-specific tool call and result parts.
+ *
+ * **When to use**
+ *
+ * Use to type a tool call or tool result part built from the provided toolkit.
  *
  * @category utility types
  */
@@ -168,6 +212,11 @@ export type ToolPart<
  * Union of tool call and result parts that also accepts tools outside the
  * provided toolkit.
  *
+ * **When to use**
+ *
+ * Use to type a tool call or tool result part that the provided toolkit may or
+ * may not define.
+ *
  * @category utility types
  */
 export type ToolPartView<
@@ -177,6 +226,11 @@ export type ToolPartView<
 
 /**
  * Tool call part whose name and parameters are not restricted by a toolkit.
+ *
+ * **When to use**
+ *
+ * Use to type a tool call part recorded for a tool whose schema is no longer
+ * available.
  *
  * @category models
  */
@@ -189,6 +243,11 @@ type RuntimeAnyToolCallPart = AnyToolCallPart & {
 /**
  * Type guard to check if a value is an unrestricted tool call part.
  *
+ * **When to use**
+ *
+ * Use to check whether a tool call part is one that the toolkit does not
+ * describe.
+ *
  * @category guards
  */
 export const isAnyToolCallPart = (u: unknown): u is RuntimeAnyToolCallPart =>
@@ -196,6 +255,10 @@ export const isAnyToolCallPart = (u: unknown): u is RuntimeAnyToolCallPart =>
 
 /**
  * Constructs a tool call part whose name and parameters are unrestricted.
+ *
+ * **When to use**
+ *
+ * Use when recording a tool call for a tool that is not part of a toolkit.
  *
  * @category constructors
  */
@@ -209,6 +272,11 @@ export const anyToolCallPart = (
 /**
  * Schema for a tool call whose name and parameters are not restricted by a
  * toolkit.
+ *
+ * **When to use**
+ *
+ * Use to decode or encode a tool call for a tool that a toolkit does not
+ * describe.
  *
  * @category schemas
  */
@@ -232,6 +300,11 @@ export const AnyToolCallPart: Schema.Codec<AnyToolCallPart, ToolCallPartEncoded>
 /**
  * Tool result part whose name and result are not restricted by a toolkit.
  *
+ * **When to use**
+ *
+ * Use to type a tool result part recorded for a tool whose schema is no longer
+ * available.
+ *
  * @category models
  */
 export type AnyToolResultPart = ToolResultPart<string, unknown, unknown>;
@@ -243,6 +316,11 @@ type RuntimeAnyToolResultPart = AnyToolResultPart & {
 /**
  * Type guard to check if a value is an unrestricted tool result part.
  *
+ * **When to use**
+ *
+ * Use to check whether a tool result part is one that the toolkit does not
+ * describe.
+ *
  * @category guards
  */
 export const isAnyToolResultPart = (u: unknown): u is RuntimeAnyToolResultPart =>
@@ -250,6 +328,10 @@ export const isAnyToolResultPart = (u: unknown): u is RuntimeAnyToolResultPart =
 
 /**
  * Union of unrestricted tool call and tool result parts.
+ *
+ * **When to use**
+ *
+ * Use to type a tool part that the provided toolkit does not describe.
  *
  * @category models
  */
@@ -260,6 +342,10 @@ type RuntimeAnyToolPart = RuntimeAnyToolCallPart | RuntimeAnyToolResultPart;
 /**
  * Type guard to check if a value is an unrestricted tool part.
  *
+ * **When to use**
+ *
+ * Use to check whether a tool part is one that the toolkit does not describe.
+ *
  * @category guards
  */
 export const isAnyToolPart = (u: unknown): u is RuntimeAnyToolPart =>
@@ -267,6 +353,10 @@ export const isAnyToolPart = (u: unknown): u is RuntimeAnyToolPart =>
 
 /**
  * Constructs a tool result part whose name and result are unrestricted.
+ *
+ * **When to use**
+ *
+ * Use when recording a tool result for a tool that is not part of a toolkit.
  *
  * @category constructors
  */
@@ -282,6 +372,11 @@ export const anyToolResultPart = <
 /**
  * Schema for a tool result whose name and result are not restricted by a
  * toolkit.
+ *
+ * **When to use**
+ *
+ * Use to decode or encode a tool result for a tool that a toolkit does not
+ * describe.
  *
  * @category schemas
  */

@@ -1,3 +1,13 @@
+/**
+ * Serializes the toolkit of a trajectory and rebinds recorded trajectories to it.
+ *
+ * A tool is described by draft-07 JSON Schema documents, so a toolkit can be
+ * stored and sent to a provider without the Effect Schemas it was built from.
+ * A trajectory recorded against an empty or older toolkit is decoded again with
+ * the tools it actually refers to, so its tool calls and tool results regain
+ * their exact names, parameters and results.
+ */
+
 import { Effect, JsonSchema, Match, Schema, Stream } from "effect";
 import { Tool, Toolkit } from "effect/ai";
 import * as Trajectory from "#/Trajectory.ts";
@@ -7,17 +17,26 @@ import { TrajectoryError } from "#/TrajectoryError.ts";
 /**
  * JSON Schema document in draft-07 form, the form tools are serialized as by
  * {@link encode}.
+ *
+ * @category models
  */
 export type JsonSchemaDocument = JsonSchema.Document<"draft-07">;
 
 /**
  * Serialized form of a single tool.
  *
+ * **When to use**
+ *
+ * Use to persist a tool or describe it to a provider without its Effect
+ * Schemas.
+ *
  * **Details**
  *
  * The parameter, success and failure schemas are stored as draft-07 JSON Schema
  * documents, so a tool can be described and sent to a provider without the
  * Effect Schemas it was built from.
+ *
+ * @category models
  */
 export type ToolEncoded = Readonly<{
   id: string;
@@ -31,12 +50,19 @@ export type ToolEncoded = Readonly<{
 /**
  * Rebuilds a dynamic tool from its serialized form.
  *
+ * **When to use**
+ *
+ * Use when a recorded tool call needs a tool to decode against after the
+ * trajectory is loaded.
+ *
  * **Details**
  *
  * Only the tool's name and parameter JSON Schema are carried over. The
  * description, success and failure schemas are dropped, so the rebuilt tool
  * takes unvalidated `unknown` parameters and reports `unknown` results, while
  * still advertising the parameter JSON Schema to the provider.
+ *
+ * @category converting
  */
 export const toDynamic = ({ name, parameters }: ToolEncoded) =>
   Tool.dynamic(name, {
@@ -45,16 +71,24 @@ export const toDynamic = ({ name, parameters }: ToolEncoded) =>
 
 /**
  * Serialized form of a toolkit, keyed by the toolkit's tool keys.
+ *
+ * @category models
  */
 export type ToolkitEncoded = Record<string, ToolEncoded>;
 
 /**
  * Serializes a toolkit into a {@link ToolkitEncoded} record.
  *
+ * **When to use**
+ *
+ * Use to persist a toolkit or pass its tool descriptions to a provider.
+ *
  * **Details**
  *
  * Each tool contributes its id, name, optional description, and its parameter,
  * success and failure schemas converted to draft-07 JSON Schema documents.
+ *
+ * @category encoding
  */
 export const encode = (toolkit: Toolkit.Any): ToolkitEncoded =>
   Object.fromEntries(
@@ -79,6 +113,11 @@ export const encode = (toolkit: Toolkit.Any): ToolkitEncoded =>
 /**
  * Extends a trajectory's toolkit with the given toolkits.
  *
+ * **When to use**
+ *
+ * Use to bind a trajectory to the tools it refers to, such as one recorded with
+ * `Toolkit.empty` or with an older version of the toolkit.
+ *
  * **Details**
  *
  * Every part is encoded with the trajectory's own toolkit and decoded again with
@@ -87,17 +126,12 @@ export const encode = (toolkit: Toolkit.Any): ToolkitEncoded =>
  * matches stays unrestricted, prompt parts and metadata are carried over, and
  * schema failures are reported as {@link TrajectoryError}.
  *
- * **When to use**
- *
- * Use to bind a trajectory to the tools it refers to, such as one recorded with
- * `Toolkit.empty` or with an older version of the toolkit.
- *
  * **Example** (Binding a recorded trajectory to its tools)
  *
  * ```ts import.meta.vitest
  * import { Effect, Schema, Stream } from "effect"
  * import { Tool, Toolkit } from "effect/ai"
- * import { Response, Trajectory, Toolkit as TrajectoryToolkit } from "@open-insight/trajectory"
+ * import { Response, Trajectory, Toolkit as TrajectoryToolkit } from "trajs"
  *
  * const weather = Toolkit.make(
  *   Tool.make("get_weather", { parameters: Schema.Struct({ city: Schema.String }) })
@@ -113,6 +147,8 @@ export const encode = (toolkit: Toolkit.Any): ToolkitEncoded =>
  * const rebound = await Effect.runPromise(TrajectoryToolkit.toolkits(weather)(recorded))
  * Object.keys(rebound.toolkit.tools) // => ["get_weather"]
  * ```
+ *
+ * @category combinators
  */
 export const toolkits = <Toolkits extends ReadonlyArray<Toolkit.Any>>(...toolkits: Toolkits) =>
   Effect.fn(function* <Tools extends Record<string, Tool.Any>>(
