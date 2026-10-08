@@ -127,7 +127,7 @@ published by `.github/workflows/deploy.yml`.
 | `packages/core`  | The `@trajs/core` library: trajectories, responses, toolkits, extensions and the `.trajs` codec. |
 | `apps/website`   | The Astro Starlight documentation site.                                                          |
 | `rfcs`           | Design records, including [RFC 0001: Extension API for Trajectory](rfcs/0001-extension.md).      |
-| `extensions`     | Reserved for extension packages.                                                                 |
+| `extensions`     | Extension packages, starting with `@trajs/extension-atif`.                                       |
 | `packages/utils` | Placeholder package from the monorepo scaffold.                                                  |
 
 Each public module of `packages/core` is a namespace and a subpath import, such as
