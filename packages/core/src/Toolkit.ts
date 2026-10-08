@@ -187,3 +187,155 @@ export const toolkits = <Toolkits extends ReadonlyArray<Toolkit.Any>>(...toolkit
 
     return Trajectory.make(parts, merged, metadata);
   });
+
+/**
+ * A tool call together with the result it produced.
+ *
+ * **When to use**
+ *
+ * Use to read what a recorded session did with a tool, such as to display,
+ * evaluate or replay its tool usage.
+ *
+ * **Details**
+ *
+ * The call and its result are narrowed to the toolkit entry they share, so a
+ * turn's parameters and result carry the types of that tool.
+ *
+ * @see {@link toolTurns} for streaming the turns of a trajectory.
+ * @category models
+ */
+export type ToolTurn<Tools extends Record<string, Tool.Any>> = {
+  [Name in keyof Tools]: Name extends string
+    ? Readonly<{
+        call: Extract<Response.ToolCallParts<Tools>, { name: Name }>;
+
+        result: Extract<Response.ToolResultParts<Tools>, { name: Name }>;
+      }>
+    : never;
+}[keyof Tools];
+
+/**
+ * Pairs a tool call with the tool result that answers it.
+ *
+ * **When to use**
+ *
+ * Use when a tool result should be read through the types of the tool it
+ * belongs to.
+ *
+ * **Details**
+ *
+ * Both parts must name the same tool, otherwise the pair is rejected with
+ * `undefined`; the identifier of the result is left to the caller to check.
+ *
+ * @see {@link toolTurns} for pairing every turn of a trajectory.
+ * @category constructors
+ */
+export const toolTurn = <Tools extends Record<string, Tool.Any>>(
+  call: Response.ToolCallParts<Tools>,
+  result: Response.ToolResultParts<Tools>,
+): ToolTurn<Tools> | undefined => {
+  if (call.name !== result.name) {
+    return undefined;
+  }
+  // SAFETY: Equal tool names correlate both union members to the same toolkit entry.
+  return { call, result } as ToolTurn<Tools>;
+};
+
+/**
+ * Streams the tool turns of a trajectory.
+ *
+ * **When to use**
+ *
+ * Use to read the tool calls a recorded session made together with the results
+ * they produced.
+ *
+ * **Details**
+ *
+ * A turn is emitted once the result of a recorded tool call is reached, so the
+ * stream follows the order of the results. Results are read from response
+ * parts, where the tools a model ran are recorded. Calls and results are
+ * correlated by their identifier and must name the same tool. Preliminary
+ * results report progress while a tool is still running, so only the final one
+ * completes a turn, and a call whose result was never recorded stays pending
+ * and is dropped. Parts that no tool of the toolkit matches are skipped,
+ * because their parameters and results are not described by any schema; bind a
+ * recording to its tools with {@link toolkits} to give those parts their exact
+ * names, parameters and results.
+ *
+ * **Example** (Reading the tool turns of a recorded session)
+ *
+ * ```ts import.meta.vitest
+ * import { Effect, Schema, Stream } from "effect"
+ * import { Tool, Toolkit } from "effect/ai"
+ * import { Response, Trajectory, Toolkit as TrajectoryToolkit } from "trajs"
+ *
+ * const weather = Toolkit.make(
+ *   Tool.make("get_weather", { parameters: Schema.Struct({ city: Schema.String }) })
+ * )
+ *
+ * const call = Response.anyToolCallPart({
+ *   id: "call_1", name: "get_weather", params: { city: "SF" }, providerExecuted: false
+ * })
+ * const result = Response.anyToolResultPart({
+ *   id: "call_1", name: "get_weather", isFailure: false, result: { temp: 22 },
+ *   encodedResult: { temp: 22 }, providerExecuted: false, preliminary: false
+ * })
+ *
+ * const recorded = Trajectory.make(
+ *   Stream.make(Trajectory.responsePart(call), Trajectory.responsePart(result)),
+ *   Toolkit.empty
+ * )
+ *
+ * const bound = await Effect.runPromise(TrajectoryToolkit.toolkits(weather)(recorded))
+ * const turns = await Effect.runPromise(Stream.runCollect(TrajectoryToolkit.toolTurns(bound)))
+ * turns.length // => 1
+ * ```
+ *
+ * @see {@link toolkits} for binding a recording to the tools it refers to.
+ * @category combinators
+ */
+export const toolTurns = <Tools extends Record<string, Tool.Any>>(
+  trajectory: Trajectory.Trajectory<Tools>,
+): Stream.Stream<ToolTurn<Tools>, TrajectoryError> =>
+  trajectory.pipe(
+    Stream.mapAccum(
+      () => new Map<string, Response.ToolCallParts<Tools>>(),
+      (calls, part) => {
+        if (part._tag !== "Response") {
+          return [calls, []] as const;
+        }
+
+        const response = part.response;
+
+        if (Response.isAnyToolPart(response)) {
+          return [calls, []] as const;
+        }
+
+        if (response.type === "tool-call") {
+          // SAFETY: A part that no `AnyTool*Part` branded is described by the toolkit, so its name is one of the toolkit's keys.
+          const call = response as Response.ToolCallParts<Tools>;
+
+          return [new Map(calls).set(call.id, call), []] as const;
+        }
+
+        if (response.type !== "tool-result" || response.preliminary) {
+          return [calls, []] as const;
+        }
+
+        // SAFETY: A part that no `AnyTool*Part` branded is described by the toolkit, so its name is one of the toolkit's keys.
+        const result = response as Response.ToolResultParts<Tools>;
+        const call = calls.get(result.id);
+
+        if (call === undefined) {
+          return [calls, []] as const;
+        }
+
+        const pending = new Map(calls);
+        pending.delete(result.id);
+
+        const turn = toolTurn(call, result);
+
+        return [pending, turn === undefined ? [] : [turn]] as const;
+      },
+    ),
+  );
