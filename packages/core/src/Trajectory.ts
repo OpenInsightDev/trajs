@@ -15,6 +15,7 @@ import { DateTime, Effect, Function, Schema, Stream } from "effect";
 import { Prompt, Tool, Toolkit } from "effect/ai";
 import * as uuid from "uuid";
 import pkg from "../package.json" with { type: "json" };
+import { promptTurns } from "#/internal/prompt.ts";
 
 /**
  * Version of the trajs specification this package reads and writes.
@@ -589,3 +590,86 @@ export const make: {
     extensions: Extension.Extensions = {},
   ): Trajectory<Tools, E, R> => Object.assign(parts, { toolkit, metadata, extensions }),
 );
+
+/**
+ * A prompt together with the response parts produced for it.
+ *
+ * **When to use**
+ *
+ * Use when reading a trajectory turn by turn, such as to inspect what a model was
+ * asked and what it answered.
+ *
+ * **Details**
+ *
+ * `prompt` holds the messages that were passed to the model, and `response` every
+ * part the model returned for them. A recording that interleaves several sessions
+ * keeps their parts in one sequence, so a turn is not attributed to a session:
+ * select the session to read before grouping.
+ *
+ * @see {@link prompt} for folding the turns of a trajectory into one prompt.
+ * @category models
+ */
+export type PromptTurn<Tools extends Record<string, Tool.Any>> = Readonly<{
+  /**
+   * The prompt of the turn.
+   */
+  prompt: Prompt.Prompt;
+  /**
+   * The response parts produced for the prompt.
+   */
+  response: Response.PartView<Tools>[];
+}>;
+
+/**
+ * Folds a trajectory back into the prompt its model was given.
+ *
+ * **When to use**
+ *
+ * Use to reconstruct the conversation a session ran on as one prompt, so it can
+ * be continued, evaluated or inspected as a whole.
+ *
+ * **Details**
+ *
+ * Each prompt part is concatenated with the response parts recorded for it, so
+ * the result is the messages of the whole trajectory rather than of one turn. A
+ * prompt part opens a turn and the response parts that follow it belong to it;
+ * session and extension parts are skipped, and response parts that no prompt
+ * precedes are dropped, because they belong to no recorded prompt.
+ *
+ * Parts are not attributed to a session, so select the session to fold out of a
+ * recording that interleaves several: pipe it through `Session.of(id)` to read a
+ * session together with what it inherited, or `Session.select(id)` for its own
+ * parts.
+ *
+ * **Example** (Folding a recording back into its prompt)
+ *
+ * ```ts import.meta.vitest
+ * import { Effect, Stream } from "effect"
+ * import { Prompt, Toolkit } from "effect/ai"
+ * import { Response, Trajectory } from "@trajs/core"
+ *
+ * const trajectory = Trajectory.make(
+ *   Stream.make(
+ *     Trajectory.promptPart(Prompt.make("Hello")),
+ *     Trajectory.responsePart(Response.makePart("text", { text: "Hi there" }))
+ *   ),
+ *   Toolkit.empty
+ * )
+ *
+ * const folded = await Effect.runPromise(Trajectory.prompt(trajectory))
+ * folded.content.map((message) => message.role) // => ["user", "assistant"]
+ * ```
+ *
+ * @see {@link PromptTurn} for the turns the prompt is folded from.
+ * @category combinators
+ */
+export const prompt = <Tools extends Record<string, Tool.Any>>(
+  trajectory: PartStream<Tools>,
+): Effect.Effect<Prompt.Prompt, TrajectoryError> =>
+  promptTurns(trajectory).pipe(
+    Stream.runFold(
+      () => Prompt.empty,
+      (curr, { prompt, response }) =>
+        Prompt.concat(curr, Prompt.concat(prompt, Prompt.fromResponseParts(response))),
+    ),
+  );
