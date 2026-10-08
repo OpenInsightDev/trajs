@@ -41,7 +41,8 @@
     "prepublishOnly": "vp run build"
   },
   "dependencies": {
-    "effect": "catalog:"
+    "effect": "catalog:",
+    "uuid": "catalog:"
   },
   "devDependencies": {
     "@types/node": "catalog:",

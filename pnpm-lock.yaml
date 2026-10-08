@@ -173,6 +173,9 @@ catalogs:
     typescript:
       specifier: ^7.0.2
       version: 7.0.2
+    uuid:
+      specifier: ^14.0.2
+      version: 14.0.2
     vite:
       specifier: npm:@voidzero-dev/vite-plus-core@1.0.0-rc.1
       version: 1.0.0-rc.1
@@ -196,6 +199,9 @@ importers:
       effect:
         specifier: 'catalog:'
         version: 4.0.2
+      uuid:
+        specifier: 'catalog:'
+        version: 14.0.2
     devDependencies:
       '@types/node':
         specifier: 'catalog:'
@@ -1315,6 +1321,10 @@ packages:
   undici-types@8.9.0:
     resolution: {integrity: sha512-KTDyRTYX8sWmKXAikPHHSyc63CRPETMctyjKFupcC6OBLXT3xsN0e9aF7m+mIXutFWpUXuedtowG7iLOzp0kQg==}
 
+  uuid@14.0.2:
+    resolution: {integrity: sha512-xZe/16rV4aa+HGSOCiY2YeLT1OybRLrrkL/Rqaq7p7GMVXjFh+6wN4oMYgjFmnSnhY8t6Xpdl2l9qmnHYuMHwQ==}
+    hasBin: true
+
   verkit@0.4.1:
     resolution: {integrity: sha512-mMVzj0TXExtVdlDEq+Mzp0eyOuyznNpFobNM3uAqe3HVm/Ps2c+u17BligMkZjZCA6EiXpoon8iRTer3iu40SQ==}
     engines: {node: '>=18.12.0'}
@@ -2357,6 +2367,8 @@ snapshots:
   undici-types@7.24.6: {}
 
   undici-types@8.9.0: {}
+
+  uuid@14.0.2: {}
 
   verkit@0.4.1: {}
 
