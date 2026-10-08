@@ -1,0 +1,12 @@
+/* Accent tuned to the trajs mark. */
+:root {
+  --sl-color-accent-low: #2b2350;
+  --sl-color-accent: #6d5efc;
+  --sl-color-accent-high: #cdc6ff;
+}
+
+:root[data-theme="light"] {
+  --sl-color-accent-low: #ded9ff;
+  --sl-color-accent: #4b3ad6;
+  --sl-color-accent-high: #241a66;
+}
