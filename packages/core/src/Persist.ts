@@ -2,9 +2,10 @@
  * Reads and writes trajectories as JSON Lines.
  *
  * A recorded trajectory is a `.trajs` file. Each line is one JSON record: the
- * first is a header carrying the trajectory's non-stream fields (the format
- * version, the metadata, the serialized toolkit and the extension definitions),
- * and the rest are the parts of the trajectory, discriminated by their `_tag`.
+ * first is a header carrying the trajectory's non-stream fields (the metadata,
+ * including the specification version, the serialized toolkit and the extension
+ * definitions), and the rest are the parts of the trajectory, discriminated by
+ * their `_tag`.
  *
  * The header is peeled off the stream and read on its own rather than described
  * as a part, because it is not one. It comes first because a decoder needs an
@@ -27,14 +28,15 @@ import { StreamWriter } from "#/internal/stream-writer.ts";
  *
  * **Details**
  *
- * The `version` field marks the format version. The remaining fields are the
- * trajectory's non-stream fields, serialized.
+ * The header carries the trajectory's non-stream fields, serialized. It has no
+ * `version` field of its own: the specification version is `metadata.version`, so
+ * a recording states its version the same way whether it is read from a file or
+ * constructed in memory.
  *
  * @category schemas
  */
 const Header = Schema.Struct({
-  version: Schema.Number,
-  metadata: Schema.optional(Trajectory.Metadata),
+  metadata: Trajectory.Metadata,
   toolkit: Schema.optional(Schema.Record(Schema.String, Schema.Unknown)),
   extensions: Schema.optional(Schema.Record(Schema.String, Schema.Unknown)),
 });
@@ -72,7 +74,6 @@ export const encode = <Tools extends Record<string, Tool.Any>>(
   );
 
   const header: unknown = {
-    version: 1,
     metadata: trajectory.metadata,
     toolkit: TrajectoryToolkit.encode(trajectory.toolkit),
     extensions: Extension.encode(trajectory.extensions),
@@ -101,7 +102,9 @@ export const encode = <Tools extends Record<string, Tool.Any>>(
  * The first record is peeled off the stream and read as the header; the remaining
  * records stay lazy and are decoded as parts. Extension data is decoded with the
  * provided definitions; data whose definition is missing is read as an
- * unconstrained part rather than failing to load. The returned trajectory's
+ * unconstrained part rather than failing to load. A header without metadata, or
+ * with metadata that does not state its `version`, is a parse failure rather than
+ * a trajectory of unknown vintage. The returned trajectory's
  * toolkit is empty, because tool parts are read unconstrained: bind them to their
  * tools with `Toolkit.toolkits` when their schemas are available.
  *
@@ -129,7 +132,7 @@ export const decode = (extensions: Extension.Extensions = {}) =>
         ),
       ),
       Toolkit.empty,
-      decodedHeader.metadata ?? {},
+      decodedHeader.metadata,
       extensions,
     );
   });

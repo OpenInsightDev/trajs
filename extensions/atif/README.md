@@ -29,7 +29,7 @@ const trajectory = Trajectory.make(
     ),
   ),
   Toolkit.empty,
-  {},
+  Trajectory.Metadata.make({}),
   Atif.extensions,
 );
 

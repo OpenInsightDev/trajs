@@ -103,7 +103,7 @@ it("carries extension parts through toolkit rebinding", async () => {
   const trajectory = Trajectory.make(
     Stream.make(span("s1")),
     Toolkit.empty,
-    {},
+    Trajectory.Metadata.make({}),
     Extension.Extensions.make(otel),
   );
 

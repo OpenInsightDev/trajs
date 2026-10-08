@@ -26,7 +26,7 @@ const trajectory = Trajectory.make(
     Atif.part(compaction, { anchor: prompt.uuid, session: "s1" }),
   ),
   Toolkit.empty,
-  { name: "compaction" },
+  Trajectory.Metadata.make({ name: "compaction" }),
   Atif.extensions,
 );
 
@@ -111,7 +111,7 @@ it("reads a system step back, typed by the definition", async () => {
   const trajectoryParts = Trajectory.make(
     Stream.fromIterable(parts),
     Toolkit.empty,
-    {},
+    Trajectory.Metadata.make({}),
     Atif.extensions,
   );
 

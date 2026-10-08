@@ -18,7 +18,7 @@ const trajectory = () =>
       Trajectory.anyExtensionPart({ extension: "dev.trajs.otel", data: { spanId: "s1" } }),
     ]),
     Toolkit.empty,
-    { name: "greeting" },
+    Trajectory.Metadata.make({ name: "greeting" }),
     Extension.Extensions.make(otel),
   );
 
@@ -30,13 +30,13 @@ const recordsOf = (trajectory: Trajectory.Any) =>
 it("writes a header record followed by one record per part", async () => {
   const records = await recordsOf(trajectory());
   const header = records[0] as {
-    version: number;
-    metadata: { name: string };
+    metadata: { version: string; name: string };
     extensions: Record<string, { version: string }>;
   };
 
-  expect(header.version).toBe(1);
+  expect(header.metadata.version).toBe(Trajectory.version);
   expect(header.metadata.name).toBe("greeting");
+  expect(header).not.toHaveProperty("version");
   expect(header.extensions["dev.trajs.otel"].version).toBe("1.0.0");
   expect(records).toHaveLength(4);
 });
@@ -78,7 +78,7 @@ it("keeps extension data whose definition the reader does not have", async () =>
 
 it("decodes the header without pulling the parts", async () => {
   const records = Stream.fromIterable([
-    { version: 1, metadata: { name: "greeting" } },
+    { metadata: { version: Trajectory.version, name: "greeting" } },
     { _tag: "Prompt", messages: "not-an-array" },
   ]);
 
@@ -101,6 +101,20 @@ it("fails when the header is missing", async () => {
   );
 
   expect(Exit.isFailure(result)).toBe(true);
+});
+
+it("fails when the header does not state the specification version", async () => {
+  const withoutVersion = await Effect.runPromise(
+    Effect.exit(
+      Effect.scoped(Persist.decode()(Stream.fromIterable([{ metadata: { name: "greeting" } }]))),
+    ),
+  );
+  const withoutMetadata = await Effect.runPromise(
+    Effect.exit(Effect.scoped(Persist.decode()(Stream.fromIterable([{ toolkit: {} }])))),
+  );
+
+  expect(Exit.isFailure(withoutVersion)).toBe(true);
+  expect(Exit.isFailure(withoutMetadata)).toBe(true);
 });
 
 it("writes and reads a trajectory through the stream services", async () => {

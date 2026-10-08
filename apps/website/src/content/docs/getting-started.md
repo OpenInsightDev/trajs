@@ -30,9 +30,12 @@ import { Trajectory } from "@trajs/core";
 const trajectory = Trajectory.make(
   Stream.make(Trajectory.promptPart(Prompt.make("Hello"))),
   Toolkit.empty,
-  { name: "greeting" },
+  Trajectory.Metadata.make({ name: "greeting" }),
 );
 ```
+
+`Trajectory.Metadata.make` builds the metadata, and `version` defaults to
+`Trajectory.version` when it is omitted.
 
 Every part carries a `uuid` (a UUID v7, so identifiers sort by creation time), an
 optional `session` and an optional `extra` field. Those come from `PartMetadata`,
@@ -74,7 +77,7 @@ const recorded = Trajectory.make(
     }),
   ),
   Toolkit.empty,
-  {},
+  Trajectory.Metadata.make({}),
   extensions,
 );
 ```

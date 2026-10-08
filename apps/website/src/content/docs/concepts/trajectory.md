@@ -18,7 +18,7 @@ import { Trajectory } from "@trajs/core";
 const trajectory = Trajectory.make(
   Stream.make(Trajectory.promptPart(Prompt.make("Hello"))),
   Toolkit.empty,
-  { name: "greeting" },
+  Trajectory.Metadata.make({ name: "greeting" }),
 );
 ```
 
@@ -26,8 +26,14 @@ The returned value is a `Stream` with three extra fields, so the parts and the
 context they were recorded in never drift apart:
 
 - `toolkit` — the tools used to encode and decode tool parts.
-- `metadata` — the trajectory's `id`, `name` and `description`.
+- `metadata` — the trajectory's `version`, `name` and `description`.
 - `extensions` — the definitions used to encode and decode extension data.
+
+`metadata.version` is the version of the trajs specification the trajectory
+conforms to: the `@trajs/core` version that wrote it, `Trajectory.version`. It
+defaults to that when a trajectory is constructed, and a recording must state it
+to be decoded, so a trajectory says which specification it was written against
+wherever it lives.
 
 ## Parts
 

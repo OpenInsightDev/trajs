@@ -81,7 +81,7 @@ const trajectory = Trajectory.make(
     }),
   ),
   Toolkit.empty,
-  { name: "greeting" },
+  Trajectory.Metadata.make({ name: "greeting" }),
   Extension.Extensions.make(otel),
 );
 
@@ -93,13 +93,14 @@ recording with `Persist.decode`, `Persist.read` or `Persist.encode`.
 
 ## The .trajs format
 
-A recording is plain JSONL: line 1 is a header carrying the format `version`, the
-`metadata`, the serialized `toolkit` and the `extensions` registry; every later
-line is a part, discriminated by `_tag`. The header carries no `_tag` — `_tag`
-means "this is a part" — so the two are impossible to confuse.
+A recording is plain JSONL: line 1 is a header carrying the `metadata` (including
+its `version`, the `@trajs/core` version that wrote the recording), the
+serialized `toolkit` and the `extensions` registry; every later line is a part,
+discriminated by `_tag`. The header carries no `_tag` — `_tag` means "this is a
+part" — so the two are impossible to confuse.
 
 ```jsonl
-{"version":1,"metadata":{},"toolkit":{},"extensions":{"dev.trajs.otel":{"version":"1.0.0","schema":{}}}}
+{"metadata":{"version":"<trajs version>"},"toolkit":{},"extensions":{"dev.trajs.otel":{"version":"1.0.0","schema":{}}}}
 {"_tag":"Prompt","uuid":"0192...","timestamp":"...","messages":[]}
 {"_tag":"Extension","extension":"dev.trajs.otel","version":"1.0.0","uuid":"0192...","timestamp":"...","anchor":"0192...","data":{}}
 ```

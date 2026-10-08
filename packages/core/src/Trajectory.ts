@@ -14,6 +14,28 @@ import type { TrajectoryError } from "#/TrajectoryError.ts";
 import { DateTime, Effect, Function, Schema, Stream } from "effect";
 import { Prompt, Tool, Toolkit } from "effect/ai";
 import * as uuid from "uuid";
+import pkg from "../package.json" with { type: "json" };
+
+/**
+ * Version of the trajs specification this package reads and writes.
+ *
+ * **When to use**
+ *
+ * Use when recording a trajectory, or when checking the specification version a
+ * recording declares.
+ *
+ * **Details**
+ *
+ * The value is the version of `@trajs/core`, read from its manifest, so the
+ * specification version cannot drift from the release that writes it. It is
+ * written into every trajectory as the `version` field of {@link Metadata}, so a
+ * recording states the specification it conforms to instead of leaving the reader
+ * to guess it from the package that produced it.
+ *
+ * @see {@link Metadata} for the field a recording carries it in.
+ * @category constants
+ */
+export const version = pkg.version;
 
 /**
  * Descriptive metadata attached to a trajectory.
@@ -26,9 +48,15 @@ import * as uuid from "uuid";
  */
 export class Metadata extends Schema.Class<Metadata>("Metadata")({
   /**
-   * Optional identifier of the trajectory.
+   * Version of the trajs specification the trajectory conforms to.
+   *
+   * **Details**
+   *
+   * Defaults to {@link version}, the version of `@trajs/core`, when a trajectory
+   * is constructed without one. Decoding and encoding require it, so a recording
+   * that does not state its version cannot be read.
    */
-  id: Schema.optional(Schema.String),
+  version: Schema.String.pipe(Schema.withConstructorDefault(Effect.succeed(version))),
   /**
    * Optional name of the trajectory.
    */
@@ -505,7 +533,9 @@ export type TrajectoryEncoded<E = never, R = never> = Stream.Stream<
  * The toolkit and metadata are attached to the returned stream as additional
  * fields, so the parts and the context they were recorded in stay together. A
  * stream that is defined elsewhere is bound by piping it into `make`, which
- * then takes the toolkit as its first argument.
+ * then takes the toolkit as its first argument. Metadata is passed as a
+ * {@link Metadata} value, whose `version` defaults to {@link version} when it is
+ * constructed.
  *
  * **Example** (Creating a trajectory)
  *
@@ -517,9 +547,10 @@ export type TrajectoryEncoded<E = never, R = never> = Stream.Stream<
  * const trajectory = Trajectory.make(
  *   Stream.make(Trajectory.promptPart(Prompt.make("Hello"))),
  *   Toolkit.empty,
- *   { name: "greeting" }
+ *   Trajectory.Metadata.make({ name: "greeting" })
  * )
  * trajectory.metadata.name // => "greeting"
+ * trajectory.metadata.version === Trajectory.version // => true
  * ```
  *
  * **Example** (Binding a stream that is already defined)
@@ -530,7 +561,7 @@ export type TrajectoryEncoded<E = never, R = never> = Stream.Stream<
  * import { Trajectory } from "@trajs/core"
  *
  * const trajectory = Stream.make(Trajectory.promptPart(Prompt.make("Hello"))).pipe(
- *   Trajectory.make(Toolkit.empty, { name: "greeting" })
+ *   Trajectory.make(Toolkit.empty, Trajectory.Metadata.make({ name: "greeting" }))
  * )
  * trajectory.metadata.name // => "greeting"
  * ```
@@ -554,7 +585,7 @@ export const make: {
   <Tools extends Record<string, Tool.Any>, E, R>(
     parts: Stream.Stream<Part<Tools>, E, R>,
     toolkit: Toolkit.Toolkit<Tools>,
-    metadata: Metadata = {},
+    metadata: Metadata = Metadata.make({}),
     extensions: Extension.Extensions = {},
   ): Trajectory<Tools, E, R> => Object.assign(parts, { toolkit, metadata, extensions }),
 );

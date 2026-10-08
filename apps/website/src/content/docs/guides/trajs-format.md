@@ -9,8 +9,8 @@ The interchange form of a trajectory is plain JSONL: one JSON object per line.
 ## Layout
 
 - **Line 1 is the header.** It carries the trajectory's non-stream fields: the
-  format `version`, `metadata`, the serialized `toolkit` and the `extensions`
-  registry.
+  `metadata` (including its `version`, the `@trajs/core` version that wrote the
+  recording), the serialized `toolkit` and the `extensions` registry.
 - **Lines 2..n are the parts**, discriminated by the existing `_tag` field.
 
 The header is deliberately **not a part** and carries **no `_tag`** — `_tag` means
@@ -18,13 +18,19 @@ The header is deliberately **not a part** and carries **no `_tag`** — `_tag` m
 confuse.
 
 ```jsonl
-{"version":1,"metadata":{},"toolkit":{},"extensions":{"dev.trajs.otel":{"version":"1.0.0","schema":{}}}}
+{"metadata":{"version":"<trajs version>"},"toolkit":{},"extensions":{"dev.trajs.otel":{"version":"1.0.0","schema":{}}}}
 {"_tag":"Prompt","uuid":"0192...","timestamp":"...","messages":[]}
 {"_tag":"Response","uuid":"0192...","timestamp":"...","response":{}}
 {"_tag":"Extension","extension":"dev.trajs.otel","version":"1.0.0","uuid":"0192...","timestamp":"...","anchor":"0192...","data":{}}
 ```
 
 Part `_tag` values are `Prompt`, `Response` and `Extension`, with no collision.
+
+The specification version is not a field of the header of its own: it is
+`metadata.version`, and both it and the metadata are required. `Persist` writes
+`Trajectory.version` — read from the `@trajs/core` manifest, so it cannot drift
+from the release — and refuses to decode a header that does not state a version,
+so a recording never leaves its vintage to be guessed.
 
 ## Why the header comes first
 

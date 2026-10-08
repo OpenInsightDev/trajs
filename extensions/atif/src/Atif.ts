@@ -288,7 +288,7 @@ export const extensions = Extension.Extensions.make(extension);
  * const trajectory = Trajectory.make(
  *   Stream.make(prompt, Atif.part({ operation: "context-management" }, { anchor: prompt.uuid })),
  *   Toolkit.empty,
- *   {},
+ *   Trajectory.Metadata.make({}),
  *   Atif.extensions
  * )
  * ```
