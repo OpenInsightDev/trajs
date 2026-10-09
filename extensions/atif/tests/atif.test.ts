@@ -1,7 +1,7 @@
 import { expect, it } from "vite-plus/test";
-import { Effect, JsonSchema, Schema, Stream } from "effect";
+import { Effect, JsonSchema, Predicate, Schema, Stream } from "effect";
 import { Prompt, Toolkit } from "effect/ai";
-import { Extension, Persist, Trajectory } from "@trajs/core";
+import { Extension, Extensionkit, Persist, Trajectory } from "@trajs/core";
 import * as Atif from "#/Atif.ts";
 
 const compaction: Atif.SystemStep = {
@@ -21,7 +21,7 @@ const prompt = Trajectory.promptPart(Prompt.make("Context compaction performed")
 
 const trajectory = Trajectory.make(
   Stream.make(
-    Trajectory.sessionPart({ session: "s1" }),
+    Trajectory.sessionPart("s1"),
     prompt,
     Atif.part(compaction, { anchor: prompt.uuid, session: "s1" }),
   ),
@@ -35,7 +35,7 @@ const recordsOf = () =>
     Array.from(records),
   );
 
-const partsOf = (extensions: Extension.Extensions, records: ReadonlyArray<unknown>) =>
+const partsOf = (extensions: Extensionkit.Any, records: ReadonlyArray<unknown>) =>
   Effect.runPromise(
     Effect.scoped(
       Effect.gen(function* () {
@@ -134,8 +134,11 @@ it("reads a system step back, typed by the definition", async () => {
 });
 
 it("reads a system step without its definition as an unconstrained part", async () => {
-  const parts = await partsOf(Extension.Extensions.empty, await recordsOf());
-  const datum = parts.find(Trajectory.isExtensionPart);
+  const parts = await partsOf(Extensionkit.empty, await recordsOf());
+
+  const datum = parts.find((part): part is Trajectory.AnyExtensionPart =>
+    Predicate.isTagged("Extension")(part),
+  );
 
   expect(datum).toBeDefined();
   expect(datum?.extension).toBe("org.js.tra.atif");

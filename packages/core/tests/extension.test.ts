@@ -1,7 +1,8 @@
 import { expect, it } from "vite-plus/test";
-import { Effect, Schema, Stream } from "effect";
+import { Effect, Predicate, Schema, Stream } from "effect";
 import { Prompt, Tool, Toolkit } from "effect/ai";
 import * as Extension from "#/Extension.ts";
+import * as Extensionkit from "#/Extensionkit.ts";
 import * as Trajectory from "#/Trajectory.ts";
 import * as TrajectoryToolkit from "#/Toolkit.ts";
 
@@ -39,13 +40,11 @@ it("defines an extension by id, version and schema", () => {
 
 it("collects and merges definitions by id", () => {
   const judge = Extension.make("dev.trajs.judge", "0.1.0", Schema.Number);
-  const defs = Extension.Extensions.make(otel, judge);
+  const defs = Extensionkit.make(otel, judge);
 
   expect(Object.keys(defs)).toEqual(["dev.trajs.otel", "dev.trajs.judge"]);
-  expect(Extension.Extensions.merge(Extension.Extensions.empty, defs)).toEqual(defs);
-  expect(Extension.Extensions.merge(defs, { "dev.trajs.otel": judge })["dev.trajs.otel"]).toBe(
-    judge,
-  );
+  expect(Extensionkit.merge(Extensionkit.empty, defs)).toEqual(defs);
+  expect(Extensionkit.merge(defs, { "dev.trajs.otel": judge })["dev.trajs.otel"]).toBe(judge);
 });
 
 it("selects the data of one extension, typed by its definition", async () => {
@@ -118,7 +117,7 @@ it("carries extension parts through toolkit rebinding", async () => {
     Stream.make(span("s1")),
     Toolkit.empty,
     Trajectory.Metadata.make({}),
-    Extension.Extensions.make(otel),
+    Extensionkit.make(otel),
   );
 
   const rebound = await Effect.runPromise(TrajectoryToolkit.toolkits(weather)(trajectory));
@@ -129,7 +128,7 @@ it("carries extension parts through toolkit rebinding", async () => {
 });
 
 it("decodes registered extension data by its definition", async () => {
-  const schema = Trajectory.Part(Toolkit.empty, Extension.Extensions.make(otel));
+  const schema = Trajectory.Part(Toolkit.empty, Extensionkit.make(otel));
 
   const part = Trajectory.anyExtensionPart({
     extension: "dev.trajs.otel",
@@ -139,7 +138,7 @@ it("decodes registered extension data by its definition", async () => {
   const encoded = await Effect.runPromise(Schema.encodeEffect(schema)(part));
   const decoded = await Effect.runPromise(Schema.decodeEffect(schema)(encoded));
 
-  if (!Trajectory.isExtensionPart(decoded)) throw new Error("expected an extension part");
+  if (!Predicate.isTagged("Extension")(decoded)) throw new Error("expected an extension part");
   expect(decoded.data).toEqual({ spanId: "s1", durationMs: 3 });
 });
 
@@ -150,6 +149,6 @@ it("decodes extension data no definition describes, instead of failing", async (
   const encoded = await Effect.runPromise(Schema.encodeEffect(schema)(part));
   const decoded = await Effect.runPromise(Schema.decodeEffect(schema)(encoded));
 
-  if (!Trajectory.isExtensionPart(decoded)) throw new Error("expected an extension part");
+  if (!Predicate.isTagged("Extension")(decoded)) throw new Error("expected an extension part");
   expect(decoded.data).toEqual({ spanId: "s1" });
 });

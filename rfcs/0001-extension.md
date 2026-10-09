@@ -68,20 +68,21 @@ introduced.
 | :-------------------------------------------------- | :------------------------------------ |
 | `Tool.make(name, { parameters, success, failure })` | `Extension.make(id, version, schema)` |
 | `Tool.Any`                                          | `Extension.Any`                       |
-| `Toolkit` (a set of tools)                          | `Extensions` (a set of extensions)    |
-| `Toolkit.make(...tools)`                            | `Extensions.make(...definitions)`     |
-| `Toolkit.empty`                                     | `Extensions.empty`                    |
-| `Toolkit.merge(...toolkits)`                        | `Extensions.merge(...extensions)`     |
+| `Toolkit` (a set of tools)                          | `Extensionkit` (a set of extensions)  |
+| `Toolkit.make(...tools)`                            | `Extensionkit.make(...definitions)`   |
+| `Toolkit.empty`                                     | `Extensionkit.empty`                  |
+| `Toolkit.merge(...toolkits)`                        | `Extensionkit.merge(...extensions)`   |
 | `ResponsePart(toolkit)`                             | `ExtensionPart(extensions)`           |
 | `AnyResponsePart = ResponsePart(Toolkit.empty)`     | `AnyExtensionPart`                    |
 | `Part(toolkit)`                                     | `Part(toolkit, extensions)`           |
 
 Read through the `Extension` module namespace, a definition is
-`Extension.make(...)` and the collection is `Extension.Extensions.make(...)`, by
-the same convention that makes `Trajectory.make(...)` and
-`Trajectory.Trajectory<T>` available today. `AnyExtensionPart` is a standalone
-part class rather than `ExtensionPart(Extensions.empty)`, because an empty
-`Schema.Union` is not a valid schema.
+`Extension.make(...)` and the collection is `Extensionkit.make(...)`, by the same
+convention that makes `Trajectory.make(...)` and `Trajectory.Trajectory<T>`
+available today — and, like `Tool` and `Toolkit`, the collection is its own
+module rather than a member of the definition's module. `AnyExtensionPart` is a
+standalone part class rather than `ExtensionPart(Extensionkit.empty)`, because an
+empty `Schema.Union` is not a valid schema.
 
 A definition is keyed by `id` in the collection, exactly as a tool is keyed by
 name in a toolkit. The `id` is expected to be namespaced (reverse-DNS or URI),
@@ -141,7 +142,7 @@ reuses the same principle as `Response.AnyToolCallPart` / `AnyToolResultPart`:
 loading recorded history must not depend on the currently installed definitions.
 
 ```ts
-export const ExtensionPart = (extensions: Extensions) =>
+export const ExtensionPart = (extensions: Extensionkit) =>
   Schema.Union([
     ...Object.values(extensions).map(ExtensionPartOf),
     AnyExtensionPart, // unconstrained; `data: Schema.Json`
@@ -184,20 +185,23 @@ operation.
 ## VI. Module layout
 
 `ExtensionPart` lives in `Trajectory.ts`, next to `ResponsePart`, and refers to
-the `Extension` and `Extensions` types with a type-only import. That import is
-erased at runtime, so `Extension.ts` still sits above `Trajectory.ts` (just as
-`Toolkit.ts` does today) without a runtime cycle, and no parallel definition
-type is needed.
+the `Extensionkit` type with a type-only import. That import is erased at
+runtime, so `Trajectory.ts` takes no runtime dependency on the definitions, and
+`Extensionkit.ts` refers to `Extension.ts` the same way; the runtime order stays
+`Extension.ts` → `Trajectory.ts`, with no cycle, and no parallel definition type
+is needed.
 
 - `Trajectory.ts`: `ExtensionPart` (typed factory + `AnyExtensionPart`),
-  `anyExtensionPart`, `isExtensionPart`, wired into `Part`, `AnyPart` and the
-  stream types. `Trajectory` gains an `extensions` field and `make` gains an
-  `extensions` parameter.
-- `Extension.ts`: `Extension`, `Extensions`, `encode`, and the analysis
-  combinators `parts`, `select`, `byAnchor`.
+  `anyExtensionPart`, wired into `Part`, `AnyPart` and the stream types.
+  `Trajectory` gains an `extensions` field and `make` gains an `extensions`
+  parameter.
+- `Extension.ts`: `Extension`, and the analysis combinators `parts`, `select`,
+  `byAnchor`.
+- `Extensionkit.ts`: the definition set `Extensionkit`, `make`, `empty`,
+  `merge`, `encode`.
 - `TrajectoryError.ts`: extension and parse failures alongside the toolkit ones.
 - `Persist.ts`: the `.trajs` codec, `encode` and `decode`.
-- `index.ts`: re-export `Extension`.
+- `index.ts`: re-export `Extension` and `Extensionkit`.
 
 ## VII. Alternatives considered
 
@@ -211,7 +215,7 @@ type is needed.
 - **A dedicated definition type mirroring `id`, `version` and `schema`.** This
   would avoid `Trajectory.ts` referencing `Extension.ts`, but duplicates types
   that already exist. A type-only import is erased at runtime, so no runtime
-  cycle appears, and the real `Extension` and `Extensions` types are used.
+  cycle appears, and the real `Extension` and `Extensionkit` types are used.
 - **Storing extension data in a part's existing `extra` field.** Loses the
   uniform envelope, the anchor, and the per-extension schema.
 

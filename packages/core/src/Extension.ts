@@ -8,14 +8,14 @@
  * dropped into an untyped bag.
  *
  * An extension is defined by an identifier, a semantic version and a Schema for
- * its data. Definitions are collected into {@link Extensions} and carried by a
+ * its data. Extensions are collected into an `Extensionkit` and carried by a
  * trajectory, exactly as tools are collected into a toolkit: the parts of a
  * recording are decoded with the definitions they were recorded against, and
  * data whose definition is missing degrades to an unconstrained part instead of
  * failing to load.
  */
 
-import { Effect, JsonSchema, Predicate, Schema, Stream } from "effect";
+import { Effect, Predicate, Schema, Stream } from "effect";
 import type { Tool } from "effect/ai";
 import * as Trajectory from "#/Trajectory.ts";
 import { TrajectoryError } from "#/TrajectoryError.ts";
@@ -38,7 +38,7 @@ const ExtensionTypeId = "~trajs/Extension" as const;
  * the extension attaches; how permissive it is, including how it treats unknown
  * fields, is decided by the schema itself.
  *
- * @see {@link Extensions} for collecting definitions into a trajectory.
+ * @see `Extensionkit` for collecting definitions into a trajectory.
  * @category models
  */
 export interface Extension<
@@ -116,114 +116,6 @@ export const make = <const Id extends string, Data, Encoded>(
 });
 
 /**
- * A set of extension definitions, keyed by their identifier.
- *
- * **When to use**
- *
- * Use as the type of the `extensions` field of a trajectory, or of the
- * definitions a function decodes with.
- *
- * @category models
- */
-export type Extensions<Definitions extends Record<string, Any> = Record<string, Any>> =
-  Readonly<Definitions>;
-
-/**
- * The extension definitions a list of definitions yields, keyed by identifier.
- *
- * @category models
- */
-export type Of<Definitions extends ReadonlyArray<Any>> = {
-  readonly [Definition in Definitions[number] as Definition["id"]]: Definition;
-};
-
-/**
- * The merged extension definitions of a list of sets.
- *
- * @category models
- */
-export type Merged<Collections extends ReadonlyArray<Record<string, Any>>> = {
-  readonly [Key in keyof Collections[number]]: Collections[number][Key];
-};
-
-// SAFETY: `empty` has no entries by construction, and `make`/`merge` derive their key
-// and value types from generic inputs whose precision `Object.fromEntries` and
-// `Object.assign` erase.
-/**
- * Collects extension definitions into a set.
- *
- * **When to use**
- *
- * Use when building the definitions a trajectory is recorded or decoded with.
- *
- * @see {@link Extensions} for the `merge` and `empty` operations.
- * @category constructors
- */
-export const Extensions = {
-  /**
-   * A set with no extension definitions.
-   */
-  empty: {} as Extensions<Record<string, never>>,
-  /**
-   * Collects extension definitions into a set, keyed by identifier.
-   */
-  make: <const Definitions extends ReadonlyArray<Any>>(
-    ...definitions: Definitions
-  ): Of<Definitions> =>
-    Object.fromEntries(
-      definitions.map((definition) => [definition.id, definition]),
-    ) as Of<Definitions>,
-  /**
-   * Merges sets of extension definitions, later definitions overriding earlier
-   * ones with the same identifier.
-   */
-  merge: <const Collections extends ReadonlyArray<Record<string, Any>>>(
-    ...collections: Collections
-  ): Merged<Collections> => Object.assign({}, ...collections) as Merged<Collections>,
-} as const;
-
-/**
- * Serialized form of an extension definition, as stored in a trajectory header.
- *
- * **When to use**
- *
- * Use to describe a recorded extension to a consumer that does not have the
- * definition installed.
- *
- * **Details**
- *
- * The version is recorded verbatim and the schema is converted to a draft-07
- * JSON Schema document, so the shape of the data is readable without the Effect
- * Schema it was built from.
- *
- * @category models
- */
-export type ExtensionEncoded = Readonly<{
-  version: string;
-  schema: JsonSchema.Document<"draft-07">;
-}>;
-
-/**
- * Serializes extension definitions into their encoded form.
- *
- * **When to use**
- *
- * Use when writing the header of a recorded trajectory.
- *
- * @category encoding
- */
-export const encode = (definitions: Extensions): Record<string, ExtensionEncoded> =>
-  Object.fromEntries(
-    Object.entries(definitions).map(([id, definition]) => [
-      id,
-      {
-        version: definition.version,
-        schema: JsonSchema.toDocumentDraft07(Schema.toJsonSchemaDocument(definition.schema)),
-      },
-    ]),
-  );
-
-/**
  * Streams the extension parts of a trajectory.
  *
  * **When to use**
@@ -238,7 +130,11 @@ export const encode = (definitions: Extensions): Record<string, ExtensionEncoded
 export const parts = <Tools extends Record<string, Tool.Any>>(
   trajectory: Trajectory.Trajectory<Tools>,
 ): Stream.Stream<Trajectory.AnyExtensionPart, TrajectoryError> =>
-  trajectory.pipe(Stream.filter(Trajectory.isExtensionPart));
+  trajectory.pipe(
+    Stream.filter((part): part is Trajectory.AnyExtensionPart =>
+      Predicate.isTagged("Extension")(part),
+    ),
+  );
 
 /**
  * Streams the data of a single extension.
@@ -284,7 +180,9 @@ export const select =
     trajectory: Trajectory.Trajectory<Tools>,
   ): Stream.Stream<Data, TrajectoryError> =>
     trajectory.pipe(
-      Stream.filter(Trajectory.isExtensionPart),
+      Stream.filter((part): part is Trajectory.AnyExtensionPart =>
+        Predicate.isTagged("Extension")(part),
+      ),
       Stream.filter((part) => part.extension === definition.id),
       Stream.mapEffect((part) =>
         Schema.decodeUnknownEffect(definition.schema)(part.data).pipe(

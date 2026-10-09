@@ -17,7 +17,7 @@ responses it returned, and **extension** data such as spans and metrics — that
 stays attached to the toolkit, metadata and extension definitions it was recorded
 with. trajs is built on [Effect](https://effect.website) and reuses the vocabulary
 of `effect/ai`: a `Trajectory` is a `Stream`, tools are `Tool`s collected into a
-`Toolkit`, and extensions mirror that shape with `Extension` and `Extensions`.
+`Toolkit`, and extensions mirror that shape with `Extension` and `Extensionkit`.
 
 trajs targets the same problem as [ATIF](https://github.com/harbor-framework/harbor/blob/main/rfcs/0001-trajectory-format.md),
 the Agent Trajectory Interchange Format, and aims to be a strict superset. Where
@@ -30,7 +30,7 @@ data a first-class part with an identity, a version, a schema and an anchor.
   extension parts share one total order, so extension data cannot be dropped by a
   combinator that only knows about messages.
 - **Extensions are first-class.** An extension is a namespaced identifier, a
-  semantic version and a schema, collected into an `Extensions` set like tools in
+  semantic version and a schema, collected into an `Extensionkit` like tools in
   a toolkit; each datum carries its version and an optional anchor to the part it
   is about.
 - **Tolerant by design.** Tools outside the toolkit and extensions without an
@@ -64,7 +64,7 @@ file:
 ```ts
 import { Effect, Schema, Stream } from "effect";
 import { Prompt, Toolkit } from "effect/ai";
-import { Extension, Persist, Trajectory } from "@trajs/core";
+import { Extension, Extensionkit, Persist, Trajectory } from "@trajs/core";
 
 const otel = Extension.make(
   "dev.trajs.otel",
@@ -82,7 +82,7 @@ const trajectory = Trajectory.make(
   ),
   Toolkit.empty,
   Trajectory.Metadata.make({ name: "greeting" }),
-  Extension.Extensions.make(otel),
+  Extensionkit.make(otel),
 );
 
 const records = await Effect.runPromise(Stream.runCollect(Persist.encode(trajectory)));

@@ -108,7 +108,7 @@ it("carries an image as a content part", async () => {
 it("skips session and extension parts", async () => {
   const sessions = await sessionsOf(
     make(
-      Trajectory.sessionPart({ session: "a" }),
+      Trajectory.sessionPart("a"),
       prompt("Hello", "a"),
       Trajectory.anyExtensionPart({
         extension: "dev.trajs.otel",
@@ -122,7 +122,7 @@ it("skips session and extension parts", async () => {
 });
 
 it("returns an empty array for a session that recorded no messages", async () => {
-  const sessions = await sessionsOf(make(Trajectory.sessionPart({ session: "a" })));
+  const sessions = await sessionsOf(make(Trajectory.sessionPart("a")));
 
   expect(sessions).toEqual({ a: [] });
 });

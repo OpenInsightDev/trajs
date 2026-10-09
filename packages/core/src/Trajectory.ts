@@ -8,10 +8,10 @@
  * refers to.
  */
 
-import type * as Extension from "#/Extension.ts";
+import type * as Extensionkit from "#/Extensionkit.ts";
 import * as Response from "#/Response.ts";
 import type { TrajectoryError } from "#/TrajectoryError.ts";
-import { DateTime, Effect, Function, Predicate, Schema, Stream } from "effect";
+import { DateTime, Effect, Function, Schema, Stream } from "effect";
 import { Prompt, Tool, Toolkit } from "effect/ai";
 import * as uuid from "uuid";
 import pkg from "../package.json" with { type: "json" };
@@ -222,27 +222,15 @@ export type SessionPartEncoded = Schema.Codec.Encoded<typeof SessionPart>;
  * ```ts import.meta.vitest
  * import { Trajectory } from "@trajs/core"
  *
- * const part = Trajectory.sessionPart({ session: "agent-b", fork: "0192..." })
+ * const part = Trajectory.sessionPart("agent-b", { fork: "agent-a" })
  * part.session // => "agent-b"
  * part._tag // => "Session"
  * ```
  *
  * @category constructors
  */
-export const sessionPart = (params: Parameters<typeof SessionPart.make>[0]): SessionPart =>
-  SessionPart.make(params);
-
-/**
- * Type guard to check if a trajectory part declares a session.
- *
- * **When to use**
- *
- * Use to narrow a trajectory part to the session it declares.
- *
- * @category guards
- */
-export const isSessionPart = (part: { readonly _tag: string }): part is SessionPart =>
-  Predicate.isTagged("Session")(part);
+export const sessionPart = (session: string, { fork }: { fork?: string } = {}): SessionPart =>
+  SessionPart.make({ session, fork });
 
 /**
  * Creates a Schema for a response part based on a toolkit.
@@ -340,19 +328,6 @@ export const AnyExtensionPart = class AnyExtensionPart extends Schema.TaggedClas
 export type AnyExtensionPart = Schema.Schema.Type<typeof AnyExtensionPart>;
 
 /**
- * Type guard to check if a trajectory part carries extension data.
- *
- * **When to use**
- *
- * Use to narrow a trajectory part to the extension data it carries, whether or
- * not a definition describes it.
- *
- * @category guards
- */
-export const isExtensionPart = (part: { readonly _tag: string }): part is AnyExtensionPart =>
-  Predicate.isTagged("Extension")(part);
-
-/**
  * Constructs a new extension part whose data no definition describes.
  *
  * **When to use**
@@ -394,7 +369,7 @@ export const anyExtensionPart = (
  *
  * @category constructors
  */
-export const ExtensionPart = (extensions: Extension.Extensions = {}) =>
+export const ExtensionPart = (extensions: Extensionkit.Any = {}) =>
   Schema.Union([
     ...Object.values(extensions).map((definition) =>
       Schema.TaggedStruct("Extension", {
@@ -422,7 +397,7 @@ export const ExtensionPart = (extensions: Extension.Extensions = {}) =>
  */
 export const Part = <
   Tools extends Record<string, Tool.Any>,
-  Exts extends Extension.Extensions = Record<string, never>,
+  Exts extends Extensionkit.Any = Record<string, never>,
 >(
   toolkit: Toolkit.Toolkit<Tools>,
   extensions?: Exts,
@@ -436,7 +411,7 @@ export const Part = <
  */
 export type Part<
   Tools extends Record<string, Tool.Any>,
-  Exts extends Extension.Extensions = Record<string, never>,
+  Exts extends Extensionkit.Any = Record<string, never>,
 > = Schema.Schema.Type<ReturnType<typeof Part<Tools, Exts>>>;
 
 /**
@@ -500,7 +475,7 @@ export type Trajectory<Tools extends Record<string, Tool.Any>, E = never, R = ne
     /**
      * The extension definitions used to encode and decode extension parts.
      */
-    extensions: Extension.Extensions;
+    extensions: Extensionkit.Any;
   }>;
 
 /**
@@ -574,12 +549,12 @@ export const make: {
     parts: Stream.Stream<Part<Tools>, E, R>,
     toolkit: Toolkit.Toolkit<Tools>,
     metadata?: Metadata,
-    extensions?: Extension.Extensions,
+    extensions?: Extensionkit.Any,
   ): Trajectory<Tools, E, R>;
   <Tools extends Record<string, Tool.Any>>(
     toolkit: Toolkit.Toolkit<Tools>,
     metadata?: Metadata,
-    extensions?: Extension.Extensions,
+    extensions?: Extensionkit.Any,
   ): <E, R>(parts: Stream.Stream<Part<Tools>, E, R>) => Trajectory<Tools, E, R>;
 } = Function.dual(
   (args) => Stream.isStream(args[0]),
@@ -587,7 +562,7 @@ export const make: {
     parts: Stream.Stream<Part<Tools>, E, R>,
     toolkit: Toolkit.Toolkit<Tools>,
     metadata: Metadata = Metadata.make({}),
-    extensions: Extension.Extensions = {},
+    extensions: Extensionkit.Any = {},
   ): Trajectory<Tools, E, R> => Object.assign(parts, { toolkit, metadata, extensions }),
 );
 

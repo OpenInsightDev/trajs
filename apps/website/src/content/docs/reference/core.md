@@ -12,7 +12,8 @@ available as a subpath import, such as `@trajs/core/Response`.
 | `Trajectory`      | `@trajs/core/Trajectory`      | The part model: `Metadata`, `PartMetadata`, `PromptPart`, `ResponsePart`, `ExtensionPart`, the part unions and `make`.                                                            |
 | `Response`        | `@trajs/core/Response`        | Tolerant response parts: `AllPartsView`, `PartView`, `StreamPartView`, `AnyToolCallPart`, `AnyToolResultPart` and their guards and constructors. Re-exports `effect/ai/Response`. |
 | `Toolkit`         | `@trajs/core/Toolkit`         | Toolkit serialization and rebinding: `encode`, `toDynamic`, `toolkits`, `toolTurn`, `toolTurns`.                                                                                  |
-| `Extension`       | `@trajs/core/Extension`       | Extension definitions and queries: `Extension`, `Extensions`, `make`, `encode`, `parts`, `select`, `attach`.                                                                      |
+| `Extension`       | `@trajs/core/Extension`       | Extension definitions and queries: `Extension`, `Any`, `isExtension`, `make`, `parts`, `select`, `attach`.                                                                        |
+| `Extensionkit`    | `@trajs/core/Extensionkit`    | Extension definition sets: `Extensionkit`, `make`, `empty`, `merge`, `encode`.                                                                                                    |
 | `Persist`         | `@trajs/core/Persist`         | The `.trajs` codec: `encode`, `decode`, `write`, `read`.                                                                                                                          |
 | `TrajectoryError` | `@trajs/core/TrajectoryError` | Typed failures: `TrajectoryError` and its reasons `EncodeError`, `DecodeError`, `ExtensionEncodeError`, `ExtensionDecodeError`, `ParseError`.                                     |
 

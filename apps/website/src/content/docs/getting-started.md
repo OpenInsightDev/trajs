@@ -57,16 +57,16 @@ const otel = Extension.make(
 );
 ```
 
-Collect definitions with `Extension.Extensions.make`, then record data as
+Collect definitions with `Extensionkit.make`, then record data as
 `ExtensionPart`s with `anyExtensionPart` (or the typed factory for a collection).
 An optional `anchor` points at the `uuid` of the part the datum is about.
 
 ```ts
 import { Stream } from "effect";
 import { Toolkit } from "effect/ai";
-import { Extension, Trajectory } from "@trajs/core";
+import { Extensionkit, Trajectory } from "@trajs/core";
 
-const extensions = Extension.Extensions.make(otel);
+const extensions = Extensionkit.make(otel);
 
 const recorded = Trajectory.make(
   Stream.make(

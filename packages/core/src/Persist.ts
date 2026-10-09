@@ -16,7 +16,7 @@
 
 import { Effect, Option, Schema, Sink, Stream } from "effect";
 import { Tool, Toolkit } from "effect/ai";
-import * as Extension from "#/Extension.ts";
+import * as Extensionkit from "#/Extensionkit.ts";
 import * as Trajectory from "#/Trajectory.ts";
 import { TrajectoryError } from "#/TrajectoryError.ts";
 import * as TrajectoryToolkit from "#/Toolkit.ts";
@@ -68,7 +68,7 @@ export const encode = <Tools extends Record<string, Tool.Any>>(
   const header = {
     metadata: trajectory.metadata,
     toolkit: TrajectoryToolkit.encode(trajectory.toolkit),
-    extensions: Extension.encode(trajectory.extensions),
+    extensions: Extensionkit.encode(trajectory.extensions),
   };
 
   return Stream.concat(
@@ -106,7 +106,7 @@ export const encode = <Tools extends Record<string, Tool.Any>>(
  * @see {@link read} for reading the records with the stream reader.
  * @category decoding
  */
-export const decode = (extensions: Extension.Extensions = {}) =>
+export const decode = (extensions: Extensionkit.Any = {}) =>
   Effect.fn("Persist.decode")(function* <E, R>(records: Stream.Stream<unknown, E, R>) {
     const [header, rest] = yield* Stream.peel(records, Sink.head<unknown>());
 
@@ -171,7 +171,7 @@ export const write =
  * @category decoding
  */
 export const read =
-  (extensions: Extension.Extensions = {}) =>
+  (extensions: Extensionkit.Any = {}) =>
   (key: string) =>
     Effect.gen(function* () {
       const reader = yield* StreamReader;

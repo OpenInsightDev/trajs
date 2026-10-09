@@ -1,5 +1,5 @@
 import { expect, it } from "vite-plus/test";
-import { Effect, Exit, Option, Stream } from "effect";
+import { Effect, Exit, Option, Predicate, Stream } from "effect";
 import { Prompt, Toolkit } from "effect/ai";
 import * as Persist from "#/Persist.ts";
 import * as Session from "#/Session.ts";
@@ -8,8 +8,7 @@ import * as Trajectory from "#/Trajectory.ts";
 const prompt = (text: string, session?: string) =>
   Trajectory.PromptPart.make({ messages: Prompt.make(text).content, session });
 
-const declaration = (session: string, fork?: string) =>
-  Trajectory.sessionPart(fork === undefined ? { session } : { session, fork });
+const declaration = (session: string, fork?: string) => Trajectory.sessionPart(session, { fork });
 
 const make = (...parts: ReadonlyArray<Trajectory.AnyPart>) =>
   Trajectory.make(Stream.fromIterable(parts), Toolkit.empty);
@@ -184,5 +183,5 @@ it("round-trips a session part through the .trajs codec", async () => {
   );
 
   expect(tags(decoded)).toEqual(["Session", "Prompt", "Session"]);
-  expect(Trajectory.isSessionPart(decoded[2]) && decoded[2].fork).toBe(hello.uuid);
+  expect(Predicate.isTagged("Session")(decoded[2]) && decoded[2].fork).toBe(hello.uuid);
 });

@@ -1,7 +1,8 @@
 import { expect, it } from "vite-plus/test";
-import { Effect, Exit, FileSystem, Schema, Sink, Stream } from "effect";
+import { Effect, Exit, FileSystem, Predicate, Schema, Sink, Stream } from "effect";
 import { Prompt, Toolkit } from "effect/ai";
 import * as Extension from "#/Extension.ts";
+import * as Extensionkit from "#/Extensionkit.ts";
 import * as Persist from "#/Persist.ts";
 import * as Response from "#/Response.ts";
 import * as Trajectory from "#/Trajectory.ts";
@@ -19,7 +20,7 @@ const trajectory = () =>
     ]),
     Toolkit.empty,
     Trajectory.Metadata.make({ name: "greeting" }),
-    Extension.Extensions.make(otel),
+    Extensionkit.make(otel),
   );
 
 const recordsOf = (trajectory: Trajectory.Any) =>
@@ -50,7 +51,7 @@ it("reads back metadata and parts, keeping the part tags", async () => {
   const { metadata, parts } = await Effect.runPromise(
     Effect.scoped(
       Effect.gen(function* () {
-        const decoded = yield* Persist.decode(Extension.Extensions.make(otel))(
+        const decoded = yield* Persist.decode(Extensionkit.make(otel))(
           Stream.fromIterable(records),
         );
 
@@ -79,7 +80,7 @@ it("keeps extension data whose definition the reader does not have", async () =>
   const extension = parts[2];
 
   expect(extension._tag).toBe("Extension");
-  expect(Trajectory.isExtensionPart(extension) && extension.data).toEqual({ spanId: "s1" });
+  expect(Predicate.isTagged("Extension")(extension) && extension.data).toEqual({ spanId: "s1" });
 });
 
 it("decodes the header without pulling the parts", async () => {
@@ -163,7 +164,7 @@ it("writes and reads a trajectory through the stream services", async () => {
     Effect.scoped(
       Effect.gen(function* () {
         yield* Persist.write(trajectory())("trajectory.trajs");
-        const decoded = yield* Persist.read(Extension.Extensions.make(otel))("trajectory.trajs");
+        const decoded = yield* Persist.read(Extensionkit.make(otel))("trajectory.trajs");
 
         return { metadata: decoded.metadata, parts: Array.from(yield* Stream.runCollect(decoded)) };
       }).pipe(Effect.provide(fileSystem)),

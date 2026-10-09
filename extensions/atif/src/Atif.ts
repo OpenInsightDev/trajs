@@ -20,7 +20,7 @@
  * with `Schema.resolveAnnotations`.
  */
 
-import { Extension, Trajectory } from "@trajs/core";
+import { Extension, Extensionkit, Trajectory } from "@trajs/core";
 import { Schema } from "effect";
 
 declare module "effect/Schema" {
@@ -259,7 +259,7 @@ export const extension = Extension.make("org.js.tra.atif", "1.0.0", SystemStep);
  *
  * @category constants
  */
-export const extensions = Extension.Extensions.make(extension);
+export const extensions = Extensionkit.make(extension);
 
 /**
  * Parameters accepted by {@link part}, built up only with the optional fields the

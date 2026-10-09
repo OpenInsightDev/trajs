@@ -48,20 +48,20 @@ the Effect Schema itself; the extension API does not police it.
 
 ## Collect definitions
 
-Definitions are collected into an `Extensions` set, keyed by identifier, exactly
-as tools are collected into a toolkit by name:
+Definitions are collected into an `Extensionkit` set, keyed by identifier,
+exactly as tools are collected into a toolkit by name:
 
 ```ts
-import { Extension } from "@trajs/core";
+import { Extensionkit } from "@trajs/core";
 
-const extensions = Extension.Extensions.make(otel);
+const extensions = Extensionkit.make(otel);
 
-Extension.Extensions.merge(extensions, Extension.Extensions.empty);
+Extensionkit.merge(extensions, Extensionkit.empty);
 ```
 
-- `Extension.Extensions.empty` — no definitions.
-- `Extension.Extensions.make(...definitions)` — keyed by `id`.
-- `Extension.Extensions.merge(...sets)` — later definitions override earlier ones
+- `Extensionkit.empty` — no definitions.
+- `Extensionkit.make(...definitions)` — keyed by `id`.
+- `Extensionkit.merge(...sets)` — later definitions override earlier ones
   with the same identifier.
 
 ## The extension datum
@@ -87,10 +87,10 @@ stays in the domain schema rather than in the envelope.
 ### Missing definitions
 
 `AnyExtensionPart` accepts any `extension` and any `data`, and is a standalone
-part class rather than `ExtensionPart(Extensions.empty)` because an empty schema
+part class rather than `ExtensionPart(Extensionkit.empty)` because an empty schema
 union is not valid. It is what a datum decodes to when its definition is not
-installed, or when its payload no longer matches the definition. `isExtensionPart`
-narrows either form to `AnyExtensionPart`.
+installed, or when its payload no longer matches the definition. A part is
+narrowed to it with `Predicate.isTagged("Extension")`.
 
 ## Query the data
 

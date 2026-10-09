@@ -13,7 +13,7 @@
  * together with what it inherited, and {@link children} reads the reverse view.
  */
 
-import { Stream } from "effect";
+import { Predicate, Stream } from "effect";
 import type { Tool } from "effect/ai";
 import * as Trajectory from "#/Trajectory.ts";
 import { TrajectoryError } from "#/TrajectoryError.ts";
@@ -33,7 +33,9 @@ import * as lineage from "#/internal/session.ts";
 export const parts = <Tools extends Record<string, Tool.Any>>(
   trajectory: Trajectory.Trajectory<Tools>,
 ): Stream.Stream<Trajectory.SessionPart, TrajectoryError> =>
-  trajectory.pipe(Stream.filter(Trajectory.isSessionPart));
+  trajectory.pipe(
+    Stream.filter((part): part is Trajectory.SessionPart => Predicate.isTagged("Session")(part)),
+  );
 
 /**
  * Streams the parts recorded under a session.
@@ -165,9 +167,9 @@ export const children =
  * const hello = Trajectory.PromptPart.make({ messages: Prompt.make("Hello").content, session: "a" })
  * const trajectory = Trajectory.make(
  *   Stream.make(
- *     Trajectory.sessionPart({ session: "a" }),
+ *     Trajectory.sessionPart("a"),
  *     hello,
- *     Trajectory.sessionPart({ session: "b", fork: hello.uuid })
+ *     Trajectory.sessionPart("b", { fork: hello.uuid })
  *   ),
  *   Toolkit.empty
  * )

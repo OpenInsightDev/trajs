@@ -57,7 +57,7 @@ it("skips response parts that no prompt precedes", async () => {
 
 it("skips parts that carry neither a prompt nor a response", async () => {
   const trajectory = make(
-    Trajectory.sessionPart({ session: "a" }),
+    Trajectory.sessionPart("a"),
     prompt("Hello"),
     Trajectory.anyExtensionPart({ extension: "dev.trajs.otel", data: { spanId: "s1" } }),
     response("Hi"),

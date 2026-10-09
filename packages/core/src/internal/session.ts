@@ -1,4 +1,4 @@
-import { Effect, Stream } from "effect";
+import { Effect, Predicate, Stream } from "effect";
 import type { Tool } from "effect/ai";
 import * as Trajectory from "#/Trajectory.ts";
 import { TrajectoryError } from "#/TrajectoryError.ts";
@@ -27,7 +27,8 @@ const declaration = <Tools extends Record<string, Tool.Any>>(
   id: string,
 ): Trajectory.SessionPart | undefined =>
   parts.find(
-    (part): part is Trajectory.SessionPart => Trajectory.isSessionPart(part) && part.session === id,
+    (part): part is Trajectory.SessionPart =>
+      Predicate.isTagged("Session")(part) && part.session === id,
   );
 
 /** The parts recorded under a session. */
@@ -94,7 +95,7 @@ export const of = <Tools extends Record<string, Tool.Any>>(
         // on every step would make holding quadratic in its length.
         state.parts.push(part);
 
-        if (Trajectory.isSessionPart(part) && part.session === id) {
+        if (Predicate.isTagged("Session")(part) && part.session === id) {
           return Effect.map(
             inheritedOf<Tools>(id, state.parts, new Set([id])),
             (inherited) => [{ parts: [], started: true }, [...inherited, part]] as const,
@@ -119,7 +120,7 @@ const edges = <Tools extends Record<string, Tool.Any>>(
     Stream.mapAccum(
       () => new Map<string, string | undefined>(),
       (sessionOf, part): readonly [Map<string, string | undefined>, ReadonlyArray<Edge>] => {
-        if (!Trajectory.isSessionPart(part)) {
+        if (!Predicate.isTagged("Session")(part)) {
           sessionOf.set(part.uuid, part.session);
 
           return [sessionOf, []];
