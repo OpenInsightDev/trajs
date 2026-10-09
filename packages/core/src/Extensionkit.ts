@@ -7,8 +7,14 @@
  * the data, exactly as tools are collected into a toolkit: {@link make} builds the
  * set, {@link merge} combines the sets of several producers, and a reader picks the
  * schema of the extension it is reading by looking its identifier up.
+ *
+ * The set is also what names the extension a datum came from: {@link Part} builds
+ * the part of one extension, discriminated by the identifier its data was
+ * recorded for, and {@link PartView} reads a recording that carries extensions
+ * the set does not hold.
  */
 
+import { Effect, Predicate, Schema } from "effect";
 import type * as Extension from "#/Extension.ts";
 
 /**
@@ -124,3 +130,204 @@ export const make = <const Exts extends ReadonlyArray<Extension.Any>>(
 export const merge = <const Kits extends ReadonlyArray<Record<string, AnyVersion>>>(
   ...kits: Kits
 ): Merged<Kits> => Object.assign({}, ...kits) as Merged<Kits>;
+
+/**
+ * One member of the parts an extension kit describes: the extension it belongs
+ * to, and its data.
+ *
+ * The identifier is recorded as a literal rather than as a string, so the data
+ * of each extension is discriminated by the extension it came from, the way a
+ * tool call is discriminated by the name of its tool.
+ */
+const extensionPart = <Id extends string, V extends Schema.Top>(id: Id, version: V) =>
+  Schema.Struct({
+    extension: Schema.Literal(id),
+    data: version,
+  });
+
+/**
+ * The members of {@link Part}: the Schema of one part per extension of the kit,
+ * keyed by the identifier the data was recorded for.
+ *
+ * The walk is what loses the kit's identifiers and schemas, so this is what the
+ * members are declared to be rather than what the walk can write down.
+ */
+type Parts<Exts extends Any> = {
+  readonly [Id in keyof Exts]: ReturnType<typeof extensionPart<Id & string, Exts[Id]>>;
+}[keyof Exts];
+
+/**
+ * A part of an extension kit: the data of one extension, discriminated by the
+ * identifier the data was recorded for.
+ *
+ * **When to use**
+ *
+ * Use when reading or matching on the data an extension kit describes.
+ *
+ * @see {@link Part} for the Schema that builds one.
+ * @category models
+ */
+export type Part<Exts extends Any> = Schema.Schema.Type<Schema.Union<ReadonlyArray<Parts<Exts>>>>;
+
+/**
+ * Encoded representation of extension parts for serialization.
+ *
+ * @category models
+ */
+export type PartEncoded<Exts extends Any> = Schema.Codec.Encoded<
+  Schema.Union<ReadonlyArray<Parts<Exts>>>
+>;
+
+// SAFETY: `Part` builds each member from the entry it came from, so the members are the kit's own schemas; the walk is what loses their types, not the union.
+/**
+ * Creates a Schema for the parts an extension kit describes.
+ *
+ * **When to use**
+ *
+ * Use when reading the data an extension kit describes, or when a recording
+ * carries that data in parts of its own.
+ *
+ * **Details**
+ *
+ * One part is carried per extension of the kit, discriminated by the identifier
+ * the data was recorded for: `extension` names the extension and `data` is its
+ * data, read by that extension's own line of versions, so data recorded against
+ * any version of it is read as the newest one.
+ *
+ * A part carries the data of its extension and nothing of the recording it ends
+ * up in: what a recording tags, timestamps and identifies its parts with is
+ * declared where the parts of a recording are.
+ *
+ * **Example** (Reading the data of an extension)
+ *
+ * ```ts import.meta.vitest
+ * import { Schema } from "effect"
+ * import { Extension, Extensionkit } from "@trajs/core"
+ *
+ * const otel = Extension.make(
+ *   "dev.observerw.otel",
+ *   Extension.Metadata.make({}),
+ *   Extension.Versions.make(Schema.Struct({
+ *     version: Schema.Literal("1.0.0"),
+ *     spanId: Schema.String
+ *   }))
+ * )
+ *
+ * const parts = Extensionkit.Part(Extensionkit.make(otel))
+ * const part = Schema.decodeUnknownSync(parts)({
+ *   extension: "dev.observerw.otel",
+ *   data: { version: "1.0.0", spanId: "s1" }
+ * })
+ * part.extension // => "dev.observerw.otel"
+ * ```
+ *
+ * @see {@link make} for collecting extensions into a set.
+ * @category constructors
+ */
+export const Part = <Exts extends Any>(
+  extkit: Exts,
+): Schema.Codec<Part<Exts>, PartEncoded<Exts>, never, never> =>
+  Schema.Union(Object.entries(extkit).map(([id, version]) => extensionPart(id, version))) as any;
+
+const AnyPartTypeId = "~trajs/Extensionkit/AnyPart" as const;
+
+/**
+ * A part of an extension a kit does not describe.
+ *
+ * **When to use**
+ *
+ * Use when reading a recording that carries data for an extension the kit does
+ * not hold, such as one a producer that declares extensions of its own wrote.
+ *
+ * **Details**
+ *
+ * The identifier is read as any string and the data as JSON, because nothing
+ * describes them: no line of versions is at hand to check the data against, so
+ * it is carried instead of being validated. A part read this way stays
+ * distinguishable with {@link isAnyPart}, so a reader can tell data a line of
+ * versions read from data a recording only carried along.
+ *
+ * @see {@link Part} for the part of an extension the kit describes.
+ * @see {@link PartView} for reading both kinds in one schema.
+ * @category models
+ */
+export type AnyPart = Schema.Schema.Type<typeof AnyPart>;
+
+/**
+ * Schema for the part of an extension a kit does not describe.
+ *
+ * **When to use**
+ *
+ * Use when a recording may carry data for extensions the kit does not hold.
+ *
+ * **Details**
+ *
+ * The identifier the data was recorded for is kept, so a reader can still tell
+ * which extension the data belongs to and look that extension up in a kit that
+ * holds it.
+ *
+ * @see {@link AnyPart} for the part this Schema reads.
+ * @category schemas
+ */
+export const AnyPart = Schema.Struct({
+  extension: Schema.String,
+  data: Schema.Json,
+  [AnyPartTypeId]: Schema.Literal(AnyPartTypeId).pipe(
+    Schema.withConstructorDefault(Effect.succeed(AnyPartTypeId)),
+    Schema.withDecodingDefaultKey(Effect.succeed(AnyPartTypeId), { encodingStrategy: "omit" }),
+  ),
+}).annotate({ identifier: "AnyPart" });
+
+/**
+ * Checks whether a part is one no extension of the kit describes.
+ *
+ * **When to use**
+ *
+ * Use to tell data a line of versions read from data a recording only carried
+ * along.
+ *
+ * @category guards
+ */
+export const isAnyPart = (u: unknown): u is AnyPart => Predicate.hasProperty(u, AnyPartTypeId);
+
+// SAFETY: `Schema.Union` widens the encoded and service type parameters of its members; the union of the two codecs is exactly the declared contract.
+/**
+ * Creates a Schema for the parts an extension kit describes, including the
+ * extensions it does not.
+ *
+ * **When to use**
+ *
+ * Use when decoding a recording that may carry data for extensions the kit does
+ * not hold, and that data should be kept rather than rejected.
+ *
+ * **Details**
+ *
+ * The extensions of the kit are read as {@link Part} reads them, and any other
+ * identifier as {@link AnyPart}: a datum the kit does not hold, and one whose
+ * shape no version of its line accepts, is carried as JSON instead of failing
+ * the whole recording.
+ *
+ * **Example** (Reading data for an extension the kit does not hold)
+ *
+ * ```ts import.meta.vitest
+ * import { Schema } from "effect"
+ * import { Extensionkit } from "@trajs/core"
+ *
+ * const part = Schema.decodeUnknownSync(Extensionkit.PartView(Extensionkit.empty))({
+ *   extension: "dev.observerw.otel",
+ *   data: { version: "1.0.0", spanId: "s1" }
+ * })
+ * Extensionkit.isAnyPart(part) // => true
+ * ```
+ *
+ * @see {@link Part} for the parts of the kit alone.
+ * @category constructors
+ */
+export const PartView = <Exts extends Any>(
+  extkit: Exts,
+): Schema.Codec<
+  Part<Exts> | AnyPart,
+  PartEncoded<Exts> | Schema.Codec.Encoded<typeof AnyPart>,
+  never,
+  never
+> => Schema.Union([Part(extkit), AnyPart]) as any;

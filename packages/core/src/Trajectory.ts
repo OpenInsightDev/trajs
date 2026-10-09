@@ -14,7 +14,6 @@ import type { TrajectoryError } from "#/TrajectoryError.ts";
 import { Effect, Function, Schema, Stream } from "effect";
 import { Prompt, Tool, Toolkit } from "effect/ai";
 import pkg from "../package.json" with { type: "json" };
-import { extensionParts } from "#/internal/extension.ts";
 import { promptTurns } from "#/internal/prompt.ts";
 import { Timestamp, Uuid } from "#/internal/schema.ts";
 
@@ -271,21 +270,37 @@ export const responsePart = (response: Response.Part<any>): AnyResponsePart =>
   AnyResponsePart.make({ response });
 
 /**
- * Creates a Schema for the extension parts an extension kit describes.
+ * Trajectory part that carries the data recorded for an extension.
  *
  * **When to use**
  *
- * Use when recording data for an extension, or when decoding a recording with
- * the extensions it was recorded against.
+ * Use when reading or matching on the extension data of a recording.
+ *
+ * @see {@link ExtensionPart} for the Schema that builds one.
+ * @category models
+ */
+export type ExtensionPart<Exts extends Extensionkit.Any> = Schema.Schema.Type<
+  ReturnType<typeof ExtensionPart<Exts>>
+>;
+
+/**
+ * Creates a Schema for the extension parts an extension kit describes, including
+ * the extensions it does not.
+ *
+ * **When to use**
+ *
+ * Use when recording data for an extension, and when decoding a recording that
+ * may carry data for extensions the kit does not hold.
  *
  * **Details**
  *
- * A part is carried per extension of the kit, discriminated by the identifier
- * the data was recorded for: `extension` names the extension and `data` is its
- * data, read by that extension's own line of versions, so data recorded against
- * any version of it is read as the newest one. The timestamp is recorded when
- * the part is constructed, and `attach` names the parts the data is associated
- * with.
+ * The data recorded for one extension is {@link Extensionkit.PartView}: the parts
+ * of the kit, discriminated by the identifier the data was recorded for, and
+ * {@link Extensionkit.AnyPart} for an extension the kit does not hold. What the
+ * trajectory records around it — the tag the part is discriminated by, when it
+ * was recorded, the parts it is attached to and the fields every part carries —
+ * is declared here, because it belongs to the recording rather than to the
+ * extension the data came from.
  *
  * **Example** (Recording data for an extension)
  *
@@ -304,18 +319,40 @@ export const responsePart = (response: Response.Part<any>): AnyResponsePart =>
  *
  * const part = Schema.decodeUnknownSync(Trajectory.ExtensionPart(Extensionkit.make(otel)))({
  *   _tag: "Extension",
- *   extension: "dev.observerw.otel",
+ *   extension: { extension: "dev.observerw.otel", data: { version: "1.0.0", spanId: "s1" } },
  *   timestamp: "2026-01-01T00:00:00.000Z",
- *   uuid: "0190f5b2-9c3c-7b1e-8a2d-4f6b8c0d1e2f",
- *   data: { version: "1.0.0", spanId: "s1" }
+ *   uuid: "0190f5b2-9c3c-7b1e-8a2d-4f6b8c0d1e2f"
  * })
- * part.extension // => "dev.observerw.otel"
+ * part._tag // => "Extension"
+ * part.extension.extension // => "dev.observerw.otel"
  * ```
  *
+ * @see {@link Extensionkit.PartView} for the data an extension kit reads.
  * @category constructors
  */
 export const ExtensionPart = <Exts extends Extensionkit.Any>(extkit: Exts) =>
-  extensionParts(extkit);
+  Schema.TaggedStruct("Extension", {
+    extension: Extensionkit.PartView(extkit),
+    timestamp: Timestamp,
+    attach: Schema.OptionFromOptionalKey(Schema.NonEmptyArray(Uuid)),
+    ...PartMetadata.fields,
+  });
+
+/**
+ * Schema for an extension part that also accepts extensions outside the provided
+ * kit.
+ *
+ * @see {@link ExtensionPart} for a Schema built from the extensions of a kit.
+ * @category constructors
+ */
+export const AnyExtensionPart = ExtensionPart(Extensionkit.empty);
+
+/**
+ * Extension part that also accepts extensions outside the provided kit.
+ *
+ * @category models
+ */
+export type AnyExtensionPart = Schema.Schema.Type<typeof AnyExtensionPart>;
 
 /**
  * Creates a Schema for trajectory parts based on a toolkit and extension kit.
@@ -352,11 +389,12 @@ export type PartEncoded = Schema.Codec.Encoded<
 >;
 
 /**
- * Trajectory part that also accepts tools outside the provided toolkit.
+ * Trajectory part that also accepts tools outside the provided toolkit and
+ * extensions outside the provided extension kit.
  *
  * @category models
  */
-export type AnyPart = PromptPart | SessionPart | AnyResponsePart;
+export type AnyPart = PromptPart | SessionPart | AnyResponsePart | AnyExtensionPart;
 
 /**
  * Stream of the parts of a trajectory.

@@ -18,3 +18,8 @@ read as the newest one.
 `Trajectory.Uuid` and `Trajectory.Timestamp` are no longer exported, and
 `Versions.upTo` is gone: a version reads its whole line and encodes its own
 value, so no separate reader has to be asked for.
+
+Data recorded for an extension the kit does not hold, or whose shape no version
+of its line accepts, is carried as `Extensionkit.AnyPart` instead of failing the
+recording: `Extensionkit.PartView` reads both kinds, and
+`Extensionkit.isAnyPart` tells them apart.

@@ -7,7 +7,7 @@ A trajectory records a session with an AI model. It is a stream, and it stays
 attached to the context it was recorded in:
 
 ```text
-Trajectory = Stream<Part> + { toolkit, metadata }
+Trajectory = Stream<Part> + { toolkit, metadata, extkit }
 ```
 
 ```ts
@@ -23,11 +23,12 @@ const trajectory = Trajectory.make(
 );
 ```
 
-The returned value is a `Stream` with two extra fields, so the parts and the
+The returned value is a `Stream` with three extra fields, so the parts and the
 context they were recorded in never drift apart:
 
 - `toolkit` — the tools used to encode and decode tool parts.
 - `metadata` — the trajectory's `version`, `name` and `description`.
+- `extkit` — the extensions used to encode and decode extension parts.
 
 `metadata.version` is the version of the trajs specification the trajectory
 conforms to: the `@trajs/core` version that wrote it, `Trajectory.version`. It
@@ -40,14 +41,15 @@ wherever it lives.
 A part is one entry in the stream. Parts are closed at the schema level and
 discriminated by `_tag`:
 
-| Part           | `_tag`     | Records                         |
-| :------------- | :--------- | :------------------------------ |
-| `PromptPart`   | `Prompt`   | The messages a model was given. |
-| `ResponsePart` | `Response` | The parts a model returned.     |
-| `SessionPart`  | `Session`  | A session declaration.          |
+| Part            | `_tag`      | Records                             |
+| :-------------- | :---------- | :---------------------------------- |
+| `PromptPart`    | `Prompt`    | The messages a model was given.     |
+| `ResponsePart`  | `Response`  | The parts a model returned.         |
+| `SessionPart`   | `Session`   | A session declaration.              |
+| `ExtensionPart` | `Extension` | The data recorded for an extension. |
 
 `AnyPart` covers the tolerant form of each: `PromptPart | SessionPart |
-AnyResponsePart`.
+AnyResponsePart | AnyExtensionPart`.
 
 Every part also carries the fields of `PartMetadata`:
 
@@ -60,17 +62,20 @@ Every part also carries the fields of `PartMetadata`:
 ## Collection-driven schemas
 
 The union of parts is built from the collections a trajectory carries:
-`Trajectory.Part(toolkit)` unions the prompt part, the session part and the
-response parts the toolkit describes. Data that no collection describes does not
-fail the union — it decodes to an unconstrained part:
+`Trajectory.Part(toolkit, extkit)` unions the prompt part, the session part, the
+response parts the toolkit describes and the extension parts the kit describes.
+Data that no collection describes does not fail the union — it decodes to an
+unconstrained part:
 
 - A tool call or result for a tool outside the toolkit becomes an
   `AnyToolCallPart` / `AnyToolResultPart`.
+- A datum recorded for an extension outside the kit becomes an `AnyPart`, which
+  keeps the identifier it was recorded for and carries its data as JSON.
 
 This is a deliberate property of the model: **loading recorded history must not
 depend on the definitions installed today.** Recorded years ago or augmented by
 another producer, a trajectory still loads, and you refine it later by binding the
-tools you have.
+tools and extensions you have.
 
 ## Why a stream
 
