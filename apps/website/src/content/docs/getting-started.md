@@ -19,17 +19,18 @@ the `@trajs/core` package.
 ## Record a trajectory
 
 A prompt part records the messages a model was given, and a response part records
-what it returned. `Trajectory.make` attaches the toolkit and metadata to the
-stream.
+what it returned. `Trajectory.make` attaches the toolkit, the extension kit and
+the metadata to the stream.
 
 ```ts
 import { Stream } from "effect";
 import { Prompt, Toolkit } from "effect/ai";
-import { Trajectory } from "@trajs/core";
+import { Extensionkit, Trajectory } from "@trajs/core";
 
 const trajectory = Trajectory.make(
   Stream.make(Trajectory.promptPart(Prompt.make("Hello"))),
   Toolkit.empty,
+  Extensionkit.empty,
   Trajectory.Metadata.make({ name: "greeting" }),
 );
 ```

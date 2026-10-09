@@ -2,6 +2,7 @@ import { expect, it } from "vite-plus/test";
 import { Effect, Stream } from "effect";
 import { Prompt, Toolkit } from "effect/ai";
 import * as Codec from "#/Codec.ts";
+import * as Extensionkit from "#/Extensionkit.ts";
 import * as Response from "#/Response.ts";
 import * as Trajectory from "#/Trajectory.ts";
 
@@ -30,7 +31,7 @@ const result = (id: string, name = "get_weather") =>
   });
 
 const make = (...parts: ReadonlyArray<Trajectory.AnyPart>) =>
-  Trajectory.make(Stream.fromIterable(parts), Toolkit.empty);
+  Trajectory.make(Stream.fromIterable(parts), Toolkit.empty, Extensionkit.empty);
 
 const sessionsOf = (trajectory: Trajectory.Any) =>
   Effect.runPromise(Codec.makeChatCompletion(trajectory));

@@ -1,6 +1,7 @@
 import { expect, it } from "vite-plus/test";
 import { Effect, Exit, Option, Predicate, Stream } from "effect";
 import { Prompt, Toolkit } from "effect/ai";
+import * as Extensionkit from "#/Extensionkit.ts";
 import * as Persist from "#/Persist.ts";
 import * as Session from "#/Session.ts";
 import * as Trajectory from "#/Trajectory.ts";
@@ -11,7 +12,7 @@ const prompt = (text: string, session?: string) =>
 const declaration = (session: string, fork?: string) => Trajectory.sessionPart(session, { fork });
 
 const make = (...parts: ReadonlyArray<Trajectory.AnyPart>) =>
-  Trajectory.make(Stream.fromIterable(parts), Toolkit.empty);
+  Trajectory.make(Stream.fromIterable(parts), Toolkit.empty, Extensionkit.empty);
 
 const tags = (parts: ReadonlyArray<{ readonly _tag: string }>) => parts.map((part) => part._tag);
 
@@ -110,6 +111,7 @@ it("reads a session without draining the rest of the recording", async () => {
       Stream.forever(Stream.make(prompt("Noise", "z"))),
     ),
     Toolkit.empty,
+    Extensionkit.empty,
   );
 
   const taken = Array.from(
@@ -133,6 +135,7 @@ it("reads a parent without draining the rest of the recording", async () => {
       Stream.forever(Stream.make(prompt("Noise", "z"))),
     ),
     Toolkit.empty,
+    Extensionkit.empty,
   );
 
   expect(await parentOf(trajectory, "b")).toBe("a");

@@ -131,7 +131,7 @@ export const encode = (toolkit: Toolkit.Any): ToolkitEncoded =>
  * ```ts import.meta.vitest
  * import { Effect, Schema, Stream } from "effect"
  * import { Tool, Toolkit } from "effect/ai"
- * import { Response, Trajectory, Toolkit as TrajectoryToolkit } from "@trajs/core"
+ * import { Extensionkit, Response, Trajectory, Toolkit as TrajectoryToolkit } from "@trajs/core"
  *
  * const weather = Toolkit.make(
  *   Tool.make("get_weather", { parameters: Schema.Struct({ city: Schema.String }) })
@@ -141,7 +141,8 @@ export const encode = (toolkit: Toolkit.Any): ToolkitEncoded =>
  *   Stream.make(Trajectory.responsePart(Response.anyToolCallPart({
  *     id: "call_1", name: "get_weather", params: { city: "SF" }, providerExecuted: false
  *   }))),
- *   Toolkit.empty
+ *   Toolkit.empty,
+ *   Extensionkit.empty
  * )
  *
  * const rebound = await Effect.runPromise(TrajectoryToolkit.toolkits(weather)(recorded))
@@ -152,7 +153,7 @@ export const encode = (toolkit: Toolkit.Any): ToolkitEncoded =>
  */
 export const toolkits = <Toolkits extends ReadonlyArray<Toolkit.Any>>(...toolkits: Toolkits) =>
   Effect.fn(<Tools extends Record<string, Tool.Any>>(trajectory: Trajectory.Trajectory<Tools>) => {
-    const { toolkit, metadata } = trajectory;
+    const { toolkit, metadata, extkit } = trajectory;
 
     const merged = Toolkit.merge(toolkit, ...toolkits);
 
@@ -161,13 +162,14 @@ export const toolkits = <Toolkits extends ReadonlyArray<Toolkit.Any>>(...toolkit
     const encode = Schema.encodeEffect(sourceSchema);
     const decode = Schema.decodeEffect(targetSchema);
 
-    const trajPart = Trajectory.Part(merged);
+    const trajPart = Trajectory.Part(merged, extkit);
 
     const parts = trajectory.pipe(
       Stream.mapEffect((part) =>
         Match.value(part).pipe(
           Match.tag("Prompt", (prompt) => Effect.succeed(trajPart.make(prompt))),
           Match.tag("Session", (session) => Effect.succeed(trajPart.make(session))),
+          Match.tag("Extension", (extension) => Effect.succeed(trajPart.make(extension))),
           Match.tag("Response", (response) =>
             Effect.gen(function* () {
               const encoded = yield* encode(response.response).pipe(
@@ -186,7 +188,7 @@ export const toolkits = <Toolkits extends ReadonlyArray<Toolkit.Any>>(...toolkit
       ),
     );
 
-    return Effect.succeed(Trajectory.make(parts, merged, metadata));
+    return Effect.succeed(Trajectory.make(parts, merged, extkit, metadata));
   });
 
 /**
@@ -269,7 +271,7 @@ export const toolTurn = <Tools extends Record<string, Tool.Any>>(
  * ```ts import.meta.vitest
  * import { Effect, Schema, Stream } from "effect"
  * import { Tool, Toolkit } from "effect/ai"
- * import { Response, Trajectory, Toolkit as TrajectoryToolkit } from "@trajs/core"
+ * import { Extensionkit, Response, Trajectory, Toolkit as TrajectoryToolkit } from "@trajs/core"
  *
  * const weather = Toolkit.make(
  *   Tool.make("get_weather", { parameters: Schema.Struct({ city: Schema.String }) })
@@ -285,7 +287,8 @@ export const toolTurn = <Tools extends Record<string, Tool.Any>>(
  *
  * const recorded = Trajectory.make(
  *   Stream.make(Trajectory.responsePart(call), Trajectory.responsePart(result)),
- *   Toolkit.empty
+ *   Toolkit.empty,
+ *   Extensionkit.empty
  * )
  *
  * const bound = await Effect.runPromise(TrajectoryToolkit.toolkits(weather)(recorded))

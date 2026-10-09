@@ -1,6 +1,7 @@
 import { expect, it } from "vite-plus/test";
 import { Effect, Exit, FileSystem, Sink, Stream } from "effect";
 import { Prompt, Toolkit } from "effect/ai";
+import * as Extensionkit from "#/Extensionkit.ts";
 import * as Persist from "#/Persist.ts";
 import * as Response from "#/Response.ts";
 import * as Trajectory from "#/Trajectory.ts";
@@ -14,6 +15,7 @@ const trajectory = () =>
       ),
     ]),
     Toolkit.empty,
+    Extensionkit.empty,
     Trajectory.Metadata.make({ name: "greeting" }),
   );
 

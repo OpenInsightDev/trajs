@@ -3,6 +3,7 @@ import { Effect, Predicate, Stream } from "effect";
 import type { Prompt, Tool } from "effect/ai";
 import { Base64 } from "effect/encoding";
 import type { ChatCompletionMessage, ChatCompletionSessions } from "#/Codec.ts";
+import type * as Extensionkit from "#/Extensionkit.ts";
 import * as Trajectory from "#/Trajectory.ts";
 import type { TrajectoryError } from "#/TrajectoryError.ts";
 
@@ -178,7 +179,7 @@ export const makeChatCompletion = Effect.fn("Codec.makeChatCompletion")(function
   E,
   R,
 >(
-  trajectory: Trajectory.Trajectory<Tools, E, R>,
+  trajectory: Trajectory.Trajectory<Tools, Extensionkit.Any, E, R>,
 ): Effect.fn.Return<ChatCompletionSessions, E | TrajectoryError, R> {
   const parts = Array.from(yield* Stream.runCollect(trajectory));
   const sessions: ChatCompletionSessions = {};

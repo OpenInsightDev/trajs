@@ -13,6 +13,7 @@
 
 import { Effect, Option, Schema, Sink, Stream } from "effect";
 import { Tool, Toolkit } from "effect/ai";
+import * as Extensionkit from "#/Extensionkit.ts";
 import * as Trajectory from "#/Trajectory.ts";
 import { TrajectoryError } from "#/TrajectoryError.ts";
 import * as TrajectoryToolkit from "#/Toolkit.ts";
@@ -52,10 +53,10 @@ const Header = Schema.Struct({
  * @see {@link write} for storing the records with the stream writer.
  * @category encoding
  */
-export const encode = <Tools extends Record<string, Tool.Any>>(
-  trajectory: Trajectory.Trajectory<Tools>,
+export const encode = <Tools extends Record<string, Tool.Any>, Exts extends Extensionkit.Any>(
+  trajectory: Trajectory.Trajectory<Tools, Exts>,
 ): Stream.Stream<unknown, TrajectoryError, Tool.ResultEncodingServices<Tools[keyof Tools]>> => {
-  const encodePart = Schema.encodeEffect(Trajectory.Part(trajectory.toolkit));
+  const encodePart = Schema.encodeEffect(Trajectory.Part(trajectory.toolkit, trajectory.extkit));
 
   const header = {
     metadata: trajectory.metadata,
@@ -108,13 +109,14 @@ export const decode = Effect.fn("Persist.decode")(function* <E, R>(
     Effect.mapError(TrajectoryError.parse),
   );
 
-  const decodePart = Schema.decodeUnknownEffect(Trajectory.Part(Toolkit.empty));
+  const decodePart = Schema.decodeUnknownEffect(Trajectory.Part(Toolkit.empty, Extensionkit.empty));
 
   return Trajectory.make(
     rest.pipe(
       Stream.mapEffect((record) => decodePart(record).pipe(Effect.mapError(TrajectoryError.parse))),
     ),
     Toolkit.empty,
+    Extensionkit.empty,
     decodedHeader.metadata,
   );
 });
@@ -134,7 +136,9 @@ export const decode = Effect.fn("Persist.decode")(function* <E, R>(
  * @category encoding
  */
 export const write =
-  <Tools extends Record<string, Tool.Any>>(trajectory: Trajectory.Trajectory<Tools>) =>
+  <Tools extends Record<string, Tool.Any>, Exts extends Extensionkit.Any>(
+    trajectory: Trajectory.Trajectory<Tools, Exts>,
+  ) =>
   (key: string) =>
     Effect.gen(function* () {
       const writer = yield* StreamWriter;

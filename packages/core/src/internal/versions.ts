@@ -1,30 +1,34 @@
 /**
- * Builds a line of document versions: a schema per version, and the readers that
- * accept any version up to a given one.
+ * Builds a line of document versions: a schema per version, each of which reads
+ * every version up to it.
  *
  * A version is built from the version before it, and carries both halves of that
  * change in one declaration: the fields that make its shape, and the data mapping
- * that makes a value of it. It also carries the versions below it, so asking one
- * version for a reader is enough:
+ * that makes a value of it.
  *
  * ```ts
  * export const V1_5 = Schema.Struct({
  *   version: Schema.Literal("1.5"),
- *   url: Schema.URLFromString,
+ *   url: Schema.String,
  * }).pipe(Versions.make);
  *
  * export const V1_6 = V1_5.pipe(
  *   Versions.upgrade(
  *     (fields) => ({ ...fields, version: Schema.Literal("1.6"), host: Schema.String }),
  *     {
- *       decode: SchemaGetter.transform((from) => ({ ...from, version: "1.6", host: from.url.hostname })),
+ *       decode: SchemaGetter.transform((from) => ({
+ *         ...from,
+ *         version: "1.6",
+ *         host: new URL(from.url).hostname,
+ *       })),
  *     },
  *   ),
  * );
  *
- * Versions.upTo(V1_6); // v1.5 | v1.6 -> v1.6
- * Versions.upTo(V1_5); // v1.5 -> v1.5
- * Schema.encodeEffect(V1_6); // v1.6 -> v1.6
+ * const document = Schema.decodeUnknownSync(V1_6)({ version: "1.5", url: "https://example.com" });
+ * document; // { version: "1.6", url: "https://example.com", host: "example.com" }
+ * Schema.decodeUnknownSync(V1_6)({ version: "1.6", url: "https://example.com", host: "example.com" });
+ * Schema.encodeSync(V1_6)(document); // { version: "1.6", url: "https://example.com", host: "example.com" }
  * ```
  *
  * - `Versions.make` is the oldest version: a schema written out by hand, piped
@@ -32,19 +36,27 @@
  *   forward compatible is written — there is nothing to declare, it just starts
  *   its own line.
  * - `Versions.upgrade(fields, change)` builds the next version: its fields and the
- *   data mapping that makes a value of it, in one place. The data mapping is
- *   checked against the shape the field mapping produced, so nothing drifts apart,
- *   and both carry the version literal — which is what tells the versions apart.
- * - `Versions.upTo(version)` is the reader for a version: it accepts every version
- *   up to it, and decodes them all to its value.
- * - `Versions.across(a, b)` reads several readers at once, keeping the versions
+ *   data mapping that makes a value of it, in one place. The data mapping turns a
+ *   value of the version below into the *encoded* form of the new version — the
+ *   form the new version's own schema decodes, so nothing skips validation — and
+ *   it is checked against the shape the field mapping produced, so the two cannot
+ *   drift apart. Both carry the version literal, which is what tells the versions
+ *   apart.
+ * - A version reads its whole line: it accepts every version up to itself and
+ *   decodes them all to its own value, so no separate reader has to be asked for.
+ *   It encodes its own value too, because the newest version is what a line is
+ *   written as.
+ * - `Versions.across(a, b)` reads several lines at once, keeping the versions
  *   distinct: the decoded value keeps its `version` tag, so a caller can tell
  *   which line a document came from.
  *
- * A version carries only its own step, and the reader is assembled the first time
- * it is read: `Versions.upTo` chains the version below, then the one below that,
- * and so on. So a line of N versions holds N steps, not one chain per version, and
- * only the readers that are actually asked for are built.
+ * A version also holds `self`: its own shape alone, without the earlier versions
+ * its reader accepts. That is the shape the next version is built from, and the one
+ * to reach for when only a single version's fields are meant.
+ *
+ * A version is assembled when it is defined, so it holds one reader per version
+ * up to it — a line of N versions holds N(N+1)/2 readers — and nothing is built on
+ * first use.
  *
  * Steps are one-way. A data mapping produces the *encoded* form of the version it
  * upgrades into — the form that version's own schema decodes — so every hop is
@@ -58,109 +70,36 @@ type Upgrade<Members extends ReadonlyArray<Schema.Top>, Next extends Schema.Top,
   readonly [K in keyof Members]: Schema.decodeTo<Next, Members[K], RD, never>;
 };
 
-/** Extends a reader that already reaches a version, so that it starts one version lower. */
-type Extend = (target: Schema.Top) => Schema.Top;
-
-/** The line below a version: the step into it, and the version that step starts from. */
-type Below = {
-  readonly previous?: Below;
-  readonly extend?: Extend;
+/**
+ * A version: the schema that reads every version up to it, and the shape it was
+ * declared with.
+ *
+ * `Members` is one reader per version of the line, newest first — the version's
+ * own shape, then a step from each earlier version — and `self` is that first
+ * member on its own.
+ */
+export type Version<
+  Self extends Schema.Struct<Schema.Struct.Fields>,
+  Members extends ReadonlyArray<Schema.Top> = ReadonlyArray<Schema.Top>,
+> = Schema.Union<Members> & {
+  /**
+   * The version's own shape: the fields it declares, and the form it encodes to.
+   */
+  readonly self: Self;
 };
 
 /**
- * A version: its schema, plus the reader for every version up to it — itself
- * first (`on`), then each earlier version chained forward into it.
+ * Assembles a version from its own shape and the readers it accepts.
  *
- * `on` is built the first time it is read, by walking `extend` down the line.
+ * The overload carries the members as a tuple, which the spread the callers build
+ * cannot write down.
  */
-export type Version<
-  Self extends Schema.Top,
-  On extends ReadonlyArray<Schema.Top> = ReadonlyArray<Schema.Top>,
-> = Self &
-  Below & {
-    readonly on: On;
-  };
-
-/**
- * Builds a version's reader: itself, then each version below it, chained forward
- * into it by the step that version holds.
- *
- * The overload carries the mapped tuple type, which a function body cannot write
- * down: the walk hands back an array, not a tuple. This is the same shape as
- * `Tuple.map` in Effect — a precise signature over a plain implementation.
- */
-function reader<Next extends Schema.Top, Members extends ReadonlyArray<Schema.Top>, RD>(
-  schema: Next,
-  extend: Extend | undefined,
-  previous: Below | undefined,
-): [Next, ...Upgrade<Members, Next, RD>];
-function reader(
-  schema: Schema.Top,
-  extend: Extend | undefined,
-  previous: Below | undefined,
-): ReadonlyArray<Schema.Top> {
-  const members: Schema.Top[] = [schema];
-  let target: Schema.Top = schema;
-  let step = extend;
-  let below = previous;
-
-  while (step !== undefined) {
-    target = step(target);
-    members.push(target);
-    step = below?.extend;
-    below = below?.previous;
-  }
-
-  return members;
-}
-
-/**
- * Attaches a reader to a version's schema, built on first read and kept after.
- *
- * The overload carries the reader's type, which the getter's body cannot write
- * down, as `reader`.
- */
-function attach<Self extends Schema.Top, On extends ReadonlyArray<Schema.Top>>(
-  schema: Self,
-  previous: Below,
-  extend: Extend,
-  read: () => On,
-): Self &
-  Below & {
-    readonly on: On;
-  };
-function attach(
-  schema: Schema.Top,
-  previous: Below,
-  extend: Extend,
-  read: () => ReadonlyArray<Schema.Top>,
-): Schema.Top {
-  Object.defineProperty(schema, "on", {
-    configurable: true,
-    get() {
-      const members = read();
-      Object.defineProperty(schema, "on", { configurable: true, value: members });
-
-      return members;
-    },
-  });
-
-  return Object.assign(schema, { previous, extend });
-}
-
-/** The reader carried by a version, or just the schema when it carries none. */
-type MembersOf<V extends Schema.Top> = V extends {
-  readonly on: infer M extends ReadonlyArray<Schema.Top>;
-}
-  ? M
-  : readonly [V];
-
-/** Reads a version's reader. Overload plus a plain implementation, as `reader`. */
-function membersOf<V extends Schema.Top>(version: V): MembersOf<V>;
-function membersOf(
-  version: Schema.Top & { readonly on?: ReadonlyArray<Schema.Top> },
-): ReadonlyArray<Schema.Top> {
-  return version.on ?? [version];
+function assemble<
+  Self extends Schema.Struct<Schema.Struct.Fields>,
+  Members extends ReadonlyArray<Schema.Top>,
+>(self: Self, readers: ReadonlyArray<Schema.Top>): Version<Self, Members>;
+function assemble(self: Schema.Top, readers: ReadonlyArray<Schema.Top>): Schema.Top {
+  return Object.assign(Schema.Union(readers), { self });
 }
 
 /** Builds a line of document versions, from the oldest one up. */
@@ -172,8 +111,8 @@ export const Versions = {
   make<Self extends Schema.Struct<{ readonly version: Schema.Literal<string> }>>(
     this: void,
     schema: Self,
-  ): Version<Self, ReadonlyArray<Self>> {
-    return Object.assign(schema, { on: [schema] });
+  ): Version<Self, readonly [Self]> {
+    return assemble<Self, readonly [Self]>(schema, [schema]);
   },
   /**
    * Builds a version from the version before it: the version literal, the fields
@@ -187,42 +126,42 @@ export const Versions = {
    * same shape as `Schema.extendTo`.
    */
   upgrade<
-    Prev extends Schema.Struct<Schema.Struct.Fields>,
-    Members extends ReadonlyArray<Schema.Top>,
+    Prev extends Version<Schema.Struct<Schema.Struct.Fields>, ReadonlyArray<Schema.Top>>,
     More extends Schema.Struct.Fields & { readonly version: Schema.Literal<string> },
     RD = never,
   >(
-    fields: (previous: Prev["fields"]) => More,
+    fields: (previous: Prev["self"]["fields"]) => More,
     change: {
       /** Produces this version's encoded form, which its own schema then validates. */
       readonly decode: SchemaGetter.Getter<Schema.Struct<More>["Encoded"], Prev["Type"], RD>;
     },
   ) {
-    return (previous: Prev & Version<Prev, Members>) => {
-      const schema = previous.mapFields(fields);
+    return (
+      previous: Prev,
+    ): Version<
+      Schema.Struct<More>,
+      readonly [Schema.Struct<More>, ...Upgrade<Prev["members"], Schema.Struct<More>, RD>]
+    > => {
+      const self = previous.self.mapFields(fields);
 
-      // The step is written against the version below, so the hop names both
-      // ends: the target is whatever the reader has reached so far.
-      const extend: Extend = (target) =>
-        Schema.decodeTo<Schema.Top, Prev & Version<Prev, Members>, RD, never>(target, {
+      // One step per earlier version. Each member below already decodes its own
+      // version up to the one this was built from, so appending this version's
+      // change leaves one step per version, every one of them validated by this
+      // version's own shape.
+      const step = (member: Prev["members"][number]) =>
+        Schema.decodeTo<Schema.Struct<More>, Prev["members"][number], RD, never>(self, {
           decode: change.decode,
           encode: SchemaGetter.forbiddenEncoding,
-        })(previous);
+        })(member);
 
-      return attach<
+      return assemble<
         Schema.Struct<More>,
-        [Schema.Struct<More>, ...Upgrade<Members, Schema.Struct<More>, RD>]
-      >(schema, previous, extend, () =>
-        reader<Schema.Struct<More>, Members, RD>(schema, extend, previous),
-      );
+        readonly [Schema.Struct<More>, ...Upgrade<Prev["members"], Schema.Struct<More>, RD>]
+      >(self, [self, ...previous.members.map(step)]);
     };
   },
-  /** Every version up to `version`, as one schema; it decodes them all to `version`. */
-  upTo<V extends Schema.Top>(version: V) {
-    return Schema.Union(membersOf(version));
-  },
   /**
-   * Reads several readers at once — every version of `a` and of `b`, in one flat
+   * Reads several versions at once — every version of `a` and of `b`, in one flat
    * union, so a rejected document reports all of them.
    */
   across<AMembers extends ReadonlyArray<Schema.Top>, BMembers extends ReadonlyArray<Schema.Top>>(

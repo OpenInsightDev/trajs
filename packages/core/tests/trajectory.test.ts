@@ -1,6 +1,7 @@
 import { expect, it } from "vite-plus/test";
 import { Effect, Stream } from "effect";
 import { Prompt, Toolkit } from "effect/ai";
+import * as Extensionkit from "#/Extensionkit.ts";
 import * as Trajectory from "#/Trajectory.ts";
 
 const parts = Stream.make(Trajectory.promptPart(Prompt.make("Hello")));
@@ -11,6 +12,7 @@ it("attaches a toolkit and metadata to a stream of parts", async () => {
   const trajectory = Trajectory.make(
     parts,
     Toolkit.empty,
+    Extensionkit.empty,
     Trajectory.Metadata.make({ name: "greeting" }),
   );
 
@@ -22,7 +24,11 @@ it("attaches a toolkit and metadata to a stream of parts", async () => {
 
 it("binds a stream that was defined before the toolkit", async () => {
   const trajectory = parts.pipe(
-    Trajectory.make(Toolkit.empty, Trajectory.Metadata.make({ name: "greeting" })),
+    Trajectory.make(
+      Toolkit.empty,
+      Extensionkit.empty,
+      Trajectory.Metadata.make({ name: "greeting" }),
+    ),
   );
 
   expect(trajectory.metadata.name).toBe("greeting");

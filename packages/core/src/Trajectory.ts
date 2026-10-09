@@ -1,20 +1,22 @@
 /**
  * Records the messages sent to a model and the responses it produced.
  *
- * A trajectory is a stream of parts that stays attached to the toolkit and
- * metadata it was recorded with. Prompts are stored as the messages the model
- * was given, responses as the parts the model returned, and each part carries
- * an identifier so a recording can be inspected or rebound to the tools it
- * refers to.
+ * A trajectory is a stream of parts that stays attached to the toolkit, metadata
+ * and extensions it was recorded with. Prompts are stored as the messages the
+ * model was given, responses as the parts the model returned, and each part
+ * carries an identifier so a recording can be inspected or rebound to the tools
+ * and extensions it refers to.
  */
 
+import * as Extensionkit from "#/Extensionkit.ts";
 import * as Response from "#/Response.ts";
 import type { TrajectoryError } from "#/TrajectoryError.ts";
-import { DateTime, Effect, Function, Schema, Stream } from "effect";
+import { Effect, Function, Schema, Stream } from "effect";
 import { Prompt, Tool, Toolkit } from "effect/ai";
-import * as uuid from "uuid";
 import pkg from "../package.json" with { type: "json" };
+import { extensionParts } from "#/internal/extension.ts";
 import { promptTurns } from "#/internal/prompt.ts";
+import { Timestamp, Uuid } from "#/internal/schema.ts";
 
 /**
  * Version of the trajs specification this package reads and writes.
@@ -73,33 +75,6 @@ export class Metadata extends Schema.Class<Metadata>("Metadata")({
  * @category models
  */
 export type MetadataEncoded = Schema.Codec.Encoded<typeof Metadata>;
-
-/**
- * Identifier schema for trajectory parts.
- *
- * **Details**
- *
- * A UUID v7 is generated for each part, so identifiers are unique and sort by
- * creation time.
- *
- * @category schemas
- */
-export const Uuid = Schema.String.check(Schema.isUUID(7)).pipe(
-  Schema.withConstructorDefault(Effect.sync(() => uuid.v7())),
-);
-
-/**
- * Timestamp schema for trajectory parts.
- *
- * **Details**
- *
- * The current time is recorded for each part and encoded as an ISO 8601 string.
- *
- * @category schemas
- */
-export const Timestamp = Schema.DateTimeUtcFromString.pipe(
-  Schema.withConstructorDefault(DateTime.now),
-);
 
 /**
  * Fields shared by every trajectory part.
@@ -296,33 +271,85 @@ export const responsePart = (response: Response.Part<any>): AnyResponsePart =>
   AnyResponsePart.make({ response });
 
 /**
- * Creates a Schema for trajectory parts based on a toolkit.
+ * Creates a Schema for the extension parts an extension kit describes.
  *
  * **When to use**
  *
- * Use when decoding or encoding recorded parts with the toolkit they were
- * recorded against.
+ * Use when recording data for an extension, or when decoding a recording with
+ * the extensions it was recorded against.
+ *
+ * **Details**
+ *
+ * A part is carried per extension of the kit, discriminated by the identifier
+ * the data was recorded for: `extension` names the extension and `data` is its
+ * data, read by that extension's own line of versions, so data recorded against
+ * any version of it is read as the newest one. The timestamp is recorded when
+ * the part is constructed, and `attach` names the parts the data is associated
+ * with.
+ *
+ * **Example** (Recording data for an extension)
+ *
+ * ```ts import.meta.vitest
+ * import { Schema } from "effect"
+ * import { Extension, Extensionkit, Trajectory } from "@trajs/core"
+ *
+ * const otel = Extension.make(
+ *   "dev.observerw.otel",
+ *   Extension.Metadata.make({}),
+ *   Extension.Versions.make(Schema.Struct({
+ *     version: Schema.Literal("1.0.0"),
+ *     spanId: Schema.String
+ *   }))
+ * )
+ *
+ * const part = Schema.decodeUnknownSync(Trajectory.ExtensionPart(Extensionkit.make(otel)))({
+ *   _tag: "Extension",
+ *   extension: "dev.observerw.otel",
+ *   timestamp: "2026-01-01T00:00:00.000Z",
+ *   uuid: "0190f5b2-9c3c-7b1e-8a2d-4f6b8c0d1e2f",
+ *   data: { version: "1.0.0", spanId: "s1" }
+ * })
+ * part.extension // => "dev.observerw.otel"
+ * ```
  *
  * @category constructors
  */
-export const Part = <Tools extends Record<string, Tool.Any>>(toolkit: Toolkit.Toolkit<Tools>) =>
-  Schema.Union([PromptPart, SessionPart, ResponsePart(toolkit)]);
+export const ExtensionPart = <Exts extends Extensionkit.Any>(extkit: Exts) =>
+  extensionParts(extkit);
 
 /**
- * Union type of the parts of a trajectory for a toolkit.
+ * Creates a Schema for trajectory parts based on a toolkit and extension kit.
+ *
+ * **When to use**
+ *
+ * Use when decoding or encoding recorded parts with the toolkit and extensions
+ * they were recorded against.
+ *
+ * @category constructors
+ */
+export const Part = <Tools extends Record<string, Tool.Any>, Exts extends Extensionkit.Any>(
+  toolkit: Toolkit.Toolkit<Tools>,
+  extkit: Exts,
+) => Schema.Union([PromptPart, SessionPart, ResponsePart(toolkit), ExtensionPart(extkit)]);
+
+/**
+ * Union type of the parts of a trajectory for a toolkit and extension kit.
  *
  * @category models
  */
-export type Part<Tools extends Record<string, Tool.Any>> = Schema.Schema.Type<
-  ReturnType<typeof Part<Tools>>
->;
+export type Part<
+  Tools extends Record<string, Tool.Any>,
+  Exts extends Extensionkit.Any = Extensionkit.Any,
+> = Schema.Schema.Type<ReturnType<typeof Part<Tools, Exts>>>;
 
 /**
  * Encoded representation of trajectory parts for serialization.
  *
  * @category models
  */
-export type PartEncoded = Schema.Codec.Encoded<ReturnType<typeof Part<any>>>;
+export type PartEncoded = Schema.Codec.Encoded<
+  ReturnType<typeof Part<Record<string, Tool.Any>, Extensionkit.Any>>
+>;
 
 /**
  * Trajectory part that also accepts tools outside the provided toolkit.
@@ -338,9 +365,10 @@ export type AnyPart = PromptPart | SessionPart | AnyResponsePart;
  */
 export type PartStream<
   Tools extends Record<string, Tool.Any>,
+  Exts extends Extensionkit.Any = Extensionkit.Any,
   E = never,
   R = never,
-> = Stream.Stream<Part<Tools>, E | TrajectoryError, R>;
+> = Stream.Stream<Part<Tools, Exts>, E | TrajectoryError, R>;
 
 /**
  * Stream of trajectory parts that also accepts tools outside the provided
@@ -351,20 +379,24 @@ export type PartStream<
 export type AnyPartStream = PartStream<Record<string, never>>;
 
 /**
- * Stream of trajectory parts with the toolkit and metadata of a trajectory.
+ * Stream of trajectory parts with the toolkit, metadata and extension kit of a
+ * trajectory.
  *
  * **Details**
  *
- * The `toolkit` and `metadata` fields travel with the stream, so the parts and
- * the context they were recorded in stay together.
+ * The `toolkit`, `metadata` and `extkit` fields travel with the stream, so the
+ * parts and the context they were recorded in stay together. Each of the two kits
+ * is a type parameter, so a trajectory carries the tools and extensions it was
+ * recorded with rather than an unknown set of them.
  *
  * @category models
  */
-export type Trajectory<Tools extends Record<string, Tool.Any>, E = never, R = never> = PartStream<
-  Tools,
-  E,
-  R
-> &
+export type Trajectory<
+  Tools extends Record<string, Tool.Any>,
+  Exts extends Extensionkit.Any = Extensionkit.Any,
+  E = never,
+  R = never,
+> = PartStream<Tools, Exts, E, R> &
   Readonly<{
     /**
      * The toolkit used to encode and decode tool parts.
@@ -374,6 +406,10 @@ export type Trajectory<Tools extends Record<string, Tool.Any>, E = never, R = ne
      * The metadata of the trajectory.
      */
     metadata: Metadata;
+    /**
+     * The extensions used to encode and decode extension parts.
+     */
+    extkit: Exts;
   }>;
 
 /**
@@ -395,32 +431,34 @@ export type TrajectoryEncoded<E = never, R = never> = Stream.Stream<
 >;
 
 /**
- * Creates a trajectory from a stream of parts and a toolkit.
+ * Creates a trajectory from a stream of parts, a toolkit and an extension kit.
  *
  * **When to use**
  *
  * Use when recording a session, or when binding a stream of recorded parts to
- * the tools it refers to.
+ * the tools and extensions it refers to.
  *
  * **Details**
  *
- * The toolkit and metadata are attached to the returned stream as additional
- * fields, so the parts and the context they were recorded in stay together. A
- * stream that is defined elsewhere is bound by piping it into `make`, which
- * then takes the toolkit as its first argument. Metadata is passed as a
- * {@link Metadata} value, whose `version` defaults to {@link version} when it is
- * constructed.
+ * The toolkit, metadata and extension kit are attached to the returned stream as
+ * additional fields, so the parts and the context they were recorded in stay
+ * together. A stream that is defined elsewhere is bound by piping it into `make`,
+ * which then takes the toolkit and the kit as its first two arguments.
+ * `Extensionkit.empty` is the kit of a trajectory that carries no extension data.
+ * Metadata is passed as a {@link Metadata} value, whose `version` defaults to
+ * {@link version} when it is constructed.
  *
  * **Example** (Creating a trajectory)
  *
  * ```ts import.meta.vitest
  * import { Stream } from "effect"
  * import { Prompt, Toolkit } from "effect/ai"
- * import { Trajectory } from "@trajs/core"
+ * import { Extensionkit, Trajectory } from "@trajs/core"
  *
  * const trajectory = Trajectory.make(
  *   Stream.make(Trajectory.promptPart(Prompt.make("Hello"))),
  *   Toolkit.empty,
+ *   Extensionkit.empty,
  *   Trajectory.Metadata.make({ name: "greeting" })
  * )
  * trajectory.metadata.name // => "greeting"
@@ -432,10 +470,10 @@ export type TrajectoryEncoded<E = never, R = never> = Stream.Stream<
  * ```ts import.meta.vitest
  * import { Stream } from "effect"
  * import { Prompt, Toolkit } from "effect/ai"
- * import { Trajectory } from "@trajs/core"
+ * import { Extensionkit, Trajectory } from "@trajs/core"
  *
  * const trajectory = Stream.make(Trajectory.promptPart(Prompt.make("Hello"))).pipe(
- *   Trajectory.make(Toolkit.empty, Trajectory.Metadata.make({ name: "greeting" }))
+ *   Trajectory.make(Toolkit.empty, Extensionkit.empty, Trajectory.Metadata.make({ name: "greeting" }))
  * )
  * trajectory.metadata.name // => "greeting"
  * ```
@@ -443,22 +481,25 @@ export type TrajectoryEncoded<E = never, R = never> = Stream.Stream<
  * @category constructors
  */
 export const make: {
-  <Tools extends Record<string, Tool.Any>, E, R>(
-    parts: Stream.Stream<Part<Tools>, E, R>,
+  <Tools extends Record<string, Tool.Any>, Exts extends Extensionkit.Any, E, R>(
+    parts: Stream.Stream<Part<Tools, Exts>, E, R>,
     toolkit: Toolkit.Toolkit<Tools>,
+    extkit: Exts,
     metadata?: Metadata,
-  ): Trajectory<Tools, E, R>;
-  <Tools extends Record<string, Tool.Any>>(
+  ): Trajectory<Tools, Exts, E, R>;
+  <Tools extends Record<string, Tool.Any>, Exts extends Extensionkit.Any>(
     toolkit: Toolkit.Toolkit<Tools>,
+    extkit: Exts,
     metadata?: Metadata,
-  ): <E, R>(parts: Stream.Stream<Part<Tools>, E, R>) => Trajectory<Tools, E, R>;
+  ): <E, R>(parts: Stream.Stream<Part<Tools, Exts>, E, R>) => Trajectory<Tools, Exts, E, R>;
 } = Function.dual(
   (args) => Stream.isStream(args[0]),
-  <Tools extends Record<string, Tool.Any>, E, R>(
-    parts: Stream.Stream<Part<Tools>, E, R>,
+  <Tools extends Record<string, Tool.Any>, Exts extends Extensionkit.Any, E, R>(
+    parts: Stream.Stream<Part<Tools, Exts>, E, R>,
     toolkit: Toolkit.Toolkit<Tools>,
+    extkit: Exts,
     metadata: Metadata = Metadata.make({}),
-  ): Trajectory<Tools, E, R> => Object.assign(parts, { toolkit, metadata }),
+  ): Trajectory<Tools, Exts, E, R> => Object.assign(parts, { toolkit, metadata, extkit }),
 );
 
 /**
@@ -534,7 +575,7 @@ export type PromptTurn<Tools extends Record<string, Tool.Any>> = Readonly<{
  * @category combinators
  */
 export const prompt = <Tools extends Record<string, Tool.Any>>(
-  trajectory: PartStream<Tools>,
+  trajectory: PartStream<Tools, Extensionkit.Any>,
 ): Effect.Effect<Prompt.Prompt, TrajectoryError> =>
   promptTurns(trajectory).pipe(
     Stream.runFold(
