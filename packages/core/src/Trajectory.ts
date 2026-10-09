@@ -541,6 +541,76 @@ export const make: {
 );
 
 /**
+ * Updates the metadata of a trajectory by applying a function to it.
+ *
+ * **When to use**
+ *
+ * Use to name or describe an existing recording, or to change any other field
+ * of its metadata, without touching the parts it holds.
+ *
+ * **Details**
+ *
+ * The function receives the trajectory's {@link Metadata} and returns the
+ * metadata the returned trajectory carries, so a field the function does not
+ * carry over is dropped rather than merged. The parts, the toolkit and the
+ * extension kit are shared with the trajectory it was given, which is left
+ * unchanged. Both call styles are supported, so the update can be applied
+ * directly or piped.
+ *
+ * **Example** (Naming a recording)
+ *
+ * ```ts import.meta.vitest
+ * import { Stream } from "effect"
+ * import { Prompt, Toolkit } from "effect/ai"
+ * import { Extensionkit, Trajectory } from "@trajs/core"
+ *
+ * const trajectory = Trajectory.make(
+ *   Stream.make(Trajectory.promptPart(Prompt.make("Hello"))),
+ *   Toolkit.empty,
+ *   Extensionkit.empty,
+ *   Trajectory.Metadata.make({ name: "greeting" })
+ * )
+ *
+ * const renamed = trajectory.pipe(
+ *   Trajectory.mapMetadata((metadata) =>
+ *     Trajectory.Metadata.make({ version: metadata.version, name: "hello" })
+ *   )
+ * )
+ * renamed.metadata.name // => "hello"
+ * trajectory.metadata.name // => "greeting"
+ * ```
+ *
+ * @see {@link Metadata} for the fields an update can change.
+ * @category combinators
+ */
+export const mapMetadata: {
+  <Tools extends Record<string, Tool.Any>, Exts extends Extensionkit.Any, E, R>(
+    trajectory: Trajectory<Tools, Exts, E, R>,
+    f: (metadata: Metadata) => Metadata,
+  ): Trajectory<Tools, Exts, E, R>;
+  (
+    f: (metadata: Metadata) => Metadata,
+  ): <Tools extends Record<string, Tool.Any>, Exts extends Extensionkit.Any, E, R>(
+    trajectory: Trajectory<Tools, Exts, E, R>,
+  ) => Trajectory<Tools, Exts, E, R>;
+} = Function.dual(
+  2,
+  <Tools extends Record<string, Tool.Any>, Exts extends Extensionkit.Any, E, R>(
+    trajectory: Trajectory<Tools, Exts, E, R>,
+    f: (metadata: Metadata) => Metadata,
+  ): Trajectory<Tools, Exts, E, R> => {
+    const { toolkit, extkit } = trajectory;
+
+    // The fields are held by the stream value itself, so the parts are mapped
+    // onto a stream that is the trajectory's own before the updated metadata is
+    // attached to it.
+    const parts = Stream.map(trajectory, Function.identity);
+
+    return Object.assign(parts, { toolkit, metadata: f(trajectory.metadata), extkit });
+  },
+);
+
+/**
  * A prompt together with the response parts produced for it.
  *
  * **When to use**
