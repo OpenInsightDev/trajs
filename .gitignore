@@ -31,3 +31,6 @@ dist-ssr
 
 # AI agent worktrees
 .claude/worktrees/
+
+# references/ holds symlinks to sibling checkouts created by .agents/prepare
+references/
