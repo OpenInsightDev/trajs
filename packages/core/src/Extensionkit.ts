@@ -11,11 +11,16 @@
  * The set is also what names the extension a datum came from: {@link Part} builds
  * the part of one extension, discriminated by the identifier its data was
  * recorded for, and {@link PartView} reads a recording that carries extensions
- * the set does not hold.
+ * the set does not hold. {@link extkits} binds a recorded trajectory to the
+ * extensions it carries data for, the way a toolkit is bound to the tools a
+ * recording names.
  */
 
-import { Effect, Predicate, Schema } from "effect";
+import { Effect, Match, Predicate, Schema, Stream } from "effect";
+import type { Tool } from "effect/ai";
 import type * as Extension from "#/Extension.ts";
+import type * as Trajectory from "#/Trajectory.ts";
+import { TrajectoryError } from "#/TrajectoryError.ts";
 
 /**
  * A version line of unknown shape: the schema a set holds for an identifier.
@@ -60,12 +65,40 @@ export type Of<Exts extends ReadonlyArray<Extension.Any>> = {
 };
 
 /**
+ * The identifiers any of the sets in a list holds.
+ *
+ * The sets are distributed over, because `keyof` of a union is only the keys every
+ * member shares, which would drop the identifier a set alone holds.
+ */
+type MergedKeys<Kits extends ReadonlyArray<Record<string, AnyVersion>>> =
+  Kits[number] extends infer Kit
+    ? Kit extends Record<string, AnyVersion>
+      ? keyof Kit
+      : never
+    : never;
+
+/**
+ * The schemas the sets of a list hold for one identifier, read from the sets that
+ * hold it.
+ */
+type MergedSchemas<
+  Kits extends ReadonlyArray<Record<string, AnyVersion>>,
+  Key extends PropertyKey,
+> = Kits[number] extends infer Kit
+  ? Kit extends Record<string, AnyVersion>
+    ? Key extends keyof Kit
+      ? Kit[Key]
+      : never
+    : never
+  : never;
+
+/**
  * The set a list of sets merges to.
  *
  * @category models
  */
 export type Merged<Kits extends ReadonlyArray<Record<string, AnyVersion>>> = {
-  readonly [Key in keyof Kits[number]]: Kits[number][Key];
+  readonly [Key in MergedKeys<Kits>]: MergedSchemas<Kits, Key>;
 };
 
 /**
@@ -331,3 +364,97 @@ export const PartView = <Exts extends Any>(
   never,
   never
 > => Schema.Union([Part(extkit), AnyPart]) as any;
+
+/**
+ * Extends a trajectory's extension kit with the given extension kits.
+ *
+ * **When to use**
+ *
+ * Use to bind a trajectory to the extensions it carries data for, such as one
+ * recorded with `Extensionkit.empty` or with an older version of an extension.
+ *
+ * **Details**
+ *
+ * Every extension part is encoded with the trajectory's own kit and decoded again
+ * with the merged one, so data recorded for an extension that was unknown, or for
+ * an older version of it, regains the types of the extension's newest version.
+ * Anything no extension matches stays {@link AnyPart}, the parts of every other
+ * kind are carried over unchanged, and the toolkit, the metadata and the merged
+ * kit travel with the returned trajectory. A schema failure is reported as a
+ * {@link TrajectoryError} carrying the kit it happened with.
+ *
+ * **Example** (Binding a recording to its extensions)
+ *
+ * ```ts import.meta.vitest
+ * import { Effect, Option, Schema, Stream } from "effect"
+ * import { Toolkit } from "effect/ai"
+ * import { Extension, Extensionkit, Trajectory } from "@trajs/core"
+ *
+ * const otel = Extension.make(
+ *   "dev.observerw.otel",
+ *   Extension.Metadata.make({ name: "OpenTelemetry" }),
+ *   Extension.Versions.make(Schema.Struct({
+ *     version: Schema.Literal("1.0.0"),
+ *     spanId: Schema.String
+ *   }))
+ * )
+ *
+ * const recorded = Trajectory.make(
+ *   Stream.make(Trajectory.AnyExtensionPart.make({
+ *     extension: { extension: "dev.observerw.otel", data: { version: "1.0.0", spanId: "s1" } },
+ *     attach: Option.none()
+ *   })),
+ *   Toolkit.empty,
+ *   Extensionkit.empty
+ * )
+ *
+ * const rebound = await Effect.runPromise(
+ *   Extensionkit.extkits(Extensionkit.make(otel))(recorded)
+ * )
+ *
+ * Object.keys(rebound.extkit) // => ["dev.observerw.otel"]
+ * ```
+ *
+ * @see {@link PartView} for reading the parts of a kit together with the ones it
+ * does not hold.
+ * @category combinators
+ */
+export const extkits = <Kits extends ReadonlyArray<Any>>(...kits: Kits) =>
+  Effect.fn(
+    <Tools extends Record<string, Tool.Any>, Exts extends Any, E, R>(
+      trajectory: Trajectory.Trajectory<Tools, Exts, E, R>,
+    ): Effect.Effect<
+      Trajectory.Trajectory<Tools, Merged<readonly [Exts, ...Kits]>, E, R>,
+      TrajectoryError
+    > => {
+      const { toolkit, metadata, extkit } = trajectory;
+
+      const merged: Merged<readonly [Exts, ...Kits]> = merge(extkit, ...kits);
+
+      const encode = Schema.encodeEffect(PartView(extkit));
+      const decode = Schema.decodeUnknownEffect(PartView(merged));
+
+      const parts = trajectory.pipe(
+        Stream.mapEffect((part) =>
+          Match.value(part).pipe(
+            Match.tag("Extension", (extension) =>
+              Effect.gen(function* () {
+                const encoded = yield* encode(extension.extension).pipe(
+                  Effect.mapError(TrajectoryError.encodeExtension(extkit)),
+                );
+
+                const decoded = yield* decode(encoded).pipe(
+                  Effect.mapError(TrajectoryError.decodeExtension(merged)),
+                );
+
+                return { ...extension, extension: decoded };
+              }),
+            ),
+            Match.orElse((part) => Effect.succeed(part)),
+          ),
+        ),
+      );
+
+      return Effect.succeed(Object.assign(parts, { toolkit, metadata, extkit: merged }));
+    },
+  );

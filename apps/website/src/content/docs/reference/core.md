@@ -13,7 +13,7 @@ available as a subpath import, such as `@trajs/core/Response`.
 | `Response`        | `@trajs/core/Response`        | Tolerant response parts: `AllPartsView`, `PartView`, `StreamPartView`, `AnyToolCallPart`, `AnyToolResultPart` and their guards and constructors. Re-exports `effect/ai/Response`. |
 | `Toolkit`         | `@trajs/core/Toolkit`         | Toolkit serialization and rebinding: `encode`, `toDynamic`, `toolkits`, `toolTurn`, `toolTurns`.                                                                                  |
 | `Persist`         | `@trajs/core/Persist`         | The `.trajs` codec: `encode`, `decode`, `write`, `read`.                                                                                                                          |
-| `TrajectoryError` | `@trajs/core/TrajectoryError` | Typed failures: `TrajectoryError` and its reasons `EncodeError`, `DecodeError`, `ParseError`.                                                                                     |
+| `TrajectoryError` | `@trajs/core/TrajectoryError` | Typed failures: `TrajectoryError` and its reasons `ToolEncodeError`, `ToolDecodeError`, `ExtensionEncodeError`, `ExtensionDecodeError`, `ParseError`.                             |
 
 ## Conventions
 

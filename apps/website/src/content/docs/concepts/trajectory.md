@@ -75,7 +75,8 @@ unconstrained part:
 This is a deliberate property of the model: **loading recorded history must not
 depend on the definitions installed today.** Recorded years ago or augmented by
 another producer, a trajectory still loads, and you refine it later by binding the
-tools and extensions you have.
+tools and extensions you have: `Toolkit.toolkits` binds a recording to the tools
+it names, and `Extensionkit.extkits` to the extensions it carries data for.
 
 ## Why a stream
 
