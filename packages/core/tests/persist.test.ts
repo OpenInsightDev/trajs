@@ -1,6 +1,7 @@
 import { expect, it } from "vite-plus/test";
-import { Effect, Exit, FileSystem, Sink, Stream } from "effect";
+import { Effect, Exit, FileSystem, Schema, Sink, Stream } from "effect";
 import { Prompt, Toolkit } from "effect/ai";
+import * as Extension from "#/Extension.ts";
 import * as Extensionkit from "#/Extensionkit.ts";
 import * as Persist from "#/Persist.ts";
 import * as Response from "#/Response.ts";
@@ -37,6 +38,29 @@ it("writes a header record followed by one record per part", async () => {
   expect(header.metadata.name).toBe("greeting");
   expect(header).not.toHaveProperty("version");
   expect(records).toHaveLength(3);
+});
+
+it("writes the encoded extension kit into the header", async () => {
+  const otel = Extension.make(
+    "dev.observerw.otel",
+    Extension.Metadata.make({ name: "OpenTelemetry" }),
+    Extension.Versions.make(
+      Schema.Struct({ version: Schema.Literal("1.0.0"), spanId: Schema.String }),
+    ),
+  );
+
+  const kit = Extensionkit.make(otel);
+  const records = await recordsOf(Trajectory.make(Stream.empty, Toolkit.empty, kit));
+
+  // SAFETY: `recordsOf` returns the encoded JSON lines; this names the header
+  // fields the assertions read.
+  const header = records[0] as { extkit: ReturnType<typeof Extensionkit.encode> };
+
+  expect(header.extkit).toEqual(Extensionkit.encode(kit));
+  expect(header.extkit[otel.id]).toMatchObject({
+    dialect: "draft-07",
+    schema: { anyOf: expect.any(Array) },
+  });
 });
 
 it("reads back metadata and parts, keeping the part tags", async () => {

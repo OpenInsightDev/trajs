@@ -10,7 +10,7 @@ The interchange form of a trajectory is plain JSONL: one JSON object per line.
 
 - **Line 1 is the header.** It carries the trajectory's non-stream fields: the
   `metadata` (including its `version`, the `@trajs/core` version that wrote the
-  recording) and the serialized `toolkit`.
+  recording), the serialized `toolkit` and the serialized `extkit`.
 - **Lines 2..n are the parts**, discriminated by the existing `_tag` field.
 
 The header is deliberately **not a part** and carries **no `_tag`** — `_tag` means
@@ -18,7 +18,7 @@ The header is deliberately **not a part** and carries **no `_tag`** — `_tag` m
 confuse.
 
 ```jsonl
-{"metadata":{"version":"<trajs version>"},"toolkit":{}}
+{"metadata":{"version":"<trajs version>"},"toolkit":{},"extkit":{}}
 {"_tag":"Prompt","uuid":"0192...","timestamp":"...","messages":[]}
 {"_tag":"Response","uuid":"0192...","timestamp":"...","response":{}}
 {"_tag":"Session","uuid":"0192...","timestamp":"...","session":"agent-a"}
@@ -36,7 +36,7 @@ so a recording never leaves its vintage to be guessed.
 
 The header must come first. This is a semantic requirement, not a convention: a
 streaming decoder needs a tool's schemas before it can decode that tool's parts.
-The toolkit is a non-stream field of the trajectory.
+The toolkit and the extension kit are non-stream fields of the trajectory.
 
 ## Ordering
 
@@ -76,9 +76,10 @@ const program = Effect.scoped(
 ## Tolerant decoding
 
 The first record is peeled off the stream and read as the header; the remaining
-records stay lazy and are decoded as parts. Tool parts are read unconstrained
-because the toolkit starts empty: bind them to their tools with
-[`Toolkit.toolkits`](../toolkits/) when the schemas are available.
+records stay lazy and are decoded as parts. Tool and extension parts are read
+unconstrained, because the toolkit starts empty and no extension kit is held:
+bind them to their schemas with [`Toolkit.toolkits`](../toolkits/) and
+`Extensionkit.extkits` when the schemas are available.
 
 Because the parts are read lazily from the same source as the header, the returned
 trajectory is only valid within the scope the effect runs in. Consume it there.

@@ -109,6 +109,19 @@ it("keeps data no version of the extension accepts", async () => {
   expect(payload.data).toEqual({ version: "1.0.0" });
 });
 
+it("serializes a kit as the JSON Schema document of each extension's versions", () => {
+  const encoded = Extensionkit.encode(timedKit);
+
+  expect(Object.keys(encoded)).toEqual([otel.id]);
+  expect(encoded[otel.id].dialect).toBe("draft-07");
+
+  // The document is the whole line, so every version it reads is described.
+  const described = JSON.stringify(encoded[otel.id].schema);
+  expect(described).toContain('"1.0.0"');
+  expect(described).toContain('"1.1.0"');
+  expect(Extensionkit.encode(Extensionkit.empty)).toEqual({});
+});
+
 it("carries the toolkit, metadata and merged kit over", async () => {
   const source = Trajectory.make(
     Stream.make(Trajectory.promptPart(Prompt.make("Hello"))),

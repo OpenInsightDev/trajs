@@ -3,8 +3,9 @@
  *
  * A recorded trajectory is a `.trajs` file. Each line is one JSON record: the
  * first is a header carrying the trajectory's non-stream fields (the metadata,
- * including the specification version, and the serialized toolkit), and the rest
- * are the parts of the trajectory, discriminated by their `_tag`.
+ * including the specification version, and the serialized toolkit and extension
+ * kit), and the rest are the parts of the trajectory, discriminated by their
+ * `_tag`.
  *
  * The header is peeled off the stream and read on its own rather than described
  * as a part, because it is not one. It comes first because a decoder needs a
@@ -25,16 +26,22 @@ import { StreamWriter } from "#/internal/stream-writer.ts";
  *
  * **Details**
  *
- * The header carries the trajectory's non-stream fields, serialized. It has no
- * `version` field of its own: the specification version is `metadata.version`, so
- * a recording states its version the same way whether it is read from a file or
- * constructed in memory.
+ * The header carries the trajectory's non-stream fields, serialized: the encoded
+ * toolkit and the encoded extension kit, each keyed by the key of the tool or the
+ * identifier of the extension it describes. It has no `version` field of its own:
+ * the specification version is `metadata.version`, so a recording states its
+ * version the same way whether it is read from a file or constructed in memory.
+ *
+ * The two kits are read as records of unknown values, because a reader needs
+ * their identifiers, not their schemas: the toolkit starts empty and the
+ * extension kit is not held at all, so the parts are read unconstrained.
  *
  * @category schemas
  */
 const Header = Schema.Struct({
   metadata: Trajectory.Metadata,
   toolkit: Schema.optional(Schema.Record(Schema.String, Schema.Unknown)),
+  extkit: Schema.optional(Schema.Record(Schema.String, Schema.Unknown)),
 });
 
 /**
@@ -47,8 +54,8 @@ const Header = Schema.Struct({
  * **Details**
  *
  * The first record is the header, followed by one record per part, encoded with
- * the toolkit the trajectory was recorded with. Records are plain JSON values,
- * ready for a newline-delimited JSON writer to serialize.
+ * the toolkit and extension kit the trajectory was recorded with. Records are
+ * plain JSON values, ready for a newline-delimited JSON writer to serialize.
  *
  * @see {@link write} for storing the records with the stream writer.
  * @category encoding
@@ -61,6 +68,7 @@ export const encode = <Tools extends Record<string, Tool.Any>, Exts extends Exte
   const header = {
     metadata: trajectory.metadata,
     toolkit: TrajectoryToolkit.encode(trajectory.toolkit),
+    extkit: Extensionkit.encode(trajectory.extkit),
   };
 
   return Stream.concat(
@@ -86,9 +94,10 @@ export const encode = <Tools extends Record<string, Tool.Any>, Exts extends Exte
  * The first record is peeled off the stream and read as the header; the remaining
  * records stay lazy and are decoded as parts. A header without metadata, or with
  * metadata that does not state its `version`, is a parse failure rather than a
- * trajectory of unknown vintage. The returned trajectory's toolkit is empty,
- * because tool parts are read unconstrained: bind them to their tools with
- * `Toolkit.toolkits` when their schemas are available.
+ * trajectory of unknown vintage. The returned trajectory's toolkit is empty and
+ * its extension kit is not held, because tool and extension parts are read
+ * unconstrained: bind them to their schemas with `Toolkit.toolkits` and
+ * `Extensionkit.extkits` when they are available.
  *
  * The parts are read from the same source as the header, so the returned
  * trajectory is only valid within the scope the effect runs in: consume it there.

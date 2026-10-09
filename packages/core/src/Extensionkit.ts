@@ -16,7 +16,7 @@
  * recording names.
  */
 
-import { Effect, Match, Predicate, Schema, Stream } from "effect";
+import { Effect, JsonSchema, Match, Predicate, Schema, Stream } from "effect";
 import type { Tool } from "effect/ai";
 import type * as Extension from "#/Extension.ts";
 import type * as Trajectory from "#/Trajectory.ts";
@@ -163,6 +163,53 @@ export const make = <const Exts extends ReadonlyArray<Extension.Any>>(
 export const merge = <const Kits extends ReadonlyArray<Record<string, AnyVersion>>>(
   ...kits: Kits
 ): Merged<Kits> => Object.assign({}, ...kits) as Merged<Kits>;
+
+/**
+ * Serialized form of an extension kit, keyed by the identifiers of its
+ * extensions.
+ *
+ * **When to use**
+ *
+ * Use to persist the data formats a recording carries, or to describe them to a
+ * reader that does not have the extensions themselves.
+ *
+ * **Details**
+ *
+ * Each value is the draft-07 JSON Schema document of an extension's line of
+ * versions, so the data an extension reads can be described without the Effect
+ * Schemas the line was built from. The document is the whole line: every version
+ * the extension's newest one reads is a member of it, so data recorded against
+ * an older version is described as well.
+ *
+ * @see {@link encode} for serializing an extension kit.
+ * @category models
+ */
+export type ExtensionkitEncoded = Record<string, JsonSchema.Document<"draft-07">>;
+
+/**
+ * Serializes an extension kit into an {@link ExtensionkitEncoded} record.
+ *
+ * **When to use**
+ *
+ * Use to persist the data formats a recording carries, or to describe them to a
+ * reader that does not have the extensions themselves.
+ *
+ * **Details**
+ *
+ * Each extension contributes the draft-07 JSON Schema document of its line of
+ * versions, keyed by the identifier its data was recorded for. Descriptive
+ * metadata is not part of the set, so it is not part of the encoded form either;
+ * read it from the extension that was declared.
+ *
+ * @category encoding
+ */
+export const encode = (extkit: Any): ExtensionkitEncoded =>
+  Object.fromEntries(
+    Object.entries(extkit).map(([id, version]) => [
+      id,
+      JsonSchema.toDocumentDraft07(Schema.toJsonSchemaDocument(version)),
+    ]),
+  );
 
 /**
  * One member of the parts an extension kit describes: the extension it belongs

@@ -77,12 +77,12 @@ Load a recording with `Persist.decode`, `Persist.read` or `Persist.encode`.
 
 A recording is plain JSONL: line 1 is a header carrying the `metadata` (including
 its `version`, the `@trajs/core` version that wrote the recording) and the
-serialized `toolkit`; every later line is a part, discriminated by `_tag`. The
-header carries no `_tag` — `_tag` means "this is a part" — so the two are
-impossible to confuse.
+serialized `toolkit` and `extkit`; every later line is a part, discriminated by
+`_tag`. The header carries no `_tag` — `_tag` means "this is a part" — so the two
+are impossible to confuse.
 
 ```jsonl
-{"metadata":{"version":"<trajs version>"},"toolkit":{}}
+{"metadata":{"version":"<trajs version>"},"toolkit":{},"extkit":{}}
 {"_tag":"Prompt","uuid":"0192...","timestamp":"...","messages":[]}
 {"_tag":"Response","uuid":"0192...","timestamp":"...","response":{}}
 ```
