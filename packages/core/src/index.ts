@@ -17,3 +17,5 @@ export * as Toolkit from "./Toolkit.ts";
 export * as Trajectory from "./Trajectory.ts";
 
 export * as TrajectoryError from "./TrajectoryError.ts";
+
+export * as View from "./View.ts";

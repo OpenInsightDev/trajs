@@ -6,6 +6,7 @@ import type { ChatCompletionMessage, ChatCompletionSessions } from "#/Codec.ts";
 import type * as Extensionkit from "#/Extensionkit.ts";
 import * as Trajectory from "#/Trajectory.ts";
 import type { TrajectoryError } from "#/TrajectoryError.ts";
+import * as View from "#/View.ts";
 
 const textPart = (text: string): OpenAiClient.ChatCompletionContentPart => ({ type: "text", text });
 
@@ -150,7 +151,7 @@ const messagesOf = (message: Prompt.Message): ChatCompletionMessage[] => {
 const sessionMessages = <Tools extends Record<string, Tool.Any>>(
   parts: ReadonlyArray<Trajectory.Part<Tools>>,
 ): Effect.Effect<ChatCompletionMessage[], TrajectoryError> =>
-  Trajectory.prompt(Stream.fromIterable(parts)).pipe(
+  View.prompt(Stream.fromIterable(parts)).pipe(
     Effect.map((prompt) => prompt.content.flatMap(messagesOf)),
   );
 

@@ -59,7 +59,7 @@ export type ChatCompletionSessions = Record<string, ChatCompletionMessage[]>;
  * **Details**
  *
  * The parts are grouped by the `session` they carry, and each group is folded
- * with {@link Trajectory.prompt}, so a prompt part contributes the messages the
+ * with {@link View.prompt}, so a prompt part contributes the messages the
  * model was given and the response parts that follow it contribute the messages
  * it returned. Parts that carry no `session` are grouped under the empty string.
  * Session parts carry no messages and are skipped.

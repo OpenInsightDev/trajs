@@ -3,7 +3,7 @@ import { Effect, Stream } from "effect";
 import { Prompt } from "effect/ai";
 import * as Response from "#/Response.ts";
 import * as Trajectory from "#/Trajectory.ts";
-import { promptTurns } from "#/internal/prompt.ts";
+import * as View from "#/View.ts";
 
 const prompt = (text: string) => Trajectory.promptPart(Prompt.make(text));
 
@@ -13,7 +13,7 @@ const make = (...parts: ReadonlyArray<Trajectory.AnyPart>) =>
   Trajectory.make(Stream.fromIterable(parts));
 
 const turnsOf = async (trajectory: Trajectory.Any) =>
-  Array.from(await Effect.runPromise(Stream.runCollect(promptTurns(trajectory))));
+  Array.from(await Effect.runPromise(Stream.runCollect(View.promptTurns(trajectory))));
 
 const roles = (prompt: Prompt.Prompt) => prompt.content.map((message) => message.role);
 
@@ -67,7 +67,7 @@ it("skips parts that carry neither a prompt nor a response", async () => {
 it("folds the turns back into the prompt a model was given", async () => {
   const trajectory = make(prompt("Hello"), response("Hi"), prompt("Bye"), response("Goodbye"));
 
-  const folded = await Effect.runPromise(Trajectory.prompt(trajectory));
+  const folded = await Effect.runPromise(View.prompt(trajectory));
 
   expect(roles(folded)).toEqual(["user", "assistant", "user", "assistant"]);
 });
