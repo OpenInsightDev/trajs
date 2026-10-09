@@ -9,8 +9,7 @@ export default defineConfig({
   integrations: [
     starlight({
       title: "trajs",
-      description:
-        "Record, version and analyze AI model sessions as trajectories, with extension data as a first-class part of the record.",
+      description: "Record, version and analyze AI model sessions as trajectories.",
       favicon: "/favicon.svg",
       customCss: ["./src/styles/custom.css"],
       social: [
@@ -30,10 +29,7 @@ export default defineConfig({
         },
         {
           label: "Concepts",
-          items: [
-            { label: "Trajectories", slug: "concepts/trajectory" },
-            { label: "Extensions", slug: "concepts/extensions" },
-          ],
+          items: [{ label: "Trajectories", slug: "concepts/trajectory" }],
         },
         {
           label: "Guides",

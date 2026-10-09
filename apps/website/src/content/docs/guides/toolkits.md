@@ -62,8 +62,8 @@ import { Toolkit as TrajectoryToolkit } from "@trajs/core";
 const rebound = await Effect.runPromise(TrajectoryToolkit.toolkits(weather)(recorded));
 ```
 
-Anything no tool matches stays unrestricted, and prompt parts, metadata and
-extensions are carried over. Schema failures are reported as a `TrajectoryError`.
+Anything no tool matches stays unrestricted, and prompt parts and metadata are
+carried over. Schema failures are reported as a `TrajectoryError`.
 
 This is the step that follows loading: `Persist.decode` returns a trajectory with
 an empty toolkit, because it reads tool parts unconstrained until you supply the

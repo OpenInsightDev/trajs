@@ -10,7 +10,7 @@ The interchange form of a trajectory is plain JSONL: one JSON object per line.
 
 - **Line 1 is the header.** It carries the trajectory's non-stream fields: the
   `metadata` (including its `version`, the `@trajs/core` version that wrote the
-  recording), the serialized `toolkit` and the `extensions` registry.
+  recording) and the serialized `toolkit`.
 - **Lines 2..n are the parts**, discriminated by the existing `_tag` field.
 
 The header is deliberately **not a part** and carries **no `_tag`** — `_tag` means
@@ -18,13 +18,13 @@ The header is deliberately **not a part** and carries **no `_tag`** — `_tag` m
 confuse.
 
 ```jsonl
-{"metadata":{"version":"<trajs version>"},"toolkit":{},"extensions":{"dev.trajs.otel":{"version":"1.0.0","schema":{}}}}
+{"metadata":{"version":"<trajs version>"},"toolkit":{}}
 {"_tag":"Prompt","uuid":"0192...","timestamp":"...","messages":[]}
 {"_tag":"Response","uuid":"0192...","timestamp":"...","response":{}}
-{"_tag":"Extension","extension":"dev.trajs.otel","version":"1.0.0","uuid":"0192...","timestamp":"...","anchor":"0192...","data":{}}
+{"_tag":"Session","uuid":"0192...","timestamp":"...","session":"agent-a"}
 ```
 
-Part `_tag` values are `Prompt`, `Response` and `Extension`, with no collision.
+Part `_tag` values are `Prompt`, `Response` and `Session`, with no collision.
 
 The specification version is not a field of the header of its own: it is
 `metadata.version`, and both it and the metadata are required. `Persist` writes
@@ -35,9 +35,8 @@ so a recording never leaves its vintage to be guessed.
 ## Why the header comes first
 
 The header must come first. This is a semantic requirement, not a convention: a
-streaming decoder needs an extension's schema before it can decode that
-extension's data, and a tool's schemas before it can decode that tool's parts. The
-registry is a non-stream field of the trajectory, exactly like `toolkit`.
+streaming decoder needs a tool's schemas before it can decode that tool's parts.
+The toolkit is a non-stream field of the trajectory.
 
 ## Ordering
 
@@ -54,7 +53,7 @@ remains the time truth; reconstructing time order is a view operation.
 | Export                           | Works on               | Needs                |
 | :------------------------------- | :--------------------- | :------------------- |
 | `Persist.encode(trajectory)`     | A `Stream` of records  | An encoder           |
-| `Persist.decode(extensions)`     | A `Stream` of records  | Definitions          |
+| `Persist.decode(records)`        | A `Stream` of records  | Nothing              |
 | `Persist.write(trajectory)(key)` | A key on a file system | A `FileSystem` layer |
 | `Persist.read(key)`              | A key on a file system | A `FileSystem` layer |
 
@@ -69,7 +68,7 @@ const records = await Effect.runPromise(Stream.runCollect(Persist.encode(traject
 
 const program = Effect.scoped(
   Effect.gen(function* () {
-    return yield* Persist.decode()(Stream.fromIterable(records));
+    return yield* Persist.decode(Stream.fromIterable(records));
   }),
 );
 ```
@@ -77,9 +76,8 @@ const program = Effect.scoped(
 ## Tolerant decoding
 
 The first record is peeled off the stream and read as the header; the remaining
-records stay lazy and are decoded as parts. Data whose definition is missing is
-read as an unconstrained part rather than failing to load, and tool parts are read
-unconstrained because the toolkit starts empty: bind them to their tools with
+records stay lazy and are decoded as parts. Tool parts are read unconstrained
+because the toolkit starts empty: bind them to their tools with
 [`Toolkit.toolkits`](../toolkits/) when the schemas are available.
 
 Because the parts are read lazily from the same source as the header, the returned

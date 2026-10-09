@@ -41,8 +41,8 @@ The core vocabulary is unchanged: **a trajectory is a stream of parts**, and a
 session derivation is one kind of part.
 
 ```
-Trajectory = Stream<Part> + { toolkit, metadata, extensions }
-Part       = PromptPart | ResponsePart(toolkit) | ExtensionPart(extensions) | SessionPart
+Trajectory = Stream<Part> + { toolkit, metadata }
+Part       = PromptPart | ResponsePart(toolkit) | SessionPart
 ```
 
 Two rules keep the design minimal:
@@ -57,15 +57,15 @@ Two rules keep the design minimal:
   and which part of another session it continues from. The inherited context
   itself stays in the parent's own parts, where it was recorded.
 
-`Part` grows one union member, exactly as RFC 0001 added `ExtensionPart`. At the
-schema level the union stays closed, so a consumer that pattern-matches parts is
+`Part` grows one union member. At the schema level the union stays closed, so a
+consumer that pattern-matches parts is
 forced by the compiler to handle sessions explicitly, and a derived session can
 never be silently mistaken for an unrelated one.
 
 ## III. `SessionPart`
 
-`SessionPart` is defined in `Trajectory.ts`, next to `ResponsePart` and
-`ExtensionPart`, and reuses the part envelope.
+`SessionPart` is defined in `Trajectory.ts`, next to `ResponsePart`, and reuses
+the part envelope.
 
 ```ts
 // Trajectory.ts
@@ -97,10 +97,6 @@ class SessionPart extends Schema.TaggedClass<SessionPart>()("Session", {
   session's other parts in the stream, because a streaming writer emits it when
   the session starts. Like the header coming first, this is a semantic
   requirement of the format, not something the schema enforces.
-- **Agent metadata is extension data.** A name, role, model or label belongs to
-  the agent, not to the derivation edge, so it is an `ExtensionPart` whose
-  `anchor` is this part's `uuid`. The anchor mechanism already exists; sessions
-  reuse it rather than growing the core envelope.
 
 ## IV. Reading sessions
 
@@ -131,9 +127,8 @@ long recording does not materialize the whole of it. The one pass over the held
 parts is the lineage walk, not a plain filter: parts of interleaved sessions are
 dropped, and each ancestor's parts are cut at _its_ fork point, not the child's.
 
-Consistent with how response and extension parts degrade, a `fork` that names a
-part absent from the loaded recording is a **dangling edge**, not a load
-failure: partial or filtered reads stay readable, and an analysis that walks the
+A `fork` that names a part absent from the loaded recording is a **dangling
+edge**, not a load failure: partial or filtered reads stay readable, and an analysis that walks the
 lineage reports the break. A cycle is invalid and is reported rather than
 followed. A well-formed recording cannot contain one: each `fork` target
 precedes its declaration, so following the edges only ever moves backwards.
@@ -154,12 +149,11 @@ Parts are the append-only timeline, and a derivation is a timeline event.
 
 ## VI. Module layout
 
-The split mirrors the extension module, which separates the part from the
-operations on it.
+The split separates the part from the operations on it.
 
 - `Trajectory.ts`: `SessionPart`, `isSessionPart`, wired into `Part`,
-  `PartEncoded` and `AnyPart`. `SessionPart` needs no toolkit- or
-  extension-parameterised variant, because nothing about it is toolkit-dependent.
+  `PartEncoded` and `AnyPart`. `SessionPart` needs no toolkit-parameterised
+  variant, because nothing about it is toolkit-dependent.
 - `Session.ts`: the public API — `parts`, `select`, `parent`, `of`, `children`.
   The file exists and is empty today; it gets its public API here. `parts` and
   `select` are filters; the rest delegate to the internal module.
@@ -174,15 +168,9 @@ operations on it.
   is written first and never rewritten, so a fork that occurs during a recording
   cannot be added to it. It also puts session identity in a second place while
   parts already carry `session`.
-- **A session-definition `ExtensionPart`.** Sessions are core (the `session`
-  string is already core), and a fork recorded as an extension would vanish for
-  any reader that does not install the definition — losing the very edge that
-  makes the recording interpretable. Extension data is domain payload, not
-  structure.
 - **A `fork` field on `PartMetadata`.** A derivation is a session-level fact, so
   carrying it on every part repeats it, and "the first part of the session" is a
   positional convention that breaks when the stream is filtered or reordered.
-  `PartMetadata` is also spread into every extension part.
 - **A structured `session` (an object that embeds its parent on each part).**
   Same redundancy, and it changes the meaning of a field that already works.
 - **A compound `parent: { session, at }` edge with an optional point.** Storing
@@ -209,14 +197,14 @@ These are recorded, not yet decided.
    later `Session` part naming an existing session could instead mean a resumed
    or compacted continuation; that is not modelled yet.
 4. **Core session metadata.** Whether a name or role deserves to be in the core
-   `SessionPart` rather than an anchored extension.
+   `SessionPart`.
 5. **Enforcement.** Whether a writer validates acyclicity and ordering, or the
    format leaves it to combinator-time checks.
 6. **`fork` boundary.** Inclusive versus exclusive is fixed here as inclusive;
    confirm that matches how inherited context is actually assembled.
 7. **ATIF interoperability.** Mapping to and from ATIF's subagent reference, and
-   whether ATIF's turn-grain `step` mapping (RFC 0001, Open Question 3) changes
-   the intended meaning of the `fork` point.
+   whether ATIF's turn-grain `step` mapping changes the intended meaning of the
+   `fork` point.
 
 ## IX. Non-goals
 

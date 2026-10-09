@@ -1,13 +1,9 @@
 import { expect, it } from "vite-plus/test";
-import { Effect, Exit, FileSystem, Predicate, Schema, Sink, Stream } from "effect";
+import { Effect, Exit, FileSystem, Sink, Stream } from "effect";
 import { Prompt, Toolkit } from "effect/ai";
-import * as Extension from "#/Extension.ts";
-import * as Extensionkit from "#/Extensionkit.ts";
 import * as Persist from "#/Persist.ts";
 import * as Response from "#/Response.ts";
 import * as Trajectory from "#/Trajectory.ts";
-
-const otel = Extension.make("dev.trajs.otel", "1.0.0", Schema.Struct({ spanId: Schema.String }));
 
 const trajectory = () =>
   Trajectory.make(
@@ -16,11 +12,9 @@ const trajectory = () =>
       Trajectory.responsePart(
         Response.anyToolCallPart({ id: "c1", name: "read", params: {}, providerExecuted: false }),
       ),
-      Trajectory.anyExtensionPart({ extension: "dev.trajs.otel", data: { spanId: "s1" } }),
     ]),
     Toolkit.empty,
     Trajectory.Metadata.make({ name: "greeting" }),
-    Extensionkit.make(otel),
   );
 
 const recordsOf = (trajectory: Trajectory.Any) =>
@@ -35,14 +29,12 @@ it("writes a header record followed by one record per part", async () => {
   // fields the assertions read.
   const header = records[0] as {
     metadata: { version: string; name: string };
-    extensions: Record<string, { version: string }>;
   };
 
   expect(header.metadata.version).toBe(Trajectory.version);
   expect(header.metadata.name).toBe("greeting");
   expect(header).not.toHaveProperty("version");
-  expect(header.extensions["dev.trajs.otel"].version).toBe("1.0.0");
-  expect(records).toHaveLength(4);
+  expect(records).toHaveLength(3);
 });
 
 it("reads back metadata and parts, keeping the part tags", async () => {
@@ -51,9 +43,7 @@ it("reads back metadata and parts, keeping the part tags", async () => {
   const { metadata, parts } = await Effect.runPromise(
     Effect.scoped(
       Effect.gen(function* () {
-        const decoded = yield* Persist.decode(Extensionkit.make(otel))(
-          Stream.fromIterable(records),
-        );
+        const decoded = yield* Persist.decode(Stream.fromIterable(records));
 
         return { metadata: decoded.metadata, parts: Array.from(yield* Stream.runCollect(decoded)) };
       }),
@@ -61,26 +51,7 @@ it("reads back metadata and parts, keeping the part tags", async () => {
   );
 
   expect(metadata.name).toBe("greeting");
-  expect(parts.map((part) => part._tag)).toEqual(["Prompt", "Response", "Extension"]);
-});
-
-it("keeps extension data whose definition the reader does not have", async () => {
-  const records = await recordsOf(trajectory());
-
-  const parts = await Effect.runPromise(
-    Effect.scoped(
-      Effect.gen(function* () {
-        const decoded = yield* Persist.decode()(Stream.fromIterable(records));
-
-        return Array.from(yield* Stream.runCollect(decoded));
-      }),
-    ),
-  );
-
-  const extension = parts[2];
-
-  expect(extension._tag).toBe("Extension");
-  expect(Predicate.isTagged("Extension")(extension) && extension.data).toEqual({ spanId: "s1" });
+  expect(parts.map((part) => part._tag)).toEqual(["Prompt", "Response"]);
 });
 
 it("decodes the header without pulling the parts", async () => {
@@ -94,7 +65,7 @@ it("decodes the header without pulling the parts", async () => {
   const name = await Effect.runPromise(
     Effect.scoped(
       Effect.gen(function* () {
-        const decoded = yield* Persist.decode()(records);
+        const decoded = yield* Persist.decode(records);
 
         return decoded.metadata.name;
       }),
@@ -105,9 +76,7 @@ it("decodes the header without pulling the parts", async () => {
 });
 
 it("fails when the header is missing", async () => {
-  const result = await Effect.runPromise(
-    Effect.exit(Effect.scoped(Persist.decode()(Stream.empty))),
-  );
+  const result = await Effect.runPromise(Effect.exit(Effect.scoped(Persist.decode(Stream.empty))));
 
   expect(Exit.isFailure(result)).toBe(true);
 });
@@ -115,12 +84,12 @@ it("fails when the header is missing", async () => {
 it("fails when the header does not state the specification version", async () => {
   const withoutVersion = await Effect.runPromise(
     Effect.exit(
-      Effect.scoped(Persist.decode()(Stream.fromIterable([{ metadata: { name: "greeting" } }]))),
+      Effect.scoped(Persist.decode(Stream.fromIterable([{ metadata: { name: "greeting" } }]))),
     ),
   );
 
   const withoutMetadata = await Effect.runPromise(
-    Effect.exit(Effect.scoped(Persist.decode()(Stream.fromIterable([{ toolkit: {} }])))),
+    Effect.exit(Effect.scoped(Persist.decode(Stream.fromIterable([{ toolkit: {} }])))),
   );
 
   expect(Exit.isFailure(withoutVersion)).toBe(true);
@@ -164,7 +133,7 @@ it("writes and reads a trajectory through the stream services", async () => {
     Effect.scoped(
       Effect.gen(function* () {
         yield* Persist.write(trajectory())("trajectory.trajs");
-        const decoded = yield* Persist.read(Extensionkit.make(otel))("trajectory.trajs");
+        const decoded = yield* Persist.read("trajectory.trajs");
 
         return { metadata: decoded.metadata, parts: Array.from(yield* Stream.runCollect(decoded)) };
       }).pipe(Effect.provide(fileSystem)),
@@ -172,5 +141,5 @@ it("writes and reads a trajectory through the stream services", async () => {
   );
 
   expect(metadata.name).toBe("greeting");
-  expect(parts.map((part) => part._tag)).toEqual(["Prompt", "Response", "Extension"]);
+  expect(parts.map((part) => part._tag)).toEqual(["Prompt", "Response"]);
 });

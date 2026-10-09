@@ -8,7 +8,6 @@
  * refers to.
  */
 
-import type * as Extensionkit from "#/Extensionkit.ts";
 import * as Response from "#/Response.ts";
 import type { TrajectoryError } from "#/TrajectoryError.ts";
 import { DateTime, Effect, Function, Schema, Stream } from "effect";
@@ -180,8 +179,7 @@ export const promptPart = (prompt: Prompt.Prompt) => PromptPart.make({ messages:
  * The part's own `session` is the session it declares. `fork` names the part of
  * another session the new session continues from, and the parent session is not
  * stored because it is that part's `session`. A part with no `fork` starts a
- * session that inherits nothing. Facts about the agent itself, such as its name
- * or role, are recorded as an extension anchored to this part's `uuid`.
+ * session that inherits nothing.
  *
  * @see {@link sessionPart} for constructing one.
  * @category models
@@ -298,121 +296,26 @@ export const responsePart = (response: Response.Part<any>): AnyResponsePart =>
   AnyResponsePart.make({ response });
 
 /**
- * Trajectory part that carries data for an extension no definition describes.
+ * Creates a Schema for trajectory parts based on a toolkit.
  *
  * **When to use**
  *
- * Use to type or decode extension data whose definition is not available, such
- * as when loading a recording made with extensions that are not installed.
- *
- * @category models
- */
-export const AnyExtensionPart = class AnyExtensionPart extends Schema.TaggedClass<AnyExtensionPart>()(
-  "Extension",
-  {
-    extension: Schema.String,
-    version: Schema.optional(Schema.String),
-    anchor: Schema.optional(Uuid),
-    timestamp: Timestamp,
-    data: Schema.Json,
-    ...PartMetadata.fields,
-  },
-) {};
-
-/**
- * Type of a trajectory part that carries data for an extension no definition
- * describes.
- *
- * @category models
- */
-export type AnyExtensionPart = Schema.Schema.Type<typeof AnyExtensionPart>;
-
-/**
- * Constructs a new extension part whose data no definition describes.
- *
- * **When to use**
- *
- * Use when recording extension data that the current definitions do not
- * describe.
- *
- * **Example** (Recording an extension part)
- *
- * ```ts import.meta.vitest
- * import { Trajectory } from "@trajs/core"
- *
- * const part = Trajectory.anyExtensionPart({ extension: "dev.trajs.otel", data: { spanId: "s1" } })
- * part.extension // => "dev.trajs.otel"
- * ```
+ * Use when decoding or encoding recorded parts with the toolkit they were
+ * recorded against.
  *
  * @category constructors
  */
-export const anyExtensionPart = (
-  params: Parameters<typeof AnyExtensionPart.make>[0],
-): AnyExtensionPart => AnyExtensionPart.make(params);
+export const Part = <Tools extends Record<string, Tool.Any>>(toolkit: Toolkit.Toolkit<Tools>) =>
+  Schema.Union([PromptPart, SessionPart, ResponsePart(toolkit)]);
 
 /**
- * Creates a Schema for the trajectory parts that carry extension data, based on
- * the registered definitions.
- *
- * **When to use**
- *
- * Use when decoding or encoding recorded extension parts with the definitions
- * they were recorded against.
- *
- * **Details**
- *
- * Each definition contributes a part whose data its schema describes. Parts that
- * no definition matches decode to {@link AnyExtensionPart} instead of failing,
- * so loading a recording does not depend on the definitions that are installed.
- * A part that a definition describes is not a class, because nothing constructs
- * it: it is only ever decoded.
- *
- * @category constructors
- */
-export const ExtensionPart = (extensions: Extensionkit.Any = {}) =>
-  Schema.Union([
-    ...Object.values(extensions).map((definition) =>
-      Schema.TaggedStruct("Extension", {
-        extension: Schema.Literal(definition.id),
-        version: Schema.optional(Schema.String),
-        anchor: Schema.optional(Uuid),
-        timestamp: Timestamp,
-        data: definition.schema,
-        ...PartMetadata.fields,
-      }),
-    ),
-    AnyExtensionPart,
-  ]);
-
-/**
- * Creates a Schema for trajectory parts based on a toolkit and extension
- * definitions.
- *
- * **When to use**
- *
- * Use when decoding or encoding recorded parts with the toolkit and extensions
- * they were recorded against.
- *
- * @category constructors
- */
-export const Part = <
-  Tools extends Record<string, Tool.Any>,
-  Exts extends Extensionkit.Any = Record<string, never>,
->(
-  toolkit: Toolkit.Toolkit<Tools>,
-  extensions?: Exts,
-) => Schema.Union([PromptPart, SessionPart, ResponsePart(toolkit), ExtensionPart(extensions)]);
-
-/**
- * Union type of the parts of a trajectory for a toolkit and extension
- * definitions.
+ * Union type of the parts of a trajectory for a toolkit.
  *
  * @category models
  */
-export type Part<
-  Tools extends Record<string, Tool.Any>,
-  Exts extends Extensionkit.Any = Record<string, never>,
-> = Schema.Schema.Type<ReturnType<typeof Part<Tools, Exts>>>;
+export type Part<Tools extends Record<string, Tool.Any>> = Schema.Schema.Type<
+  ReturnType<typeof Part<Tools>>
+>;
 
 /**
  * Encoded representation of trajectory parts for serialization.
@@ -422,12 +325,11 @@ export type Part<
 export type PartEncoded = Schema.Codec.Encoded<ReturnType<typeof Part<any>>>;
 
 /**
- * Trajectory part that also accepts tools outside the provided toolkit and
- * extensions no definition describes.
+ * Trajectory part that also accepts tools outside the provided toolkit.
  *
  * @category models
  */
-export type AnyPart = PromptPart | SessionPart | AnyResponsePart | AnyExtensionPart;
+export type AnyPart = PromptPart | SessionPart | AnyResponsePart;
 
 /**
  * Stream of the parts of a trajectory.
@@ -472,10 +374,6 @@ export type Trajectory<Tools extends Record<string, Tool.Any>, E = never, R = ne
      * The metadata of the trajectory.
      */
     metadata: Metadata;
-    /**
-     * The extension definitions used to encode and decode extension parts.
-     */
-    extensions: Extensionkit.Any;
   }>;
 
 /**
@@ -549,12 +447,10 @@ export const make: {
     parts: Stream.Stream<Part<Tools>, E, R>,
     toolkit: Toolkit.Toolkit<Tools>,
     metadata?: Metadata,
-    extensions?: Extensionkit.Any,
   ): Trajectory<Tools, E, R>;
   <Tools extends Record<string, Tool.Any>>(
     toolkit: Toolkit.Toolkit<Tools>,
     metadata?: Metadata,
-    extensions?: Extensionkit.Any,
   ): <E, R>(parts: Stream.Stream<Part<Tools>, E, R>) => Trajectory<Tools, E, R>;
 } = Function.dual(
   (args) => Stream.isStream(args[0]),
@@ -562,8 +458,7 @@ export const make: {
     parts: Stream.Stream<Part<Tools>, E, R>,
     toolkit: Toolkit.Toolkit<Tools>,
     metadata: Metadata = Metadata.make({}),
-    extensions: Extensionkit.Any = {},
-  ): Trajectory<Tools, E, R> => Object.assign(parts, { toolkit, metadata, extensions }),
+  ): Trajectory<Tools, E, R> => Object.assign(parts, { toolkit, metadata }),
 );
 
 /**
@@ -608,8 +503,8 @@ export type PromptTurn<Tools extends Record<string, Tool.Any>> = Readonly<{
  * Each prompt part is concatenated with the response parts recorded for it, so
  * the result is the messages of the whole trajectory rather than of one turn. A
  * prompt part opens a turn and the response parts that follow it belong to it;
- * session and extension parts are skipped, and response parts that no prompt
- * precedes are dropped, because they belong to no recorded prompt.
+ * session parts are skipped, and response parts that no prompt precedes are
+ * dropped, because they belong to no recorded prompt.
  *
  * Parts are not attributed to a session, so select the session to fold out of a
  * recording that interleaves several: pipe it through `Session.of(id)` to read a

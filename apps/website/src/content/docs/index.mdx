@@ -1,6 +1,6 @@
 ---
 title: trajs
-description: A trajectory format for AI model sessions, with extension data as a first-class part of the record.
+description: A trajectory format for AI model sessions.
 template: splash
 hero:
   tagline: Record an AI model session as a stream of parts — the conversation, the tools it used and the telemetry around it — and read it back later without the schemas it was written with.
@@ -17,27 +17,21 @@ hero:
 import { Card, CardGrid } from "@astrojs/starlight/components";
 
 A session with an AI model is recorded for evaluation, debugging and analysis.
-The conversation alone is rarely enough: you also want the OpenTelemetry spans,
-the per-call token and cost metrics, the retrieval scores, the judge outputs.
-trajs gives that data a home next to the conversation, without an untyped bag and
-without versioning the whole file every time something changes.
+trajs records the conversation the model ran on — the messages it was given and
+the parts it returned — as a trajectory that stays attached to the toolkit and
+metadata it was recorded with, so it can be stored, replayed and inspected.
 
 ## What trajs gives you
 
 <CardGrid stagger>
   <Card title="A trajectory is a stream" icon="list-format">
     A trajectory is an Effect `Stream` of parts, not a document. Prompt parts, response parts and
-    extension parts share one total order, so extension data can never be dropped by a combinator
-    that only knows about messages.
-  </Card>
-  <Card title="Extensions are first-class" icon="puzzle">
-    Every extension datum carries a namespaced identifier, a semantic version, a schema and an
-    optional anchor to the part it is about. Knock-off untyped `extra` bags are not part of the
-    model.
+    session declarations share one total order, so nothing is dropped by a combinator that only
+    knows about messages.
   </Card>
   <Card title="Tolerant by design" icon="star">
-    Tools outside the toolkit and extensions without an installed definition decode to unconstrained
-    parts instead of failing. Loading recorded history does not depend on what is installed today.
+    Tools outside the toolkit decode to unconstrained parts instead of failing. Loading recorded
+    history does not depend on what is installed today.
   </Card>
   <Card title="Tool calls with their results" icon="information">
     `Toolkit.toolTurns` correlates each recorded tool call with the result that answers it and
@@ -56,13 +50,12 @@ without versioning the whole file every time something changes.
 ## Built on Effect
 
 trajs is built from the same pieces as `effect/ai`: trajectories are `Stream`s,
-tools are `Tool`s collected into a `Toolkit`, extensions mirror that shape with
-`Extension` and `Extensionkit`, and every failure is a typed error. If you already
-model AI sessions with Effect, the vocabulary is the one you know.
+tools are `Tool`s collected into a `Toolkit`, and every failure is a typed error.
+If you already model AI sessions with Effect, the vocabulary is the one you know.
 
 <CardGrid>
   <Card title="Getting started" icon="rocket">
-    Record a trajectory, attach an extension and read it back.
+    Record a trajectory and read it back.
 
     [Open the guide](getting-started/)
 

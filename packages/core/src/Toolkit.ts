@@ -152,7 +152,7 @@ export const encode = (toolkit: Toolkit.Any): ToolkitEncoded =>
  */
 export const toolkits = <Toolkits extends ReadonlyArray<Toolkit.Any>>(...toolkits: Toolkits) =>
   Effect.fn(<Tools extends Record<string, Tool.Any>>(trajectory: Trajectory.Trajectory<Tools>) => {
-    const { toolkit, metadata, extensions } = trajectory;
+    const { toolkit, metadata } = trajectory;
 
     const merged = Toolkit.merge(toolkit, ...toolkits);
 
@@ -161,7 +161,7 @@ export const toolkits = <Toolkits extends ReadonlyArray<Toolkit.Any>>(...toolkit
     const encode = Schema.encodeEffect(sourceSchema);
     const decode = Schema.decodeEffect(targetSchema);
 
-    const trajPart = Trajectory.Part(merged, extensions);
+    const trajPart = Trajectory.Part(merged);
 
     const parts = trajectory.pipe(
       Stream.mapEffect((part) =>
@@ -181,13 +181,12 @@ export const toolkits = <Toolkits extends ReadonlyArray<Toolkit.Any>>(...toolkit
               return trajPart.make({ ...response, response: decoded });
             }),
           ),
-          Match.tag("Extension", (extension) => Effect.succeed(extension)),
           Match.exhaustive,
         ),
       ),
     );
 
-    return Effect.succeed(Trajectory.make(parts, merged, metadata, extensions));
+    return Effect.succeed(Trajectory.make(parts, merged, metadata));
   });
 
 /**

@@ -61,7 +61,7 @@ export type ChatCompletionSessions = Record<string, ChatCompletionMessage[]>;
  * with {@link Trajectory.prompt}, so a prompt part contributes the messages the
  * model was given and the response parts that follow it contribute the messages
  * it returned. Parts that carry no `session` are grouped under the empty string.
- * Session and extension parts carry no messages and are skipped.
+ * Session parts carry no messages and are skipped.
  *
  * The conversion is lossy where chat completions has no equivalent: reasoning,
  * non-image file and tool approval parts are dropped, and a file that is not an

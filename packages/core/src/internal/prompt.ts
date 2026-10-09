@@ -8,8 +8,8 @@ import type { TrajectoryError } from "#/TrajectoryError.ts";
  * produced for it.
  *
  * A `PromptPart` opens a turn, and every `ResponsePart` that follows it until the
- * next prompt is recorded on it. Session and extension parts are skipped, and so
- * are response parts that precede the first prompt, because they belong to no
+ * next prompt is recorded on it. Session parts are skipped, and so are response
+ * parts that precede the first prompt, because they belong to no
  * prompt the recording holds. A turn is not attributed to a session, so select
  * the session to read before grouping a recording that interleaves several.
  *

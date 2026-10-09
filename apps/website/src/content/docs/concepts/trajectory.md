@@ -1,13 +1,13 @@
 ---
 title: Trajectories
-description: The trajectory part model — a stream of prompt, response and extension parts with the toolkit and metadata they were recorded with.
+description: The trajectory part model — a stream of prompt and response parts with the toolkit and metadata they were recorded with.
 ---
 
 A trajectory records a session with an AI model. It is a stream, and it stays
 attached to the context it was recorded in:
 
 ```text
-Trajectory = Stream<Part> + { toolkit, metadata, extensions }
+Trajectory = Stream<Part> + { toolkit, metadata }
 ```
 
 ```ts
@@ -22,12 +22,11 @@ const trajectory = Trajectory.make(
 );
 ```
 
-The returned value is a `Stream` with three extra fields, so the parts and the
+The returned value is a `Stream` with two extra fields, so the parts and the
 context they were recorded in never drift apart:
 
 - `toolkit` — the tools used to encode and decode tool parts.
 - `metadata` — the trajectory's `version`, `name` and `description`.
-- `extensions` — the definitions used to encode and decode extension data.
 
 `metadata.version` is the version of the trajs specification the trajectory
 conforms to: the `@trajs/core` version that wrote it, `Trajectory.version`. It
@@ -40,14 +39,14 @@ wherever it lives.
 A part is one entry in the stream. Parts are closed at the schema level and
 discriminated by `_tag`:
 
-| Part            | `_tag`      | Records                         |
-| :-------------- | :---------- | :------------------------------ |
-| `PromptPart`    | `Prompt`    | The messages a model was given. |
-| `ResponsePart`  | `Response`  | The parts a model returned.     |
-| `ExtensionPart` | `Extension` | Data an extension attached.     |
+| Part           | `_tag`     | Records                         |
+| :------------- | :--------- | :------------------------------ |
+| `PromptPart`   | `Prompt`   | The messages a model was given. |
+| `ResponsePart` | `Response` | The parts a model returned.     |
+| `SessionPart`  | `Session`  | A session declaration.          |
 
-`AnyPart` covers the tolerant form of each: `PromptPart | AnyResponsePart |
-AnyExtensionPart`.
+`AnyPart` covers the tolerant form of each: `PromptPart | SessionPart |
+AnyResponsePart`.
 
 Every part also carries the fields of `PartMetadata`:
 
@@ -60,32 +59,27 @@ Every part also carries the fields of `PartMetadata`:
 ## Collection-driven schemas
 
 The union of parts is built from the collections a trajectory carries:
-`Trajectory.Part(toolkit, extensions)` unions the prompt part, the response parts
-the toolkit describes and one extension part per definition. Data that no
-collection describes does not fail the union — it decodes to an unconstrained
-part:
+`Trajectory.Part(toolkit)` unions the prompt part, the session part and the
+response parts the toolkit describes. Data that no collection describes does not
+fail the union — it decodes to an unconstrained part:
 
 - A tool call or result for a tool outside the toolkit becomes an
   `AnyToolCallPart` / `AnyToolResultPart`.
-- Extension data with no installed definition becomes an `AnyExtensionPart`.
 
 This is a deliberate property of the model: **loading recorded history must not
 depend on the definitions installed today.** Recorded years ago or augmented by
 another producer, a trajectory still loads, and you refine it later by binding the
-tools and definitions you have.
+tools you have.
 
 ## Why a stream
 
 A stream lets a recording be consumed without materializing it, and lets the same
-data serve both live and recorded analysis. Because extension data is a part of
-the same stream rather than a side channel, a combinator that handles prompts and
-responses cannot silently drop it: a consumer that pattern-matches parts gains an
-`Extension` arm, which the type checker forces it to make explicit.
+data serve both live and recorded analysis. A consumer that pattern-matches parts
+is forced by the type checker to handle every kind explicitly, so a part tag
+cannot be silently ignored.
 
 ## Working with trajectories
 
 - [Toolkits and recorded tools](../guides/toolkits/) — bind a recording to its tools
   and read tool calls with their results.
-- [Extensions](../extensions/) — read the non-conversation data a
-  trajectory carries.
 - [The .trajs format](../guides/trajs-format/) — store and load a trajectory.

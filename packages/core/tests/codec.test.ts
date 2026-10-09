@@ -105,18 +105,8 @@ it("carries an image as a content part", async () => {
   ]);
 });
 
-it("skips session and extension parts", async () => {
-  const sessions = await sessionsOf(
-    make(
-      Trajectory.sessionPart("a"),
-      prompt("Hello", "a"),
-      Trajectory.anyExtensionPart({
-        extension: "dev.trajs.otel",
-        data: { spanId: "s1" },
-        session: "a",
-      }),
-    ),
-  );
+it("skips session parts", async () => {
+  const sessions = await sessionsOf(make(Trajectory.sessionPart("a"), prompt("Hello", "a")));
 
   expect(sessions).toEqual({ a: [{ role: "user", content: "Hello" }] });
 });

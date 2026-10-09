@@ -175,7 +175,7 @@ it("round-trips a session part through the .trajs codec", async () => {
   const decoded = await Effect.runPromise(
     Effect.scoped(
       Effect.gen(function* () {
-        const loaded = yield* Persist.decode()(Stream.fromIterable(records));
+        const loaded = yield* Persist.decode(Stream.fromIterable(records));
 
         return Array.from(yield* Stream.runCollect(loaded));
       }),

@@ -3,20 +3,16 @@
  *
  * A recorded trajectory is a `.trajs` file. Each line is one JSON record: the
  * first is a header carrying the trajectory's non-stream fields (the metadata,
- * including the specification version, the serialized toolkit and the extension
- * definitions), and the rest are the parts of the trajectory, discriminated by
- * their `_tag`.
+ * including the specification version, and the serialized toolkit), and the rest
+ * are the parts of the trajectory, discriminated by their `_tag`.
  *
  * The header is peeled off the stream and read on its own rather than described
- * as a part, because it is not one. It comes first because a decoder needs an
- * extension's schema before it can decode that extension's data; a reader
- * supplies the definitions it has, and data whose definition is missing is read
- * as an unconstrained part rather than failing to load.
+ * as a part, because it is not one. It comes first because a decoder needs a
+ * tool's schemas before it can decode that tool's parts.
  */
 
 import { Effect, Option, Schema, Sink, Stream } from "effect";
 import { Tool, Toolkit } from "effect/ai";
-import * as Extensionkit from "#/Extensionkit.ts";
 import * as Trajectory from "#/Trajectory.ts";
 import { TrajectoryError } from "#/TrajectoryError.ts";
 import * as TrajectoryToolkit from "#/Toolkit.ts";
@@ -38,7 +34,6 @@ import { StreamWriter } from "#/internal/stream-writer.ts";
 const Header = Schema.Struct({
   metadata: Trajectory.Metadata,
   toolkit: Schema.optional(Schema.Record(Schema.String, Schema.Unknown)),
-  extensions: Schema.optional(Schema.Record(Schema.String, Schema.Unknown)),
 });
 
 /**
@@ -50,10 +45,9 @@ const Header = Schema.Struct({
  *
  * **Details**
  *
- * The first record is the header, followed by one record per part. Parts are
- * encoded with the toolkit and extension definitions the trajectory was recorded
- * with. Records are plain JSON values, ready for a newline-delimited JSON writer
- * to serialize.
+ * The first record is the header, followed by one record per part, encoded with
+ * the toolkit the trajectory was recorded with. Records are plain JSON values,
+ * ready for a newline-delimited JSON writer to serialize.
  *
  * @see {@link write} for storing the records with the stream writer.
  * @category encoding
@@ -61,14 +55,11 @@ const Header = Schema.Struct({
 export const encode = <Tools extends Record<string, Tool.Any>>(
   trajectory: Trajectory.Trajectory<Tools>,
 ): Stream.Stream<unknown, TrajectoryError, Tool.ResultEncodingServices<Tools[keyof Tools]>> => {
-  const encodePart = Schema.encodeEffect(
-    Trajectory.Part(trajectory.toolkit, trajectory.extensions),
-  );
+  const encodePart = Schema.encodeEffect(Trajectory.Part(trajectory.toolkit));
 
   const header = {
     metadata: trajectory.metadata,
     toolkit: TrajectoryToolkit.encode(trajectory.toolkit),
-    extensions: Extensionkit.encode(trajectory.extensions),
   };
 
   return Stream.concat(
@@ -92,13 +83,11 @@ export const encode = <Tools extends Record<string, Tool.Any>>(
  * **Details**
  *
  * The first record is peeled off the stream and read as the header; the remaining
- * records stay lazy and are decoded as parts. Extension data is decoded with the
- * provided definitions; data whose definition is missing is read as an
- * unconstrained part rather than failing to load. A header without metadata, or
- * with metadata that does not state its `version`, is a parse failure rather than
- * a trajectory of unknown vintage. The returned trajectory's
- * toolkit is empty, because tool parts are read unconstrained: bind them to their
- * tools with `Toolkit.toolkits` when their schemas are available.
+ * records stay lazy and are decoded as parts. A header without metadata, or with
+ * metadata that does not state its `version`, is a parse failure rather than a
+ * trajectory of unknown vintage. The returned trajectory's toolkit is empty,
+ * because tool parts are read unconstrained: bind them to their tools with
+ * `Toolkit.toolkits` when their schemas are available.
  *
  * The parts are read from the same source as the header, so the returned
  * trajectory is only valid within the scope the effect runs in: consume it there.
@@ -106,31 +95,29 @@ export const encode = <Tools extends Record<string, Tool.Any>>(
  * @see {@link read} for reading the records with the stream reader.
  * @category decoding
  */
-export const decode = (extensions: Extensionkit.Any = {}) =>
-  Effect.fn("Persist.decode")(function* <E, R>(records: Stream.Stream<unknown, E, R>) {
-    const [header, rest] = yield* Stream.peel(records, Sink.head<unknown>());
+export const decode = Effect.fn("Persist.decode")(function* <E, R>(
+  records: Stream.Stream<unknown, E, R>,
+) {
+  const [header, rest] = yield* Stream.peel(records, Sink.head<unknown>());
 
-    if (Option.isNone(header)) {
-      return yield* Effect.fail(TrajectoryError.parse("missing trajectory header"));
-    }
+  if (Option.isNone(header)) {
+    return yield* Effect.fail(TrajectoryError.parse("missing trajectory header"));
+  }
 
-    const decodedHeader = yield* Schema.decodeUnknownEffect(Header)(header.value).pipe(
-      Effect.mapError(TrajectoryError.parse),
-    );
+  const decodedHeader = yield* Schema.decodeUnknownEffect(Header)(header.value).pipe(
+    Effect.mapError(TrajectoryError.parse),
+  );
 
-    const decodePart = Schema.decodeUnknownEffect(Trajectory.Part(Toolkit.empty, extensions));
+  const decodePart = Schema.decodeUnknownEffect(Trajectory.Part(Toolkit.empty));
 
-    return Trajectory.make(
-      rest.pipe(
-        Stream.mapEffect((record) =>
-          decodePart(record).pipe(Effect.mapError(TrajectoryError.parse)),
-        ),
-      ),
-      Toolkit.empty,
-      decodedHeader.metadata,
-      extensions,
-    );
-  });
+  return Trajectory.make(
+    rest.pipe(
+      Stream.mapEffect((record) => decodePart(record).pipe(Effect.mapError(TrajectoryError.parse))),
+    ),
+    Toolkit.empty,
+    decodedHeader.metadata,
+  );
+});
 
 /**
  * Writes a trajectory to a `.trajs` file.
@@ -164,17 +151,15 @@ export const write =
  *
  * **Details**
  *
- * The file is read as newline-delimited JSON and decoded with the provided
- * extension definitions. Parts stay lazy, so the returned trajectory is only
- * valid within the scope the effect runs in: consume it there.
+ * The file is read as newline-delimited JSON. Parts stay lazy, so the returned
+ * trajectory is only valid within the scope the effect runs in: consume it
+ * there.
  *
  * @category decoding
  */
-export const read =
-  (extensions: Extensionkit.Any = {}) =>
-  (key: string) =>
-    Effect.gen(function* () {
-      const reader = yield* StreamReader;
+export const read = (key: string) =>
+  Effect.gen(function* () {
+    const reader = yield* StreamReader;
 
-      return yield* decode(extensions)(reader.read(Schema.Unknown)(key));
-    }).pipe(Effect.provide(StreamReader.layer), Effect.withSpan("Persist.read"));
+    return yield* decode(reader.read(Schema.Unknown)(key));
+  }).pipe(Effect.provide(StreamReader.layer), Effect.withSpan("Persist.read"));
