@@ -124,8 +124,6 @@ export const decode = Effect.fn("Persist.decode")(function* <E, R>(
     rest.pipe(
       Stream.mapEffect((record) => decodePart(record).pipe(Effect.mapError(TrajectoryError.parse))),
     ),
-    Toolkit.empty,
-    Extensionkit.empty,
     decodedHeader.metadata,
   );
 });

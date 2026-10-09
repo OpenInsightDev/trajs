@@ -434,7 +434,6 @@ export const PartView = <Exts extends Any>(
  *
  * ```ts import.meta.vitest
  * import { Effect, Option, Schema, Stream } from "effect"
- * import { Toolkit } from "effect/ai"
  * import { Extension, Extensionkit, Trajectory } from "@trajs/core"
  *
  * const otel = Extension.make(
@@ -450,9 +449,7 @@ export const PartView = <Exts extends Any>(
  *   Stream.make(Trajectory.AnyExtensionPart.make({
  *     extension: { extension: "dev.observerw.otel", data: { version: "1.0.0", spanId: "s1" } },
  *     attach: Option.none()
- *   })),
- *   Toolkit.empty,
- *   Extensionkit.empty
+ *   }))
  * )
  *
  * const rebound = await Effect.runPromise(

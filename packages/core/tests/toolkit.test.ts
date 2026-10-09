@@ -1,7 +1,6 @@
 import { expect, it } from "vite-plus/test";
 import { Effect, Schema, Stream } from "effect";
 import { Tool, Toolkit } from "effect/ai";
-import * as Extensionkit from "#/Extensionkit.ts";
 import * as Response from "#/Response.ts";
 import * as Trajectory from "#/Trajectory.ts";
 import * as TrajectoryToolkit from "#/Toolkit.ts";
@@ -28,7 +27,7 @@ const result = (id: string, options: { name?: string; preliminary?: boolean } = 
   });
 
 const turnsOf = Effect.fn(function* (parts: ReadonlyArray<Trajectory.AnyPart>) {
-  const recorded = Trajectory.make(Stream.fromIterable(parts), Toolkit.empty, Extensionkit.empty);
+  const recorded = Trajectory.make(Stream.fromIterable(parts));
   const bound = yield* TrajectoryToolkit.toolkits(weather)(recorded);
   const turns = yield* Stream.runCollect(TrajectoryToolkit.toolTurns(bound));
 

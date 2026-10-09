@@ -1,20 +1,14 @@
 import { expect, it } from "vite-plus/test";
 import { Effect, Stream } from "effect";
 import { Prompt, Toolkit } from "effect/ai";
-import * as Extensionkit from "#/Extensionkit.ts";
 import * as Trajectory from "#/Trajectory.ts";
 
 const parts = Stream.make(Trajectory.promptPart(Prompt.make("Hello")));
 
 const collect = (trajectory: Trajectory.Any) => Effect.runPromise(Stream.runCollect(trajectory));
 
-it("attaches a toolkit and metadata to a stream of parts", async () => {
-  const trajectory = Trajectory.make(
-    parts,
-    Toolkit.empty,
-    Extensionkit.empty,
-    Trajectory.Metadata.make({ name: "greeting" }),
-  );
+it("attaches metadata to a stream of parts", async () => {
+  const trajectory = Trajectory.make(parts, Trajectory.Metadata.make({ name: "greeting" }));
 
   expect(trajectory.metadata.name).toBe("greeting");
   expect(trajectory.metadata.version).toBe(Trajectory.version);
@@ -22,14 +16,8 @@ it("attaches a toolkit and metadata to a stream of parts", async () => {
   expect(Array.from(await collect(trajectory))).toHaveLength(1);
 });
 
-it("binds a stream that was defined before the toolkit", async () => {
-  const trajectory = parts.pipe(
-    Trajectory.make(
-      Toolkit.empty,
-      Extensionkit.empty,
-      Trajectory.Metadata.make({ name: "greeting" }),
-    ),
-  );
+it("binds a stream that was defined before the metadata", async () => {
+  const trajectory = parts.pipe(Trajectory.make(Trajectory.Metadata.make({ name: "greeting" })));
 
   expect(trajectory.metadata.name).toBe("greeting");
   expect(trajectory.toolkit).toBe(Toolkit.empty);
@@ -37,12 +25,7 @@ it("binds a stream that was defined before the toolkit", async () => {
 });
 
 it("updates the metadata without touching the recording it was given", async () => {
-  const trajectory = Trajectory.make(
-    parts,
-    Toolkit.empty,
-    Extensionkit.empty,
-    Trajectory.Metadata.make({ name: "greeting" }),
-  );
+  const trajectory = Trajectory.make(parts, Trajectory.Metadata.make({ name: "greeting" }));
 
   const renamed = trajectory.pipe(
     Trajectory.mapMetadata((metadata) =>
@@ -58,12 +41,7 @@ it("updates the metadata without touching the recording it was given", async () 
 });
 
 it("updates the metadata in data-first style", () => {
-  const trajectory = Trajectory.make(
-    parts,
-    Toolkit.empty,
-    Extensionkit.empty,
-    Trajectory.Metadata.make({ name: "greeting" }),
-  );
+  const trajectory = Trajectory.make(parts, Trajectory.Metadata.make({ name: "greeting" }));
 
   const renamed = Trajectory.mapMetadata(trajectory, (metadata) =>
     Trajectory.Metadata.make({

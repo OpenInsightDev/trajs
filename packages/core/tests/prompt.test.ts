@@ -1,7 +1,6 @@
 import { expect, it } from "vite-plus/test";
 import { Effect, Stream } from "effect";
-import { Prompt, Toolkit } from "effect/ai";
-import * as Extensionkit from "#/Extensionkit.ts";
+import { Prompt } from "effect/ai";
 import * as Response from "#/Response.ts";
 import * as Trajectory from "#/Trajectory.ts";
 import { promptTurns } from "#/internal/prompt.ts";
@@ -11,7 +10,7 @@ const prompt = (text: string) => Trajectory.promptPart(Prompt.make(text));
 const response = (text: string) => Trajectory.responsePart(Response.makePart("text", { text }));
 
 const make = (...parts: ReadonlyArray<Trajectory.AnyPart>) =>
-  Trajectory.make(Stream.fromIterable(parts), Toolkit.empty, Extensionkit.empty);
+  Trajectory.make(Stream.fromIterable(parts));
 
 const turnsOf = async (trajectory: Trajectory.Any) =>
   Array.from(await Effect.runPromise(Stream.runCollect(promptTurns(trajectory))));

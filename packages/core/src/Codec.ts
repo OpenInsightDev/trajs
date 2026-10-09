@@ -74,12 +74,11 @@ export type ChatCompletionSessions = Record<string, ChatCompletionMessage[]>;
  *
  * ```ts import.meta.vitest
  * import { Effect, Stream } from "effect"
- * import { Prompt, Toolkit } from "effect/ai"
+ * import { Prompt } from "effect/ai"
  * import { Codec, Trajectory } from "@trajs/core"
  *
  * const trajectory = Trajectory.make(
- *   Stream.make(Trajectory.promptPart(Prompt.make("Hello"))),
- *   Toolkit.empty
+ *   Stream.make(Trajectory.promptPart(Prompt.make("Hello")))
  * )
  *
  * const sessions = await Effect.runPromise(Codec.makeChatCompletion(trajectory))

@@ -1,6 +1,6 @@
 import { expect, it } from "vite-plus/test";
 import { Effect, Exit, FileSystem, Schema, Sink, Stream } from "effect";
-import { Prompt, Toolkit } from "effect/ai";
+import { Prompt } from "effect/ai";
 import * as Extension from "#/Extension.ts";
 import * as Extensionkit from "#/Extensionkit.ts";
 import * as Persist from "#/Persist.ts";
@@ -15,8 +15,6 @@ const trajectory = () =>
         Response.anyToolCallPart({ id: "c1", name: "read", params: {}, providerExecuted: false }),
       ),
     ]),
-    Toolkit.empty,
-    Extensionkit.empty,
     Trajectory.Metadata.make({ name: "greeting" }),
   );
 
@@ -50,7 +48,8 @@ it("writes the encoded extension kit into the header", async () => {
   );
 
   const kit = Extensionkit.make(otel);
-  const records = await recordsOf(Trajectory.make(Stream.empty, Toolkit.empty, kit));
+  const bound = await Effect.runPromise(Extensionkit.extkits(kit)(Trajectory.make(Stream.empty)));
+  const records = await recordsOf(bound);
 
   // SAFETY: `recordsOf` returns the encoded JSON lines; this names the header
   // fields the assertions read.

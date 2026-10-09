@@ -131,7 +131,7 @@ export const encode = (toolkit: Toolkit.Any): ToolkitEncoded =>
  * ```ts import.meta.vitest
  * import { Effect, Schema, Stream } from "effect"
  * import { Tool, Toolkit } from "effect/ai"
- * import { Extensionkit, Response, Trajectory, Toolkit as TrajectoryToolkit } from "@trajs/core"
+ * import { Response, Trajectory, Toolkit as TrajectoryToolkit } from "@trajs/core"
  *
  * const weather = Toolkit.make(
  *   Tool.make("get_weather", { parameters: Schema.Struct({ city: Schema.String }) })
@@ -140,9 +140,7 @@ export const encode = (toolkit: Toolkit.Any): ToolkitEncoded =>
  * const recorded = Trajectory.make(
  *   Stream.make(Trajectory.responsePart(Response.anyToolCallPart({
  *     id: "call_1", name: "get_weather", params: { city: "SF" }, providerExecuted: false
- *   }))),
- *   Toolkit.empty,
- *   Extensionkit.empty
+ *   })))
  * )
  *
  * const rebound = await Effect.runPromise(TrajectoryToolkit.toolkits(weather)(recorded))
@@ -188,7 +186,9 @@ export const toolkits = <Toolkits extends ReadonlyArray<Toolkit.Any>>(...toolkit
       ),
     );
 
-    return Effect.succeed(Trajectory.make(parts, merged, extkit, metadata));
+    // The parts are re-read against the merged toolkit and the trajectory is put
+    // back together from them and the fields of the one it was given.
+    return Effect.succeed(Object.assign(parts, { toolkit: merged, metadata, extkit }));
   });
 
 /**
@@ -271,7 +271,7 @@ export const toolTurn = <Tools extends Record<string, Tool.Any>>(
  * ```ts import.meta.vitest
  * import { Effect, Schema, Stream } from "effect"
  * import { Tool, Toolkit } from "effect/ai"
- * import { Extensionkit, Response, Trajectory, Toolkit as TrajectoryToolkit } from "@trajs/core"
+ * import { Response, Trajectory, Toolkit as TrajectoryToolkit } from "@trajs/core"
  *
  * const weather = Toolkit.make(
  *   Tool.make("get_weather", { parameters: Schema.Struct({ city: Schema.String }) })
@@ -286,9 +286,7 @@ export const toolTurn = <Tools extends Record<string, Tool.Any>>(
  * })
  *
  * const recorded = Trajectory.make(
- *   Stream.make(Trajectory.responsePart(call), Trajectory.responsePart(result)),
- *   Toolkit.empty,
- *   Extensionkit.empty
+ *   Stream.make(Trajectory.responsePart(call), Trajectory.responsePart(result))
  * )
  *
  * const bound = await Effect.runPromise(TrajectoryToolkit.toolkits(weather)(recorded))

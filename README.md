@@ -59,12 +59,11 @@ Record a prompt and encode the trajectory as a `.trajs` file:
 
 ```ts
 import { Effect, Stream } from "effect";
-import { Prompt, Toolkit } from "effect/ai";
+import { Prompt } from "effect/ai";
 import { Persist, Trajectory } from "@trajs/core";
 
 const trajectory = Trajectory.make(
   Stream.make(Trajectory.promptPart(Prompt.make("Hello"))),
-  Toolkit.empty,
   Trajectory.Metadata.make({ name: "greeting" }),
 );
 

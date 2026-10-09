@@ -57,15 +57,14 @@ export const parts = <Tools extends Record<string, Tool.Any>>(
  *
  * ```ts import.meta.vitest
  * import { Effect, Stream } from "effect"
- * import { Prompt, Toolkit } from "effect/ai"
+ * import { Prompt } from "effect/ai"
  * import { Session, Trajectory } from "@trajs/core"
  *
  * const part = (text: string, session: string) =>
  *   Trajectory.PromptPart.make({ messages: Prompt.make(text).content, session })
  *
  * const trajectory = Trajectory.make(
- *   Stream.make(part("Hello", "a"), part("Hi", "b"), part("Continue", "a")),
- *   Toolkit.empty
+ *   Stream.make(part("Hello", "a"), part("Hi", "b"), part("Continue", "a"))
  * )
  *
  * const selected = await Effect.runPromise(Stream.runCollect(Session.select("a")(trajectory)))
@@ -161,7 +160,7 @@ export const children =
  *
  * ```ts import.meta.vitest
  * import { Effect, Stream } from "effect"
- * import { Prompt, Toolkit } from "effect/ai"
+ * import { Prompt } from "effect/ai"
  * import { Session, Trajectory } from "@trajs/core"
  *
  * const hello = Trajectory.PromptPart.make({ messages: Prompt.make("Hello").content, session: "a" })
@@ -170,8 +169,7 @@ export const children =
  *     Trajectory.sessionPart("a"),
  *     hello,
  *     Trajectory.sessionPart("b", { fork: hello.uuid })
- *   ),
- *   Toolkit.empty
+ *   )
  * )
  *
  * const parts = await Effect.runPromise(Stream.runCollect(Session.of("b")(trajectory)))

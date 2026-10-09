@@ -12,13 +12,11 @@ Trajectory = Stream<Part> + { toolkit, metadata, extkit }
 
 ```ts
 import { Stream } from "effect";
-import { Prompt, Toolkit } from "effect/ai";
-import { Extensionkit, Trajectory } from "@trajs/core";
+import { Prompt } from "effect/ai";
+import { Trajectory } from "@trajs/core";
 
 const trajectory = Trajectory.make(
   Stream.make(Trajectory.promptPart(Prompt.make("Hello"))),
-  Toolkit.empty,
-  Extensionkit.empty,
   Trajectory.Metadata.make({ name: "greeting" }),
 );
 ```
@@ -29,6 +27,12 @@ context they were recorded in never drift apart:
 - `toolkit` — the tools used to encode and decode tool parts.
 - `metadata` — the trajectory's `version`, `name` and `description`.
 - `extkit` — the extensions used to encode and decode extension parts.
+
+`Trajectory.make` takes the parts in their tolerant form and leaves the toolkit
+empty and the extension kit unheld, because the tools and extensions a recording
+refers to are not known when it is written. Bind the recording to the ones you
+have when its parts should carry their types: `Toolkit.toolkits` for the tools,
+`Extensionkit.extkits` for the extensions.
 
 `metadata.version` is the version of the trajs specification the trajectory
 conforms to: the `@trajs/core` version that wrote it, `Trajectory.version`. It

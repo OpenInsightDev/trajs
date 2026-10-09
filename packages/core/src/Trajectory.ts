@@ -469,75 +469,70 @@ export type TrajectoryEncoded<E = never, R = never> = Stream.Stream<
 >;
 
 /**
- * Creates a trajectory from a stream of parts, a toolkit and an extension kit.
+ * Creates a trajectory from a stream of parts and, optionally, its metadata.
  *
  * **When to use**
  *
- * Use when recording a session, or when binding a stream of recorded parts to
- * the tools and extensions it refers to.
+ * Use when recording a session, or when starting from a stream of recorded parts
+ * that is not yet bound to the tools and extensions it refers to.
  *
  * **Details**
  *
- * The toolkit, metadata and extension kit are attached to the returned stream as
- * additional fields, so the parts and the context they were recorded in stay
- * together. A stream that is defined elsewhere is bound by piping it into `make`,
- * which then takes the toolkit and the kit as its first two arguments.
- * `Extensionkit.empty` is the kit of a trajectory that carries no extension data.
- * Metadata is passed as a {@link Metadata} value, whose `version` defaults to
- * {@link version} when it is constructed.
+ * The metadata is attached to the returned stream as an additional field, so the
+ * parts and the description they were recorded with stay together. It is passed
+ * as a {@link Metadata} value, whose `version` defaults to {@link version} when
+ * it is constructed. The parts are taken in their tolerant form, so the returned
+ * trajectory carries no toolkit and holds no extension kit ({@link AnyPart}): a
+ * tool call or result, and a datum recorded for an extension, stay untyped.
+ *
+ * Bind the recording when the parts should carry the types of the tools and
+ * extensions they refer to: {@link Toolkit.toolkits} narrows tool calls and
+ * results to the schemas of their tools, and {@link Extensionkit.extkits} narrows
+ * extension data to the versions of its extension. Both run an effect, so they
+ * are piped over the trajectory rather than given to `make`.
  *
  * **Example** (Creating a trajectory)
  *
  * ```ts import.meta.vitest
  * import { Stream } from "effect"
  * import { Prompt, Toolkit } from "effect/ai"
- * import { Extensionkit, Trajectory } from "@trajs/core"
+ * import { Trajectory } from "@trajs/core"
  *
  * const trajectory = Trajectory.make(
  *   Stream.make(Trajectory.promptPart(Prompt.make("Hello"))),
- *   Toolkit.empty,
- *   Extensionkit.empty,
  *   Trajectory.Metadata.make({ name: "greeting" })
  * )
  * trajectory.metadata.name // => "greeting"
  * trajectory.metadata.version === Trajectory.version // => true
+ * trajectory.toolkit === Toolkit.empty // => true
  * ```
  *
  * **Example** (Binding a stream that is already defined)
  *
  * ```ts import.meta.vitest
  * import { Stream } from "effect"
- * import { Prompt, Toolkit } from "effect/ai"
- * import { Extensionkit, Trajectory } from "@trajs/core"
+ * import { Prompt } from "effect/ai"
+ * import { Trajectory } from "@trajs/core"
  *
  * const trajectory = Stream.make(Trajectory.promptPart(Prompt.make("Hello"))).pipe(
- *   Trajectory.make(Toolkit.empty, Extensionkit.empty, Trajectory.Metadata.make({ name: "greeting" }))
+ *   Trajectory.make(Trajectory.Metadata.make({ name: "greeting" }))
  * )
  * trajectory.metadata.name // => "greeting"
  * ```
  *
+ * @see {@link Metadata} for the fields the trajectory carries.
  * @category constructors
  */
 export const make: {
-  <Tools extends Record<string, Tool.Any>, Exts extends Extensionkit.Any, E, R>(
-    parts: Stream.Stream<Part<Tools, Exts>, E, R>,
-    toolkit: Toolkit.Toolkit<Tools>,
-    extkit: Exts,
-    metadata?: Metadata,
-  ): Trajectory<Tools, Exts, E, R>;
-  <Tools extends Record<string, Tool.Any>, Exts extends Extensionkit.Any>(
-    toolkit: Toolkit.Toolkit<Tools>,
-    extkit: Exts,
-    metadata?: Metadata,
-  ): <E, R>(parts: Stream.Stream<Part<Tools, Exts>, E, R>) => Trajectory<Tools, Exts, E, R>;
+  <E, R>(parts: Stream.Stream<AnyPart, E, R>, metadata?: Metadata): Trajectory<{}, {}, E, R>;
+  (metadata?: Metadata): <E, R>(parts: Stream.Stream<AnyPart, E, R>) => Trajectory<{}, {}, E, R>;
 } = Function.dual(
   (args) => Stream.isStream(args[0]),
-  <Tools extends Record<string, Tool.Any>, Exts extends Extensionkit.Any, E, R>(
-    parts: Stream.Stream<Part<Tools, Exts>, E, R>,
-    toolkit: Toolkit.Toolkit<Tools>,
-    extkit: Exts,
+  <E, R>(
+    parts: Stream.Stream<AnyPart, E, R>,
     metadata: Metadata = Metadata.make({}),
-  ): Trajectory<Tools, Exts, E, R> => Object.assign(parts, { toolkit, metadata, extkit }),
+  ): Trajectory<{}, {}, E, R> =>
+    Object.assign(parts, { toolkit: Toolkit.empty, metadata, extkit: Extensionkit.empty }),
 );
 
 /**
@@ -561,13 +556,11 @@ export const make: {
  *
  * ```ts import.meta.vitest
  * import { Stream } from "effect"
- * import { Prompt, Toolkit } from "effect/ai"
- * import { Extensionkit, Trajectory } from "@trajs/core"
+ * import { Prompt } from "effect/ai"
+ * import { Trajectory } from "@trajs/core"
  *
  * const trajectory = Trajectory.make(
  *   Stream.make(Trajectory.promptPart(Prompt.make("Hello"))),
- *   Toolkit.empty,
- *   Extensionkit.empty,
  *   Trajectory.Metadata.make({ name: "greeting" })
  * )
  *
@@ -664,15 +657,14 @@ export type PromptTurn<Tools extends Record<string, Tool.Any>> = Readonly<{
  *
  * ```ts import.meta.vitest
  * import { Effect, Stream } from "effect"
- * import { Prompt, Toolkit } from "effect/ai"
+ * import { Prompt } from "effect/ai"
  * import { Response, Trajectory } from "@trajs/core"
  *
  * const trajectory = Trajectory.make(
  *   Stream.make(
  *     Trajectory.promptPart(Prompt.make("Hello")),
  *     Trajectory.responsePart(Response.makePart("text", { text: "Hi there" }))
- *   ),
- *   Toolkit.empty
+ *   )
  * )
  *
  * const folded = await Effect.runPromise(Trajectory.prompt(trajectory))

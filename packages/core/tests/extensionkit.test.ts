@@ -1,6 +1,6 @@
 import { expect, it } from "vite-plus/test";
 import { Effect, Option, Predicate, Schema, Stream } from "effect";
-import { Prompt, Tool, Toolkit } from "effect/ai";
+import { Prompt, Tool } from "effect/ai";
 import * as Extension from "#/Extension.ts";
 import * as Extensionkit from "#/Extensionkit.ts";
 import * as Trajectory from "#/Trajectory.ts";
@@ -28,7 +28,7 @@ const span = (extension: string, data: Extensionkit.AnyPart["data"]) =>
   Trajectory.AnyExtensionPart.make({ extension: { extension, data }, attach: Option.none() });
 
 const recorded = (...parts: ReadonlyArray<Trajectory.AnyPart>) =>
-  Trajectory.make(Stream.fromIterable(parts), Toolkit.empty, Extensionkit.empty);
+  Trajectory.make(Stream.fromIterable(parts));
 
 const extensionOf = <Tools extends Record<string, Tool.Any>, Exts extends Extensionkit.Any>(
   part: Trajectory.Part<Tools, Exts>,
@@ -125,8 +125,6 @@ it("serializes a kit as the JSON Schema document of each extension's versions", 
 it("carries the toolkit, metadata and merged kit over", async () => {
   const source = Trajectory.make(
     Stream.make(Trajectory.promptPart(Prompt.make("Hello"))),
-    Toolkit.empty,
-    Extensionkit.empty,
     Trajectory.Metadata.make({ name: "greeting" }),
   );
 
@@ -140,18 +138,13 @@ it("carries the toolkit, metadata and merged kit over", async () => {
 
   // The rebound trajectory is put together from the parts and the kits alone, so
   // its fields are asserted against the ones `Trajectory.make` attaches.
-  expect(Object.keys(rebound)).toEqual(
-    Object.keys(Trajectory.make(Stream.empty, Toolkit.empty, Extensionkit.empty)),
-  );
+  expect(Object.keys(rebound)).toEqual(Object.keys(Trajectory.make(Stream.empty)));
 });
 
 it("merges the given kits over the trajectory's own", async () => {
-  const part = Trajectory.ExtensionPart(otelKit).make({
-    extension: { extension: otel.id, data: { version: "1.0.0", spanId: "s1" } },
-    attach: Option.none(),
-  });
-
-  const source = Trajectory.make(Stream.make(part), Toolkit.empty, otelKit);
+  const source = await Effect.runPromise(
+    Extensionkit.extkits(otelKit)(recorded(span(otel.id, { version: "1.0.0", spanId: "s1" }))),
+  );
 
   const rebound = await Effect.runPromise(Extensionkit.extkits(timedKit)(source));
   const [payload] = await payloadsOf(rebound);
