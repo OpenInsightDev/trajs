@@ -3,9 +3,7 @@ import { defineConfig } from "astro/config";
 import starlight from "@astrojs/starlight";
 
 export default defineConfig({
-  // Published at https://openinsightdev.github.io/trajs/ until the tra.js.org request is approved.
-  site: "https://openinsightdev.github.io",
-  base: "/trajs",
+  site: "https://tra.js.org",
   integrations: [
     starlight({
       title: "trajs",
