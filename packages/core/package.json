@@ -41,6 +41,7 @@
     "prepublishOnly": "vp run build"
   },
   "dependencies": {
+    "@effect/ai-openai-compat": "catalog:",
     "effect": "catalog:",
     "uuid": "catalog:"
   },

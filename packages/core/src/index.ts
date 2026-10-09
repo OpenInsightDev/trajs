@@ -4,6 +4,8 @@
  * Every module is re-exported as a namespace and is also available as a subpath
  * import such as `@trajs/core/Response`.
  */
+export * as Codec from "./Codec.ts";
+
 export * as Extension from "./Extension.ts";
 
 export * as Persist from "./Persist.ts";

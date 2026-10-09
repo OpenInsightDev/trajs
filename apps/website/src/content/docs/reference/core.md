@@ -8,6 +8,7 @@ available as a subpath import, such as `@trajs/core/Response`.
 
 | Module            | Subpath                       | Purpose                                                                                                                                                                           |
 | :---------------- | :---------------------------- | :-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Codec`           | `@trajs/core/Codec`           | Chat completions export: `ChatCompletionMessage`, `ChatCompletionSessions` and `makeChatCompletion`.                                                                              |
 | `Trajectory`      | `@trajs/core/Trajectory`      | The part model: `Metadata`, `PartMetadata`, `PromptPart`, `ResponsePart`, `ExtensionPart`, the part unions and `make`.                                                            |
 | `Response`        | `@trajs/core/Response`        | Tolerant response parts: `AllPartsView`, `PartView`, `StreamPartView`, `AnyToolCallPart`, `AnyToolResultPart` and their guards and constructors. Re-exports `effect/ai/Response`. |
 | `Toolkit`         | `@trajs/core/Toolkit`         | Toolkit serialization and rebinding: `encode`, `toDynamic`, `toolkits`, `toolTurn`, `toolTurns`.                                                                                  |
