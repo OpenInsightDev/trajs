@@ -18,7 +18,7 @@
  *     {
  *       decode: SchemaGetter.transform((from) => ({
  *         ...from,
- *         version: "1.6",
+ *         version: "1.6" as const,
  *         host: new URL(from.url).hostname,
  *       })),
  *     },
@@ -54,9 +54,12 @@
  * its reader accepts. That is the shape the next version is built from, and the one
  * to reach for when only a single version's fields are meant.
  *
- * A version is assembled when it is defined, so it holds one reader per version
- * up to it — a line of N versions holds N(N+1)/2 readers — and nothing is built on
- * first use.
+ * Every version after the oldest holds two readers: its own shape, and one step
+ * from the version before it — and that step reads through the whole reader of the
+ * version before it, which already accepts every version up to that one. A version
+ * is therefore "my shape, or everything earlier mapped forward", and a line of N
+ * versions holds O(N) readers. It is assembled when it is defined, and nothing is
+ * built on first use.
  *
  * Steps are one-way. A data mapping produces the *encoded* form of the version it
  * upgrades into — the form that version's own schema decodes — so every hop is
@@ -65,18 +68,23 @@
  */
 import { Schema, SchemaGetter } from "effect";
 
-/** Every member of `Members`, chained forward into `Next`. */
-type Upgrade<Members extends ReadonlyArray<Schema.Top>, Next extends Schema.Top, RD> = {
-  readonly [K in keyof Members]: Schema.decodeTo<Next, Members[K], RD, never>;
-};
+/**
+ * A step from `Prev` into `Next`: reads everything `Prev` reads, maps that value
+ * into `Next`'s encoded form, and is validated by `Next`'s own shape.
+ */
+type Step<Prev extends Schema.Top, Next extends Schema.Top, RD> = Schema.decodeTo<
+  Next,
+  Prev,
+  RD,
+  never
+>;
 
 /**
  * A version: the schema that reads every version up to it, and the shape it was
  * declared with.
  *
- * `Members` is one reader per version of the line, newest first — the version's
- * own shape, then a step from each earlier version — and `self` is that first
- * member on its own.
+ * `Members` is the version's readers, newest first — its own shape, then one step
+ * from the version before it — and `self` is that first member on its own.
  */
 export type Version<
   Self extends Schema.Struct<Schema.Struct.Fields>,
@@ -91,7 +99,7 @@ export type Version<
 /**
  * Assembles a version from its own shape and the readers it accepts.
  *
- * The overload carries the members as a tuple, which the spread the callers build
+ * The overload carries the members as a tuple, which the array the caller builds
  * cannot write down.
  */
 function assemble<
@@ -140,29 +148,30 @@ export const Versions = {
       previous: Prev,
     ): Version<
       Schema.Struct<More>,
-      readonly [Schema.Struct<More>, ...Upgrade<Prev["members"], Schema.Struct<More>, RD>]
+      readonly [Schema.Struct<More>, Step<Prev, Schema.Struct<More>, RD>]
     > => {
       const self = previous.self.mapFields(fields);
 
-      // One step per earlier version. Each member below already decodes its own
-      // version up to the one this was built from, so appending this version's
-      // change leaves one step per version, every one of them validated by this
-      // version's own shape.
-      const step = (member: Prev["members"][number]) =>
-        Schema.decodeTo<Schema.Struct<More>, Prev["members"][number], RD, never>(self, {
-          decode: change.decode,
-          encode: SchemaGetter.forbiddenEncoding,
-        })(member);
+      // One step for the whole line below. Its source is the previous version's
+      // reader, which already accepts every version up to it and decodes them all
+      // into a value of it, so this version's `decode` maps that value into this
+      // version's encoded form, and `self` then validates it. Nothing below is
+      // expanded, so a version costs one step however long the line is.
+      const step = Schema.decodeTo<Schema.Struct<More>, Prev, RD, never>(self, {
+        decode: change.decode,
+        encode: SchemaGetter.forbiddenEncoding,
+      })(previous);
 
       return assemble<
         Schema.Struct<More>,
-        readonly [Schema.Struct<More>, ...Upgrade<Prev["members"], Schema.Struct<More>, RD>]
-      >(self, [self, ...previous.members.map(step)]);
+        readonly [Schema.Struct<More>, Step<Prev, Schema.Struct<More>, RD>]
+      >(self, [self, step]);
     };
   },
   /**
-   * Reads several versions at once — every version of `a` and of `b`, in one flat
-   * union, so a rejected document reports all of them.
+   * Reads several versions at once — every version of `a` and of `b`, in one
+   * union, so a rejected document is reported against both lines rather than only
+   * the first one tried.
    */
   across<AMembers extends ReadonlyArray<Schema.Top>, BMembers extends ReadonlyArray<Schema.Top>>(
     a: Schema.Union<AMembers>,

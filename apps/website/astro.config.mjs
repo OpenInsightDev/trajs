@@ -35,6 +35,7 @@ export default defineConfig({
           label: "Guides",
           items: [
             { label: "Toolkits and recorded tools", slug: "guides/toolkits" },
+            { label: "Versioned data", slug: "guides/versioned-data" },
             { label: "The .trajs format", slug: "guides/trajs-format" },
           ],
         },
