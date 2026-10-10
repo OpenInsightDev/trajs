@@ -12,7 +12,7 @@ import type { OpenAiClient } from "@effect/ai-openai-compat";
 import type { Effect } from "effect";
 import type { Tool } from "effect/ai";
 import * as codec from "#/internal/codec.ts";
-import type * as Extensionkit from "#/Extensionkit.ts";
+import type * as Extension from "#/Extension.ts";
 import type * as Trajectory from "#/Trajectory.ts";
 import type { TrajectoryError } from "#/TrajectoryError.ts";
 
@@ -90,6 +90,6 @@ export type ChatCompletionSessions = Record<string, ChatCompletionMessage[]>;
  * @category encoding
  */
 export const makeChatCompletion = <Tools extends Record<string, Tool.Any>, E, R>(
-  trajectory: Trajectory.Trajectory<Tools, Extensionkit.Any, E, R>,
+  trajectory: Trajectory.Trajectory<Tools, Record<string, Extension.Any>, E, R>,
 ): Effect.Effect<ChatCompletionSessions, E | TrajectoryError, R> =>
   codec.makeChatCompletion(trajectory);

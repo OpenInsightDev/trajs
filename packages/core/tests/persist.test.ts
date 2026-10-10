@@ -18,7 +18,9 @@ const trajectory = () =>
     Trajectory.Metadata.make({ name: "greeting" }),
   );
 
-const recordsOf = (trajectory: Trajectory.Any) =>
+const recordsOf = <Exts extends Record<string, Extension.Any>>(
+  trajectory: Trajectory.Trajectory<{}, Exts>,
+) =>
   Effect.runPromise(Stream.runCollect(Persist.encode(trajectory))).then((records) =>
     Array.from(records),
   );
@@ -48,7 +50,7 @@ it("writes the encoded extension kit into the header", async () => {
   );
 
   const kit = Extensionkit.make(otel);
-  const bound = await Effect.runPromise(Extensionkit.extkits(kit)(Trajectory.make(Stream.empty)));
+  const bound = Extensionkit.extkits(kit)(Trajectory.make(Stream.empty));
   const records = await recordsOf(bound);
 
   // SAFETY: `recordsOf` returns the encoded JSON lines; this names the header
@@ -57,8 +59,8 @@ it("writes the encoded extension kit into the header", async () => {
 
   expect(header.extkit).toEqual(Extensionkit.encode(kit));
   expect(header.extkit[otel.id]).toMatchObject({
-    dialect: "draft-07",
-    schema: { anyOf: expect.any(Array) },
+    name: "OpenTelemetry",
+    schema: { dialect: "draft-07", schema: { anyOf: expect.any(Array) } },
   });
 });
 

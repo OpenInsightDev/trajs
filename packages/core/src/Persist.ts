@@ -14,6 +14,7 @@
 
 import { Effect, Option, Schema, Sink, Stream } from "effect";
 import { Tool, Toolkit } from "effect/ai";
+import type * as Extension from "#/Extension.ts";
 import * as Extensionkit from "#/Extensionkit.ts";
 import * as Trajectory from "#/Trajectory.ts";
 import { TrajectoryError } from "#/TrajectoryError.ts";
@@ -60,7 +61,10 @@ const Header = Schema.Struct({
  * @see {@link write} for storing the records with the stream writer.
  * @category encoding
  */
-export const encode = <Tools extends Record<string, Tool.Any>, Exts extends Extensionkit.Any>(
+export const encode = <
+  Tools extends Record<string, Tool.Any>,
+  Exts extends Record<string, Extension.Any>,
+>(
   trajectory: Trajectory.Trajectory<Tools, Exts>,
 ): Stream.Stream<unknown, TrajectoryError, Tool.ResultEncodingServices<Tools[keyof Tools]>> => {
   const encodePart = Schema.encodeEffect(Trajectory.Part(trajectory.toolkit, trajectory.extkit));
@@ -75,7 +79,7 @@ export const encode = <Tools extends Record<string, Tool.Any>, Exts extends Exte
     Stream.make(header),
     trajectory.pipe(
       Stream.mapEffect((part) =>
-        encodePart(part).pipe(Effect.mapError(TrajectoryError.encode(trajectory.toolkit))),
+        encodePart(part).pipe(Effect.mapError(TrajectoryError.encodeTool(trajectory.toolkit))),
       ),
     ),
   );
@@ -143,7 +147,7 @@ export const decode = Effect.fn("Persist.decode")(function* <E, R>(
  * @category encoding
  */
 export const write =
-  <Tools extends Record<string, Tool.Any>, Exts extends Extensionkit.Any>(
+  <Tools extends Record<string, Tool.Any>, Exts extends Record<string, Extension.Any>>(
     trajectory: Trajectory.Trajectory<Tools, Exts>,
   ) =>
   (key: string) =>

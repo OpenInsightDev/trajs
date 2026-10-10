@@ -24,7 +24,8 @@ confuse.
 {"_tag":"Session","uuid":"0192...","timestamp":"...","session":"agent-a"}
 ```
 
-Part `_tag` values are `Prompt`, `Response` and `Session`, with no collision.
+Part `_tag` values are `Prompt`, `Response`, `Session` and `Extension`, with no
+collision.
 
 The specification version is not a field of the header of its own: it is
 `metadata.version`, and both it and the metadata are required. `Persist` writes

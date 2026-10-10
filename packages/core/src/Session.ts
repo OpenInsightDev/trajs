@@ -15,6 +15,7 @@
 
 import { Predicate, Stream } from "effect";
 import type { Tool } from "effect/ai";
+import type * as Extension from "#/Extension.ts";
 import * as Trajectory from "#/Trajectory.ts";
 import { TrajectoryError } from "#/TrajectoryError.ts";
 import * as lineage from "#/internal/session.ts";
@@ -30,8 +31,11 @@ import * as lineage from "#/internal/session.ts";
  * @see {@link of} for a session together with what it inherited.
  * @category combinators
  */
-export const parts = <Tools extends Record<string, Tool.Any>>(
-  trajectory: Trajectory.Trajectory<Tools>,
+export const parts = <
+  Tools extends Record<string, Tool.Any>,
+  Exts extends Record<string, Extension.Any>,
+>(
+  trajectory: Trajectory.Trajectory<Tools, Exts>,
 ): Stream.Stream<Trajectory.SessionPart, TrajectoryError> =>
   trajectory.pipe(
     Stream.filter((part): part is Trajectory.SessionPart => Predicate.isTagged("Session")(part)),
@@ -76,9 +80,9 @@ export const parts = <Tools extends Record<string, Tool.Any>>(
  */
 export const select =
   (id: string) =>
-  <Tools extends Record<string, Tool.Any>>(
-    trajectory: Trajectory.Trajectory<Tools>,
-  ): Stream.Stream<Trajectory.Part<Tools>, TrajectoryError> =>
+  <Tools extends Record<string, Tool.Any>, Exts extends Record<string, Extension.Any>>(
+    trajectory: Trajectory.Trajectory<Tools, Exts>,
+  ): Stream.Stream<Trajectory.Part<Tools, Exts>, TrajectoryError> =>
     trajectory.pipe(Stream.filter((part) => part.session === id));
 
 /**
@@ -103,8 +107,8 @@ export const select =
  */
 export const parent =
   (id: string) =>
-  <Tools extends Record<string, Tool.Any>>(
-    trajectory: Trajectory.Trajectory<Tools>,
+  <Tools extends Record<string, Tool.Any>, Exts extends Record<string, Extension.Any>>(
+    trajectory: Trajectory.Trajectory<Tools, Exts>,
   ): Stream.Stream<string, TrajectoryError> =>
     lineage.parent(id, trajectory);
 
@@ -128,8 +132,8 @@ export const parent =
  */
 export const children =
   (id: string) =>
-  <Tools extends Record<string, Tool.Any>>(
-    trajectory: Trajectory.Trajectory<Tools>,
+  <Tools extends Record<string, Tool.Any>, Exts extends Record<string, Extension.Any>>(
+    trajectory: Trajectory.Trajectory<Tools, Exts>,
   ): Stream.Stream<string, TrajectoryError> =>
     lineage.children(id, trajectory);
 
@@ -182,7 +186,7 @@ export const children =
  */
 export const of =
   (id: string) =>
-  <Tools extends Record<string, Tool.Any>>(
-    trajectory: Trajectory.Trajectory<Tools>,
-  ): Stream.Stream<Trajectory.Part<Tools>, TrajectoryError> =>
+  <Tools extends Record<string, Tool.Any>, Exts extends Record<string, Extension.Any>>(
+    trajectory: Trajectory.Trajectory<Tools, Exts>,
+  ): Stream.Stream<Trajectory.Part<Tools, Exts>, TrajectoryError> =>
     lineage.of(id, trajectory);

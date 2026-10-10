@@ -28,7 +28,7 @@ const result = (id: string, options: { name?: string; preliminary?: boolean } = 
 
 const turnsOf = Effect.fn(function* (parts: ReadonlyArray<Trajectory.AnyPart>) {
   const recorded = Trajectory.make(Stream.fromIterable(parts));
-  const bound = yield* TrajectoryToolkit.toolkits(weather)(recorded);
+  const bound = TrajectoryToolkit.toolkits(weather)(recorded);
   const turns = yield* Stream.runCollect(TrajectoryToolkit.toolTurns(bound));
 
   return Array.from(turns);

@@ -10,6 +10,7 @@
 
 import { Effect, JsonSchema, Match, Predicate, Schema, Stream } from "effect";
 import { Tool, Toolkit } from "effect/ai";
+import type * as Extension from "#/Extension.ts";
 import * as Trajectory from "#/Trajectory.ts";
 import * as Response from "#/Response.ts";
 import { TrajectoryError } from "#/TrajectoryError.ts";
@@ -120,16 +121,18 @@ export const encode = (toolkit: Toolkit.Any): ToolkitEncoded =>
  *
  * **Details**
  *
- * Every part is encoded with the trajectory's own toolkit and decoded again with
- * the merged one, so tool calls and results that were recorded while their tools
- * were unknown gain their exact names, parameters and results. Anything no tool
- * matches stays unrestricted, prompt parts and metadata are carried over, and
- * schema failures are reported as {@link TrajectoryError}.
+ * Every response part is encoded with the trajectory's own toolkit and decoded
+ * again with the merged one, so tool calls and results that were recorded while
+ * their tools were unknown gain their exact names, parameters and results.
+ * Anything no tool matches stays unrestricted, the parts of every other kind
+ * are carried over unchanged, and the metadata and the extension kit travel
+ * with the returned trajectory. A schema failure is reported as
+ * {@link TrajectoryError}.
  *
  * **Example** (Binding a recorded trajectory to its tools)
  *
  * ```ts import.meta.vitest
- * import { Effect, Schema, Stream } from "effect"
+ * import { Schema, Stream } from "effect"
  * import { Tool, Toolkit } from "effect/ai"
  * import { Response, Trajectory, Toolkit as TrajectoryToolkit } from "@trajs/core"
  *
@@ -143,53 +146,47 @@ export const encode = (toolkit: Toolkit.Any): ToolkitEncoded =>
  *   })))
  * )
  *
- * const rebound = await Effect.runPromise(TrajectoryToolkit.toolkits(weather)(recorded))
+ * const rebound = TrajectoryToolkit.toolkits(weather)(recorded)
  * Object.keys(rebound.toolkit.tools) // => ["get_weather"]
  * ```
  *
  * @category combinators
  */
-export const toolkits = <Toolkits extends ReadonlyArray<Toolkit.Any>>(...toolkits: Toolkits) =>
-  Effect.fn(<Tools extends Record<string, Tool.Any>>(trajectory: Trajectory.Trajectory<Tools>) => {
+export const toolkits =
+  <Toolkits extends ReadonlyArray<Toolkit.Any>>(...toolkits: Toolkits) =>
+  <Tools extends Record<string, Tool.Any>, Exts extends Record<string, Extension.Any>, E, R>(
+    trajectory: Trajectory.Trajectory<Tools, Exts, E, R>,
+  ) => {
     const { toolkit, metadata, extkit } = trajectory;
 
     const merged = Toolkit.merge(toolkit, ...toolkits);
 
-    const sourceSchema = Response.PartView(toolkit);
-    const targetSchema = Response.PartView(merged);
-    const encode = Schema.encodeEffect(sourceSchema);
-    const decode = Schema.decodeEffect(targetSchema);
-
-    const trajPart = Trajectory.Part(merged, extkit);
+    const encode = Schema.encodeEffect(Response.PartView(toolkit));
+    const decode = Schema.decodeEffect(Response.PartView(merged));
 
     const parts = trajectory.pipe(
       Stream.mapEffect((part) =>
         Match.value(part).pipe(
-          Match.tag("Prompt", (prompt) => Effect.succeed(trajPart.make(prompt))),
-          Match.tag("Session", (session) => Effect.succeed(trajPart.make(session))),
-          Match.tag("Extension", (extension) => Effect.succeed(trajPart.make(extension))),
           Match.tag("Response", (response) =>
             Effect.gen(function* () {
               const encoded = yield* encode(response.response).pipe(
-                Effect.mapError(TrajectoryError.encode(toolkit)),
+                Effect.mapError(TrajectoryError.encodeTool(toolkit)),
               );
 
               const decoded = yield* decode(encoded).pipe(
-                Effect.mapError(TrajectoryError.decode(merged)),
+                Effect.mapError(TrajectoryError.decodeTool(merged)),
               );
 
-              return trajPart.make({ ...response, response: decoded });
+              return { ...response, response: decoded };
             }),
           ),
-          Match.exhaustive,
+          Match.orElse((part) => Effect.succeed(part)),
         ),
       ),
     );
 
-    // The parts are re-read against the merged toolkit and the trajectory is put
-    // back together from them and the fields of the one it was given.
-    return Effect.succeed(Object.assign(parts, { toolkit: merged, metadata, extkit }));
-  });
+    return Object.assign(parts, { toolkit: merged, metadata, extkit });
+  };
 
 /**
  * A tool call together with the result it produced.
@@ -289,7 +286,7 @@ export const toolTurn = <Tools extends Record<string, Tool.Any>>(
  *   Stream.make(Trajectory.responsePart(call), Trajectory.responsePart(result))
  * )
  *
- * const bound = await Effect.runPromise(TrajectoryToolkit.toolkits(weather)(recorded))
+ * const bound = TrajectoryToolkit.toolkits(weather)(recorded)
  * const turns = await Effect.runPromise(Stream.runCollect(TrajectoryToolkit.toolTurns(bound)))
  * turns.length // => 1
  * ```
@@ -297,8 +294,11 @@ export const toolTurn = <Tools extends Record<string, Tool.Any>>(
  * @see {@link toolkits} for binding a recording to the tools it refers to.
  * @category combinators
  */
-export const toolTurns = <Tools extends Record<string, Tool.Any>>(
-  trajectory: Trajectory.Trajectory<Tools>,
+export const toolTurns = <
+  Tools extends Record<string, Tool.Any>,
+  Exts extends Record<string, Extension.Any>,
+>(
+  trajectory: Trajectory.Trajectory<Tools, Exts>,
 ): Stream.Stream<ToolTurn<Tools>, TrajectoryError> =>
   trajectory.pipe(
     Stream.mapAccum(

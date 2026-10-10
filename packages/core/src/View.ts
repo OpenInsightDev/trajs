@@ -14,7 +14,7 @@
 
 import { Effect, Option, Predicate, Stream } from "effect";
 import { Prompt, type Tool } from "effect/ai";
-import type * as Extensionkit from "#/Extensionkit.ts";
+import type * as Extension from "#/Extension.ts";
 import type * as Response from "#/Response.ts";
 import type { Part, PartStream } from "#/Trajectory.ts";
 import type { TrajectoryError } from "#/TrajectoryError.ts";
@@ -73,13 +73,13 @@ export type PromptTurn<Tools extends Record<string, Tool.Any>> = Readonly<{
  * @category combinators
  */
 export const promptTurns = <Tools extends Record<string, Tool.Any>, E, R>(
-  trajectory: PartStream<Tools, Extensionkit.Any, E, R>,
+  trajectory: PartStream<Tools, Record<string, Extension.Any>, E, R>,
 ): Stream.Stream<PromptTurn<Tools>, E | TrajectoryError, R> =>
   // A turn is only known to be over once the next prompt is reached, so the
   // trajectory is closed with a marker that releases the turn still open.
   Stream.concat(
     trajectory.pipe(Stream.map((part) => Option.some(part))),
-    Stream.make(Option.none<Part<Tools>>()),
+    Stream.make(Option.none<Part<Tools, Record<string, Extension.Any>>>()),
   ).pipe(
     Stream.mapAccum(
       (): Option.Option<PromptTurn<Tools>> => Option.none(),
@@ -154,7 +154,7 @@ export const promptTurns = <Tools extends Record<string, Tool.Any>, E, R>(
  * @category combinators
  */
 export const prompt = <Tools extends Record<string, Tool.Any>>(
-  trajectory: PartStream<Tools, Extensionkit.Any>,
+  trajectory: PartStream<Tools, Record<string, Extension.Any>>,
 ): Effect.Effect<Prompt.Prompt, TrajectoryError> =>
   promptTurns(trajectory).pipe(
     Stream.runFold(

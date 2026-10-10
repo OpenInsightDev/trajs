@@ -8,6 +8,7 @@
  * and extensions it refers to.
  */
 
+import type * as Extension from "#/Extension.ts";
 import * as Extensionkit from "#/Extensionkit.ts";
 import * as Response from "#/Response.ts";
 import type { TrajectoryError } from "#/TrajectoryError.ts";
@@ -338,6 +339,13 @@ export const ExtensionPart = <Exts extends Extensionkit.Any>(extkit: Exts) =>
   });
 
 /**
+ * Encoded representation of extension parts for serialization.
+ *
+ * @category models
+ */
+export type ExtensionPartEncoded = Schema.Codec.Encoded<ReturnType<typeof ExtensionPart<any>>>;
+
+/**
  * Schema for an extension part that also accepts extensions outside the provided
  * kit.
  *
@@ -363,7 +371,10 @@ export type AnyExtensionPart = Schema.Schema.Type<typeof AnyExtensionPart>;
  *
  * @category constructors
  */
-export const Part = <Tools extends Record<string, Tool.Any>, Exts extends Extensionkit.Any>(
+export const Part = <
+  Tools extends Record<string, Tool.Any>,
+  Exts extends Record<string, Extension.Any>,
+>(
   toolkit: Toolkit.Toolkit<Tools>,
   extkit: Exts,
 ) => Schema.Union([PromptPart, SessionPart, ResponsePart(toolkit), ExtensionPart(extkit)]);
@@ -375,7 +386,7 @@ export const Part = <Tools extends Record<string, Tool.Any>, Exts extends Extens
  */
 export type Part<
   Tools extends Record<string, Tool.Any>,
-  Exts extends Extensionkit.Any = Extensionkit.Any,
+  Exts extends Record<string, Extension.Any>,
 > = Schema.Schema.Type<ReturnType<typeof Part<Tools, Exts>>>;
 
 /**
@@ -384,7 +395,7 @@ export type Part<
  * @category models
  */
 export type PartEncoded = Schema.Codec.Encoded<
-  ReturnType<typeof Part<Record<string, Tool.Any>, Extensionkit.Any>>
+  ReturnType<typeof Part<Record<string, Tool.Any>, Record<string, Extension.Any>>>
 >;
 
 /**
@@ -402,7 +413,7 @@ export type AnyPart = PromptPart | SessionPart | AnyResponsePart | AnyExtensionP
  */
 export type PartStream<
   Tools extends Record<string, Tool.Any>,
-  Exts extends Extensionkit.Any = Extensionkit.Any,
+  Exts extends Record<string, Extension.Any>,
   E = never,
   R = never,
 > = Stream.Stream<Part<Tools, Exts>, E | TrajectoryError, R>;
@@ -413,7 +424,7 @@ export type PartStream<
  *
  * @category models
  */
-export type AnyPartStream = PartStream<Record<string, never>>;
+export type AnyPartStream = PartStream<{}, {}>;
 
 /**
  * Stream of trajectory parts with the toolkit, metadata and extension kit of a
@@ -421,16 +432,16 @@ export type AnyPartStream = PartStream<Record<string, never>>;
  *
  * **Details**
  *
- * The `toolkit`, `metadata` and `extkit` fields travel with the stream, so the
- * parts and the context they were recorded in stay together. Each of the two kits
- * is a type parameter, so a trajectory carries the tools and extensions it was
- * recorded with rather than an unknown set of them.
+ * The `toolkit`, `metadata` and `extkit` fields travel with the stream, so
+ * the parts and the context they were recorded in stay together. Each of the two
+ * kits is a type parameter, so a trajectory carries the tools and extensions it
+ * was recorded with rather than an unknown set of them.
  *
  * @category models
  */
 export type Trajectory<
   Tools extends Record<string, Tool.Any>,
-  Exts extends Extensionkit.Any = Extensionkit.Any,
+  Exts extends Record<string, Extension.Any>,
   E = never,
   R = never,
 > = PartStream<Tools, Exts, E, R> &
@@ -454,7 +465,7 @@ export type Trajectory<
  *
  * @category models
  */
-export type Any = Trajectory<Record<string, never>>;
+export type Any = Trajectory<{}, {}>;
 
 /**
  * Encoded stream of trajectory parts for serialization.
@@ -486,9 +497,9 @@ export type TrajectoryEncoded<E = never, R = never> = Stream.Stream<
  *
  * Bind the recording when the parts should carry the types of the tools and
  * extensions they refer to: {@link Toolkit.toolkits} narrows tool calls and
- * results to the schemas of their tools, and {@link Extensionkit.extkits} narrows
- * extension data to the versions of its extension. Both run an effect, so they
- * are piped over the trajectory rather than given to `make`.
+ * results to the schemas of their tools, and {@link Extensionkit.extkits}
+ * narrows extension data to the versions of its extension. Both are applied to
+ * the trajectory rather than passed to `make`.
  *
  * **Example** (Creating a trajectory)
  *
@@ -576,18 +587,18 @@ export const make: {
  * @category combinators
  */
 export const mapMetadata: {
-  <Tools extends Record<string, Tool.Any>, Exts extends Extensionkit.Any, E, R>(
+  <Tools extends Record<string, Tool.Any>, Exts extends Record<string, Extension.Any>, E, R>(
     trajectory: Trajectory<Tools, Exts, E, R>,
     f: (metadata: Metadata) => Metadata,
   ): Trajectory<Tools, Exts, E, R>;
   (
     f: (metadata: Metadata) => Metadata,
-  ): <Tools extends Record<string, Tool.Any>, Exts extends Extensionkit.Any, E, R>(
+  ): <Tools extends Record<string, Tool.Any>, Exts extends Record<string, Extension.Any>, E, R>(
     trajectory: Trajectory<Tools, Exts, E, R>,
   ) => Trajectory<Tools, Exts, E, R>;
 } = Function.dual(
   2,
-  <Tools extends Record<string, Tool.Any>, Exts extends Extensionkit.Any, E, R>(
+  <Tools extends Record<string, Tool.Any>, Exts extends Record<string, Extension.Any>, E, R>(
     trajectory: Trajectory<Tools, Exts, E, R>,
     f: (metadata: Metadata) => Metadata,
   ): Trajectory<Tools, Exts, E, R> => {

@@ -50,16 +50,15 @@ You can build these parts directly with `Response.anyToolCallPart` and
 
 ## Bind a recording to its tools
 
-`Toolkit.toolkits` extends a trajectory's toolkit. Every part is encoded with the
-trajectory's own toolkit and decoded again with the merged one, so tool calls and
-results recorded while their tools were unknown regain their exact names,
-parameters and results:
+`Toolkit.toolkits` extends a trajectory's toolkit. Every response part is
+encoded with the trajectory's own toolkit and decoded again with the merged one,
+so tool calls and results recorded while their tools were unknown regain their
+exact names, parameters and results:
 
 ```ts
-import { Effect } from "effect";
 import { Toolkit as TrajectoryToolkit } from "@trajs/core";
 
-const rebound = await Effect.runPromise(TrajectoryToolkit.toolkits(weather)(recorded));
+const rebound = TrajectoryToolkit.toolkits(weather)(recorded);
 ```
 
 Anything no tool matches stays unrestricted, and prompt parts and metadata are

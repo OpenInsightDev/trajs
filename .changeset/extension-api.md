@@ -5,8 +5,8 @@
 Add the extension API: an extension is an identifier, descriptive metadata and a
 line of versions of its data. `Extension.make` declares the oldest version,
 `Extension.upgrade` derives the next one, and `Extensionkit` collects extensions
-into the identifier to schema map a recording is read with. A trajectory carries
-that map as its `extkit` field, typed the way `toolkit` is, and
+into the identifier to extension map a recording is read with. A trajectory
+carries that map as its `extkit` field, typed the way `toolkit` is, and
 `Trajectory.ExtensionPart` reads the data of each extension through the
 extension's own line of versions, so data recorded against an older version is
 read as the newest one.

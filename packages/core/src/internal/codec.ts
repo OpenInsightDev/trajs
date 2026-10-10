@@ -3,7 +3,7 @@ import { Effect, Predicate, Stream } from "effect";
 import type { Prompt, Tool } from "effect/ai";
 import { Base64 } from "effect/encoding";
 import type { ChatCompletionMessage, ChatCompletionSessions } from "#/Codec.ts";
-import type * as Extensionkit from "#/Extensionkit.ts";
+import type * as Extension from "#/Extension.ts";
 import * as Trajectory from "#/Trajectory.ts";
 import type { TrajectoryError } from "#/TrajectoryError.ts";
 import * as View from "#/View.ts";
@@ -149,16 +149,16 @@ const messagesOf = (message: Prompt.Message): ChatCompletionMessage[] => {
 // recorded: each prompt contributes the messages the model was given and the
 // responses that follow it contribute what the model returned.
 const sessionMessages = <Tools extends Record<string, Tool.Any>>(
-  parts: ReadonlyArray<Trajectory.Part<Tools>>,
+  parts: ReadonlyArray<Trajectory.Part<Tools, Record<string, Extension.Any>>>,
 ): Effect.Effect<ChatCompletionMessage[], TrajectoryError> =>
   View.prompt(Stream.fromIterable(parts)).pipe(
     Effect.map((prompt) => prompt.content.flatMap(messagesOf)),
   );
 
 const groupBySession = <Tools extends Record<string, Tool.Any>>(
-  parts: ReadonlyArray<Trajectory.Part<Tools>>,
-): Map<string, Trajectory.Part<Tools>[]> => {
-  const sessions = new Map<string, Trajectory.Part<Tools>[]>();
+  parts: ReadonlyArray<Trajectory.Part<Tools, Record<string, Extension.Any>>>,
+): Map<string, Trajectory.Part<Tools, Record<string, Extension.Any>>[]> => {
+  const sessions = new Map<string, Trajectory.Part<Tools, Record<string, Extension.Any>>[]>();
 
   for (const part of parts) {
     const id = part.session ?? "";
@@ -180,7 +180,7 @@ export const makeChatCompletion = Effect.fn("Codec.makeChatCompletion")(function
   E,
   R,
 >(
-  trajectory: Trajectory.Trajectory<Tools, Extensionkit.Any, E, R>,
+  trajectory: Trajectory.Trajectory<Tools, Record<string, Extension.Any>, E, R>,
 ): Effect.fn.Return<ChatCompletionSessions, E | TrajectoryError, R> {
   const parts = Array.from(yield* Stream.runCollect(trajectory));
   const sessions: ChatCompletionSessions = {};

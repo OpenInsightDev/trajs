@@ -96,7 +96,7 @@ export class TrajectoryError extends Data.TaggedError("TrajectoryError")<{
    *
    * @category constructors
    */
-  static encode = (toolkit: Toolkit.Any) => (cause: Schema.SchemaError) =>
+  static encodeTool = (toolkit: Toolkit.Any) => (cause: Schema.SchemaError) =>
     new TrajectoryError({ reason: new ToolEncodeError({ toolkit, cause }) });
 
   /**
@@ -104,7 +104,7 @@ export class TrajectoryError extends Data.TaggedError("TrajectoryError")<{
    *
    * @category constructors
    */
-  static decode = (toolkit: Toolkit.Any) => (cause: Schema.SchemaError) =>
+  static decodeTool = (toolkit: Toolkit.Any) => (cause: Schema.SchemaError) =>
     new TrajectoryError({ reason: new ToolDecodeError({ toolkit, cause }) });
 
   /**

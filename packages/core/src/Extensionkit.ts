@@ -3,10 +3,10 @@
  *
  * A trajectory records the data formats it carries alongside its parts, so the
  * data can be versioned, validated and queried instead of being read as an untyped
- * bag. Extensions are collected here as a mapping from identifier to the schema of
- * the data, exactly as tools are collected into a toolkit: {@link make} builds the
- * set, {@link merge} combines the sets of several producers, and a reader picks the
- * schema of the extension it is reading by looking its identifier up.
+ * bag. Extensions are collected here as a mapping from identifier to the extension
+ * itself, exactly as tools are collected into a toolkit: {@link make} builds the
+ * set, {@link merge} combines the sets of several producers, and a reader looks the
+ * extension it is reading up by the identifier a datum was recorded for.
  *
  * The set is also what names the extension a datum came from: {@link Part} builds
  * the part of one extension, discriminated by the identifier its data was
@@ -16,44 +16,40 @@
  * recording names.
  */
 
-import { Effect, JsonSchema, Match, Predicate, Schema, Stream } from "effect";
+import { Effect, JsonSchema, Match, Predicate, Schema, Stream, Struct } from "effect";
 import type { Tool } from "effect/ai";
 import type * as Extension from "#/Extension.ts";
 import type * as Trajectory from "#/Trajectory.ts";
 import { TrajectoryError } from "#/TrajectoryError.ts";
+import type { JsonSchemaDocument } from "#/Toolkit.ts";
 
 /**
- * A version line of unknown shape: the schema a set holds for an identifier.
- */
-type AnyVersion = Extension.Any["version"];
-
-/**
- * The schemas of the extensions a trajectory carries, keyed by identifier.
+ * The extensions a trajectory carries, keyed by identifier.
  *
  * **When to use**
  *
  * Use as the type of the extensions a trajectory is recorded with, or of the
- * schemas a function reads extension data by.
+ * extensions a function reads extension data by.
  *
  * **Details**
  *
- * Each value is the `version` of an {@link Extension.Extension}: the schema that
- * reads the extension's data, whatever version of it was recorded. Descriptive
- * metadata is not part of the set, because nothing reads data by it; read it from
- * the extension that was declared.
+ * Each value is an {@link Extension.Extension}, so the set names the extension a
+ * datum came from and holds the line of versions that reads the datum. Descriptive
+ * metadata is part of the extension, so it travels with the set.
  *
  * @see {@link Extension.Extension} for defining an extension.
  * @category models
  */
-export type Extensionkit<Schemas extends Record<string, AnyVersion> = Record<string, AnyVersion>> =
-  Readonly<Schemas>;
+export type Extensionkit<
+  Exts extends Record<string, Extension.Any> = Record<string, Extension.Any>,
+> = Readonly<Exts>;
 
 /**
  * A set of extensions of unknown identifiers and data.
  *
  * @category models
  */
-export type Any = Extensionkit;
+export type Any = Extensionkit<Record<string, Extension.Any>>;
 
 /**
  * The set a list of extensions yields, keyed by identifier.
@@ -61,45 +57,30 @@ export type Any = Extensionkit;
  * @category models
  */
 export type Of<Exts extends ReadonlyArray<Extension.Any>> = {
-  readonly [Ext in Exts[number] as Ext["id"]]: Ext["version"];
+  readonly [Ext in Exts[number] as Ext["id"]]: Ext;
 };
 
 /**
- * The identifiers any of the sets in a list holds.
+ * The extensions the sets of a list hold, read from the sets that hold them.
  *
  * The sets are distributed over, because `keyof` of a union is only the keys every
- * member shares, which would drop the identifier a set alone holds.
+ * member shares, which would drop the identifier a set alone holds. Effect's own
+ * `MergeRecords` does the same for a toolkit, but reads the tool out of each
+ * member, so it cannot be reused for extensions.
  */
-type MergedKeys<Kits extends ReadonlyArray<Record<string, AnyVersion>>> =
-  Kits[number] extends infer Kit
-    ? Kit extends Record<string, AnyVersion>
-      ? keyof Kit
-      : never
-    : never;
-
-/**
- * The schemas the sets of a list hold for one identifier, read from the sets that
- * hold it.
- */
-type MergedSchemas<
-  Kits extends ReadonlyArray<Record<string, AnyVersion>>,
-  Key extends PropertyKey,
-> = Kits[number] extends infer Kit
-  ? Kit extends Record<string, AnyVersion>
-    ? Key extends keyof Kit
-      ? Kit[Key]
-      : never
-    : never
-  : never;
+type MergeRecords<Kits> = {
+  readonly [Id in Extract<Kits extends unknown ? keyof Kits : never, string>]: Extract<
+    Kits extends Record<Id, infer Ext> ? Ext : never,
+    Extension.Any
+  >;
+};
 
 /**
  * The set a list of sets merges to.
  *
  * @category models
  */
-export type Merged<Kits extends ReadonlyArray<Record<string, AnyVersion>>> = {
-  readonly [Key in MergedKeys<Kits>]: MergedSchemas<Kits, Key>;
-};
+export type Merged<Kits extends ReadonlyArray<Any>> = Struct.Simplify<MergeRecords<Kits[number]>>;
 
 /**
  * A set with no extensions.
@@ -145,8 +126,10 @@ export const empty: Extensionkit<{}> = {};
  */
 export const make = <const Exts extends ReadonlyArray<Extension.Any>>(
   ...extensions: Exts
-): Of<Exts> =>
-  Object.fromEntries(extensions.map((extension) => [extension.id, extension.version])) as Of<Exts>;
+): Extensionkit<Of<Exts>> =>
+  Object.fromEntries(extensions.map((extension) => [extension.id, extension])) as Extensionkit<
+    Of<Exts>
+  >;
 
 // SAFETY: `merge` derives its key and value types from generic inputs whose precision `Object.assign` erases.
 /**
@@ -160,9 +143,35 @@ export const make = <const Exts extends ReadonlyArray<Extension.Any>>(
  * @see {@link make} for collecting extensions into a set.
  * @category combinators
  */
-export const merge = <const Kits extends ReadonlyArray<Record<string, AnyVersion>>>(
+export const merge = <const Kits extends ReadonlyArray<Any>>(
   ...kits: Kits
-): Merged<Kits> => Object.assign({}, ...kits) as Merged<Kits>;
+): Extensionkit<Merged<Kits>> => Object.assign({}, ...kits) as Extensionkit<Merged<Kits>>;
+
+/**
+ * Serialized form of a single extension.
+ *
+ * **When to use**
+ *
+ * Use to persist an extension, or to describe it to a reader that does not have
+ * the extension itself.
+ *
+ * **Details**
+ *
+ * The line of versions is stored as the draft-07 JSON Schema document of its
+ * newest version, so the data the extension reads can be described without the
+ * Effect Schemas the line was built from. The document is the whole line: every
+ * version the newest one reads is a member of it, so data recorded against an
+ * older version is described as well. The descriptive metadata is carried
+ * alongside, as a tool's name and description are.
+ *
+ * @see {@link ExtensionkitEncoded} for the record an extension kit serializes to.
+ * @category models
+ */
+export type ExtensionEncoded = Readonly<{
+  name?: string;
+  description?: string;
+  schema: JsonSchemaDocument;
+}>;
 
 /**
  * Serialized form of an extension kit, keyed by the identifiers of its
@@ -170,45 +179,45 @@ export const merge = <const Kits extends ReadonlyArray<Record<string, AnyVersion
  *
  * **When to use**
  *
- * Use to persist the data formats a recording carries, or to describe them to a
- * reader that does not have the extensions themselves.
- *
- * **Details**
- *
- * Each value is the draft-07 JSON Schema document of an extension's line of
- * versions, so the data an extension reads can be described without the Effect
- * Schemas the line was built from. The document is the whole line: every version
- * the extension's newest one reads is a member of it, so data recorded against
- * an older version is described as well.
+ * Use to persist the extensions a recording carries, or to describe them to a
+ * reader that does not have them.
  *
  * @see {@link encode} for serializing an extension kit.
  * @category models
  */
-export type ExtensionkitEncoded = Record<string, JsonSchema.Document<"draft-07">>;
+export type ExtensionkitEncoded = Record<string, ExtensionEncoded>;
 
 /**
  * Serializes an extension kit into an {@link ExtensionkitEncoded} record.
  *
  * **When to use**
  *
- * Use to persist the data formats a recording carries, or to describe them to a
- * reader that does not have the extensions themselves.
+ * Use to persist the extensions a recording carries, or to describe them to a
+ * reader that does not have them.
  *
  * **Details**
  *
  * Each extension contributes the draft-07 JSON Schema document of its line of
- * versions, keyed by the identifier its data was recorded for. Descriptive
- * metadata is not part of the set, so it is not part of the encoded form either;
- * read it from the extension that was declared.
+ * versions and its descriptive metadata, keyed by the identifier its data was
+ * recorded for, the way a toolkit's encoded form keeps each tool's name and
+ * description.
  *
  * @category encoding
  */
 export const encode = (extkit: Any): ExtensionkitEncoded =>
   Object.fromEntries(
-    Object.entries(extkit).map(([id, version]) => [
-      id,
-      JsonSchema.toDocumentDraft07(Schema.toJsonSchemaDocument(version)),
-    ]),
+    Object.entries(extkit).map(([id, extension]) => {
+      const { name, description } = extension.metadata;
+
+      const encoded = {
+        schema: JsonSchema.toDocumentDraft07(Schema.toJsonSchemaDocument(extension.version)),
+      };
+
+      const named = name === undefined ? encoded : { ...encoded, name };
+      const described = description === undefined ? named : { ...named, description };
+
+      return [id, described];
+    }),
   );
 
 /**
@@ -233,7 +242,7 @@ const extensionPart = <Id extends string, V extends Schema.Top>(id: Id, version:
  * members are declared to be rather than what the walk can write down.
  */
 type Parts<Exts extends Any> = {
-  readonly [Id in keyof Exts]: ReturnType<typeof extensionPart<Id & string, Exts[Id]>>;
+  readonly [Id in keyof Exts]: ReturnType<typeof extensionPart<Id & string, Exts[Id]["version"]>>;
 }[keyof Exts];
 
 /**
@@ -307,7 +316,9 @@ export type PartEncoded<Exts extends Any> = Schema.Codec.Encoded<
 export const Part = <Exts extends Any>(
   extkit: Exts,
 ): Schema.Codec<Part<Exts>, PartEncoded<Exts>, never, never> =>
-  Schema.Union(Object.entries(extkit).map(([id, version]) => extensionPart(id, version))) as any;
+  Schema.Union(
+    Object.entries(extkit).map(([id, extension]) => extensionPart(id, extension.version)),
+  ) as any;
 
 const AnyPartTypeId = "~trajs/Extensionkit/AnyPart" as const;
 
@@ -370,7 +381,10 @@ export const AnyPart = Schema.Struct({
  */
 export const isAnyPart = (u: unknown): u is AnyPart => Predicate.hasProperty(u, AnyPartTypeId);
 
-// SAFETY: `Schema.Union` widens the encoded and service type parameters of its members; the union of the two codecs is exactly the declared contract.
+// SAFETY: `PartView` describes the parts of one kit and carries any other datum as
+// `AnyPart`, so the union of the two codecs is the declared contract and its
+// encoded form is the encoded form of that unconstrained part, whatever kit it is
+// built from: the walk is what loses the kit's identifiers, not the encoded value.
 /**
  * Creates a Schema for the parts an extension kit describes, including the
  * extensions it does not.
@@ -405,12 +419,8 @@ export const isAnyPart = (u: unknown): u is AnyPart => Predicate.hasProperty(u, 
  */
 export const PartView = <Exts extends Any>(
   extkit: Exts,
-): Schema.Codec<
-  Part<Exts> | AnyPart,
-  PartEncoded<Exts> | Schema.Codec.Encoded<typeof AnyPart>,
-  never,
-  never
-> => Schema.Union([Part(extkit), AnyPart]) as any;
+): Schema.Codec<Part<Exts> | AnyPart, Schema.Codec.Encoded<typeof AnyPart>, never, never> =>
+  Schema.Union([Part(extkit), AnyPart]) as any;
 
 /**
  * Extends a trajectory's extension kit with the given extension kits.
@@ -433,7 +443,7 @@ export const PartView = <Exts extends Any>(
  * **Example** (Binding a recording to its extensions)
  *
  * ```ts import.meta.vitest
- * import { Effect, Option, Schema, Stream } from "effect"
+ * import { Option, Schema, Stream } from "effect"
  * import { Extension, Extensionkit, Trajectory } from "@trajs/core"
  *
  * const otel = Extension.make(
@@ -452,10 +462,7 @@ export const PartView = <Exts extends Any>(
  *   }))
  * )
  *
- * const rebound = await Effect.runPromise(
- *   Extensionkit.extkits(Extensionkit.make(otel))(recorded)
- * )
- *
+ * const rebound = Extensionkit.extkits(Extensionkit.make(otel))(recorded)
  * Object.keys(rebound.extkit) // => ["dev.observerw.otel"]
  * ```
  *
@@ -463,42 +470,38 @@ export const PartView = <Exts extends Any>(
  * does not hold.
  * @category combinators
  */
-export const extkits = <Kits extends ReadonlyArray<Any>>(...kits: Kits) =>
-  Effect.fn(
-    <Tools extends Record<string, Tool.Any>, Exts extends Any, E, R>(
-      trajectory: Trajectory.Trajectory<Tools, Exts, E, R>,
-    ): Effect.Effect<
-      Trajectory.Trajectory<Tools, Merged<readonly [Exts, ...Kits]>, E, R>,
-      TrajectoryError
-    > => {
-      const { toolkit, metadata, extkit } = trajectory;
+export const extkits =
+  <Kits extends ReadonlyArray<Any>>(...kits: Kits) =>
+  <Tools extends Record<string, Tool.Any>, Exts extends Record<string, Extension.Any>, E, R>(
+    trajectory: Trajectory.Trajectory<Tools, Exts, E, R>,
+  ) => {
+    const { toolkit, metadata, extkit } = trajectory;
 
-      const merged: Merged<readonly [Exts, ...Kits]> = merge(extkit, ...kits);
+    const merged = merge(extkit, ...kits);
 
-      const encode = Schema.encodeEffect(PartView(extkit));
-      const decode = Schema.decodeUnknownEffect(PartView(merged));
+    const encode = Schema.encodeEffect(PartView(extkit));
+    const decode = Schema.decodeEffect(PartView(merged));
 
-      const parts = trajectory.pipe(
-        Stream.mapEffect((part) =>
-          Match.value(part).pipe(
-            Match.tag("Extension", (extension) =>
-              Effect.gen(function* () {
-                const encoded = yield* encode(extension.extension).pipe(
-                  Effect.mapError(TrajectoryError.encodeExtension(extkit)),
-                );
+    const parts = trajectory.pipe(
+      Stream.mapEffect((part) =>
+        Match.value(part).pipe(
+          Match.tag("Extension", (extension) =>
+            Effect.gen(function* () {
+              const encoded = yield* encode(extension.extension).pipe(
+                Effect.mapError(TrajectoryError.encodeExtension(extkit)),
+              );
 
-                const decoded = yield* decode(encoded).pipe(
-                  Effect.mapError(TrajectoryError.decodeExtension(merged)),
-                );
+              const decoded = yield* decode(encoded).pipe(
+                Effect.mapError(TrajectoryError.decodeExtension(merged)),
+              );
 
-                return { ...extension, extension: decoded };
-              }),
-            ),
-            Match.orElse((part) => Effect.succeed(part)),
+              return { ...extension, extension: decoded };
+            }),
           ),
+          Match.orElse((part) => Effect.succeed(part)),
         ),
-      );
+      ),
+    );
 
-      return Effect.succeed(Object.assign(parts, { toolkit, metadata, extkit: merged }));
-    },
-  );
+    return Object.assign(parts, { toolkit, metadata, extkit: merged });
+  };

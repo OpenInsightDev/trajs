@@ -30,7 +30,10 @@ const span = (extension: string, data: Extensionkit.AnyPart["data"]) =>
 const recorded = (...parts: ReadonlyArray<Trajectory.AnyPart>) =>
   Trajectory.make(Stream.fromIterable(parts));
 
-const extensionOf = <Tools extends Record<string, Tool.Any>, Exts extends Extensionkit.Any>(
+const extensionOf = <
+  Tools extends Record<string, Tool.Any>,
+  Exts extends Record<string, Extension.Any>,
+>(
   part: Trajectory.Part<Tools, Exts>,
 ): Extensionkit.Part<Exts> | Extensionkit.AnyPart => {
   if (!Predicate.isTagged("Extension")(part)) {
@@ -40,16 +43,17 @@ const extensionOf = <Tools extends Record<string, Tool.Any>, Exts extends Extens
   return part.extension;
 };
 
-const payloadsOf = async <Tools extends Record<string, Tool.Any>, Exts extends Extensionkit.Any>(
+const payloadsOf = async <
+  Tools extends Record<string, Tool.Any>,
+  Exts extends Record<string, Extension.Any>,
+>(
   trajectory: Trajectory.Trajectory<Tools, Exts>,
 ): Promise<ReadonlyArray<Extensionkit.Part<Exts> | Extensionkit.AnyPart>> =>
   Array.from(await Effect.runPromise(Stream.runCollect(trajectory))).map(extensionOf);
 
 it("reads data recorded for an extension the trajectory does not hold", async () => {
-  const rebound = await Effect.runPromise(
-    Extensionkit.extkits(otelKit)(
-      recorded(span("dev.observerw.otel", { version: "1.0.0", spanId: "s1" })),
-    ),
+  const rebound = Extensionkit.extkits(otelKit)(
+    recorded(span("dev.observerw.otel", { version: "1.0.0", spanId: "s1" })),
   );
 
   const [payload] = await payloadsOf(rebound);
@@ -62,10 +66,8 @@ it("reads data recorded for an extension the trajectory does not hold", async ()
 });
 
 it("reads data recorded for an older version as the newest one", async () => {
-  const rebound = await Effect.runPromise(
-    Extensionkit.extkits(timedKit)(
-      recorded(span("dev.observerw.otel", { version: "1.0.0", spanId: "s1" })),
-    ),
+  const rebound = Extensionkit.extkits(timedKit)(
+    recorded(span("dev.observerw.otel", { version: "1.0.0", spanId: "s1" })),
   );
 
   const [payload] = await payloadsOf(rebound);
@@ -78,8 +80,8 @@ it("reads data recorded for an older version as the newest one", async () => {
 });
 
 it("keeps data recorded for an extension no given kit holds", async () => {
-  const rebound = await Effect.runPromise(
-    Extensionkit.extkits(otelKit)(recorded(span("dev.observerw.other", { score: 0.5 }))),
+  const rebound = Extensionkit.extkits(otelKit)(
+    recorded(span("dev.observerw.other", { score: 0.5 })),
   );
 
   const [payload] = await payloadsOf(rebound);
@@ -94,8 +96,8 @@ it("keeps data recorded for an extension no given kit holds", async () => {
 });
 
 it("keeps data no version of the extension accepts", async () => {
-  const rebound = await Effect.runPromise(
-    Extensionkit.extkits(otelKit)(recorded(span("dev.observerw.otel", { version: "1.0.0" }))),
+  const rebound = Extensionkit.extkits(otelKit)(
+    recorded(span("dev.observerw.otel", { version: "1.0.0" })),
   );
 
   const [payload] = await payloadsOf(rebound);
@@ -109,11 +111,12 @@ it("keeps data no version of the extension accepts", async () => {
   expect(payload.data).toEqual({ version: "1.0.0" });
 });
 
-it("serializes a kit as the JSON Schema document of each extension's versions", () => {
+it("serializes a kit as each extension's metadata and version line", () => {
   const encoded = Extensionkit.encode(timedKit);
 
   expect(Object.keys(encoded)).toEqual([otel.id]);
-  expect(encoded[otel.id].dialect).toBe("draft-07");
+  expect(encoded[otel.id].name).toBe("OpenTelemetry");
+  expect(encoded[otel.id].schema.dialect).toBe("draft-07");
 
   // The document is the whole line, so every version it reads is described.
   const described = JSON.stringify(encoded[otel.id].schema);
@@ -128,7 +131,7 @@ it("carries the toolkit, metadata and merged kit over", async () => {
     Trajectory.Metadata.make({ name: "greeting" }),
   );
 
-  const rebound = await Effect.runPromise(Extensionkit.extkits(otelKit)(source));
+  const rebound = Extensionkit.extkits(otelKit)(source);
   const parts = Array.from(await Effect.runPromise(Stream.runCollect(rebound)));
 
   expect(rebound.toolkit).toBe(source.toolkit);
@@ -142,11 +145,11 @@ it("carries the toolkit, metadata and merged kit over", async () => {
 });
 
 it("merges the given kits over the trajectory's own", async () => {
-  const source = await Effect.runPromise(
-    Extensionkit.extkits(otelKit)(recorded(span(otel.id, { version: "1.0.0", spanId: "s1" }))),
+  const source = Extensionkit.extkits(otelKit)(
+    recorded(span(otel.id, { version: "1.0.0", spanId: "s1" })),
   );
 
-  const rebound = await Effect.runPromise(Extensionkit.extkits(timedKit)(source));
+  const rebound = Extensionkit.extkits(timedKit)(source);
   const [payload] = await payloadsOf(rebound);
 
   if (Extensionkit.isAnyPart(payload)) {
@@ -154,5 +157,5 @@ it("merges the given kits over the trajectory's own", async () => {
   }
 
   expect(payload.data).toEqual({ version: "1.1.0", spanId: "s1", durationMs: 0 });
-  expect(rebound.extkit[otel.id]).toBe(timed.version);
+  expect(rebound.extkit[otel.id]).toBe(timed);
 });

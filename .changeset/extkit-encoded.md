@@ -4,7 +4,8 @@
 
 Add `Extensionkit.encode`, which serializes an extension kit the way `Toolkit.encode`
 serializes a toolkit: each extension contributes the draft-07 JSON Schema document
-of its line of versions, keyed by its identifier, so the data formats a recording
+of its line of versions and its descriptive name and description, keyed by its
+identifier, so the data formats a recording
 carries can be stored or described without the Effect Schemas the lines were built
 from. The document describes the whole line, so data recorded against an older
 version is described too.
