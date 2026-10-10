@@ -111,12 +111,11 @@ published by `.github/workflows/deploy.yml`.
 
 ## Repository layout
 
-| Path             | Description                                                                                  |
-| :--------------- | :------------------------------------------------------------------------------------------- |
-| `packages/core`  | The `@trajs/core` library: trajectories, responses, toolkits and the `.trajs` codec.         |
-| `apps/website`   | The Astro Starlight documentation site.                                                      |
-| `rfcs`           | Design records, including [RFC 0002: Sessions and Session Derivation](rfcs/0002-session.md). |
-| `packages/utils` | Placeholder package from the monorepo scaffold.                                              |
+| Path             | Description                                                                          |
+| :--------------- | :----------------------------------------------------------------------------------- |
+| `packages/core`  | The `@trajs/core` library: trajectories, responses, toolkits and the `.trajs` codec. |
+| `apps/website`   | The Astro Starlight documentation site.                                              |
+| `packages/utils` | Placeholder package from the monorepo scaffold.                                      |
 
 Each public module of `packages/core` is a namespace and a subpath import, such as
 `@trajs/core/Trajectory` or `@trajs/core/Persist`; everything under `@trajs/core/internal/*` is

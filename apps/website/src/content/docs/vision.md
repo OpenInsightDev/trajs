@@ -40,6 +40,6 @@ attached to the toolkit and metadata it was recorded with.
 
 ## How to follow along
 
-The library lives in `packages/core`, the design record in `rfcs/`, and the
-format version is recorded in the trajectory header. Contributions and shape
-feedback are welcome on [GitHub](https://github.com/OpenInsightDev/trajs).
+The library lives in `packages/core`, and the format version is recorded in the
+trajectory header. Contributions and shape feedback are welcome on
+[GitHub](https://github.com/OpenInsightDev/trajs).
