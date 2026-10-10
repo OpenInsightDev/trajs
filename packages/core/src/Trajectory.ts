@@ -11,6 +11,13 @@
  * carries the conversation itself, or an {@link ExtensionPart}, the data recorded
  * for an extension about that conversation. {@link Part} unions the two, so a
  * recording stays one stream while its message parts can be read on their own.
+ *
+ * A response is recorded at one of two granularities. {@link ResponsePart} holds
+ * the parts a model returned once they have been folded — one piece of content
+ * per part — and {@link StreamResponsePart} holds the same response as the
+ * increments it arrived in. A trajectory of streaming response parts is a
+ * {@link StreamTrajectory}, and {@link fold} collapses it into the trajectory
+ * {@link ResponsePart} records.
  */
 
 import type * as Extension from "#/Extension.ts";
@@ -20,6 +27,7 @@ import type { TrajectoryError } from "#/TrajectoryError.ts";
 import { Effect, Function, Predicate, Schema, Stream } from "effect";
 import { Prompt, Tool, Toolkit } from "effect/ai";
 import pkg from "../package.json" with { type: "json" };
+import * as folding from "#/internal/folding.ts";
 import { Timestamp, Uuid } from "#/internal/schema.ts";
 
 /**
@@ -275,6 +283,87 @@ export const responsePart = (response: Response.Part<any>): AnyResponsePart =>
   AnyResponsePart.make({ response });
 
 /**
+ * Creates a Schema for a response part that holds a response as it was streamed,
+ * based on a toolkit.
+ *
+ * **When to use**
+ *
+ * Use when recording a response as the increments a model streamed it in, rather
+ * than as the parts it can be folded into.
+ *
+ * **Details**
+ *
+ * The Schema holds one increment of a response as it arrived — the start, a delta
+ * or the end of a chunk of text or reasoning, a tool call or its result, and so
+ * on — as {@link Response.AllPartsView}, which tolerates tools outside the
+ * toolkit exactly as {@link ResponsePart} does. The timestamp is recorded when
+ * the part is constructed, so a response is recorded as one part per increment.
+ *
+ * A recording of those parts is a {@link StreamTrajectory}, which {@link fold}
+ * collapses into the response parts this Schema does not hold.
+ *
+ * @see {@link ResponsePart} for a response recorded as the parts it was folded
+ * into.
+ * @category constructors
+ */
+export const StreamResponsePart = <T extends Toolkit.Any>(toolkit: T) =>
+  class StreamResponsePart extends Schema.TaggedClass<StreamResponsePart>()("Response", {
+    response: Response.AllPartsView(toolkit),
+    timestamp: Timestamp,
+    ...PartMetadata.fields,
+  }) {};
+
+/**
+ * Encoded representation of streaming response parts for serialization.
+ *
+ * @category models
+ */
+export type StreamResponsePartEncoded = Schema.Codec.Encoded<
+  ReturnType<typeof StreamResponsePart<any>>
+>;
+
+/**
+ * Schema for a streaming response part that also accepts tools outside the
+ * provided toolkit.
+ *
+ * @see {@link StreamResponsePart} for a Schema restricted to the provided
+ * toolkit.
+ * @category constructors
+ */
+export const AnyStreamResponsePart = StreamResponsePart(Toolkit.empty);
+
+/**
+ * Streaming response part that also accepts tools outside the provided toolkit.
+ *
+ * @category models
+ */
+export type AnyStreamResponsePart = Schema.Schema.Type<typeof AnyStreamResponsePart>;
+
+/**
+ * Constructs a new streaming response part from a part a model streamed.
+ *
+ * **When to use**
+ *
+ * Use when recording a part of a response as it arrived.
+ *
+ * **Example** (Recording a streamed part)
+ *
+ * ```ts import.meta.vitest
+ * import { Response, Trajectory } from "@trajs/core"
+ *
+ * const part = Trajectory.streamResponsePart(
+ *   Response.makePart("text-delta", { id: "0", delta: "Hel" })
+ * )
+ * part._tag // => "Response"
+ * part.response.type // => "text-delta"
+ * ```
+ *
+ * @category constructors
+ */
+export const streamResponsePart = (response: Response.AllParts<any>): AnyStreamResponsePart =>
+  AnyStreamResponsePart.make({ response });
+
+/**
  * Creates a Schema for the message parts of a trajectory based on a toolkit.
  *
  * **When to use**
@@ -327,6 +416,52 @@ export type MessagePartEncoded = Schema.Codec.Encoded<
  * @category models
  */
 export type AnyMessagePart = PromptPart | SessionPart | AnyResponsePart;
+
+/**
+ * Creates a Schema for the message parts of a stream trajectory based on a
+ * toolkit.
+ *
+ * **When to use**
+ *
+ * Use when reading or writing the trajectory data of a response as it streamed —
+ * the messages a model was given, the increments it streamed back and the
+ * sessions they were recorded under.
+ *
+ * **Details**
+ *
+ * It is {@link MessagePart} with {@link StreamResponsePart} in place of
+ * {@link ResponsePart}, so the two hold the same trajectory data at different
+ * granularities and neither reads the other's responses.
+ *
+ * @see {@link MessagePart} for the parts a response is foldable into.
+ * @category constructors
+ */
+export const StreamMessagePart = <Tools extends Record<string, Tool.Any>>(
+  toolkit: Toolkit.Toolkit<Tools>,
+) => Schema.Union([PromptPart, SessionPart, StreamResponsePart(toolkit)]);
+
+/**
+ * Union type of the message parts of a stream trajectory for a toolkit.
+ *
+ * @see {@link StreamMessagePart} for the Schema that builds the union.
+ * @category models
+ */
+export type StreamMessagePart<Tools extends Record<string, Tool.Any>> = Schema.Schema.Type<
+  ReturnType<typeof StreamMessagePart<Tools>>
+>;
+
+/**
+ * Streaming message part that also accepts tools outside the provided toolkit.
+ *
+ * **Details**
+ *
+ * The tolerant form of every message part of a stream trajectory:
+ * {@link PromptPart}, {@link SessionPart} and {@link AnyStreamResponsePart}.
+ *
+ * @see {@link AnyPart} for the tolerant form of every part of a recording.
+ * @category models
+ */
+export type AnyStreamMessagePart = PromptPart | SessionPart | AnyStreamResponsePart;
 
 /**
  * Trajectory part that carries the data recorded for an extension.
@@ -475,6 +610,48 @@ export type PartEncoded = Schema.Codec.Encoded<
 export type AnyPart = AnyMessagePart | AnyExtensionPart;
 
 /**
+ * Creates a Schema for the parts of a stream trajectory based on a toolkit and
+ * extension kit.
+ *
+ * **When to use**
+ *
+ * Use when decoding or encoding recorded parts whose responses are held as the
+ * increments they streamed in.
+ *
+ * @see {@link Part} for the parts of a response that has been folded.
+ * @category constructors
+ */
+export const StreamPart = <
+  Tools extends Record<string, Tool.Any>,
+  Exts extends Record<string, Extension.Any>,
+>(
+  toolkit: Toolkit.Toolkit<Tools>,
+  extkit: Exts,
+) => Schema.Union([StreamMessagePart(toolkit), ExtensionPart(extkit)]);
+
+/**
+ * Union type of the parts of a stream trajectory for a toolkit and extension
+ * kit.
+ *
+ * @see {@link StreamMessagePart} for the trajectory data of a stream trajectory
+ * alone.
+ * @see {@link Part} for the parts of a recording whose responses are folded.
+ * @category models
+ */
+export type StreamPart<
+  Tools extends Record<string, Tool.Any>,
+  Exts extends Record<string, Extension.Any>,
+> = StreamMessagePart<Tools> | ExtensionPart<Exts>;
+
+/**
+ * Stream trajectory part that also accepts tools outside the provided toolkit
+ * and extensions outside the provided extension kit.
+ *
+ * @category models
+ */
+export type AnyStreamPart = AnyStreamMessagePart | AnyExtensionPart;
+
+/**
  * Stream of the message parts of a trajectory.
  *
  * **When to use**
@@ -562,6 +739,54 @@ export type Trajectory<
 export type Any = Trajectory<{}, {}>;
 
 /**
+ * Stream of trajectory parts whose responses are held as they streamed, with
+ * the toolkit, metadata and extension kit of a trajectory.
+ *
+ * **When to use**
+ *
+ * Use as the type of a recording of a response as it arrived, such as the one
+ * {@link makeStream} builds.
+ *
+ * **Details**
+ *
+ * It carries what a {@link Trajectory} carries — the parts and the context they
+ * were recorded in — over parts that hold a response as the increments a model
+ * streamed it in ({@link StreamResponsePart}) rather than as the parts it folds
+ * into ({@link ResponsePart}). {@link fold} collapses one into the other.
+ *
+ * @see {@link Trajectory} for the trajectory a fold produces.
+ * @see {@link fold} for the fold itself.
+ * @category models
+ */
+export type StreamTrajectory<
+  Tools extends Record<string, Tool.Any>,
+  Exts extends Record<string, Extension.Any>,
+  E = never,
+  R = never,
+> = Stream.Stream<StreamPart<Tools, Exts>, E | TrajectoryError, R> &
+  Readonly<{
+    /**
+     * The toolkit used to encode and decode tool parts.
+     */
+    toolkit: Toolkit.Toolkit<Tools>;
+    /**
+     * The metadata of the trajectory.
+     */
+    metadata: Metadata;
+    /**
+     * The extensions used to encode and decode extension parts.
+     */
+    extkit: Exts;
+  }>;
+
+/**
+ * Stream trajectory that also accepts tools outside the provided toolkit.
+ *
+ * @category models
+ */
+export type AnyStreamTrajectory = StreamTrajectory<{}, {}>;
+
+/**
  * Encoded stream of trajectory parts for serialization.
  *
  * @category models
@@ -638,6 +863,174 @@ export const make: {
   ): Trajectory<{}, {}, E, R> =>
     Object.assign(parts, { toolkit: Toolkit.empty, metadata, extkit: Extensionkit.empty }),
 );
+
+/**
+ * Creates a stream trajectory from a stream of streaming parts and, optionally,
+ * its metadata.
+ *
+ * **When to use**
+ *
+ * Use when recording a response as the increments a model streamed it in, such
+ * as to keep what a model produced before it is folded, or to hand the recording
+ * to {@link fold} once it is complete.
+ *
+ * **Details**
+ *
+ * It carries what {@link make} does — the metadata, attached to the returned
+ * stream as an additional field, the parts it was given, and a toolkit and an
+ * extension kit that start empty — over {@link StreamTrajectory} rather than
+ * {@link Trajectory}: the parts are taken in their tolerant form
+ * ({@link AnyStreamPart}), so the returned trajectory carries no toolkit and
+ * holds no extension kit, and a response part stays as it streamed rather than
+ * as it was folded.
+ *
+ * Bind the recording the same way: {@link Toolkit.toolkits} narrows tool calls
+ * and results to the schemas of their tools, and {@link Extensionkit.extkits}
+ * narrows extension data to the versions of its extension.
+ *
+ * **Example** (Creating a stream trajectory)
+ *
+ * ```ts import.meta.vitest
+ * import { Response } from "effect/ai"
+ * import { Stream } from "effect"
+ * import { Trajectory } from "@trajs/core"
+ *
+ * const trajectory = Trajectory.makeStream(
+ *   Stream.make(
+ *     Trajectory.streamResponsePart(Response.makePart("text-delta", { id: "0", delta: "Hel" }))
+ *   ),
+ *   Trajectory.Metadata.make({ name: "greeting" })
+ * )
+ * trajectory.metadata.name // => "greeting"
+ * trajectory.metadata.version === Trajectory.version // => true
+ * trajectory.toolkit === Toolkit.empty // => true
+ * ```
+ *
+ * @see {@link fold} for the folded trajectory a stream trajectory records.
+ * @see {@link StreamTrajectory} for the recording it builds.
+ * @category constructors
+ */
+export const makeStream: {
+  <E, R>(
+    parts: Stream.Stream<AnyStreamPart, E, R>,
+    metadata?: Metadata,
+  ): StreamTrajectory<{}, {}, E, R>;
+  (
+    metadata?: Metadata,
+  ): <E, R>(parts: Stream.Stream<AnyStreamPart, E, R>) => StreamTrajectory<{}, {}, E, R>;
+} = Function.dual(
+  (args) => Stream.isStream(args[0]),
+  <E, R>(
+    parts: Stream.Stream<AnyStreamPart, E, R>,
+    metadata: Metadata = Metadata.make({}),
+  ): StreamTrajectory<{}, {}, E, R> =>
+    Object.assign(parts, { toolkit: Toolkit.empty, metadata, extkit: Extensionkit.empty }),
+);
+
+/**
+ * Folds a stream trajectory into the trajectory it records.
+ *
+ * **When to use**
+ *
+ * Use when a response recorded as it streamed should be read as the parts the
+ * response was made of, such as to read the recording turn by turn with
+ * `View.promptTurns` or export it to a provider with `Codec.makeMessages`, both
+ * of which take the parts a model returned once they are folded.
+ *
+ * **Details**
+ *
+ * The increments of a chunk are converged by the identifier the part protocol
+ * gives them and by the session they were recorded under, so the chunks of
+ * interleaved sessions stay apart even where a model numbers them the same. A
+ * chunk is opened by its `*-start` — replacing a chunk already open under the
+ * same identifier, which the stream did not end — accumulated from its deltas,
+ * and emitted when it ends, as one `text` or `reasoning` part holding the text
+ * its deltas accumulated, with the metadata of its parts merged.
+ *
+ * The part a chunk folds into keeps the envelope of the part that ended it: the
+ * session it was recorded under, the time the chunk ended and its identifier,
+ * which is what the recording holds in place of the parts it was folded from.
+ * A part that cannot be folded — a prompt, a session declaration, the data
+ * recorded for an extension, and the tool calls, results, sources and finish
+ * parts of a response — is carried over with its own envelope.
+ *
+ * What has no folded form to be recorded in is dropped: the parts of a tool
+ * call's parameters, because the `tool-call` that follows carries the whole
+ * call, and an error a model reported, because a folded response records none.
+ * So are the increments of no chunk: a delta no start opened, and an end no
+ * chunk is open for. A chunk is not emitted either where the stream never ends
+ * it, even after it accumulated text.
+ *
+ * **Example** (Folding a streamed response)
+ *
+ * ```ts import.meta.vitest
+ * import { Effect, Stream } from "effect"
+ * import { Response } from "effect/ai"
+ * import { Trajectory } from "@trajs/core"
+ *
+ * const trajectory = Trajectory.makeStream(
+ *   Stream.make(
+ *     Trajectory.streamResponsePart(Response.makePart("text-start", { id: "0" })),
+ *     Trajectory.streamResponsePart(Response.makePart("text-delta", { id: "0", delta: "Hello" })),
+ *     Trajectory.streamResponsePart(Response.makePart("text-end", { id: "0" }))
+ *   )
+ * )
+ *
+ * const folded = await Effect.runPromise(Stream.runCollect(Trajectory.fold(trajectory)))
+ * const [part] = Array.from(folded)
+ * part._tag // => "Response"
+ * part.response.type // => "text"
+ * ```
+ *
+ * @see {@link makeStream} for the trajectory that is folded.
+ * @see {@link StreamTrajectory} for the recording it reads.
+ * @see {@link Trajectory} for the recording it produces.
+ * @category combinators
+ */
+export const fold = <
+  Tools extends Record<string, Tool.Any>,
+  Exts extends Record<string, Extension.Any>,
+  E,
+  R,
+>(
+  trajectory: StreamTrajectory<Tools, Exts, E, R>,
+): Trajectory<Tools, Exts, E, R> => {
+  const { toolkit, metadata, extkit } = trajectory;
+
+  // The folded parts are built with the toolkit the trajectory was recorded
+  // with, so a tool call keeps the schemas of its own tool.
+  const Folded = ResponsePart(toolkit);
+
+  const parts = trajectory.pipe(
+    Stream.mapAccum(
+      folding.initial,
+      (state, part): readonly [folding.State, ReadonlyArray<Part<Tools, Exts>>] => {
+        if (!Predicate.isTagged("Response")(part)) {
+          return [state, [part]] as const;
+        }
+
+        const [next, folded] = folding.collapse(state, part.session, part.response);
+
+        return [
+          next,
+          folded.map((response) =>
+            // The folded part stands in for the parts it was folded from, so it
+            // keeps the envelope of the one that ended the chunk.
+            Folded.make({
+              response,
+              uuid: part.uuid,
+              timestamp: part.timestamp,
+              session: part.session,
+              extra: part.extra,
+            }),
+          ),
+        ] as const;
+      },
+    ),
+  );
+
+  return Object.assign(parts, { toolkit, metadata, extkit });
+};
 
 /**
  * Updates the metadata of a trajectory by applying a function to it.
