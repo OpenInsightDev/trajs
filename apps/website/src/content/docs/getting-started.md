@@ -65,7 +65,23 @@ const restored = await Effect.runPromise(
 
 `Persist.read` and `Persist.write` do the same against a key on a
 `FileSystem.FileSystem`; provide a platform layer for your runtime when you use
-them. See [The .trajs format](../guides/trajs-format/) for the record layout.
+them. They store the records in the format the key names — `recording.trajs` is
+newline-delimited JSON and `recording.trajs.bson` is BSON — or in the format
+passed along with the key:
+
+```ts
+import { Effect } from "effect";
+import { Format, Persist } from "@trajs/core";
+
+const program = Effect.gen(function* () {
+  yield* Persist.write(trajectory)("recording.bin", { format: Format.bson });
+
+  return yield* Persist.read("recording.bin", { format: Format.bson });
+});
+```
+
+See [The .trajs format](../guides/trajs-format/) for the record layout and the
+storage formats.
 
 ## Next steps
 

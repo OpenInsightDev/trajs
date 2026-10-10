@@ -38,8 +38,9 @@ attached to the context it was recorded in.
   resumes and sub-agents can be reconstructed from the recording.
 - **Tool calls come with their results.** `Toolkit.toolTurns` correlates each
   recorded tool call with the result that answers it, narrowed to the tool's types.
-- **One interchange format.** A `.trajs` file is newline-delimited JSON with the
-  header first.
+- **One interchange format, two storages.** A `.trajs` file is a header record
+  and one record per part; `Format.jsonl` writes them as lines of JSON and
+  `Format.bson` as BSON documents.
 
 ## Install
 
@@ -74,11 +75,19 @@ Load a recording with `Persist.decode`, `Persist.read` or `Persist.encode`.
 
 ## The .trajs format
 
-A recording is plain JSONL: line 1 is a header carrying the `metadata` (including
-its `version`, the `@trajs/core` version that wrote the recording) and the
-serialized `toolkit` and `extkit`; every later line is a part, discriminated by
-`_tag`. The header carries no `_tag` — `_tag` means "this is a part" — so the two
-are impossible to confuse.
+A recording is a stream of records. The first is a header carrying the `metadata`
+(including its `version`, the `@trajs/core` version that wrote the recording) and
+the serialized `toolkit` and `extkit`; every record after it is a part,
+discriminated by `_tag`. The header carries no `_tag` — `_tag` means "this is a
+part" — so the two are impossible to confuse.
+
+`Format` holds the storage formats the records are written in, and a file says
+which one it is in its own name:
+
+| Format         | Extensions               | One record is     |
+| :------------- | :----------------------- | :---------------- |
+| `Format.jsonl` | `.trajs`, `.trajs.jsonl` | One line of JSON  |
+| `Format.bson`  | `.trajs.bson`            | One BSON document |
 
 ```jsonl
 {"metadata":{"version":"<trajs version>"},"toolkit":{},"extkit":{}}

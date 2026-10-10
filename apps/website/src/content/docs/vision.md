@@ -24,8 +24,9 @@ attached to the toolkit and metadata it was recorded with.
   tools it actually refers to.
 - **Loading tolerates unknown tools.** A recorded tool call or result whose tool is
   not installed decodes to an unconstrained part instead of failing.
-- **The record is JSONL with the header first.** The non-stream fields precede the
-  parts they describe.
+- **The record is a header first.** The non-stream fields precede the parts they
+  describe, and the storage format the file names decides whether those records
+  are lines of JSON or BSON documents.
 - **Sessions derive.** A session records where it continues from, so forks,
   resumes and sub-agents can be reconstructed from the recording.
 

@@ -43,6 +43,7 @@
   "dependencies": {
     "@effect/ai-anthropic": "catalog:",
     "@effect/ai-openai-compat": "catalog:",
+    "bson": "catalog:",
     "effect": "catalog:",
     "uuid": "catalog:"
   },

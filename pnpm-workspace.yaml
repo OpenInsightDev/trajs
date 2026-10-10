@@ -12,6 +12,7 @@ catalog:
   "@effect/ai-anthropic": ^4.0.2
   "@effect/ai-openai-compat": ^4.0.2
   "@types/node": ^24
+  bson: ^7.3.3
   effect: ^4.0.2
   typescript: ^7.0.2
   uuid: ^14.0.2

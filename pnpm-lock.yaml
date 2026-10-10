@@ -179,6 +179,9 @@ catalogs:
     '@types/node':
       specifier: ^24
       version: 24.19.1
+    bson:
+      specifier: ^7.3.3
+      version: 7.3.3
     effect:
       specifier: ^4.0.2
       version: 4.0.2
@@ -260,6 +263,9 @@ importers:
       '@effect/ai-openai-compat':
         specifier: 'catalog:'
         version: 4.0.2(effect@4.0.2)
+      bson:
+        specifier: 'catalog:'
+        version: 7.3.3
       effect:
         specifier: 'catalog:'
         version: 4.0.2
@@ -1971,6 +1977,10 @@ packages:
 
   boolbase@1.0.0:
     resolution: {integrity: sha512-JZOSA7Mo9sNGB8+UjSgzdLtokWAky1zbztM3WRLCbZ70/3cTANmQmOdR7y2g+J0e2WXywy1yS468tY+IruqEww==}
+
+  bson@7.3.3:
+    resolution: {integrity: sha512-oz3LwE3qGEhTCSyhzQRLY3Bj1NLOsjFMf6tcmY5J8M+3R7EVcmoBfSHWvjUK3yXCLDUsGpIuB3aQL4nDZ1EV/g==}
+    engines: {node: '>=20.19.0'}
 
   cac@7.0.0:
     resolution: {integrity: sha512-tixWYgm5ZoOD+3g6UTea91eow5z6AAHaho3g0V9CNSNb45gM8SmflpAc+GRd1InC4AqN/07Unrgp56Y94N9hJQ==}
@@ -4530,6 +4540,8 @@ snapshots:
       is-decimal: 2.0.1
 
   boolbase@1.0.0: {}
+
+  bson@7.3.3: {}
 
   cac@7.0.0: {}
 

@@ -1,5 +1,4 @@
 import { ByteSize, Context, Effect, FileSystem, Formatter, Layer, Schema, Stream } from "effect";
-import { Ndjson } from "effect/encoding";
 
 export class ReadFailed extends Schema.TaggedError<ReadFailed>(
   "open-insight/utils/StreamReaderError/ReadFailed",
@@ -12,15 +11,16 @@ export class ReadFailed extends Schema.TaggedError<ReadFailed>(
 }
 
 export interface Service {
-  readonly read: <S extends Schema.Constraint>(
-    schema: S,
-  ) => (key: string) => Stream.Stream<S["Type"], ReadFailed, S["DecodingServices"]>;
+  readonly read: (key: string) => Stream.Stream<Uint8Array, ReadFailed>;
 }
 
 export class StreamReader extends Context.Service<StreamReader, Service>()(
   "open-insight/utils/StreamReader",
 ) {
-  /** Reads records stored as newline-delimited JSON, one record per line. */
+  /**
+   * Reads the bytes of a key as a stream, leaving what they hold to the reader of
+   * the stream.
+   */
   static readonly layerFromOption = (
     options: Readonly<{
       bytesToRead?: ByteSize.Input;
@@ -31,15 +31,12 @@ export class StreamReader extends Context.Service<StreamReader, Service>()(
     Layer.effect(
       StreamReader,
       Effect.map(FileSystem.FileSystem, (fs): Service => ({
-        read: (schema) => {
-          const decoder = Ndjson.decodeSchema(schema);
-
-          return (key) =>
-            fs.stream(key, options).pipe(
-              Stream.pipeThroughChannel(decoder({ ignoreEmptyLines: true })),
-              Stream.mapError((cause) => new ReadFailed({ cause })),
-            );
-        },
+        read: (key) =>
+          fs
+            .stream(key, options)
+            .pipe(
+              Stream.catchTag("PlatformError", (cause) => Stream.fail(new ReadFailed({ cause }))),
+            ),
       })),
     );
 

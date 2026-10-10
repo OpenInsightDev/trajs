@@ -2,9 +2,9 @@
  * Errors raised while reading, writing or converting trajectories.
  *
  * Rebinding a trajectory encodes each part with the kits it was recorded against
- * and decodes it again with the merged ones, and a recording is read from JSON
- * lines. Each of these steps can fail, so every {@link TrajectoryError} carries
- * what it was checking.
+ * and decodes it again with the merged ones, and a recording is read out of the
+ * bytes of a file. Each of these steps can fail, so every {@link TrajectoryError}
+ * carries what it was checking.
  */
 
 import { Data, Schema } from "effect";
@@ -63,6 +63,9 @@ export class SessionError extends Data.TaggedError("SessionError")<{
 
 /**
  * Failure to read a recorded trajectory.
+ *
+ * A record that does not hold what a recording holds is one; so is a key that
+ * names no storage format, because what it holds cannot be read at all.
  *
  * @category errors
  */

@@ -10,6 +10,8 @@ export * as Extension from "./Extension.ts";
 
 export * as Extensionkit from "./Extensionkit.ts";
 
+export * as Format from "./Format.ts";
+
 export * as Persist from "./Persist.ts";
 
 export * as Response from "./Response.ts";

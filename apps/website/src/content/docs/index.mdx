@@ -41,9 +41,9 @@ metadata it was recorded with, so it can be stored, replayed and inspected.
     A toolkit round-trips through draft-07 JSON Schema, and a recording made against an empty or
     older toolkit is decoded again against the tools it actually refers to.
   </Card>
-  <Card title="One interchange format" icon="document">
-    A `.trajs` file is newline-delimited JSON: a header first, then one part per line, discriminated
-    by `_tag`.
+  <Card title="One interchange format, two storages" icon="document">
+    A `.trajs` file is a header record and one record per part; `Format.jsonl` writes them as lines
+    of JSON and `Format.bson` as BSON documents.
   </Card>
 </CardGrid>
 

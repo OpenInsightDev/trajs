@@ -1,11 +1,18 @@
 /**
- * Reads and writes trajectories as JSON Lines.
+ * Reads and writes trajectories in the storage formats of a `.trajs` file.
  *
- * A recorded trajectory is a `.trajs` file. Each line is one JSON record: the
- * first is a header carrying the trajectory's non-stream fields (the metadata,
- * including the specification version, and the serialized toolkit and extension
- * kit), and the rest are the parts of the trajectory, discriminated by their
- * `_tag`.
+ * A recorded trajectory is a stream of records. The first is a header carrying
+ * the trajectory's non-stream fields (the metadata, including the specification
+ * version, and the serialized toolkit and extension kit), and the rest are the
+ * parts of the trajectory, discriminated by their `_tag`. {@link encode} and
+ * {@link decode} are that pair, and they say nothing about how the records are
+ * stored.
+ *
+ * How they are stored is the storage format of the file: {@link Format.jsonl}
+ * writes them as newline-delimited JSON, the plain `.trajs` file, and
+ * {@link Format.bson} as concatenated BSON documents, a `.trajs.bson` file.
+ * {@link write} and {@link read} take the format from the extension of the key,
+ * so a recording states how it is stored in its own name.
  *
  * The header is peeled off the stream and read on its own rather than described
  * as a part, because it is not one. It comes first because a decoder needs a
@@ -16,6 +23,7 @@ import { Effect, Option, Schema, Sink, Stream } from "effect";
 import { Tool, Toolkit } from "effect/ai";
 import type * as Extension from "#/Extension.ts";
 import * as Extensionkit from "#/Extensionkit.ts";
+import * as Format from "#/Format.ts";
 import * as Trajectory from "#/Trajectory.ts";
 import { TrajectoryError } from "#/TrajectoryError.ts";
 import * as TrajectoryToolkit from "#/Toolkit.ts";
@@ -37,7 +45,36 @@ const Header = Schema.Struct({
 });
 
 /**
- * Encodes a trajectory as the records of a `.trajs` file.
+ * How {@link read} and {@link write} choose the storage format of a file.
+ *
+ * **When to use**
+ *
+ * Use when a key names no storage format: a file of a format this package does
+ * not ship, or a name that simply does not say how the file is stored.
+ *
+ * @see {@link Format.resolve} for the format a key names by itself.
+ * @category models
+ */
+export interface FormatOptions {
+  /**
+   * The storage format to read or write with, instead of the one the key's
+   * extension names.
+   */
+  readonly format?: Format.Format;
+}
+
+const formatFor = (
+  key: string,
+  options: FormatOptions,
+): Effect.Effect<Format.Format, TrajectoryError> =>
+  options.format === undefined
+    ? Effect.fromOption(Format.resolve(key), () =>
+        TrajectoryError.parse(`the key "${key}" names no .trajs storage format`),
+      )
+    : Effect.succeed(options.format);
+
+/**
+ * Encodes a trajectory as the records of a recording.
  *
  * **When to use**
  *
@@ -46,8 +83,9 @@ const Header = Schema.Struct({
  * **Details**
  *
  * The first record is the header, followed by one record per part, encoded with
- * the toolkit and extension kit the trajectory was recorded with. Records are
- * plain JSON values, ready for a newline-delimited JSON writer to serialize.
+ * the toolkit and extension kit the trajectory was recorded with. The records
+ * are plain values, ready for a storage format to write as the bytes of a
+ * `.trajs` file; {@link Format} holds the formats that ship with this package.
  *
  * @see {@link write} for storing the records with the stream writer.
  * @category encoding
@@ -77,7 +115,7 @@ export const encode = <
 };
 
 /**
- * Decodes a trajectory from the records of a `.trajs` file.
+ * Decodes a trajectory from the records of a recording.
  *
  * **When to use**
  *
@@ -124,7 +162,7 @@ export const decode = Effect.fn("Persist.decode")(function* <E, R>(
 });
 
 /**
- * Writes a trajectory to a `.trajs` file.
+ * Writes a trajectory to a file.
  *
  * **When to use**
  *
@@ -132,24 +170,33 @@ export const decode = Effect.fn("Persist.decode")(function* <E, R>(
  *
  * **Details**
  *
- * The trajectory's records are written as newline-delimited JSON, the header
- * first.
+ * The trajectory's records are written with the storage format the key names —
+ * `recording.trajs` is newline-delimited JSON and `recording.trajs.bson` is BSON
+ * documents — and a key that names none of them is written in the format passed
+ * with it. The header is written first.
  *
+ * Writing is a failure of the file, not of the recording, when the file cannot
+ * be written (`WriteFailed`); a trajectory that cannot be encoded stays a
+ * failure of the recording.
+ *
+ * @see {@link encode} for the records that are written.
+ * @see {@link Format} for the storage formats a key can name.
  * @category encoding
  */
 export const write =
   <Tools extends Record<string, Tool.Any>, Exts extends Record<string, Extension.Any>>(
     trajectory: Trajectory.Trajectory<Tools, Exts>,
   ) =>
-  (key: string) =>
+  (key: string, options: FormatOptions = {}) =>
     Effect.gen(function* () {
+      const format = yield* formatFor(key, options);
       const writer = yield* StreamWriter;
 
-      yield* writer.write(Schema.Unknown)(key, encode(trajectory));
+      yield* writer.write(key, format.encode(encode(trajectory)));
     }).pipe(Effect.provide(StreamWriter.layer), Effect.withSpan("Persist.write"));
 
 /**
- * Reads a trajectory from a `.trajs` file.
+ * Reads a trajectory from a file.
  *
  * **When to use**
  *
@@ -157,15 +204,24 @@ export const write =
  *
  * **Details**
  *
- * The file is read as newline-delimited JSON. Parts stay lazy, so the returned
- * trajectory is only valid within the scope the effect runs in: consume it
- * there.
+ * The file is read with the storage format the key names — `recording.trajs` is
+ * newline-delimited JSON and `recording.trajs.bson` is BSON documents — and a
+ * key that names none of them is read in the format passed with it. Parts stay
+ * lazy, so the returned trajectory is only valid within the scope the effect
+ * runs in: consume it there.
  *
+ * Reading a file that is not there is a failure of the file, not of the
+ * recording, and is reported as `ReadFailed`; a file whose bytes do not decode
+ * stays a failure of the recording.
+ *
+ * @see {@link decode} for the records that are read.
+ * @see {@link Format} for the storage formats a key can name.
  * @category decoding
  */
-export const read = (key: string) =>
+export const read = (key: string, options: FormatOptions = {}) =>
   Effect.gen(function* () {
+    const format = yield* formatFor(key, options);
     const reader = yield* StreamReader;
 
-    return yield* decode(reader.read(Schema.Unknown)(key));
+    return yield* decode(format.decode(reader.read(key)));
   }).pipe(Effect.provide(StreamReader.layer), Effect.withSpan("Persist.read"));

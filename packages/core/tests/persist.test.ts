@@ -1,11 +1,14 @@
 import { expect, it } from "vite-plus/test";
+import { BSON } from "bson";
 import { Effect, Exit, FileSystem, Schema, Sink, Stream } from "effect";
 import { Prompt } from "effect/ai";
 import * as Extension from "#/Extension.ts";
 import * as Extensionkit from "#/Extensionkit.ts";
+import * as Format from "#/Format.ts";
 import * as Persist from "#/Persist.ts";
 import * as Response from "#/Response.ts";
 import * as Trajectory from "#/Trajectory.ts";
+import { TrajectoryError } from "#/TrajectoryError.ts";
 
 const trajectory = () =>
   Trajectory.make(
@@ -28,8 +31,8 @@ const recordsOf = <Exts extends Record<string, Extension.Any>>(
 it("writes a header record followed by one record per part", async () => {
   const records = await recordsOf(trajectory());
 
-  // SAFETY: `recordsOf` returns the encoded JSON lines; this names the header
-  // fields the assertions read.
+  // SAFETY: `recordsOf` returns the encoded records; this names the header fields
+  // the assertions read.
   const header = records[0] as {
     metadata: { version: string; name: string };
   };
@@ -53,8 +56,8 @@ it("writes the encoded extension kit into the header", async () => {
   const bound = Extensionkit.extkits(kit)(Trajectory.make(Stream.empty));
   const records = await recordsOf(bound);
 
-  // SAFETY: `recordsOf` returns the encoded JSON lines; this names the header
-  // fields the assertions read.
+  // SAFETY: `recordsOf` returns the encoded records; this names the header fields
+  // the assertions read.
   const header = records[0] as { extkit: ReturnType<typeof Extensionkit.encode> };
 
   expect(header.extkit).toEqual(Extensionkit.encode(kit));
@@ -123,10 +126,12 @@ it("fails when the header does not state the specification version", async () =>
   expect(Exit.isFailure(withoutMetadata)).toBe(true);
 });
 
-it("writes and reads a trajectory through the stream services", async () => {
-  const files = new Map<string, Uint8Array>();
-
-  const fileSystem = FileSystem.layerNoop({
+/**
+ * A file system that holds the files written to it in memory, and serves each of
+ * them back in chunks smaller than a record, so nothing is read in one piece.
+ */
+const memoryFileSystem = (files: Map<string, Uint8Array>) =>
+  FileSystem.layerNoop({
     // SAFETY: `layerNoop` describes FileSystem's full member signatures; this stub
     // only needs to capture what `Persist.write` sends.
     sink: ((path: string) =>
@@ -152,9 +157,32 @@ it("writes and reads a trajectory through the stream services", async () => {
       )) as never,
     // SAFETY: `layerNoop` describes FileSystem's full member signatures; this stub
     // only needs to serve the bytes the sink captured.
-    stream: ((path: string) =>
-      Stream.fromIterable(files.has(path) ? [files.get(path)!] : [])) as never,
+    stream: ((path: string) => Stream.fromIterable(chunksOf(files.get(path)))) as never,
   });
+
+/** The bytes of a file, in chunks of seven, and none at all for a file that is absent. */
+const chunksOf = (bytes: Uint8Array | undefined, size = 7): ReadonlyArray<Uint8Array> => {
+  if (bytes === undefined) {
+    return [];
+  }
+
+  const chunks: Array<Uint8Array> = [];
+
+  for (let offset = 0; offset < bytes.length; offset += size) {
+    chunks.push(bytes.subarray(offset, offset + size));
+  }
+
+  return chunks;
+};
+
+/** The first BSON document of a file, read with BSON itself. */
+const firstDocument = (bytes: Uint8Array): BSON.Document =>
+  BSON.deserialize(
+    bytes.subarray(0, new DataView(bytes.buffer, bytes.byteOffset, 4).getInt32(0, true)),
+  );
+
+it("writes and reads a trajectory through the stream services", async () => {
+  const files = new Map<string, Uint8Array>();
 
   const { metadata, parts } = await Effect.runPromise(
     Effect.scoped(
@@ -163,10 +191,77 @@ it("writes and reads a trajectory through the stream services", async () => {
         const decoded = yield* Persist.read("trajectory.trajs");
 
         return { metadata: decoded.metadata, parts: Array.from(yield* Stream.runCollect(decoded)) };
-      }).pipe(Effect.provide(fileSystem)),
+      }).pipe(Effect.provide(memoryFileSystem(files))),
     ),
   );
 
   expect(metadata.name).toBe("greeting");
   expect(parts.map((part) => part._tag)).toEqual(["Prompt", "Response"]);
+});
+
+it("writes and reads a trajectory in the format the key names", async () => {
+  const files = new Map<string, Uint8Array>();
+
+  const read = (key: string) =>
+    Effect.gen(function* () {
+      const decoded = yield* Persist.read(key);
+
+      return { metadata: decoded.metadata, parts: Array.from(yield* Stream.runCollect(decoded)) };
+    });
+
+  const { jsonl, bson } = await Effect.runPromise(
+    Effect.scoped(
+      Effect.gen(function* () {
+        yield* Persist.write(trajectory())("trajectory.trajs");
+        yield* Persist.write(trajectory())("trajectory.trajs.bson");
+
+        return {
+          jsonl: yield* read("trajectory.trajs"),
+          bson: yield* read("trajectory.trajs.bson"),
+        };
+      }).pipe(Effect.provide(memoryFileSystem(files))),
+    ),
+  );
+
+  expect(jsonl.metadata.name).toBe("greeting");
+  expect(bson.metadata.name).toBe("greeting");
+  expect(jsonl.parts.map((part) => part._tag)).toEqual(["Prompt", "Response"]);
+  expect(bson.parts.map((part) => part._tag)).toEqual(["Prompt", "Response"]);
+
+  // The plain file is JSON text, and the BSON one is the documents of the same
+  // recording, starting with the header.
+  expect(files.get("trajectory.trajs")![0]).toBe(0x7b);
+  expect(firstDocument(files.get("trajectory.trajs.bson")!).metadata).toMatchObject({
+    name: "greeting",
+  });
+});
+
+it("reads and writes with the format the caller passes", async () => {
+  const files = new Map<string, Uint8Array>();
+
+  const parts = await Effect.runPromise(
+    Effect.scoped(
+      Effect.gen(function* () {
+        yield* Persist.write(trajectory())("trajectory.bin", { format: Format.bson });
+        const decoded = yield* Persist.read("trajectory.bin", { format: Format.bson });
+
+        return Array.from(yield* Stream.runCollect(decoded));
+      }).pipe(Effect.provide(memoryFileSystem(files))),
+    ),
+  );
+
+  expect(parts.map((part) => part._tag)).toEqual(["Prompt", "Response"]);
+  expect(firstDocument(files.get("trajectory.bin")!).metadata).toMatchObject({ name: "greeting" });
+});
+
+it("fails when the key names no storage format", async () => {
+  const error = await Effect.runPromise(
+    Effect.flip(
+      Effect.scoped(
+        Persist.read("trajectory.txt").pipe(Effect.provide(memoryFileSystem(new Map()))),
+      ),
+    ),
+  );
+
+  expect(error).toBeInstanceOf(TrajectoryError);
 });

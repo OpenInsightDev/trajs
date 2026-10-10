@@ -1,5 +1,4 @@
 import { Context, Effect, FileSystem, Formatter, Layer, Schema, Stream } from "effect";
-import { Ndjson } from "effect/encoding";
 import type { OpenFlag } from "effect/FileSystem";
 
 export class WriteFailed extends Schema.TaggedError<WriteFailed>(
@@ -13,18 +12,19 @@ export class WriteFailed extends Schema.TaggedError<WriteFailed>(
 }
 
 export interface Service {
-  readonly write: <S extends Schema.Constraint>(
-    schema: S,
-  ) => <E, R>(
+  readonly write: <E, R>(
     key: string,
-    values: Stream.Stream<S["Type"], E, R>,
-  ) => Effect.Effect<void, E | WriteFailed, R | S["EncodingServices"]>;
+    bytes: Stream.Stream<Uint8Array, E, R>,
+  ) => Effect.Effect<void, E | WriteFailed, R>;
 }
 
 export class StreamWriter extends Context.Service<StreamWriter, Service>()(
   "open-insight/utils/StreamWriter",
 ) {
-  /** Writes records as newline-delimited JSON, one record per line. */
+  /**
+   * Writes the bytes of a stream to a key, wrapping a failure to write them in
+   * {@link WriteFailed} and keeping a failure to read them as it is.
+   */
   static readonly layerFromOptions = (
     options: Readonly<{
       readonly flag?: OpenFlag;
@@ -34,16 +34,11 @@ export class StreamWriter extends Context.Service<StreamWriter, Service>()(
     Layer.effect(
       StreamWriter,
       Effect.map(FileSystem.FileSystem, (fs): Service => ({
-        write: (schema) => {
-          const encoder = Ndjson.encodeSchema(schema);
-
-          return (key, values) =>
-            values.pipe(
-              Stream.pipeThroughChannel(encoder()),
-              Stream.run(fs.sink(key, options)),
-              Effect.mapError((cause) => new WriteFailed({ cause })),
-            );
-        },
+        write: (key, bytes) =>
+          bytes.pipe(
+            Stream.run(fs.sink(key, options)),
+            Effect.catchTag("PlatformError", (cause) => Effect.fail(new WriteFailed({ cause }))),
+          ),
       })),
     );
 
