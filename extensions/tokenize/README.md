@@ -100,6 +100,72 @@ const totals = await Effect.runPromise(
 );
 ```
 
+## Recording the counts
+
+A count is worth keeping: computing it again costs a pass over every part, and the
+recording outlives the tokenizer that produced it. The package's `Extension` module
+records what a part is worth as the `org.js.tra.tokenize` extension, so the counts
+travel with the recording and a reader that installs the extension gets them back
+with their types. It is re-exported directly from the package, because it is what
+the package is for:
+
+```ts
+import { annotate, of } from "@trajs/extension-tokenize";
+
+// What one part is worth, anchored to that part by its uuid.
+const estimate = await Effect.runPromise(of(part, tokenizer));
+
+// A whole recording, for the parts whose messages carry the kinds `tags` names.
+const annotated = annotate(trajectory, tokenizer, { tags: ["text"] });
+```
+
+`annotate` emits an estimate directly after every part whose messages carry a
+message part of a kind `tags` names — every part a tokenizer can count when it is
+omitted — and carries the toolkit, the metadata and the extension kit over, its kit
+extended with the extension. The kinds are the `type` of a message part that
+carries content: `text`, `reasoning`, `tool-call`, `tool-result` and `file`. The
+kinds that carry meta information instead — `tool-approval-request`,
+`tool-approval-response`, `source`, `response-metadata` and `finish` — hold nothing
+a tokenizer answers for, so a count is not taken from them and they are not tags.
+The count is the part's own whichever kinds selected it, because the kinds decide
+which parts are annotated rather than what a count covers. A recording written that
+way decodes the estimates back with `Extensionkit.extkits(extensions)`, the way any
+other extension data is rebound.
+
+Each datum carries the estimate and how it was taken: `tokens`, the `encoding` it
+was counted under, `mediaTokens`, how many of those tokens a rule on a payload that
+is not text priced, and `media` when a family was named to do the pricing. It says
+nothing about the part it is about — the extension part's `attach` names that part,
+so the datum does not repeat its kind or its content. `tokens` is an estimate, not
+the usage a provider reported: a `finish` part holds the exact whole-request
+figure, and that is where the exact number should be read from.
+
+The datum's shape is versioned the way any extension's is: `0.1.0` is the oldest
+version, written out, and `0.1.1` is derived from it with `Extension.upgrade` from
+`@trajs/core` — the version that added `mediaTokens`. `Estimate` is the newest
+shape, `extension` the newest extension, and `registry` the extension as of each
+version, keyed by the version literal with `latest` naming the newest. Each entry
+reads the versions up to it and writes the one it is keyed by, so an earlier entry
+neither accepts nor emits data of a later one:
+
+```ts
+import { Extensionkit } from "@trajs/core";
+import { registry } from "@trajs/extension-tokenize";
+
+// The extension as of one version, to write or read that version deliberately.
+Extensionkit.make(registry["0.1.0"]);
+
+// The newest version, whatever it is; the same as `extension`.
+Extensionkit.make(registry.latest);
+```
+
+A datum recorded at an older version reads as the newest one through the line —
+`Extensionkit.extkits(extensions)` does it for a whole recording — and a field the
+older datum cannot supply stays absent rather than being guessed: a datum recorded
+at `0.1.0` states no `mediaTokens`. Adding a version is deriving the newest entry
+once and keying it in the registry, with every earlier datum pinned to read forward
+as it; the `Extension` module states what that change looks like.
+
 ## Development
 
 - Install dependencies:

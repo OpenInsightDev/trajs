@@ -23,7 +23,7 @@
 
 import { Effect, Function, Predicate } from "effect";
 import type { Trajectory } from "@trajs/core";
-import { type Contribution, promptContributions, responseContributions } from "#/internal/count.ts";
+import { countedOf } from "#/internal/count.ts";
 import type { ImageSize } from "#/internal/image.ts";
 import {
   type AnthropicNumbers,
@@ -83,27 +83,6 @@ export interface CountOptions {
  * the argument that names the encoding, and a part is one of the recorded kinds.
  */
 const isTokenizer = <Value>(value: Value): boolean => Predicate.hasProperty(value, "encodingName");
-
-/**
- * Counts what a part contributes: text under the encoding, estimates as they are.
- */
-const countContributions = (
-  tokenizer: Tokenizer.Service,
-  contributions: ReadonlyArray<Contribution>,
-): Effect.Effect<number, Tokenizer.DisallowedSpecialToken> =>
-  Effect.gen(function* () {
-    let total = 0;
-
-    for (const contribution of contributions) {
-      if (Predicate.isString(contribution)) {
-        total += yield* tokenizer.count(contribution);
-      } else {
-        total += contribution;
-      }
-    }
-
-    return total;
-  });
 
 /**
  * Estimates the tokens the messages of a prompt part are worth.
@@ -175,7 +154,10 @@ export const promptPart: {
 } = Function.dual(
   (args) => !isTokenizer(args[0]),
   (part: Trajectory.PromptPart, tokenizer: Tokenizer.Service, options?: CountOptions) =>
-    countContributions(tokenizer, promptContributions(part, mediaRuleOf(options?.media))),
+    Effect.map(
+      countedOf(part, tokenizer, mediaRuleOf(options?.media)),
+      (counted) => counted.tokens,
+    ),
 );
 
 /**
@@ -237,5 +219,8 @@ export const responsePart: {
 } = Function.dual(
   (args) => !isTokenizer(args[0]),
   (part: Trajectory.AnyResponsePart, tokenizer: Tokenizer.Service, options?: CountOptions) =>
-    countContributions(tokenizer, responseContributions(part, mediaRuleOf(options?.media))),
+    Effect.map(
+      countedOf(part, tokenizer, mediaRuleOf(options?.media)),
+      (counted) => counted.tokens,
+    ),
 );

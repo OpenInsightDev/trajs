@@ -31,7 +31,15 @@ export type MediaPart = Prompt.FilePart | Extract<RecordedResponsePart, { type: 
  */
 export type MediaRule = (part: MediaPart, size: ImageSize | undefined) => number;
 
-export type MediaRuleId = "openai" | "anthropic";
+/** The rule families the package names, as `MediaRuleId` accepts them. */
+export const mediaRuleIds = ["openai", "anthropic"] as const;
+
+/**
+ * Name of a family a payload that is not text is priced with.
+ *
+ * @see {@link mediaRuleOf} for the rule a name stands for.
+ */
+export type MediaRuleId = (typeof mediaRuleIds)[number];
 
 /** Tokens an image is estimated at when the caller supplies no rule of its own. */
 const IMAGE_TOKENS = 85;
