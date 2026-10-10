@@ -124,7 +124,8 @@ vp check          # format, lint and type-check
 vp run -r test    # run the test suites
 vp run -r build   # build every package and the docs site
 vp run ready      # check + tests + builds, the aggregate gate
-vp run dev        # docs dev server (vp run website#dev)
+vp run website    # docs dev server
+vp run dev        # alias for vp run website
 ```
 
 ## Status

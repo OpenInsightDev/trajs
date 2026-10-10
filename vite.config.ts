@@ -51,6 +51,17 @@ export default defineConfig({
     options: { typeAware: true, typeCheck: true },
   },
   run: {
-    cache: true,
+    // Cache tasks, not `package.json` scripts (the Vite+ default). Script
+    // caching would also cover long-running commands like the docs dev server,
+    // whose recorded output would be replayed instead of served.
+    cache: { tasks: true, scripts: false },
+    tasks: {
+      // `vp run website` starts the docs site's Astro dev server; the task is
+      // never replayed for the same reason.
+      website: {
+        command: "vp run website#dev",
+        cache: false,
+      },
+    },
   },
 });
