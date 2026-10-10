@@ -158,8 +158,8 @@ export const children =
  * session is forked from, ordered from the root, followed by the session's own
  * parts. A `fork` that names a part absent from the loaded recording inherits
  * nothing, and a session that is never declared streams its own parts. Every
- * part of the lineage is returned; filter it to the messages with `Prompt` and
- * `Response` when that is what is wanted.
+ * part of the lineage is returned; pipe it through `Trajectory.messages` when the
+ * trajectory data is wanted without the data recorded for extensions about it.
  * A cycle is reported as {@link TrajectoryError} rather than followed.
  *
  * **Example** (Reconstructing what a forked session inherited)

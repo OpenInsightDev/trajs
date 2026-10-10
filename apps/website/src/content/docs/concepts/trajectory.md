@@ -52,8 +52,16 @@ discriminated by `_tag`:
 | `SessionPart`   | `Session`   | A session declaration.              |
 | `ExtensionPart` | `Extension` | The data recorded for an extension. |
 
-`AnyPart` covers the tolerant form of each: `PromptPart | SessionPart |
-AnyResponsePart | AnyExtensionPart`.
+The first three are the **message parts** — the trajectory data itself,
+`MessagePart<Tools>` — and the last carries the data an extension recorded about
+that conversation. `AnyPart` covers the tolerant form of each:
+`AnyMessagePart | AnyExtensionPart`.
+
+A recording stays one stream of both kinds, and the message parts can be read on
+their own: `Trajectory.MessagePart(toolkit)` is their schema,
+`Trajectory.MessageStream` a stream of them alone, and `Trajectory.messages`
+drops the extension parts of a recording when the conversation is all that is
+wanted.
 
 Every part also carries the fields of `PartMetadata`:
 
@@ -66,10 +74,10 @@ Every part also carries the fields of `PartMetadata`:
 ## Collection-driven schemas
 
 The union of parts is built from the collections a trajectory carries:
-`Trajectory.Part(toolkit, extkit)` unions the prompt part, the session part, the
-response parts the toolkit describes and the extension parts the kit describes.
-Data that no collection describes does not fail the union — it decodes to an
-unconstrained part:
+`Trajectory.Part(toolkit, extkit)` unions the message parts — the prompt part,
+the session part and the response parts the toolkit describes — with the
+extension parts the kit describes. Data that no collection describes does not
+fail the union — it decodes to an unconstrained part:
 
 - A tool call or result for a tool outside the toolkit becomes an
   `AnyToolCallPart` / `AnyToolResultPart`.

@@ -1,6 +1,7 @@
 import { expect, it } from "vite-plus/test";
-import { Effect, Stream } from "effect";
+import { Effect, Option, Schema, Stream } from "effect";
 import { Prompt, Toolkit } from "effect/ai";
+import * as Response from "#/Response.ts";
 import * as Trajectory from "#/Trajectory.ts";
 
 const parts = Stream.make(Trajectory.promptPart(Prompt.make("Hello")));
@@ -60,4 +61,40 @@ it("gives each part its own identifier", () => {
   const second = Trajectory.promptPart(Prompt.make("Hello"));
 
   expect(first.uuid).not.toBe(second.uuid);
+});
+
+const extensionPart = () =>
+  Trajectory.AnyExtensionPart.make({
+    extension: { extension: "dev.observerw.otel", data: { spanId: "s1" } },
+    attach: Option.none(),
+  });
+
+const encodePart = Schema.encodeSync(Trajectory.Part(Toolkit.empty, {}));
+
+it("reads a recording's message parts without the data recorded for extensions", async () => {
+  const trajectory = Trajectory.make(
+    Stream.make(
+      Trajectory.promptPart(Prompt.make("Hello")),
+      Trajectory.sessionPart("a"),
+      extensionPart(),
+      Trajectory.responsePart(Response.makePart("text", { text: "Hi there" })),
+    ),
+  );
+
+  const messages = await Effect.runPromise(Stream.runCollect(Trajectory.messages(trajectory)));
+
+  expect(Array.from(messages, (part) => part._tag)).toEqual(["Prompt", "Session", "Response"]);
+});
+
+it("reads the parts of a recording as message parts or extension parts", () => {
+  const read = Schema.decodeUnknownSync(Trajectory.Part(Toolkit.empty, {}));
+  const readMessages = Schema.decodeUnknownSync(Trajectory.MessagePart(Toolkit.empty));
+
+  const prompt = encodePart(Trajectory.promptPart(Prompt.make("Hello")));
+  const extension = encodePart(extensionPart());
+
+  expect(read(prompt)._tag).toBe("Prompt");
+  expect(read(extension)._tag).toBe("Extension");
+  expect(readMessages(prompt)._tag).toBe("Prompt");
+  expect(() => readMessages(extension)).toThrow();
 });

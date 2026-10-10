@@ -6,13 +6,18 @@
  * model was given, responses as the parts the model returned, and each part
  * carries an identifier so a recording can be inspected or rebound to the tools
  * and extensions it refers to. {@link make} builds one.
+ *
+ * A part is one of two things: a {@link MessagePart}, the trajectory data that
+ * carries the conversation itself, or an {@link ExtensionPart}, the data recorded
+ * for an extension about that conversation. {@link Part} unions the two, so a
+ * recording stays one stream while its message parts can be read on their own.
  */
 
 import type * as Extension from "#/Extension.ts";
 import * as Extensionkit from "#/Extensionkit.ts";
 import * as Response from "#/Response.ts";
 import type { TrajectoryError } from "#/TrajectoryError.ts";
-import { Effect, Function, Schema, Stream } from "effect";
+import { Effect, Function, Predicate, Schema, Stream } from "effect";
 import { Prompt, Tool, Toolkit } from "effect/ai";
 import pkg from "../package.json" with { type: "json" };
 import { Timestamp, Uuid } from "#/internal/schema.ts";
@@ -270,6 +275,60 @@ export const responsePart = (response: Response.Part<any>): AnyResponsePart =>
   AnyResponsePart.make({ response });
 
 /**
+ * Creates a Schema for the message parts of a trajectory based on a toolkit.
+ *
+ * **When to use**
+ *
+ * Use when reading or writing the trajectory data of a recording — the messages
+ * a model was given, the parts it returned and the sessions they were recorded
+ * under — without the data an extension recorded about them.
+ *
+ * **Details**
+ *
+ * The parts are the ones {@link Part} unions, minus the extension parts, and they
+ * keep their own shapes: a response part carries the names, parameters and
+ * results of the tools the toolkit describes.
+ *
+ * @see {@link Part} for the Schema that reads the extension parts alongside them.
+ * @category constructors
+ */
+export const MessagePart = <Tools extends Record<string, Tool.Any>>(
+  toolkit: Toolkit.Toolkit<Tools>,
+) => Schema.Union([PromptPart, SessionPart, ResponsePart(toolkit)]);
+
+/**
+ * Union type of the message parts of a trajectory for a toolkit.
+ *
+ * @see {@link MessagePart} for the Schema that builds the union.
+ * @category models
+ */
+export type MessagePart<Tools extends Record<string, Tool.Any>> = Schema.Schema.Type<
+  ReturnType<typeof MessagePart<Tools>>
+>;
+
+/**
+ * Encoded representation of message parts for serialization.
+ *
+ * @category models
+ */
+export type MessagePartEncoded = Schema.Codec.Encoded<
+  ReturnType<typeof MessagePart<Record<string, Tool.Any>>>
+>;
+
+/**
+ * Message part that also accepts tools outside the provided toolkit.
+ *
+ * **Details**
+ *
+ * The tolerant form of every message part: {@link PromptPart},
+ * {@link SessionPart} and {@link AnyResponsePart}.
+ *
+ * @see {@link AnyPart} for the tolerant form of every part of a recording.
+ * @category models
+ */
+export type AnyMessagePart = PromptPart | SessionPart | AnyResponsePart;
+
+/**
  * Trajectory part that carries the data recorded for an extension.
  *
  * **When to use**
@@ -369,6 +428,13 @@ export type AnyExtensionPart = Schema.Schema.Type<typeof AnyExtensionPart>;
  * Use when decoding or encoding recorded parts with the toolkit and extensions
  * they were recorded against.
  *
+ * **Details**
+ *
+ * A part is the trajectory data of a recording ({@link MessagePart}) or the data
+ * recorded for an extension about it ({@link ExtensionPart}), so the two can be
+ * read as one stream or the messages alone.
+ *
+ * @see {@link MessagePart} for the trajectory data without the extension parts.
  * @category constructors
  */
 export const Part = <
@@ -377,17 +443,19 @@ export const Part = <
 >(
   toolkit: Toolkit.Toolkit<Tools>,
   extkit: Exts,
-) => Schema.Union([PromptPart, SessionPart, ResponsePart(toolkit), ExtensionPart(extkit)]);
+) => Schema.Union([MessagePart(toolkit), ExtensionPart(extkit)]);
 
 /**
  * Union type of the parts of a trajectory for a toolkit and extension kit.
  *
+ * @see {@link MessagePart} for the trajectory data of a recording alone.
+ * @see {@link ExtensionPart} for the data recorded for an extension.
  * @category models
  */
 export type Part<
   Tools extends Record<string, Tool.Any>,
   Exts extends Record<string, Extension.Any>,
-> = Schema.Schema.Type<ReturnType<typeof Part<Tools, Exts>>>;
+> = MessagePart<Tools> | ExtensionPart<Exts>;
 
 /**
  * Encoded representation of trajectory parts for serialization.
@@ -404,11 +472,37 @@ export type PartEncoded = Schema.Codec.Encoded<
  *
  * @category models
  */
-export type AnyPart = PromptPart | SessionPart | AnyResponsePart | AnyExtensionPart;
+export type AnyPart = AnyMessagePart | AnyExtensionPart;
+
+/**
+ * Stream of the message parts of a trajectory.
+ *
+ * **When to use**
+ *
+ * Use as the type of a stream that carries a recording's messages without the
+ * data recorded for extensions about them, such as the one {@link messages}
+ * returns.
+ *
+ * @see {@link PartStream} for a stream that carries the extension parts too.
+ * @category models
+ */
+export type MessageStream<
+  Tools extends Record<string, Tool.Any>,
+  E = never,
+  R = never,
+> = Stream.Stream<MessagePart<Tools>, E | TrajectoryError, R>;
+
+/**
+ * Stream of message parts that also accepts tools outside the provided toolkit.
+ *
+ * @category models
+ */
+export type AnyMessageStream = MessageStream<{}>;
 
 /**
  * Stream of the parts of a trajectory.
  *
+ * @see {@link MessageStream} for a stream of the message parts alone.
  * @category models
  */
 export type PartStream<
@@ -612,3 +706,65 @@ export const mapMetadata: {
     return Object.assign(parts, { toolkit, metadata: f(trajectory.metadata), extkit });
   },
 );
+
+/**
+ * Streams the message parts of a trajectory, without the data recorded for
+ * extensions about them.
+ *
+ * **When to use**
+ *
+ * Use when a recording should be read as the trajectory data it holds alone,
+ * such as to hand it to a reader that takes no interest in the extension data
+ * recorded alongside it.
+ *
+ * **Details**
+ *
+ * Extension parts are dropped and the prompt, session and response parts are
+ * carried over unchanged, so no part is copied. The returned stream is a
+ * {@link MessageStream}: the toolkit, the metadata and the extension kit are left
+ * on the trajectory the parts came from, because they describe the recording
+ * rather than the messages alone. Parts are read in the order they were recorded,
+ * so a trajectory is piped through `Session.of` or `Session.select` first when
+ * the messages of one session are wanted.
+ *
+ * **Example** (Reading the messages of a recording that carries extension data)
+ *
+ * ```ts import.meta.vitest
+ * import { Effect, Option, Stream } from "effect"
+ * import { Prompt } from "effect/ai"
+ * import { Trajectory } from "@trajs/core"
+ *
+ * const trajectory = Trajectory.make(
+ *   Stream.make(
+ *     Trajectory.promptPart(Prompt.make("Hello")),
+ *     Trajectory.AnyExtensionPart.make({
+ *       extension: { extension: "dev.observerw.otel", data: { spanId: "s1" } },
+ *       attach: Option.none()
+ *     })
+ *   )
+ * )
+ *
+ * const messages = await Effect.runPromise(Stream.runCollect(Trajectory.messages(trajectory)))
+ * Array.from(messages, (part) => part._tag) // => ["Prompt"]
+ * ```
+ *
+ * @see {@link MessageStream} for the stream type returned.
+ * @see {@link MessagePart} for the parts the stream carries.
+ * @category combinators
+ */
+export const messages = <
+  Tools extends Record<string, Tool.Any>,
+  Exts extends Record<string, Extension.Any>,
+  E,
+  R,
+>(
+  trajectory: PartStream<Tools, Exts, E, R>,
+): MessageStream<Tools, E, R> =>
+  trajectory.pipe(
+    Stream.filter(
+      (part): part is MessagePart<Tools> =>
+        Predicate.isTagged("Prompt")(part) ||
+        Predicate.isTagged("Session")(part) ||
+        Predicate.isTagged("Response")(part),
+    ),
+  );
