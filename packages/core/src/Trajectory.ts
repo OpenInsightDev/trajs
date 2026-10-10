@@ -5,7 +5,8 @@
  * {@link Metadata} and its extensions. Prompts are stored as the messages the
  * model was given, responses as the parts the model returned, and each part
  * carries an identifier so a recording can be inspected or rebound to the tools
- * and extensions it refers to. {@link make} builds one.
+ * and extensions it refers to. {@link make} builds one from recorded parts, and
+ * {@link empty} builds one that holds none.
  *
  * A part is one of two things: a {@link MessagePart}, the trajectory data that
  * carries the conversation itself, or an {@link ExtensionPart}, the data recorded
@@ -850,6 +851,7 @@ export type TrajectoryEncoded<E = never, R = never> = Stream.Stream<
  * ```
  *
  * @see {@link Metadata} for the fields the trajectory carries.
+ * @see {@link empty} for a trajectory that holds no parts.
  * @category constructors
  */
 export const make: {
@@ -863,6 +865,41 @@ export const make: {
   ): Trajectory<{}, {}, E, R> =>
     Object.assign(parts, { toolkit: Toolkit.empty, metadata, extkit: Extensionkit.empty }),
 );
+
+/**
+ * Creates a trajectory that holds no parts.
+ *
+ * **When to use**
+ *
+ * Use as the starting point of a recording that is assembled from parts which
+ * are not available yet, or where a consumer takes a trajectory and nothing has
+ * been recorded.
+ *
+ * **Details**
+ *
+ * The returned trajectory is the one {@link make} returns for an empty stream:
+ * it carries the metadata it is given, defaulting to {@link Metadata} with no
+ * name and no description, and holds no toolkit and no extension kit. It is
+ * bound the same way, so {@link Toolkit.toolkits} and {@link Extensionkit.extkits}
+ * attach the tools and extensions its parts will refer to. The parts are empty
+ * rather than tolerant: a trajectory that records parts whose types are not
+ * known is created with `make`.
+ *
+ * **Example** (Starting an empty trajectory)
+ *
+ * ```ts import.meta.vitest
+ * import { Effect, Stream } from "effect"
+ * import { Trajectory } from "@trajs/core"
+ *
+ * const trajectory = Trajectory.empty(Trajectory.Metadata.make({ name: "greeting" }))
+ * trajectory.metadata.name // => "greeting"
+ * Array.from(await Effect.runPromise(Stream.runCollect(trajectory))) // => []
+ * ```
+ *
+ * @see {@link make} for a trajectory built from parts that are already recorded.
+ * @category constructors
+ */
+export const empty = (metadata: Metadata = Metadata.make({})): Any => make(Stream.empty, metadata);
 
 /**
  * Creates a stream trajectory from a stream of streaming parts and, optionally,

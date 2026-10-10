@@ -26,6 +26,23 @@ it("binds a stream that was defined before the metadata", async () => {
   expect(Array.from(await collect(trajectory))).toHaveLength(1);
 });
 
+it("creates a trajectory that holds no parts", async () => {
+  const trajectory = Trajectory.empty();
+
+  expect(trajectory.metadata.version).toBe(Trajectory.version);
+  expect(trajectory.toolkit).toBe(Toolkit.empty);
+  expect(Object.keys(trajectory.extkit)).toHaveLength(0);
+  expect(Array.from(await collect(trajectory))).toHaveLength(0);
+});
+
+it("carries the metadata of an empty trajectory it was given", async () => {
+  const trajectory = Trajectory.empty(Trajectory.Metadata.make({ name: "greeting" }));
+
+  expect(trajectory.metadata.name).toBe("greeting");
+  expect(trajectory.metadata.version).toBe(Trajectory.version);
+  expect(Array.from(await collect(trajectory))).toHaveLength(0);
+});
+
 it("updates the metadata without touching the recording it was given", async () => {
   const trajectory = Trajectory.make(parts, Trajectory.Metadata.make({ name: "greeting" }));
 
