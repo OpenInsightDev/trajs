@@ -14,11 +14,18 @@
  * the set does not hold. {@link extkits} binds a recorded trajectory to the
  * extensions it carries data for, the way a toolkit is bound to the tools a
  * recording names.
+ *
+ * The set is also what carries the producer of each extension's data: an
+ * extension declares the data and what writing it takes, and {@link withProducers}
+ * pairs every extension of a set with the producer that writes its data, so a set
+ * whose producers are incomplete is rejected rather than failing once a recording
+ * is read. The pair is a {@link Produced}, and a set of them a {@link ProducedKit}.
  */
 
 import { Effect, JsonSchema, Match, Predicate, Schema, Stream, Struct } from "effect";
 import type { Tool } from "effect/ai";
 import type * as Extension from "#/Extension.ts";
+import type { Unheld } from "#/internal/producers.ts";
 import type * as Trajectory from "#/Trajectory.ts";
 import { TrajectoryError } from "#/TrajectoryError.ts";
 import type { JsonSchemaDocument } from "#/Toolkit.ts";
@@ -146,6 +153,166 @@ export const make = <const Exts extends ReadonlyArray<Extension.Any>>(
 export const merge = <const Kits extends ReadonlyArray<Any>>(
   ...kits: Kits
 ): Extensionkit<Merged<Kits>> => Object.assign({}, ...kits) as Extensionkit<Merged<Kits>>;
+
+/**
+ * The producer of every extension of a set, keyed by the identifier of the
+ * extension.
+ *
+ * **When to use**
+ *
+ * Use when writing the producers of a set of extensions, or when a function takes
+ * the producers a set is recorded with.
+ *
+ * **Details**
+ *
+ * A key is an identifier the set holds, and the value under it is the
+ * {@link Extension.Producer} that writes that extension's data. The services a
+ * producer needs are the requirements its extension declares, so a producer that
+ * needs the tokenizer an estimate is counted with belongs to an extension that
+ * declares it and to no other.
+ *
+ * The failures a producer raises are not fixed by the extension it writes for, so
+ * they are read off the producer that is given rather than stated here.
+ *
+ * @see {@link withProducers} for attaching the producers of a set.
+ * @category models
+ */
+export type Producers<Exts extends Any> = {
+  readonly [Id in keyof Exts]: Extension.Producer<
+    Exts[Id],
+    // A producer fails with what it fails with, so the extension it writes for
+    // says nothing about the error channel it raises.
+    any,
+    Extension.Requirements<Exts[Id]>
+  >;
+};
+
+/**
+ * An extension together with the producer that writes its data.
+ *
+ * **When to use**
+ *
+ * Use when a set of extensions should carry the producers that write their data,
+ * or when reading one extension of such a set.
+ *
+ * **Details**
+ *
+ * The extension is the value the set was collected with, so what a datum is read
+ * by and what writes it stay together rather than being looked up separately. The
+ * producer is kept as it is typed, so the failures it raises stay readable.
+ *
+ * @see {@link withProducers} for the pairs a set of extensions yields.
+ * @category models
+ */
+export type Produced<
+  Ext extends Extension.Any,
+  P extends Extension.Producer<Ext, any, any> = Extension.Producer<Ext>,
+> = Readonly<{
+  /**
+   * The extension whose data is written.
+   */
+  extension: Ext;
+  /**
+   * The producer that writes it.
+   */
+  producer: P;
+}>;
+
+/**
+ * A set of extensions that each carry the producer of their data.
+ *
+ * **When to use**
+ *
+ * Use as the type of a set whose producers have been written, such as the one
+ * {@link withProducers} returns.
+ *
+ * **Details**
+ *
+ * Every extension of the set is paired with the producer that writes its data, so
+ * a set that is missing one is not of this type. A function that writes the data
+ * of a set takes this type rather than the set and its producers separately, so
+ * an incomplete set is rejected where it is built instead of once a recording is
+ * read.
+ *
+ * @see {@link withProducers} for the constructor.
+ * @category models
+ */
+export type ProducedKit<Exts extends Any, P extends Producers<Exts> = Producers<Exts>> = {
+  readonly [Id in keyof Exts]: Produced<Exts[Id], P[Id]>;
+};
+
+/**
+ * Attaches a producer to every extension of a set.
+ *
+ * **When to use**
+ *
+ * Use when the data of a set of extensions is derived from a recording, and the
+ * producers are declared once beside the set rather than passed to every caller of
+ * one.
+ *
+ * **Details**
+ *
+ * The producers are keyed by the identifier of the extension they write for, and
+ * one producer per identifier of the set is required: a producer that is missing,
+ * one given for an identifier the set does not hold, and one written for another
+ * extension's data are all rejected when the set is built. Each producer takes the
+ * services its extension declares, so an extension states what producing its data
+ * needs and the producer given for it takes the same.
+ *
+ * The extensions are carried over as they are, so the set that is returned reads
+ * and writes the data of the set it was given.
+ *
+ * **Example** (Writing the producer of a set)
+ *
+ * ```ts import.meta.vitest
+ * import { Effect, Schema, Stream } from "effect"
+ * import { Prompt } from "effect/ai"
+ * import { Extension, Extensionkit, Trajectory } from "@trajs/core"
+ *
+ * const otel = Extension.make(
+ *   "dev.observerw.otel",
+ *   Extension.Metadata.make({ name: "OpenTelemetry" }),
+ *   Extension.Versions.make(Schema.Struct({
+ *     version: Schema.Literal("1.0.0"),
+ *     spanId: Schema.String
+ *   }))
+ * )
+ *
+ * const produced = Extensionkit.withProducers(Extensionkit.make(otel))({
+ *   "dev.observerw.otel": (messages) =>
+ *     Stream.map(messages, (part) => ({
+ *       data: { version: "1.0.0", spanId: part.uuid },
+ *       attach: [part.uuid]
+ *     }))
+ * })
+ *
+ * const part = Trajectory.promptPart(Prompt.make("Hello"))
+ * const recorded = Trajectory.make(Stream.make(part))
+ * const written = await Effect.runPromise(
+ *   Stream.runCollect(produced["dev.observerw.otel"].producer(Trajectory.messages(recorded)))
+ * )
+ *
+ * Array.from(written)[0].attach // => [part.uuid]
+ * ```
+ *
+ * @see {@link Producers} for the producers a set takes.
+ * @see {@link ProducedKit} for the set it returns.
+ * @category constructors
+ */
+export const withProducers =
+  <Exts extends Any>(extkit: Exts) =>
+  <P extends Producers<Exts>>(producers: P & Unheld<Exts, P>): ProducedKit<Exts, P> => {
+    const given = new Map<string, Extension.Producer<Extension.Any, any, any>>(
+      Object.entries(producers),
+    );
+
+    // SAFETY: every pair is built from the entry the set holds under that identifier
+    // and the producer given for it, so the walk loses the identifiers rather than the
+    // pairs.
+    return Object.fromEntries(
+      Object.entries(extkit).map(([id, extension]) => [id, { extension, producer: given.get(id) }]),
+    ) as ProducedKit<Exts, P>;
+  };
 
 /**
  * Serialized form of a single extension.

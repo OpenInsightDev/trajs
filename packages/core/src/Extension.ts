@@ -19,11 +19,18 @@
  * tokenizer an estimate is counted with, the tracer a span is recorded by — the
  * way a tool declares the services its handler needs. They are carried in the
  * type alone and read with {@link Requirements}, so what producing the data takes
- * is stated with the format rather than by every caller of a producer.
+ * is stated with the format rather than by every caller of a producer. The
+ * producer itself is written apart from the extension — a {@link Producer} reads
+ * the messages of a recording and writes the data of one extension — and the set a
+ * recording is made with is what carries it, through
+ * `Extensionkit.withProducers`.
  */
 
-import { Context, Data, Schema, SchemaGetter, Types } from "effect";
+import { Context, Data, Schema, SchemaGetter, Stream, Types } from "effect";
 import { Versions, type Version } from "#/internal/versions.ts";
+import type { Tool } from "effect/ai";
+import * as Trajectory from "#/Trajectory.ts";
+import type { TrajectoryError } from "./TrajectoryError.ts";
 
 /**
  * The line of versions of an extension's data.
@@ -222,6 +229,103 @@ export type Requirements<Ext> =
  * @category models
  */
 export type Any = Extension<string, Schema.Decoder<unknown>, any>;
+
+/**
+ * The data one datum of an extension records: the value a producer wrote, and the
+ * parts it is about.
+ *
+ * **When to use**
+ *
+ * Use as the type of what a producer writes, or when reading what a producer
+ * wrote before it is recorded as a part.
+ *
+ * **Details**
+ *
+ * `data` is the value of the extension's newest version, taken off the line the
+ * extension carries, so a producer writes the version the extension states rather
+ * than one a recording holds. `attach` names the parts the datum is about by their
+ * identifier, and is absent when the datum is about the recording rather than
+ * about a part of it.
+ *
+ * @see {@link Producer} for the function that writes one.
+ * @see `Trajectory.ExtensionPart` for the part a datum is recorded as.
+ * @category models
+ */
+export type ProducerOutput<Ext extends Any> = Readonly<{
+  data: Ext["version"]["Type"];
+  attach?: [string, ...string[]];
+}>;
+
+/**
+ * Writes the data of one extension from the messages of a trajectory.
+ *
+ * **When to use**
+ *
+ * Use when the data of an extension is derived from a recording rather than
+ * recorded as it happens: what each part is worth to a model, a span that
+ * summarises a turn, a verdict on a whole conversation.
+ *
+ * **Details**
+ *
+ * A producer reads the messages of a recording as a stream and writes the data of
+ * one extension as a stream, so it may write as it reads — one datum per part — or
+ * read the recording to its end before writing, when the datum is about the
+ * recording rather than about one of its parts. The two streams are independent,
+ * so what a datum is about is named by its `attach` rather than by the position it
+ * was written at.
+ *
+ * The services a producer needs are the ones its extension declares
+ * ({@link Requirements}), so what producing the data takes travels with the format
+ * rather than with every caller of a producer. The failures a producer raises are
+ * its own: they travel in the error channel of the stream it returns, beside the
+ * `TrajectoryError` a recording reports.
+ *
+ * A producer is not a field of the extension it writes for: it is carried by the
+ * set of extensions a recording is made with.
+ * `Extensionkit.withProducers` takes one producer per extension of a set, keyed by
+ * the identifier of the extension, and rejects a set whose producers are missing,
+ * unknown or written for another extension's data.
+ *
+ * **Example** (Writing what a part is about)
+ *
+ * ```ts import.meta.vitest
+ * import { Effect, Schema, Stream } from "effect"
+ * import { Prompt } from "effect/ai"
+ * import { Extension, Trajectory } from "@trajs/core"
+ *
+ * const otel = Extension.make(
+ *   "dev.observerw.otel",
+ *   Extension.Metadata.make({ name: "OpenTelemetry" }),
+ *   Extension.Versions.make(Schema.Struct({
+ *     version: Schema.Literal("1.0.0"),
+ *     spanId: Schema.String
+ *   }))
+ * )
+ *
+ * const span: Extension.Producer<typeof otel> = (messages) =>
+ *   Stream.map(messages, (part) => ({
+ *     data: { version: "1.0.0", spanId: part.uuid },
+ *     attach: [part.uuid]
+ *   }))
+ *
+ * const part = Trajectory.promptPart(Prompt.make("Hello"))
+ * const recorded = Trajectory.make(Stream.make(part))
+ * const written = await Effect.runPromise(
+ *   Stream.runCollect(span(Trajectory.messages(recorded)))
+ * )
+ *
+ * Array.from(written)[0].attach // => [part.uuid]
+ * ```
+ *
+ * @see {@link Requirements} for the services a producer takes.
+ * @see `Extensionkit.withProducers` for attaching producers to a set.
+ * @category models
+ */
+export type Producer<Ext extends Any, E = never, R = Requirements<Ext>> = <
+  Tools extends Record<string, Tool.Any>,
+>(
+  messages: Trajectory.MessageStream<Tools, E, R>,
+) => Stream.Stream<ProducerOutput<Ext>, E | TrajectoryError, R>;
 
 /**
  * Declares an extension data format.
