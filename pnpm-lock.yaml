@@ -170,6 +170,9 @@ catalogs:
     '@changesets/cli':
       specifier: ^3.0.3
       version: 3.0.3
+    '@effect/ai-anthropic':
+      specifier: ^4.0.2
+      version: 4.0.2
     '@effect/ai-openai-compat':
       specifier: ^4.0.2
       version: 4.0.2
@@ -229,6 +232,9 @@ importers:
 
   packages/core:
     dependencies:
+      '@effect/ai-anthropic':
+        specifier: 'catalog:'
+        version: 4.0.2(effect@4.0.2)
       '@effect/ai-openai-compat':
         specifier: 'catalog:'
         version: 4.0.2(effect@4.0.2)
@@ -535,6 +541,11 @@ packages:
   '@ctrl/tinycolor@4.2.1':
     resolution: {integrity: sha512-Vh5uy9Y1JBMId6J1f68TMXnZrTCvNdo9Fu2k0d1YnJngR+sM5kWTKl441c/3TFs+cG0NWOjRWgQ/iaWhbYx+7A==}
     engines: {node: '>=14'}
+
+  '@effect/ai-anthropic@4.0.2':
+    resolution: {integrity: sha512-HkObD5bG3GvlTgFJhu7B4wWdqEZ88RIrTAnQZIFKkhhip5ZlyQhIWwmvIaPUYFton8G3rgqQwq/wXJ/9LNLwHQ==}
+    peerDependencies:
+      effect: ^4.0.2
 
   '@effect/ai-openai-compat@4.0.2':
     resolution: {integrity: sha512-M4mg50Pe9gxkJRabnSEyNT6vlT9gsmpyXxoZ8yX8dQ7d5Xs8dw3Im6Sf6Ab/r0IU/IkT8pZgCoLsnbeb8QChBA==}
@@ -3329,6 +3340,10 @@ snapshots:
       sisteransi: 1.0.5
 
   '@ctrl/tinycolor@4.2.1': {}
+
+  '@effect/ai-anthropic@4.0.2(effect@4.0.2)':
+    dependencies:
+      effect: 4.0.2
 
   '@effect/ai-openai-compat@4.0.2(effect@4.0.2)':
     dependencies:

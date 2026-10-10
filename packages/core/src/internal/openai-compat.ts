@@ -1,12 +1,12 @@
 import type { OpenAiClient } from "@effect/ai-openai-compat";
-import { Effect, Predicate, Stream } from "effect";
+import { Effect, Predicate } from "effect";
 import type { Prompt, Tool } from "effect/ai";
 import { Base64 } from "effect/encoding";
 import type { ChatCompletionMessage, ChatCompletionSessions } from "#/Codec.ts";
 import type * as Extension from "#/Extension.ts";
-import * as Trajectory from "#/Trajectory.ts";
+import type * as Trajectory from "#/Trajectory.ts";
 import type { TrajectoryError } from "#/TrajectoryError.ts";
-import * as View from "#/View.ts";
+import * as conversation from "#/internal/conversation.ts";
 
 const textPart = (text: string): OpenAiClient.ChatCompletionContentPart => ({ type: "text", text });
 
@@ -145,34 +145,8 @@ const messagesOf = (message: Prompt.Message): ChatCompletionMessage[] => {
   }
 };
 
-// A session's messages are folded from its own parts, in the order they were
-// recorded: each prompt contributes the messages the model was given and the
-// responses that follow it contribute what the model returned.
-const sessionMessages = <Tools extends Record<string, Tool.Any>>(
-  parts: ReadonlyArray<Trajectory.Part<Tools, Record<string, Extension.Any>>>,
-): Effect.Effect<ChatCompletionMessage[], TrajectoryError> =>
-  View.prompt(Stream.fromIterable(parts)).pipe(
-    Effect.map((prompt) => prompt.content.flatMap(messagesOf)),
-  );
-
-const groupBySession = <Tools extends Record<string, Tool.Any>>(
-  parts: ReadonlyArray<Trajectory.Part<Tools, Record<string, Extension.Any>>>,
-): Map<string, Trajectory.Part<Tools, Record<string, Extension.Any>>[]> => {
-  const sessions = new Map<string, Trajectory.Part<Tools, Record<string, Extension.Any>>[]>();
-
-  for (const part of parts) {
-    const id = part.session ?? "";
-    const group = sessions.get(id);
-
-    if (group === undefined) {
-      sessions.set(id, [part]);
-    } else {
-      group.push(part);
-    }
-  }
-
-  return sessions;
-};
+const chatCompletionMessages = (messages: ReadonlyArray<Prompt.Message>): ChatCompletionMessage[] =>
+  messages.flatMap(messagesOf);
 
 /** Converts a trajectory into the chat completion messages of each of its sessions. */
 export const makeChatCompletion = Effect.fn("Codec.makeChatCompletion")(function* <
@@ -182,12 +156,12 @@ export const makeChatCompletion = Effect.fn("Codec.makeChatCompletion")(function
 >(
   trajectory: Trajectory.Trajectory<Tools, Record<string, Extension.Any>, E, R>,
 ): Effect.fn.Return<ChatCompletionSessions, E | TrajectoryError, R> {
-  const parts = Array.from(yield* Stream.runCollect(trajectory));
-  const sessions: ChatCompletionSessions = {};
+  const sessions = yield* conversation.messagesBySession(trajectory);
+  const result: ChatCompletionSessions = {};
 
-  for (const [id, group] of groupBySession(parts)) {
-    sessions[id] = yield* sessionMessages(group);
+  for (const [id, messages] of Object.entries(sessions)) {
+    result[id] = chatCompletionMessages(messages);
   }
 
-  return sessions;
+  return result;
 });

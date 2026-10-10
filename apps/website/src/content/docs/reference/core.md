@@ -6,15 +6,15 @@ description: The modules and exports of the trajs core package.
 The `@trajs/core` package re-exports every module as a namespace. Each is also
 available as a subpath import, such as `@trajs/core/Response`.
 
-| Module            | Subpath                       | Purpose                                                                                                                                                                           |
-| :---------------- | :---------------------------- | :-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `Codec`           | `@trajs/core/Codec`           | Chat completions export: `ChatCompletionMessage`, `ChatCompletionSessions` and `makeChatCompletion`.                                                                              |
-| `Trajectory`      | `@trajs/core/Trajectory`      | The part model: `Metadata`, `PartMetadata`, `PromptPart`, `ResponsePart`, the part unions, `make` and `mapMetadata`.                                                              |
-| `View`            | `@trajs/core/View`            | Reading a trajectory as a conversation: `PromptTurn`, `promptTurns`, `prompt`.                                                                                                    |
-| `Response`        | `@trajs/core/Response`        | Tolerant response parts: `AllPartsView`, `PartView`, `StreamPartView`, `AnyToolCallPart`, `AnyToolResultPart` and their guards and constructors. Re-exports `effect/ai/Response`. |
-| `Toolkit`         | `@trajs/core/Toolkit`         | Toolkit serialization and rebinding: `encode`, `toDynamic`, `toolkits`, `toolTurn`, `toolTurns`.                                                                                  |
-| `Persist`         | `@trajs/core/Persist`         | The `.trajs` codec: `encode`, `decode`, `write`, `read`.                                                                                                                          |
-| `TrajectoryError` | `@trajs/core/TrajectoryError` | Typed failures: `TrajectoryError` and its reasons `ToolEncodeError`, `ToolDecodeError`, `ExtensionEncodeError`, `ExtensionDecodeError`, `ParseError`.                             |
+| Module            | Subpath                       | Purpose                                                                                                                                                                                                                             |
+| :---------------- | :---------------------------- | :---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Codec`           | `@trajs/core/Codec`           | Request exports: `ChatCompletionMessage`, `ChatCompletionSessions` and `makeChatCompletion` for chat completions; `AnthropicMessage`, `AnthropicConversation`, `AnthropicSessions` and `makeMessages` for Anthropic's Messages API. |
+| `Trajectory`      | `@trajs/core/Trajectory`      | The part model: `Metadata`, `PartMetadata`, `PromptPart`, `ResponsePart`, the part unions, `make` and `mapMetadata`.                                                                                                                |
+| `View`            | `@trajs/core/View`            | Reading a trajectory as a conversation: `PromptTurn`, `promptTurns`, `prompt`.                                                                                                                                                      |
+| `Response`        | `@trajs/core/Response`        | Tolerant response parts: `AllPartsView`, `PartView`, `StreamPartView`, `AnyToolCallPart`, `AnyToolResultPart` and their guards and constructors. Re-exports `effect/ai/Response`.                                                   |
+| `Toolkit`         | `@trajs/core/Toolkit`         | Toolkit serialization and rebinding: `encode`, `toDynamic`, `toolkits`, `toolTurn`, `toolTurns`.                                                                                                                                    |
+| `Persist`         | `@trajs/core/Persist`         | The `.trajs` codec: `encode`, `decode`, `write`, `read`.                                                                                                                                                                            |
+| `TrajectoryError` | `@trajs/core/TrajectoryError` | Typed failures: `TrajectoryError` and its reasons `ToolEncodeError`, `ToolDecodeError`, `ExtensionEncodeError`, `ExtensionDecodeError`, `ParseError`.                                                                               |
 
 ## Conventions
 
