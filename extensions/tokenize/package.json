@@ -1,6 +1,6 @@
 {
   "name": "@trajs/extension-tokenize",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "Byte-pair tokenization and token counts, built on Effect.",
   "homepage": "https://github.com/OpenInsightDev/trajs",
   "license": "MIT",
