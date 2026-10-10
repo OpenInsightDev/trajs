@@ -14,9 +14,15 @@
  * version of the line can still be read. Extensions are collected into an
  * `Extensionkit` and carried by a trajectory, exactly as tools are collected into
  * a toolkit.
+ *
+ * An extension also declares the services a producer of its data needs — the
+ * tokenizer an estimate is counted with, the tracer a span is recorded by — the
+ * way a tool declares the services its handler needs. They are carried in the
+ * type alone and read with {@link Requirements}, so what producing the data takes
+ * is stated with the format rather than by every caller of a producer.
  */
 
-import { Data, Schema, SchemaGetter } from "effect";
+import { Context, Data, Schema, SchemaGetter, Types } from "effect";
 import { Versions, type Version } from "#/internal/versions.ts";
 
 /**
@@ -86,9 +92,20 @@ export class Metadata extends Schema.Class<Metadata>("Metadata")({
  * with `Equal.equals`, and it is pipeable, which is how a version is derived
  * with {@link upgrade}.
  *
+ * The type parameter `Requirements` declares the services a producer of the
+ * extension's data needs. It is phantom — no field of an extension depends on it
+ * — so it is declared through {@link make} and read with {@link Requirements},
+ * and nothing checks at runtime that a producer provides the services, because
+ * the declaration is a contract of the type. Requirements are covariant, so an
+ * extension that declares none is usable where one that declares some is
+ * expected, and not the reverse. A derived version is still the same extension,
+ * so {@link upgrade} carries the requirements over.
+ *
  * An extension whose versions are not known — {@link Any}, and the element type of
  * `Extensionkit.Any` — reads them as a schema of unknown shape, so data can still
- * be decoded with it, but not against the fields of a particular version.
+ * be decoded with it, but not against the fields of a particular version. The
+ * services its data needs are unknown there as well, so an extension of any
+ * requirements is one.
  *
  * The identifier and metadata of an extension are fixed for its whole life: a
  * derived version is still the same extension, so {@link upgrade} keeps both —
@@ -103,6 +120,7 @@ export class Metadata extends Schema.Class<Metadata>("Metadata")({
 export class Extension<
   out Id extends string = string,
   out Versions extends Schema.Top = Schema.Decoder<unknown>,
+  out Requirements = never,
 > extends Data.Class<{
   /**
    * Namespaced identifier of the extension.
@@ -116,20 +134,94 @@ export class Extension<
    * The versions of the extension's data, newest first.
    */
   readonly version: Versions;
-}> {}
+}> {
+  /**
+   * Declared rather than assigned, so the requirements of an extension are
+   * carried by its type without becoming part of its value; it is what keeps
+   * them covariant.
+   */
+  declare readonly [RequirementsTypeId]: {
+    readonly _Requirements: Types.Covariant<Requirements>;
+  };
+
+  /**
+   * Declares one more service the data of this extension needs.
+   *
+   * **When to use**
+   *
+   * Use when an extension is produced with a service the extension itself does
+   * not declare, such as one a recording provides for a single run instead of a
+   * producer needing it every time.
+   *
+   * **Details**
+   *
+   * The returned extension is the same identifier, metadata and line of versions
+   * with the given service added to its {@link Requirements}, so the extension it
+   * was called on is left unchanged. Nothing is checked at runtime, because the
+   * addition is a contract of the type alone.
+   *
+   * @see {@link make} for declaring the services an extension needs when it is
+   * declared.
+   * @category combinators
+   */
+  addDependency<Identifier, Service>(
+    _tag: Context.Key<Identifier, Service>,
+  ): Extension<Id, Versions, Requirements | Identifier> {
+    // SAFETY: the requirements of an extension are carried by the type and nothing
+    // else, so the extension is rebuilt from the fields it already holds.
+    return new Extension({
+      id: this.id,
+      metadata: this.metadata,
+      version: this.version,
+    }) as Extension<Id, Versions, Requirements | Identifier>;
+  }
+}
 
 /**
- * An extension of unknown identifier and versions.
+ * An identifier of its own keeps the marker from colliding with the fields of an
+ * extension, which are the data of an extension rather than what producing it
+ * takes.
+ */
+const RequirementsTypeId = "~trajs/Extension/Requirements" as const;
+
+/**
+ * The services a producer of an extension's data needs.
+ *
+ * **When to use**
+ *
+ * Use when a function produces the data of an extension and should state what it
+ * needs to be run, such as the producer of a recording that annotates parts with
+ * the extension's data.
+ *
+ * **Details**
+ *
+ * The requirements are the ones an extension declares, whether through
+ * {@link make} or by `addDependency`. They are the identifiers a program yields
+ * to be given a service rather than the services themselves, so they are the
+ * requirements of an `Effect` or a `Stream` as they are. An extension that
+ * declares none has no requirements, and a derived version keeps those of the
+ * extension it was derived from.
+ *
+ * @see {@link make} for declaring the services an extension needs.
+ * @see {@link Extension} for the type parameter they are read off.
+ * @category models
+ */
+export type Requirements<Ext> =
+  Ext extends Extension<infer _Id, infer _Versions, infer Declared> ? Declared : never;
+
+/**
+ * An extension of unknown identifier, versions and requirements.
  *
  * **Details**
  *
  * Its versions are read as a schema of unknown shape, so an extension that was
  * declared elsewhere can still have its data decoded, but not against the fields
- * of a particular version.
+ * of a particular version. The services its data needs are unknown too, so an
+ * extension of any requirements is one.
  *
  * @category models
  */
-export type Any = Extension<string, Schema.Decoder<unknown>>;
+export type Any = Extension<string, Schema.Decoder<unknown>, any>;
 
 /**
  * Declares an extension data format.
@@ -144,6 +236,12 @@ export type Any = Extension<string, Schema.Decoder<unknown>>;
  * The version is the oldest one of the extension, built by `Versions.make`; later
  * versions are derived from the extension with {@link upgrade}. Metadata declares
  * nothing about the data, so it may be empty.
+ *
+ * `dependencies` names the services a producer of the data needs, which the
+ * returned extension carries as its {@link Requirements}: the tokenizer an
+ * estimate is counted with, the tracer a span is recorded by. Nothing checks at
+ * runtime that the services are provided where the data is produced, so they
+ * describe what a producer takes rather than what it is given.
  *
  * **Example** (Declaring an extension)
  *
@@ -162,6 +260,40 @@ export type Any = Extension<string, Schema.Decoder<unknown>>;
  * otel.id // => "dev.observerw.otel"
  * ```
  *
+ * **Example** (Declaring the services an extension's data needs)
+ *
+ * ```ts import.meta.vitest
+ * import { Context, Effect, Schema } from "effect"
+ * import { Extension } from "@trajs/core"
+ *
+ * class Tokenizer extends Context.Service<Tokenizer, {
+ *   readonly count: (text: string) => Effect.Effect<number>
+ * }>()("Tokenizer") {}
+ *
+ * const estimate = Extension.make(
+ *   "org.js.tra.tokenize",
+ *   Extension.Metadata.make({ name: "Token estimate" }),
+ *   Extension.Versions.make(Schema.Struct({
+ *     version: Schema.Literal("1.0.0"),
+ *     tokens: Schema.Number
+ *   })),
+ *   { dependencies: [Tokenizer] }
+ * )
+ *
+ * const counted = Effect.gen(function* () {
+ *   const tokenizer = yield* Tokenizer
+ *
+ *   return yield* tokenizer.count("Hello")
+ * })
+ *
+ * // A producer of an estimate takes the tokenizer the extension declares.
+ * const declared: Effect.Effect<number, never, Extension.Requirements<typeof estimate>> = counted
+ *
+ * await Effect.runPromise(Effect.provideService(declared, Tokenizer, {
+ *   count: () => Effect.succeed(1)
+ * })) // => 1
+ * ```
+ *
  * @see {@link upgrade} for deriving a later version of an extension.
  * @category constructors
  */
@@ -169,11 +301,20 @@ export const make = <
   const Id extends string,
   Self extends Schema.Struct<{ readonly version: Schema.Literal<string> }>,
   Members extends ReadonlyArray<Schema.Top>,
+  const Dependencies extends ReadonlyArray<Context.Key<any, any>> = [],
 >(
   id: Id,
   metadata: Metadata,
   version: Version<Self, Members>,
-): Extension<Id, Version<Self, Members>> => new Extension({ id, metadata, version });
+  // The declared services live in the type alone, so no option is read here.
+  _options?: {
+    /**
+     * Services a producer of the extension's data needs.
+     */
+    readonly dependencies?: Dependencies;
+  },
+): Extension<Id, Version<Self, Members>, Context.Service.Identifier<Dependencies[number]>> =>
+  new Extension({ id, metadata, version });
 
 /**
  * Derives the next version of an extension.
@@ -194,7 +335,9 @@ export const make = <
  * Metadata is derived the same way: `metadata` receives the metadata of the
  * version being derived from and returns the metadata of the new one, so a change
  * that also describes the extension differently says only what changes. It is
- * carried over when no mapping is given.
+ * carried over when no mapping is given. The {@link Requirements} of the
+ * extension are carried over as well, because a new version is still the same
+ * extension, produced by the same code.
  *
  * `decode` is a plain function rather than a `SchemaGetter`, so the encoded form
  * it returns is checked against the new version's own schema — the thing a
@@ -246,14 +389,16 @@ export const upgrade =
     },
     metadata?: (previous: Metadata) => Metadata,
   ) =>
-  <Id extends string>(extension: Extension<Id, Prev>) => {
+  <Id extends string, Declared>(extension: Extension<Id, Prev, Declared>) => {
     const version = Versions.upgrade<Prev, More>(fields, {
       decode: SchemaGetter.transform(change.decode),
     })(extension.version);
 
+    // SAFETY: a derived version is the same extension, so it takes the same
+    // services to produce as the extension it was derived from.
     return new Extension({
       id: extension.id,
       metadata: metadata?.(extension.metadata) ?? extension.metadata,
       version,
-    });
+    }) as Extension<Id, typeof version, Declared>;
   };
