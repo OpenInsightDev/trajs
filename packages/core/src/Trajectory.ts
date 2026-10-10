@@ -94,9 +94,13 @@ export type MetadataEncoded = Schema.Codec.Encoded<typeof Metadata>;
  *
  * **Details**
  *
- * Spread into each part class, so every part carries its own identifier, an
- * optional session identifier and optional extra data.
+ * Spread into each part class, so every part carries its own identifier and
+ * optional extra data. The `session` field is carried by the message parts
+ * alone: a session is made of the trajectory data of a recording, and the data
+ * an extension recorded about a part is read through the parts it is attached
+ * to.
  *
+ * @see {@link MessagePart} for the parts that carry a `session` as well.
  * @category models
  */
 export class PartMetadata extends Schema.Class<PartMetadata>("PartMetadata")({
@@ -104,10 +108,6 @@ export class PartMetadata extends Schema.Class<PartMetadata>("PartMetadata")({
    * Unique identifier of the part.
    */
   uuid: Uuid,
-  /**
-   * Optional identifier of the session the part belongs to.
-   */
-  session: Schema.optional(Schema.String),
   /**
    * Optional extra data attached to the part.
    */
@@ -122,6 +122,10 @@ export class PartMetadata extends Schema.Class<PartMetadata>("PartMetadata")({
 export class PromptPart extends Schema.TaggedClass<PromptPart>()("Prompt", {
   messages: Schema.Array(Prompt.Message),
   ...PartMetadata.fields,
+  /**
+   * Optional identifier of the session the part belongs to.
+   */
+  session: Schema.optional(Schema.String),
 }) {}
 
 /**
@@ -237,6 +241,10 @@ export const ResponsePart = <T extends Toolkit.Any>(toolkit: T) =>
     response: Response.PartView(toolkit),
     timestamp: Timestamp,
     ...PartMetadata.fields,
+    /**
+     * Optional identifier of the session the part belongs to.
+     */
+    session: Schema.optional(Schema.String),
   }) {};
 
 /**
@@ -312,6 +320,10 @@ export const StreamResponsePart = <T extends Toolkit.Any>(toolkit: T) =>
     response: Response.AllPartsView(toolkit),
     timestamp: Timestamp,
     ...PartMetadata.fields,
+    /**
+     * Optional identifier of the session the part belongs to.
+     */
+    session: Schema.optional(Schema.String),
   }) {};
 
 /**
@@ -495,7 +507,9 @@ export type ExtensionPart<Exts extends Extensionkit.Any> = Schema.Schema.Type<
  * trajectory records around it — the tag the part is discriminated by, when it
  * was recorded, the parts it is attached to and the fields every part carries —
  * is declared here, because it belongs to the recording rather than to the
- * extension the data came from.
+ * extension the data came from. The part carries no `session`, unlike a message
+ * part: it belongs to the session of the parts it is about, which `attach` names,
+ * so the session is read from them rather than restated on the part.
  *
  * **Example** (Recording data for an extension)
  *
@@ -529,6 +543,14 @@ export const ExtensionPart = <Exts extends Extensionkit.Any>(extkit: Exts) =>
   Schema.TaggedStruct("Extension", {
     extension: Extensionkit.PartView(extkit),
     timestamp: Timestamp,
+    /**
+     * Identifiers of the parts the recorded data is about.
+     *
+     * A part named here precedes the extension part, because the data is recorded
+     * with the part it is about, so a reader that walks a recording in order can
+     * resolve the session the part belongs to. The field is absent when the data
+     * is about the recording rather than about a part of it.
+     */
     attach: Schema.OptionFromOptionalKey(Schema.NonEmptyArray(Uuid)),
     ...PartMetadata.fields,
   });

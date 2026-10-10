@@ -1,14 +1,14 @@
 import { Effect, Stream } from "effect";
 import type { Prompt, Tool } from "effect/ai";
 import type * as Extension from "#/Extension.ts";
-import type * as Trajectory from "#/Trajectory.ts";
+import * as Trajectory from "#/Trajectory.ts";
 import type { TrajectoryError } from "#/TrajectoryError.ts";
 import * as View from "#/View.ts";
 
 const groupBySession = <Tools extends Record<string, Tool.Any>>(
-  parts: ReadonlyArray<Trajectory.Part<Tools, Record<string, Extension.Any>>>,
-): Map<string, Trajectory.Part<Tools, Record<string, Extension.Any>>[]> => {
-  const sessions = new Map<string, Trajectory.Part<Tools, Record<string, Extension.Any>>[]>();
+  parts: ReadonlyArray<Trajectory.MessagePart<Tools>>,
+): Map<string, Trajectory.MessagePart<Tools>[]> => {
+  const sessions = new Map<string, Trajectory.MessagePart<Tools>[]>();
 
   for (const part of parts) {
     const id = part.session ?? "";
@@ -28,18 +28,20 @@ const groupBySession = <Tools extends Record<string, Tool.Any>>(
 // recorded: each prompt contributes the messages the model was given and the
 // responses that follow it contribute what the model returned.
 const sessionMessages = <Tools extends Record<string, Tool.Any>>(
-  parts: ReadonlyArray<Trajectory.Part<Tools, Record<string, Extension.Any>>>,
+  parts: ReadonlyArray<Trajectory.MessagePart<Tools>>,
 ): Effect.Effect<ReadonlyArray<Prompt.Message>, TrajectoryError> =>
   View.prompt(Stream.fromIterable(parts)).pipe(Effect.map((prompt) => prompt.content));
 
 /**
  * Reads a trajectory as the provider-neutral messages of each of its sessions.
  *
- * The parts are grouped by the `session` they carry and each group is folded
- * with {@link View.prompt}, so a prompt part contributes the messages the model
- * was given and the response parts that follow it contribute the messages it
- * returned. Parts that carry no `session` are grouped under the empty string,
- * and session and extension parts are skipped.
+ * The message parts are grouped by the `session` they carry and each group is
+ * folded with {@link View.prompt}, so a prompt part contributes the messages the
+ * model was given and the response parts that follow it contribute the messages
+ * it returned. A message part that carries no `session` is grouped under the
+ * empty string. An extension part carries no messages, so it contributes nothing
+ * to any group, while a session part forms the group of the session it declares
+ * without contributing a message to it.
  *
  * Both provider exports of `Codec` read their input through this fold and then
  * write the messages in the request shape of one provider, so the grouping and
@@ -52,7 +54,7 @@ export const messagesBySession = Effect.fn("Codec.messagesBySession")(function* 
 >(
   trajectory: Trajectory.Trajectory<Tools, Record<string, Extension.Any>, E, R>,
 ): Effect.fn.Return<Record<string, ReadonlyArray<Prompt.Message>>, E | TrajectoryError, R> {
-  const parts = Array.from(yield* Stream.runCollect(trajectory));
+  const parts = Array.from(yield* Stream.runCollect(Trajectory.messages(trajectory)));
   const sessions: Record<string, ReadonlyArray<Prompt.Message>> = {};
 
   for (const [id, group] of groupBySession(parts)) {

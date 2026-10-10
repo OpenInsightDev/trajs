@@ -117,6 +117,14 @@ it("reads the parts of a recording as message parts or extension parts", () => {
   expect(() => readMessages(extension)).toThrow();
 });
 
+it("carries no session on an extension part, even one a recording gave it", () => {
+  const read = Schema.decodeUnknownSync(Trajectory.Part(Toolkit.empty, {}));
+
+  const written = { ...encodePart(extensionPart()), session: "a" };
+
+  expect(encodePart(read(written))).not.toHaveProperty("session");
+});
+
 const streamed = (part: Response.AllParts<any>, session?: string) =>
   Trajectory.AnyStreamResponsePart.make({ response: part, session });
 
@@ -200,7 +208,7 @@ it("folds the chunks of interleaved sessions apart", async () => {
     Response.makePart("text", { text: "Alice" }),
     Response.makePart("text", { text: "Bob" }),
   ]);
-  expect(Array.from(folded, (part) => part.session)).toEqual(["a", "b"]);
+  expect(responsePartsOf(folded).map((part) => part.session)).toEqual(["a", "b"]);
 });
 
 it("keeps the envelope of the part the chunk ended with", async () => {

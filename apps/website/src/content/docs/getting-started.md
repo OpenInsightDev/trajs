@@ -38,9 +38,11 @@ const trajectory = Trajectory.make(
 `Trajectory.Metadata.make` builds the metadata, and `version` defaults to
 `Trajectory.version` when it is omitted.
 
-Every part carries a `uuid` (a UUID v7, so identifiers sort by creation time), an
-optional `session` and an optional `extra` field. Those come from `PartMetadata`,
-which is spread into every part class.
+Every part carries a `uuid` (a UUID v7, so identifiers sort by creation time) and
+an optional `extra` field, both from `PartMetadata`, which is spread into every
+part class. The message parts carry the optional `session` they were recorded
+under as well; an extension part belongs to the session of the parts it is
+attached to, which its `attach` names.
 
 ## Store it
 

@@ -149,7 +149,28 @@ it("selects the parts recorded under one session", async () => {
   );
 
   expect(tags(selected)).toEqual(["Prompt", "Prompt"]);
-  expect(selected.map((part) => part.session)).toEqual(["a", "a"]);
+  expect(
+    selected.map((part) => (Predicate.isTagged("Prompt")(part) ? part.session : undefined)),
+  ).toEqual(["a", "a"]);
+});
+
+it("reads an extension part under the session of the part it is attached to", async () => {
+  const attached = (part: Trajectory.AnyPart) =>
+    Trajectory.AnyExtensionPart.make({
+      extension: { extension: "dev.observerw.otel", data: { spanId: part.uuid } },
+      attach: Option.some([part.uuid]),
+    });
+
+  const hello = prompt("Hello", "a");
+  const hi = prompt("Hi", "b");
+  const trajectory = make(declaration("a"), hello, attached(hello), hi, attached(hi));
+
+  const selected = Array.from(
+    await Effect.runPromise(Stream.runCollect(Session.select("a")(trajectory))),
+  );
+
+  expect(tags(selected)).toEqual(["Session", "Prompt", "Extension"]);
+  expect(await sessionOf(trajectory, "a")).toEqual(["Session", "Prompt", "Extension"]);
 });
 
 it("streams the session declarations of a trajectory", async () => {

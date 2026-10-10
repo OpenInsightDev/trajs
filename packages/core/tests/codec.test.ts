@@ -1,5 +1,5 @@
 import { expect, it } from "vite-plus/test";
-import { Effect, Stream } from "effect";
+import { Effect, Option, Stream } from "effect";
 import { Prompt } from "effect/ai";
 import * as Codec from "#/Codec.ts";
 import * as Response from "#/Response.ts";
@@ -115,4 +115,17 @@ it("returns an empty array for a session that recorded no messages", async () =>
   const sessions = await sessionsOf(make(Trajectory.sessionPart("a")));
 
   expect(sessions).toEqual({ a: [] });
+});
+
+it("writes no session for a recording that holds extension data alone", async () => {
+  const sessions = await sessionsOf(
+    make(
+      Trajectory.AnyExtensionPart.make({
+        extension: { extension: "dev.observerw.otel", data: { spanId: "s1" } },
+        attach: Option.none(),
+      }),
+    ),
+  );
+
+  expect(sessions).toEqual({});
 });

@@ -2,11 +2,13 @@
  * Reads the sessions of a trajectory and how they derive from one another.
  *
  * A trajectory records sessions as parts that carry an optional `session`
- * string, so several sessions can be interleaved in one stream. A session may
- * also continue from an earlier one: a fork, a resumed session, or a sub-agent
- * spawned by a parent. That relation is recorded by a `SessionPart`, whose
- * `fork` names the part the new session continues from, and the parent session
- * is read off that part.
+ * string, so several sessions can be interleaved in one stream. The data an
+ * extension recorded about a part belongs to that part's session: an extension
+ * part carries no session of its own, and the session is read from the parts its
+ * `attach` names. A session may also continue from an earlier one: a fork, a
+ * resumed session, or a sub-agent spawned by a parent. That relation is recorded
+ * by a `SessionPart`, whose `fork` names the part the new session continues from,
+ * and the parent session is read off that part.
  *
  * The graph is a forest, because a session has at most one `fork`. This module
  * walks it: {@link parent} reads the edge, {@link of} streams a session
@@ -52,10 +54,10 @@ export const parts = <
  *
  * **Details**
  *
- * Parts are selected by the `session` they carry, so the result is the
- * session's own timeline and does not include what it inherited. Parts that
- * carry no session are not selected. Use {@link of} to read what a session
- * inherited as well.
+ * A part is selected by the session it belongs to: a message part by the
+ * `session` it carries, and an extension part by the session of the parts its
+ * `attach` names. The result is the session's own timeline and does not include
+ * what it inherited. Use {@link of} to read what a session inherited as well.
  *
  * **Example** (Reading one session out of an interleaved recording)
  *
@@ -83,7 +85,7 @@ export const select =
   <Tools extends Record<string, Tool.Any>, Exts extends Record<string, Extension.Any>>(
     trajectory: Trajectory.Trajectory<Tools, Exts>,
   ): Stream.Stream<Trajectory.Part<Tools, Exts>, TrajectoryError> =>
-    trajectory.pipe(Stream.filter((part) => part.session === id));
+    lineage.select(id, trajectory);
 
 /**
  * Streams the session a session continues from.
@@ -156,11 +158,13 @@ export const children =
  *
  * The result is each ancestor's parts up to and including the part the next
  * session is forked from, ordered from the root, followed by the session's own
- * parts. A `fork` that names a part absent from the loaded recording inherits
- * nothing, and a session that is never declared streams its own parts. Every
- * part of the lineage is returned; pipe it through `Trajectory.messages` when the
- * trajectory data is wanted without the data recorded for extensions about it.
- * A cycle is reported as {@link TrajectoryError} rather than followed.
+ * parts. A part belongs to the session by the `session` it carries or, for an
+ * extension part, by the session of the parts it is attached to, so the data an
+ * extension recorded about a session's parts is streamed with them; pipe the
+ * result through `Trajectory.messages` for the trajectory data alone. A `fork`
+ * that names a part absent from the loaded recording inherits nothing, and a
+ * session that is never declared streams its own parts. A cycle is reported as
+ * {@link TrajectoryError} rather than followed.
  *
  * **Example** (Reconstructing what a forked session inherited)
  *
