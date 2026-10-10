@@ -1,7 +1,7 @@
 {
-  "name": "@trajs/<%= it.name %>",
+  "name": "@trajs/extension-tokenize",
   "version": "0.0.0",
-  "description": "<%= it.description %>",
+  "description": "Byte-pair tokenization and token counts, built on Effect.",
   "homepage": "https://github.com/OpenInsightDev/trajs",
   "license": "MIT",
   "author": "Bowei Wang <wozluohd@gmail.com>",
@@ -40,7 +40,10 @@
     "check": "vp check",
     "prepublishOnly": "vp run build"
   },
-  "dependencies": {},
+  "dependencies": {
+    "@trajs/core": "workspace:*",
+    "effect": "catalog:"
+  },
   "devDependencies": {
     "@types/node": "catalog:",
     "typescript": "catalog:",

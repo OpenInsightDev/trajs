@@ -15,7 +15,7 @@ Scaffold new `@trajs` packages, or sync existing ones, to the templates in `temp
    - `templates/README.md` → `README.md`
    - `templates/tsconfig.json`, `templates/vite.config.ts` → copy verbatim (no placeholders)
 3. Add `src/index.ts` and `tests/index.test.ts`.
-4. Add dependencies; use `"catalog:"` for anything already in `pnpm-workspace.yaml`. Effect tests need `@effect/vitest` + `vitest` in `devDependencies`.
+4. Add dependencies; use `"catalog:"` for anything already in `pnpm-workspace.yaml`. Tests import `expect`/`it` from `vite-plus/test`, which the template's `vite-plus` already provides, so a package adds no test runner of its own.
 5. Run `vp install` at the repo root, then `vp check` and `vp test` in the package.
 
 ## Layout
@@ -42,7 +42,7 @@ tests/
 - Package metadata (`homepage`, `license`, `author`, `repository`) defaults to the top-level `package.json` — never re-invent it or leave the template placeholders. A package may deliberately set its own value (e.g. an independent author); keep that value instead of overwriting it with the default.
 - `imports` maps `#/*` to `./src/*`; imports use explicit `.ts` extensions.
 - Tests live in `tests/*.test.ts`.
-- Publish only `dist`, with `publishConfig.access: "public"`.
+- Publish only `dist`, with `publishConfig.access: "public"`. `pack.unbundle` keeps one module per file, so the published `./*` map resolves every public module from `dist` and a subpath import like `@trajs/<name>/Foo` survives publishing; the dev `./*` map points at `src`.
 - Standard scripts: `build`, `dev`, `test`, `check`, `prepublishOnly`. Run them via `vp run`, never raw `node`/`vite`.
 - Never hardcode versions that exist in the catalog.
 - Add the package name to the `fixed` group in `.changeset/config.json`, so every published package releases on one version; leave it out while the package is private.
