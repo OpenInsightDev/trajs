@@ -103,6 +103,7 @@ export const select =
  * does too.
  *
  * @see {@link of} for a session together with what it inherited.
+ * @see {@link children} for the reverse view.
  * @category combinators
  */
 export const parent =
@@ -128,6 +129,7 @@ export const parent =
  * anywhere. A child is reported even when the session it forks from has no parts
  * of its own.
  *
+ * @see {@link parent} for the session a session continues from.
  * @category combinators
  */
 export const children =

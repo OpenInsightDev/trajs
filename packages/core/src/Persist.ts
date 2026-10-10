@@ -23,21 +23,12 @@ import { StreamReader } from "#/internal/stream-reader.ts";
 import { StreamWriter } from "#/internal/stream-writer.ts";
 
 /**
- * Header of a `.trajs` file.
- *
- * **Details**
- *
- * The header carries the trajectory's non-stream fields, serialized: the encoded
- * toolkit and the encoded extension kit, each keyed by the key of the tool or the
- * identifier of the extension it describes. It has no `version` field of its own:
- * the specification version is `metadata.version`, so a recording states its
- * version the same way whether it is read from a file or constructed in memory.
- *
- * The two kits are read as records of unknown values, because a reader needs
- * their identifiers, not their schemas: the toolkit starts empty and the
- * extension kit is not held at all, so the parts are read unconstrained.
- *
- * @category schemas
+ * The header has no `version` field of its own: the specification version is
+ * `metadata.version`, so a recording states it the same way whether it is read
+ * from a file or constructed in memory. The two kits are read as records of
+ * unknown values, because a reader needs their identifiers, not their schemas:
+ * the toolkit starts empty and the extension kit is not held at all, so the
+ * parts are read unconstrained.
  */
 const Header = Schema.Struct({
   metadata: Trajectory.Metadata,

@@ -91,6 +91,7 @@ export type ChatCompletionSessions = Record<string, ChatCompletionMessage[]>;
  *
  * @see {@link ChatCompletionMessage} for the message shape produced.
  * @see {@link ChatCompletionSessions} for the result keyed by session.
+ * @see {@link makeMessages} for the Messages API conversion.
  * @category encoding
  */
 export const makeChatCompletion = <Tools extends Record<string, Tool.Any>, E, R>(
@@ -207,6 +208,7 @@ export type AnthropicSessions = Record<string, AnthropicConversation>;
  * @see {@link AnthropicMessage} for the message shape produced.
  * @see {@link AnthropicConversation} for the conversation of one session.
  * @see {@link AnthropicSessions} for the result keyed by session.
+ * @see {@link makeChatCompletion} for the chat completions conversion.
  * @category encoding
  */
 export const makeMessages = <Tools extends Record<string, Tool.Any>, E, R>(

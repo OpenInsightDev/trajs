@@ -1,11 +1,11 @@
 /**
  * Records the messages sent to a model and the responses it produced.
  *
- * A trajectory is a stream of parts that stays attached to the toolkit, metadata
- * and extensions it was recorded with. Prompts are stored as the messages the
+ * A trajectory is a stream of parts that stays attached to the toolkit, its
+ * {@link Metadata} and its extensions. Prompts are stored as the messages the
  * model was given, responses as the parts the model returned, and each part
  * carries an identifier so a recording can be inspected or rebound to the tools
- * and extensions it refers to.
+ * and extensions it refers to. {@link make} builds one.
  */
 
 import type * as Extension from "#/Extension.ts";

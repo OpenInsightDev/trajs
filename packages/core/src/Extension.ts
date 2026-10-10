@@ -19,6 +19,24 @@
 import { Data, Schema, SchemaGetter } from "effect";
 import { Versions, type Version } from "#/internal/versions.ts";
 
+/**
+ * The line of versions of an extension's data.
+ *
+ * **When to use**
+ *
+ * Use when declaring an extension's oldest version, and when deriving a later
+ * version from it: {@link make} takes a `Versions.make` value and {@link upgrade}
+ * derives each version after it.
+ *
+ * **Details**
+ *
+ * A line reads data recorded against any of its versions, so a recording of an
+ * older shape can still be read as the newest one. `Versions.across` reads the
+ * versions of several lines as a single union.
+ *
+ * @see {@link upgrade} for deriving a later version of an extension.
+ * @category schemas
+ */
 export { Versions, type Version };
 
 /**

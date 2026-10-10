@@ -2,14 +2,14 @@
  * Response parts that tolerate tools the toolkit does not know about.
  *
  * `effect/ai/Response` types tool call and tool result parts by the tool names of
- * the toolkit they were built from, so decoding a recorded response that mentions
+ * toolkit they were built from, so decoding a recorded response that mentions
  * any other tool fails. Each `*View` schema unions the upstream schema with the
- * two unconstrained parts below, `AnyToolCallPart` / `AnyToolResultPart`, so those
- * tools decode instead of being rejected while tools that are in the toolkit keep
- * their exact names, parameters and results. A part claiming a known tool name
- * whose payload no longer matches that tool's schema also falls back to the
- * unconstrained part, because loading recorded history should not depend on the
- * current tool schemas.
+ * two unconstrained parts below, {@link AnyToolCallPart} and
+ * {@link AnyToolResultPart}, so those tools decode instead of being rejected
+ * while tools that are in the toolkit keep their exact names, parameters and
+ * results. A part claiming a known tool name whose payload no longer matches that
+ * tool's schema also falls back to the unconstrained part, because loading
+ * recorded history should not depend on the current tool schemas.
  */
 
 import { Effect, identity, Predicate, Schema, SchemaTransformation } from "effect";
@@ -203,6 +203,7 @@ export type ToolResultPartsView<Tools extends Record<string, Tool.Any>> =
  *
  * Use to type a tool call or tool result part built from the provided toolkit.
  *
+ * @see {@link ToolPartView} for parts that may name tools outside the toolkit.
  * @category utility types
  */
 export type ToolPart<
@@ -219,6 +220,7 @@ export type ToolPart<
  * Use to type a tool call or tool result part that the provided toolkit may or
  * may not define.
  *
+ * @see {@link ToolPart} for toolkit-specific parts.
  * @category utility types
  */
 export type ToolPartView<

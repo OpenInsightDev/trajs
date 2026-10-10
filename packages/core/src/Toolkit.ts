@@ -1,11 +1,11 @@
 /**
  * Serializes the toolkit of a trajectory and rebinds recorded trajectories to it.
  *
- * A tool is described by draft-07 JSON Schema documents, so a toolkit can be
- * stored and sent to a provider without the Effect Schemas it was built from.
- * A trajectory recorded against an empty or older toolkit is decoded again with
- * the tools it actually refers to, so its tool calls and tool results regain
- * their exact names, parameters and results.
+ * A tool is described by draft-07 JSON Schema documents by {@link encode}, so a
+ * toolkit can be stored and sent to a provider without the Effect Schemas it was
+ * built from. A trajectory recorded against an empty or older toolkit is decoded
+ * again by {@link toolkits} with the tools it actually refers to, so its tool
+ * calls and tool results regain their exact names, parameters and results.
  */
 
 import { Effect, JsonSchema, Match, Predicate, Schema, Stream } from "effect";
@@ -73,6 +73,12 @@ export const toDynamic = ({ name, parameters }: ToolEncoded) =>
 /**
  * Serialized form of a toolkit, keyed by the toolkit's tool keys.
  *
+ * **When to use**
+ *
+ * Use to persist a toolkit, or to describe its tools to a provider, without the
+ * Effect Schemas it was built from.
+ *
+ * @see {@link ToolEncoded} for a single tool's serialized form.
  * @category models
  */
 export type ToolkitEncoded = Record<string, ToolEncoded>;
@@ -292,6 +298,7 @@ export const toolTurn = <Tools extends Record<string, Tool.Any>>(
  * ```
  *
  * @see {@link toolkits} for binding a recording to the tools it refers to.
+ * @see {@link toolTurn} for pairing a single call with its result.
  * @category combinators
  */
 export const toolTurns = <

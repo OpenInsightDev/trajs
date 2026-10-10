@@ -6,6 +6,10 @@
  */
 export * as Codec from "./Codec.ts";
 
+export * as Extension from "./Extension.ts";
+
+export * as Extensionkit from "./Extensionkit.ts";
+
 export * as Persist from "./Persist.ts";
 
 export * as Response from "./Response.ts";

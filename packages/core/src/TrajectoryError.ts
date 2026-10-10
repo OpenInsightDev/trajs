@@ -3,8 +3,8 @@
  *
  * Rebinding a trajectory encodes each part with the kits it was recorded against
  * and decodes it again with the merged ones, and a recording is read from JSON
- * lines. Each of these steps can fail, so every failure carries what it was
- * checking.
+ * lines. Each of these steps can fail, so every {@link TrajectoryError} carries
+ * what it was checking.
  */
 
 import { Data, Schema } from "effect";
