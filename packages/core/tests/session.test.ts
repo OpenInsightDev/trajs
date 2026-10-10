@@ -26,6 +26,18 @@ const parentOf = async (trajectory: ReturnType<typeof make>, session: string) =>
 const childrenOf = async (trajectory: ReturnType<typeof make>, session: string) =>
   Array.from(await Effect.runPromise(Stream.runCollect(Session.children(session)(trajectory))));
 
+const allOf = async (trajectory: ReturnType<typeof make>) =>
+  Effect.runPromise(Session.all(trajectory));
+
+const read = async (trajectory: Trajectory.Any) =>
+  tags(Array.from(await Effect.runPromise(Stream.runCollect(trajectory))));
+
+const attached = (part: Trajectory.AnyPart) =>
+  Trajectory.AnyExtensionPart.make({
+    extension: { extension: "dev.observerw.otel", data: { spanId: part.uuid } },
+    attach: Option.some([part.uuid]),
+  });
+
 it("reads a session that declares no fork as having no parent", async () => {
   const trajectory = make(declaration("a"), prompt("Hello", "a"));
 
@@ -155,12 +167,6 @@ it("selects the parts recorded under one session", async () => {
 });
 
 it("reads an extension part under the session of the part it is attached to", async () => {
-  const attached = (part: Trajectory.AnyPart) =>
-    Trajectory.AnyExtensionPart.make({
-      extension: { extension: "dev.observerw.otel", data: { spanId: part.uuid } },
-      attach: Option.some([part.uuid]),
-    });
-
   const hello = prompt("Hello", "a");
   const hi = prompt("Hi", "b");
   const trajectory = make(declaration("a"), hello, attached(hello), hi, attached(hi));
@@ -203,4 +209,98 @@ it("round-trips a session part through the .trajs codec", async () => {
 
   expect(tags(decoded)).toEqual(["Session", "Prompt", "Session"]);
   expect(Predicate.isTagged("Session")(decoded[2]) && decoded[2].fork).toBe(hello.uuid);
+});
+
+it("reads every session of a recording, keyed by identifier", async () => {
+  const hello = prompt("Hello", "a");
+
+  const trajectory = make(
+    declaration("a"),
+    hello,
+    prompt("Unassigned"),
+    declaration("b", hello.uuid),
+    prompt("Continue", "b"),
+  );
+
+  const sessions = await allOf(trajectory);
+
+  expect(Object.keys(sessions)).toEqual(["a", "b"]);
+  expect(await read(sessions["a"])).toEqual(["Session", "Prompt"]);
+  // `b` reads the parts of `a` up to the fork point, then its own.
+  expect(await read(sessions["b"])).toEqual(["Session", "Prompt", "Session", "Prompt"]);
+});
+
+it("reads a session the way `of` streams it", async () => {
+  const hello = prompt("Hello", "a");
+
+  const trajectory = make(
+    declaration("a"),
+    hello,
+    prompt("After the fork", "a"),
+    declaration("b", hello.uuid),
+    prompt("Continue", "b"),
+  );
+
+  const sessions = await allOf(trajectory);
+
+  expect(await read(sessions["b"])).toEqual(await sessionOf(trajectory, "b"));
+});
+
+it("reads a session no declaration names", async () => {
+  const trajectory = make(prompt("Hello", "a"), prompt("Hi", "b"), prompt("Continue", "a"));
+
+  const sessions = await allOf(trajectory);
+
+  expect(Object.keys(sessions)).toEqual(["a", "b"]);
+  expect(await read(sessions["a"])).toEqual(["Prompt", "Prompt"]);
+});
+
+it("reads a session with no parts of its own", async () => {
+  const trajectory = make(declaration("a"), declaration("b"));
+
+  const sessions = await allOf(trajectory);
+
+  expect(await read(sessions["a"])).toEqual(["Session"]);
+  expect(await read(sessions["b"])).toEqual(["Session"]);
+});
+
+it("groups an extension part under the session of the part it is attached to", async () => {
+  const hello = prompt("Hello", "a");
+  const hi = prompt("Hi", "b");
+  const trajectory = make(declaration("a"), hello, attached(hello), hi, attached(hi));
+
+  const sessions = await allOf(trajectory);
+
+  expect(await read(sessions["a"])).toEqual(["Session", "Prompt", "Extension"]);
+  expect(await read(sessions["b"])).toEqual(["Prompt", "Extension"]);
+});
+
+it("carries the recording's metadata and can be read more than once", async () => {
+  const trajectory = Trajectory.make(
+    Stream.make(declaration("a"), prompt("Hello", "a")),
+    Trajectory.Metadata.make({ name: "greeting" }),
+  );
+
+  const sessions = await allOf(trajectory);
+  const session = sessions["a"];
+
+  expect(session.metadata.name).toBe("greeting");
+  expect(await read(session)).toEqual(["Session", "Prompt"]);
+  expect(await read(session)).toEqual(["Session", "Prompt"]);
+});
+
+it("reports a cycle instead of following it", async () => {
+  const helloA = prompt("Hello", "a");
+  const helloB = prompt("Hi", "b");
+
+  const trajectory = make(
+    helloA,
+    declaration("b", helloA.uuid),
+    helloB,
+    declaration("a", helloB.uuid),
+  );
+
+  const exit = await Effect.runPromise(Effect.exit(Session.all(trajectory)));
+
+  expect(Exit.isFailure(exit)).toBe(true);
 });

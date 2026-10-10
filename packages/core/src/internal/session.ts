@@ -26,6 +26,12 @@ interface Edge {
   readonly source: string;
 }
 
+/** A recording indexed as it was read. */
+interface Indexed {
+  readonly recorded: Recorded;
+  readonly ids: ReadonlyArray<string>;
+}
+
 /** The sessions of the parts an extension part is attached to. */
 const attached = <Exts extends Record<string, Extension.Any>>(
   part: Trajectory.ExtensionPart<Exts>,
@@ -152,6 +158,56 @@ const inheritedOf = <
     const cut = parent.findIndex((part) => part.uuid === fork);
 
     return cut === -1 ? parent : parent.slice(0, cut + 1);
+  });
+
+/**
+ * Indexes the parts of a recording.
+ *
+ * The index is built as the recording is read rather than from the complete array,
+ * because an extension part belongs to the sessions of the parts its `attach`
+ * names, which precede it.
+ */
+const indexed = <
+  Tools extends Record<string, Tool.Any>,
+  Exts extends Record<string, Extension.Any>,
+>(
+  parts: ReadonlyArray<Trajectory.Part<Tools, Exts>>,
+): Indexed => {
+  const recorded: Recorded = new Map();
+  const ids: string[] = [];
+  const seen = new Set<string>();
+
+  for (const part of parts) {
+    for (const id of record(recorded, part)) {
+      if (!seen.has(id)) {
+        seen.add(id);
+        ids.push(id);
+      }
+    }
+  }
+
+  return { recorded, ids };
+};
+
+/** Reads every session of a recording as the parts it ran on. */
+export const all = <
+  Tools extends Record<string, Tool.Any>,
+  Exts extends Record<string, Extension.Any>,
+>(
+  trajectory: Trajectory.Trajectory<Tools, Exts>,
+): Effect.Effect<Record<string, ReadonlyArray<Trajectory.Part<Tools, Exts>>>, TrajectoryError> =>
+  Effect.gen(function* () {
+    const parts = Array.from(yield* Stream.runCollect(trajectory));
+    const { recorded, ids } = indexed(parts);
+    const read: Record<string, ReadonlyArray<Trajectory.Part<Tools, Exts>>> = {};
+
+    // Each session is read the way `of` reads it, so the parts it inherited come
+    // first and a cycle is reported rather than followed.
+    for (const id of ids) {
+      read[id] = yield* partsOf<Tools, Exts>(id, parts, recorded, new Set());
+    }
+
+    return read;
   });
 
 /** Streams the parts recorded under a session. */

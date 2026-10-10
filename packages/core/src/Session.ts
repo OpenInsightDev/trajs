@@ -15,7 +15,7 @@
  * together with what it inherited, and {@link children} reads the reverse view.
  */
 
-import { Predicate, Stream } from "effect";
+import { Effect, Predicate, Stream } from "effect";
 import type { Tool } from "effect/ai";
 import type * as Extension from "#/Extension.ts";
 import * as Trajectory from "#/Trajectory.ts";
@@ -86,6 +86,81 @@ export const select =
     trajectory: Trajectory.Trajectory<Tools, Exts>,
   ): Stream.Stream<Trajectory.Part<Tools, Exts>, TrajectoryError> =>
     lineage.select(id, trajectory);
+
+/**
+ * Reads every session of a trajectory as a trajectory of its own.
+ *
+ * **When to use**
+ *
+ * Use to split a recording that interleaves several sessions into the sessions it
+ * holds, such as to analyze, replay or display each agent of a multi-agent
+ * recording on its own.
+ *
+ * **Details**
+ *
+ * The whole recording is consumed once, and the sessions it holds are returned as
+ * a record keyed by their identifiers: a session a `SessionPart` declares, as well
+ * as one only the parts of the recording name. Each entry is the session together
+ * with what it inherited, as {@link of} streams it: the parts of each ancestor
+ * up to the part the next session is forked from, followed by the session's own
+ * parts. A session therefore shares what it inherited with the one it forked from:
+ * a part recorded under one session appears in the entry of every session that read
+ * it. A part that belongs to no session, such as a message part that carries none,
+ * is left out rather than given a key of its own. Parts are in the order they were
+ * recorded, and the sessions are keyed in the order they first appear. A cycle in
+ * the derivation is reported as {@link TrajectoryError} rather than followed.
+ *
+ * Each trajectory is bound to the recording it was read from: it carries the
+ * toolkit, the metadata and the extension kit of the trajectory it was split off,
+ * and its parts are held in memory rather than read from the recording again, so a
+ * session can be consumed more than once. Splitting a recording is eager for that
+ * reason: the sessions a recording holds are only known once it has been read.
+ *
+ * **Example** (Splitting a multi-agent recording into its sessions)
+ *
+ * ```ts import.meta.vitest
+ * import { Effect, Stream } from "effect"
+ * import { Prompt } from "effect/ai"
+ * import { Session, Trajectory } from "@trajs/core"
+ *
+ * const hello = Trajectory.PromptPart.make({ messages: Prompt.make("Hello").content, session: "a" })
+ * const trajectory = Trajectory.make(
+ *   Stream.make(
+ *     Trajectory.sessionPart("a"),
+ *     hello,
+ *     Trajectory.sessionPart("b", { fork: hello.uuid }),
+ *     Trajectory.PromptPart.make({ messages: Prompt.make("Continue").content, session: "b" })
+ *   )
+ * )
+ *
+ * const sessions = await Effect.runPromise(Session.all(trajectory))
+ * Object.keys(sessions) // => ["a", "b"]
+ * const parts = await Effect.runPromise(Stream.runCollect(sessions["b"]))
+ * Array.from(parts, (part) => part._tag) // => ["Session", "Prompt", "Session", "Prompt"]
+ * ```
+ *
+ * @see {@link of} for the session one entry of the record holds.
+ * @see {@link select} for a session's own parts without what it inherited.
+ * @category combinators
+ */
+export const all = <
+  Tools extends Record<string, Tool.Any>,
+  Exts extends Record<string, Extension.Any>,
+>(
+  trajectory: Trajectory.Trajectory<Tools, Exts>,
+): Effect.Effect<Record<string, Trajectory.Trajectory<Tools, Exts>>, TrajectoryError> => {
+  const { toolkit, metadata, extkit } = trajectory;
+
+  return Effect.map(lineage.all(trajectory), (partsBySession) => {
+    const sessions: Record<string, Trajectory.Trajectory<Tools, Exts>> = {};
+
+    for (const [id, parts] of Object.entries(partsBySession)) {
+      sessions[id] = Object.assign(Stream.fromIterable(parts), { toolkit, metadata, extkit });
+    }
+
+    return sessions;
+  });
+};
 
 /**
  * Streams the session a session continues from.

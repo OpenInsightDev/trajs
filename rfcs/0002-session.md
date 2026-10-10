@@ -106,6 +106,9 @@ at most one `fork`, the graph is a forest and the operations are small:
 - `Session.parts(trajectory)` — the `SessionPart` declarations of a trajectory.
 - `Session.select(id)` — the parts recorded under a session, its own timeline
   without what it inherited.
+- `Session.all(trajectory)` — every session of a recording, keyed by identifier,
+  each read the way `of` reads it, so an entry holds the session together with
+  what it inherited.
 - `Session.parent(id)` — the parent edge: look up the `fork` part, read its
   `session`. Emitted at most once.
 - `Session.of(id)` — streams a session: the parent's parts up to the `fork`
@@ -113,11 +116,22 @@ at most one `fork`, the graph is a forest and the operations are small:
 - `Session.children(id)` — the reverse view, computed from the edges; the
   format stores one direction only.
 
-Every read is a stream. `parent`, `children` and `of` share one scan that keeps
-the session of each part by its identifier, because a `fork` names the part it
-continues from. `parent` and `of` stop consuming at the session's declaration;
-`children` consumes the whole recording, because a child can be declared
-anywhere, and `of` holds only the parts up to the declaration.
+Every read but `all` is a stream. `parent`, `children` and `of` share one scan
+that keeps the session of each part by its identifier, because a `fork` names the
+part it continues from. `parent` and `of` stop consuming at the session's
+declaration; `children` consumes the whole recording, because a child can be
+declared anywhere, and `of` holds only the parts up to the declaration.
+
+`all` is eager for the same reason: the sessions a recording holds are only known
+once it has been read. It consumes the recording once, indexes it as it is read,
+and reads each session it finds the way `of` reads one, so an entry holds a
+session together with what it inherited and a cycle is reported rather than
+followed.
+Each entry is returned as a trajectory of its own that carries the toolkit, the
+metadata and the extension kit of the recording it was read from, and holds its
+parts in memory, so it can be consumed more than once. Unlike `select`, the
+entries therefore overlap: a part a session inherited is in the entry of that
+session and in the entry of the one it forked from.
 
 `of` holds parts while the stream is consumed and releases them once the
 session's declaration is reached, where the inherited parts are resolved from
@@ -154,12 +168,13 @@ The split separates the part from the operations on it.
 - `Trajectory.ts`: `SessionPart`, `isSessionPart`, wired into `Part`,
   `PartEncoded` and `AnyPart`. `SessionPart` needs no toolkit-parameterised
   variant, because nothing about it is toolkit-dependent.
-- `Session.ts`: the public API — `parts`, `select`, `parent`, `of`, `children`.
-  The file exists and is empty today; it gets its public API here. `parts` and
-  `select` are filters; the rest delegate to the internal module.
-- `internal/session.ts`: the lineage walk and the streaming reducer for `of`,
-  plus `parent` and `children`. It is not exported from the package, so the
-  recursive resolution stays off the public surface.
+- `Session.ts`: the public API — `parts`, `select`, `all`, `parent`, `of`,
+  `children`. The file exists and is empty today; it gets its public API here.
+  `parts` and `select` are filters, and `all` wraps the parts it reads as
+  trajectories; the rest delegate to the internal module.
+- `internal/session.ts`: the lineage walk and the streaming reducer for `of`, the
+  sessions `all` reads one by one, plus `parent` and `children`. It is not exported
+  from the package, so the recursive resolution stays off the public surface.
 - `index.ts`: re-export `Session`, alongside the other namespaces.
 
 ## VII. Alternatives considered
