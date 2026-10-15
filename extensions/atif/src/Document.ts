@@ -7,8 +7,9 @@
  * — {@link Document} and the schemas it is made of — and {@link of} reads one as the
  * recording it states, so a `trajectory.json` a program that ran elsewhere wrote is
  * a `@trajs/core` trajectory: {@link Step.steps} reads it back as the steps it was
- * read from, and every other reader of a trajectory — {@link View}, `Codec`, the
- * kits a run records with — reads it as one.
+ * read from, and every other reader of a trajectory — {@link View}, the codec
+ * extensions that write one as a provider's API takes it, the kits a run records
+ * with — reads it as one.
  *
  * What is read of a document is the conversation its steps hold. What a document
  * states beyond that — the ordinal of a step, the model that answered it, the
@@ -681,7 +682,7 @@ const record = (
  * writes for an agent it ran — is to be read on this package's own terms: to read it
  * step by step with {@link Step.steps}, to display it, to fold it back into the
  * prompt its model was given with {@link View.prompt}, or to hand it to a model
- * again with `Codec`.
+ * again with `@trajs/extension-anthropic` or `@trajs/extension-openai-compat`.
  *
  * **Details**
  *

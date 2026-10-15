@@ -42,8 +42,6 @@
     "prepublishOnly": "vp run build"
   },
   "dependencies": {
-    "@effect/ai-anthropic": "catalog:",
-    "@effect/ai-openai-compat": "catalog:",
     "@effect/platform-node": "catalog:",
     "@napi-rs/blake-hash": "catalog:",
     "@structured-world/structured-zstd": "catalog:",

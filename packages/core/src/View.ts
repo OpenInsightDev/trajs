@@ -1,8 +1,10 @@
 /**
  * Ways of reading a trajectory as the conversation it records: {@link promptTurns}
  * groups the parts of one into the turns a model was given and answered, folding
- * the increments of a streamed response into the parts they complete, and
- * {@link prompt} folds those turns back into the one prompt a model was given.
+ * the increments of a streamed response into the parts they complete,
+ * {@link prompt} folds those turns back into the one prompt a model was given, and
+ * {@link conversations} reads a trajectory session by session, as the messages each
+ * of them ran on — which is what a provider's API is handed.
  *
  * A trajectory is one stream of parts in total order — see {@link Trajectory} — so
  * what a model was given and what it returned are read by grouping the parts that
@@ -16,7 +18,7 @@ import type * as Response from "#/Response.ts";
 import type * as Trajectory from "#/Trajectory.ts";
 import type { TrajectoryError } from "#/TrajectoryError.ts";
 
-import { readPrompt, readTurns } from "./internal/view.ts";
+import { readConversations, readPrompt, readTurns } from "./internal/view.ts";
 
 /** The tools of a config's toolkit, which the response parts read from it are typed by. */
 type Tools<Config extends Trajectory.AnyConfig> = Config["toolkit"]["tools"];
@@ -157,3 +159,90 @@ export const promptTurns = <Config extends Trajectory.AnyConfig, E, R>(
 export const prompt = <Config extends Trajectory.AnyConfig, E, R>(
   trajectory: Trajectory.TrajectoryStream<Config, E, R>,
 ): Effect.Effect<Prompt.Prompt, E | TrajectoryError, R> => readPrompt(trajectory);
+
+/**
+ * The messages of one session of a trajectory, as the conversation it ran in: the
+ * messages the session recorded, and the ones it inherited from the sessions it
+ * continues from.
+ *
+ * **When to use**
+ *
+ * Use to type a conversation read from a trajectory — what {@link conversations}
+ * returns — such as to write one as a provider's API states it.
+ *
+ * @see {@link conversations} for the operation that reads a trajectory as them.
+ * @category models
+ */
+export type Conversation = ReadonlyArray<Prompt.Message>;
+
+/**
+ * Reads a trajectory as the conversations its sessions ran in, one conversation per
+ * session, keyed by the id of the session.
+ *
+ * **When to use**
+ *
+ * Use to read a recording as the messages each of its sessions was given and
+ * answered — to write them as a provider's API states them, or to inspect what one
+ * session's model saw — rather than as the single stream its parts arrived in.
+ *
+ * **Details**
+ *
+ * - A session's conversation is the messages the session recorded, preceded by the
+ *   ones it inherited: what the sessions it continues from recorded up to the part
+ *   it continues from, from the root of the fork down. A session that continues from
+ *   nothing is read as the messages it recorded alone.
+ * - The messages of a session are its prompts and the responses to them, folded the
+ *   way {@link prompt} folds a recording: a session declaration is read past, and
+ *   the increments of a streamed response into the parts they complete.
+ * - A session appears whether or not it recorded a conversation: a session whose
+ *   parts hold no prompt is one that ran on what it inherited alone, and is read as
+ *   that.
+ *
+ * The effect fails with what reading the trajectory's sessions fails with — `E` on
+ * top of the {@link TrajectoryError} a recording whose sessions cannot be read fails
+ * with — and requires the services `R` names.
+ *
+ * **Example** (Reading a recording as the conversation of each of its sessions)
+ *
+ * ```ts import.meta.vitest
+ * import { Effect, Stream } from "effect"
+ * import { Extra, Prompt, Response, Toolkit, Trajectory, View } from "@trajs/core"
+ *
+ * const extrakit = Extra.makeKit()
+ * const response = Trajectory.ResponsePart({ toolkit: Toolkit.empty, extrakit, stream: false })
+ *
+ * const asked = Trajectory.promptPart(extrakit)({
+ *   prompt: Prompt.make("What is a fork?"),
+ *   sessionId: "asking"
+ * })
+ * const answered = response.make({
+ *   response: Response.makePart("text", { text: "It is a session that continues another." }),
+ *   sessionId: "asking",
+ *   extra: {}
+ * })
+ *
+ * // One session asks and is answered, and a session forked off the answer asks again:
+ * // its conversation is the answer that was given, then its own question.
+ * const trajectory = Stream.make(
+ *   Trajectory.sessionPart(extrakit)({ id: "asking" }),
+ *   asked,
+ *   answered,
+ *   Trajectory.sessionPart(extrakit)({ id: "reply", fork: answered.uuid }),
+ *   Trajectory.promptPart(extrakit)({ prompt: Prompt.make("And what does it hold?"), sessionId: "reply" })
+ * )
+ *
+ * const conversations = await Effect.runPromise(View.conversations(trajectory))
+ *
+ * conversations["asking"]?.map((message) => message.role) // => ["user", "assistant"]
+ * conversations["reply"]?.map((message) => message.role) // => ["user", "assistant", "user"]
+ * ```
+ *
+ * @see {@link Conversation} for one session's messages.
+ * @see {@link Session.sessions} for the sessions a recording is read as.
+ * @see {@link prompt} for the whole recording read as one prompt instead.
+ * @category combinators
+ */
+export const conversations = <Config extends Trajectory.AnyConfig, E, R>(
+  trajectory: Trajectory.TrajectoryStream<Config, E, R>,
+): Effect.Effect<Record<string, Conversation>, E | TrajectoryError, R> =>
+  readConversations(trajectory);

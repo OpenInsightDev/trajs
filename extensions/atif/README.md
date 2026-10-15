@@ -38,9 +38,9 @@ session at a time.
 `Document.of` reads an ATIF document as the recording it states: the steps of the
 document are recorded as the turns of a trajectory with `Produce.produce`, so a
 `trajectory.json` a program that ran elsewhere wrote is a recording like any other
-— `View`, `Codec`, `Session` and the metric kits read it as one, and `Step.steps`
-reads back the steps it was read from. The document is stated as the schemas ATIF
-states it in, so what a file holds is decoded before it is read.
+— `View`, `Session`, the codec extensions and the metric kits read it as one, and
+`Step.steps` reads back the steps it was read from. The document is stated as the
+schemas ATIF states it in, so what a file holds is decoded before it is read.
 
 ```ts
 import { Schema } from "effect";
