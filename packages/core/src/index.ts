@@ -14,6 +14,8 @@
  * runs anywhere — the payload is loaded when it first writes or reads a frame.
  */
 
+export * as Codec from "#/Codec.ts";
+
 export * as Event from "#/Event.ts";
 
 export * as Exchange from "#/Exchange.ts";
