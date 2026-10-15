@@ -1,0 +1,39 @@
+{
+  "name": "@trajs/cli",
+  "version": "0.0.0",
+  "description": "The trajs command line: read what a `.trajs` recording states about itself.",
+  "homepage": "https://github.com/OpenInsightDev/trajs",
+  "license": "MIT",
+  "author": "Bowei Wang <wozluohd@gmail.com>",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/OpenInsightDev/trajs.git"
+  },
+  "bin": {
+    "trajs": "./dist/index.mjs"
+  },
+  "files": [
+    "dist"
+  ],
+  "type": "module",
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "vp pack",
+    "dev": "node src/index.ts",
+    "check": "vp check",
+    "prepublishOnly": "vp run build"
+  },
+  "dependencies": {
+    "@effect/platform-node": "catalog:",
+    "@trajs/core": "workspace:*",
+    "effect": "catalog:"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "typescript": "catalog:",
+    "vite": "catalog:",
+    "vite-plus": "catalog:"
+  }
+}
