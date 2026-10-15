@@ -1,7 +1,8 @@
 /**
  * The format the exchange layer this package ships writes: the header line a
- * recording starts with, the frames the parts of a trajectory are carried in, and
- * the two directions of the recording's bytes.
+ * recording starts with, the frames the parts of a trajectory are carried in, the
+ * digest those frames are read off, and the two directions of the recording's
+ * bytes.
  *
  * Nothing here is published: a program reaches the format through
  * `Exchange.layer`, and the parts a recording holds through `Exchange.Part`. The
@@ -9,13 +10,14 @@
  * from the model the layer holds.
  */
 
-import { Effect, Pull, Schema, SchemaTransformation, Sink, Stream } from "effect";
+import { Effect, Fiber, Pull, Schema, SchemaTransformation, Sink, Stream } from "effect";
 import * as Arr from "effect/Array";
 import { SchemaBinary } from "effect/encoding";
 
 import * as Event from "#/Event.ts";
 import type { Compression, EncodingServices, Header, Service } from "#/Exchange.ts";
 import type * as Extra from "#/Extra.ts";
+import type { Hasher } from "#/Indexing.ts";
 import * as Metric from "#/Metric.ts";
 import * as Prompt from "#/Prompt.ts";
 import * as Toolkit from "#/Toolkit.ts";
@@ -370,12 +372,98 @@ const trajectoryOf = <C extends Trajectory.AnyConfig, E, R>(
 ): Trajectory.Trajectory<C, E, R> => Object.assign(parts, { ...config, metadata });
 
 /**
+ * The digest a recording ends with, as the hex a {@link Hasher} reads one off
+ * with: 64 characters, as its `digest` states, and so 64 bytes at the end of
+ * every recording.
+ */
+const DigestBytes = 64;
+
+const DigestText = new RegExp(`^[0-9a-f]{${DigestBytes}}$`);
+
+/** The bytes of `chunks` joined onto `held`, in the order they arrived. */
+const joined = (held: Uint8Array, chunks: ReadonlyArray<Uint8Array>): Uint8Array => {
+  let length = held.length;
+
+  for (const chunk of chunks) {
+    length += chunk.length;
+  }
+
+  const bytes = new Uint8Array(length);
+
+  bytes.set(held);
+
+  let at = held.length;
+
+  for (const chunk of chunks) {
+    bytes.set(chunk, at);
+    at += chunk.length;
+  }
+
+  return bytes;
+};
+
+/**
+ * Drops the digest a recording ends with: it is no part of the frame the parts
+ * are carried in, so what reads that frame is handed the bytes without it.
+ *
+ * How many bytes to drop is known before any of them arrive ({@link DigestBytes}),
+ * but which bytes they are is not: that many are held back as the chunks arrive
+ * and everything before them is emitted, and whatever is still held when the
+ * stream ends is left behind.
+ */
+const withoutDigest = <E, R>(
+  bytes: Stream.Stream<Uint8Array, E, R>,
+): Stream.Stream<Uint8Array, E, R> =>
+  bytes.pipe(
+    Stream.mapAccumArrayEffect(
+      () => new Uint8Array(0),
+      (held, chunks) => {
+        const all = joined(held, chunks);
+        const kept = Math.min(DigestBytes, all.length);
+        const emitted = all.slice(0, all.length - kept);
+
+        return Effect.succeed([
+          all.slice(all.length - kept),
+          emitted.length > 0 ? [emitted] : [],
+        ] as const);
+      },
+    ),
+  );
+
+/**
+ * A sink that reads the digest a recording ends with.
+ *
+ * The digest is the last {@link DigestBytes} bytes of what a recording carries,
+ * so the sink reads them to their end and holds none of the rest: what a recording
+ * ends with is the hex a {@link Hasher} read off its parts, so bytes that end in
+ * anything else are a recording that does not end with a digest — one written
+ * before the format held one, or one that was cut short.
+ */
+const digestSink: Sink.Sink<string, Uint8Array, never, TrajectoryError> = Sink.reduce(
+  () => new Uint8Array(0),
+  (held, chunk: Uint8Array) => {
+    const all = joined(held, [chunk]);
+
+    return all.slice(Math.max(0, all.length - DigestBytes));
+  },
+).pipe(
+  Sink.mapEffect((tail) => {
+    const stated = new TextDecoder().decode(tail);
+
+    return DigestText.test(stated)
+      ? Effect.succeed(stated)
+      : Effect.fail(TrajectoryError.parse("the bytes do not end with a digest"));
+  }),
+);
+
+/**
  * The exchange of the format this package ships, over the sink that reads what a
- * recording states itself with and the compression its parts are carried in: the
- * head of a recording is the model the layer holds, so it reads one rather than
- * stating the model again here, and what writes and reads a frame is the
- * compression the layer was provided with, so the same format is carried by
- * `node:zlib` in one program and by WebAssembly in another.
+ * recording states itself with, the compression its parts are carried in and the
+ * hasher those parts are digested with: the head of a recording is the model the
+ * layer holds, so it reads one rather than stating the model again here, and what
+ * writes and reads a frame is the compression the layer was provided with, so the
+ * same format is carried by `node:zlib` in one program and by WebAssembly in
+ * another.
  *
  * A compression reports a frame it cannot write or read as a
  * {@link TrajectoryError} itself, since which bytes a frame is refused for is the
@@ -384,18 +472,44 @@ const trajectoryOf = <C extends Trajectory.AnyConfig, E, R>(
 export const service = (
   sink: Sink.Sink<Header, Uint8Array, Uint8Array, TrajectoryError>,
   compression: Compression,
+  hasher: Hasher,
 ): Service => {
   return {
     metadata: sink,
-    write: <C extends Trajectory.AnyConfig, E, R>(trajectory: Trajectory.Trajectory<C, E, R>) => {
-      const config = configOf(trajectory);
+    write: <C extends Trajectory.AnyConfig, E, R>(trajectory: Trajectory.Trajectory<C, E, R>) =>
+      Stream.scoped(
+        Stream.unwrap(
+          Effect.gen(function* () {
+            const config = configOf(trajectory);
 
-      const line = encodeHeader({ ...config, metadata: trajectory.metadata });
+            const line = encodeHeader({ ...config, metadata: trajectory.metadata });
 
-      const parts = trajectory.pipe(Stream.mapEffect(encodePart(config)), compression.compress);
+            const frames = trajectory.pipe(
+              Stream.mapEffect(encodePart(config), { concurrency: 1 }),
+            );
 
-      return Stream.concat(Stream.make(new TextEncoder().encode(`${line}\n`)), parts);
-    },
+            // The digest is of the parts, and the parts are what the compression
+            // writes, so the frames are handed to both at once: one reader writes
+            // them into the frame, the other reads a digest off them.
+            const [written, hashed] = yield* Stream.broadcastN(frames, { n: 2, capacity: 16 });
+
+            const digest = yield* Effect.forkScoped(Stream.run(hashed, hasher.digest));
+
+            // The digest follows the parts it is of, so it is emitted once the
+            // compression has finished the frame it wrote for them.
+            return Stream.concat(
+              Stream.make(new TextEncoder().encode(`${line}\n`)),
+              Stream.concat(
+                written.pipe(compression.compress),
+                Stream.fromEffect(
+                  Fiber.join(digest).pipe(Effect.map((hex) => new TextEncoder().encode(hex))),
+                ),
+              ),
+            );
+          }),
+        ),
+      ),
+    digest: digestSink,
     read:
       <
         Toolkit extends Toolkit.Any,
@@ -424,7 +538,11 @@ export const service = (
         const parts = Stream.unwrap(
           bytes.pipe(
             Stream.peel(sink),
-            Effect.map(([, frames]) => frames.pipe(compression.decompress, decodeParts(config))),
+            Effect.map(([, frames]) => {
+              const body = withoutDigest(frames);
+
+              return body.pipe(compression.decompress, decodeParts(config));
+            }),
           ),
         );
 

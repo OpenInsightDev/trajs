@@ -510,91 +510,8 @@ export const sessions: Index<Trajectory.AnyConfig, Sessions, TrajectoryError> = 
 };
 
 /**
- * The hash a trajectory is fingerprinted with: BLAKE3 over the bytes a recording
- * carries its parts in.
- *
- * **When to use**
- *
- * Use to require a fingerprint of a program — what names a trajectory by the
- * bytes it is carried in rather than by the parts it is made of — or to write a
- * layer of your own, and {@link nodeLayer} or {@link wasmLayer} to provide one of
- * the two this package states.
- *
- * **Details**
- *
- * A fingerprint is a hash of bytes rather than of parts: a {@link Hasher} is fed
- * the bytes a recording carries its parts in, in the order they were recorded,
- * and the fingerprint is read off it once they have ended. What those bytes are
- * is the format's and the same for every program — a part of a recording is
- * carried the way `Exchange.Part` carries it rather than the way a program
- * happened to read it — so the fingerprint of a trajectory is the same wherever
- * one is computed from it.
- *
- * The two layers this package states differ in what they need to run, and neither
- * is loaded unless it is provided: {@link nodeLayer} is over a Rust binding that
- * only a program that runs on Node loads, and {@link wasmLayer} is over a
- * WebAssembly build of the same hash that runs anywhere WebAssembly does. BLAKE3
- * is what either computes, so a fingerprint one layer writes the other agrees
- * with.
- *
- * @see {@link Hasher} for what a fingerprint is computed with.
- * @category services
- */
-export interface Fingerprint {
-  /**
-   * A hasher of one stream of bytes: the bytes a recording carries its parts in
-   * are fed to it in the order they were recorded, and the fingerprint is read
-   * off it once they have ended.
-   */
-  readonly hasher: () => Hasher;
-}
-
-/**
- * The service tag a trajectory is fingerprinted through.
- *
- * **When to use**
- *
- * Use to require a fingerprint of a program, and {@link nodeLayer} or
- * {@link wasmLayer} to provide one the way the program runs.
- *
- * **Details**
- *
- * An effect written against this service is fingerprinted by whatever the layer
- * it is provided with hashes with — nothing of how a fingerprint is computed is
- * part of what one requires — so a program that hashes bytes some other way
- * provides a layer of its own and the code that reads a fingerprint is
- * unchanged.
- *
- * **Example** (Fingerprinting the bytes of a recording)
- *
- * ```ts import.meta.vitest
- * import { Effect } from "effect"
- * import { Fingerprint, nodeLayer } from "@trajs/core/Indexing"
- *
- * const program = Effect.gen(function*() {
- *   const fingerprinted = yield* Fingerprint
- *   const hashing = fingerprinted.hasher()
- *
- *   hashing.update(new TextEncoder().encode("hello"))
- *
- *   return hashing.digest()
- * })
- *
- * const fingerprint = await Effect.runPromise(Effect.provide(program, nodeLayer))
- *
- * fingerprint // => "ea8f163db38682925e4491c5e58d4bb3506ef8c14eb78a86e908c5624a67200f"
- * ```
- *
- * @see {@link Fingerprint} for what a fingerprint is made of.
- * @category services
- */
-export const Fingerprint: Context.Service<Fingerprint, Fingerprint> = Context.Service<
-  Fingerprint,
-  Fingerprint
->()("trajs/core/Indexing/Fingerprint");
-
-/**
- * The hasher a {@link Fingerprint} computes a fingerprint with.
+ * The hasher the bytes of a recording are hashed with: the bytes are given to it as
+ * a sink, and it reads a digest off them once they have ended.
  *
  * **When to use**
  *
@@ -602,35 +519,84 @@ export const Fingerprint: Context.Service<Fingerprint, Fingerprint> = Context.Se
  *
  * **Details**
  *
- * - `update` feeds the bytes of one chunk to the hash. A stream of bytes is fed
- *   to one hasher in the order it arrives, so what a hasher has hashed is the
- *   bytes it was fed, in that order, and nothing else.
- * - `digest` reads the fingerprint of the bytes fed so far, as a lowercase hex
- *   string of 64 characters. A hasher is read once the bytes have ended: what a
- *   layer does with one that is read before then, or updated after, is its own to
- *   say and none of a fingerprint's.
+ * `digest` is a sink of the bytes of one stream: it consumes them to their end and
+ * leaves none of them over, and what it holds when it is done is the digest, as a
+ * lowercase hex string of 64 characters. The bytes a recording carries its parts in
+ * are what it is given — the format's own bytes, so a part of a recording is hashed
+ * the way `Exchange.Part` carries it rather than the way a program happened to read
+ * it — so the digest of a trajectory is the same wherever one is computed from it.
  *
- * A hasher belongs to one run of one stream of bytes rather than to a program:
- * two streams are hashed by two hashers, and a hasher that has read its
- * fingerprint is not fed the bytes of another stream.
+ * What a hasher is of is a stream of bytes rather than a program: two streams are
+ * hashed by two runs of the sink, and nothing of one is held for the next.
  *
- * @see {@link Fingerprint} for the service that makes one.
+ * @see {@link Hasher} for the service that reads a digest with one.
  * @category models
  */
 export interface Hasher {
   /**
-   * Feeds the bytes of one chunk to the hash, after the chunks fed before it.
+   * The digest of the bytes given to it, read once they have ended.
    */
-  readonly update: (bytes: Uint8Array) => void;
-
-  /**
-   * Reads the fingerprint of the bytes fed so far.
-   */
-  readonly digest: () => string;
+  readonly digest: Sink.Sink<string, Uint8Array, never, TrajectoryError>;
 }
 
 /**
- * The fingerprint a program on Node computes, over the Rust binding
+ * The service a trajectory is hashed through: what `yield* Hasher` gives reads the
+ * digest of a stream of bytes.
+ *
+ * **When to use**
+ *
+ * Use to require a hasher of a program — what names a trajectory by the bytes it
+ * is carried in rather than by the parts it is made of — or to write a layer of
+ * your own, and {@link nodeLayer} or {@link wasmLayer} to provide one of the two
+ * this package states.
+ *
+ * **Details**
+ *
+ * A digest is read once per stream of bytes rather than held between them
+ * ({@link Hasher}), so nothing of it survives a read: two streams are hashed by
+ * two runs of the sink, whatever else is going on.
+ *
+ * What a hasher computes is the layer's to say — nothing of how a digest is read
+ * is part of what this service requires — so a program that hashes bytes some
+ * other way provides a layer of its own and the code that reads a digest is
+ * unchanged. What this package hashes with is BLAKE3 over the bytes a recording
+ * carries its parts in: the format's own bytes, so a part of a recording is hashed
+ * the way `Exchange.Part` carries it rather than the way a program happened to
+ * read it, and the digest of a trajectory is the same wherever one is computed
+ * from it.
+ *
+ * The two layers this package states differ in what they need to run, and neither
+ * is loaded unless it is provided: {@link nodeLayer} is over a Rust binding that
+ * only a program that runs on Node loads, and {@link wasmLayer} is over a
+ * WebAssembly build of the same hash that runs anywhere WebAssembly does. BLAKE3
+ * is what either computes, so a digest one layer writes the other agrees with.
+ *
+ * **Example** (Hashing the bytes of a recording)
+ *
+ * ```ts import.meta.vitest
+ * import { Effect, Stream } from "effect"
+ * import { Hasher, nodeLayer } from "@trajs/core/Indexing"
+ *
+ * const program = Effect.gen(function*() {
+ *   const hasher = yield* Hasher
+ *
+ *   return yield* Stream.run(Stream.make(new TextEncoder().encode("hello")), hasher.digest)
+ * })
+ *
+ * const digest = await Effect.runPromise(Effect.provide(program, nodeLayer))
+ *
+ * digest // => "ea8f163db38682925e4491c5e58d4bb3506ef8c14eb78a86e908c5624a67200f"
+ * ```
+ *
+ * @see {@link Hasher} for the hasher this gives.
+ * @category services
+ */
+export const Hasher: Context.Service<Hasher, Hasher> = Context.Service<Hasher, Hasher>()(
+  "trajs/core/Indexing/Hasher",
+);
+
+/**
+ * The service a program on Node hashes through, over the Rust binding
  * `@napi-rs/blake-hash`.
  *
  * **When to use**
@@ -647,17 +613,17 @@ export interface Hasher {
  * since a bundle carrying one would carry a binding for that platform alone.
  * What a program that runs where a native addon cannot be loaded provides
  * instead is {@link wasmLayer}; BLAKE3 is what either computes, and the layers
- * agree on the fingerprint of a trajectory whole.
+ * agree on the digest of a trajectory whole.
  *
- * @see {@link Fingerprint} for the service this provides.
+ * @see {@link Hasher} for the service this provides.
  * @category layers
  */
-export const nodeLayer: Layer.Layer<Fingerprint> = Layer.unwrap(
+export const nodeLayer: Layer.Layer<Hasher> = Layer.unwrap(
   Effect.promise(() => import("#/internal/blake3.ts")).pipe(Effect.map((blake3) => blake3.layer)),
 );
 
 /**
- * The fingerprint a program computes anywhere, over the WebAssembly BLAKE3
+ * The service a program computes anywhere with, over the WebAssembly BLAKE3
  * `blake3-wasm` carries.
  *
  * **When to use**
@@ -671,37 +637,34 @@ export const nodeLayer: Layer.Layer<Fingerprint> = Layer.unwrap(
  * The WebAssembly code is loaded when this layer is provided rather than when
  * this module is imported, and hashing through it is what {@link nodeLayer} does
  * through the binding: the bytes of a trajectory are fed to one hasher in the
- * order they arrive and the fingerprint is read off it once they have ended.
+ * order they arrive and a digest is read off it once they have ended.
  *
  * The hasher is spent by reading it — the WebAssembly hasher frees itself on the
- * digest — so a layer reads it once: the fingerprint is held where it is read
- * again, rather than asked of the code that has already let go of the bytes.
+ * digest — so a digest is read off one made where the sink runs, rather than off
+ * code that has already let go of the bytes.
  *
  * A bundle is handed the implementation `blake3-wasm` states for the browser,
  * which carries no WebAssembly code of its own: a page provides that code the way
  * the package's own readme says — `blake3/browser` is the entry carrying it — and
- * a program that will not is better served by a layer of its own
- * ({@link Fingerprint}). What carries the code itself is the package's Node.js
- * entry, so a program that runs on Node hashes through this layer as it stands.
+ * a program that will not is better served by a layer of its own ({@link Hasher}).
+ * What carries the code itself is the package's Node.js entry, so a program that
+ * runs on Node hashes through this layer as it stands.
  *
- * @see {@link Fingerprint} for the service this provides.
+ * @see {@link Hasher} for the service this provides.
  * @category layers
  */
-export const wasmLayer: Layer.Layer<Fingerprint> = Layer.unwrap(
+export const wasmLayer: Layer.Layer<Hasher> = Layer.unwrap(
   Effect.promise(() => import("blake3-wasm")).pipe(
     Effect.map((blake3) =>
-      Layer.succeed(Fingerprint, {
-        hasher: () => {
-          const hashing = blake3.createHash();
-          let fingerprint: string | undefined;
+      Layer.succeed(Hasher, {
+        digest: Sink.reduce(
+          () => blake3.createHash(),
+          (hashing, chunk: Uint8Array) => {
+            hashing.update(chunk);
 
-          return {
-            update: (bytes) => {
-              hashing.update(bytes);
-            },
-            digest: () => (fingerprint ??= hashing.digest("hex")),
-          };
-        },
+            return hashing;
+          },
+        ).pipe(Sink.map((hashing) => hashing.digest("hex"))),
       }),
     ),
   ),

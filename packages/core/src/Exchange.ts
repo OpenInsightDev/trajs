@@ -13,11 +13,13 @@
  * format this package ships — the bytes a `.trajs` file holds, described on the
  * layer itself — and a program that keeps recordings some other way provides a
  * layer of its own, which is the only thing that changes. Of that format, the
- * parts are carried in one zstd frame, and how such a frame is written and read
- * is not the format's to state either: a layer is built over a
- * {@link Compression}, which {@link nodeLayer} states for a program that runs on
- * Node and {@link wasmLayer} for one that runs where `node:zlib` is not — a page,
- * say — or which a program states one of its own as.
+ * parts are carried in one zstd frame and the digest of those parts follows it,
+ * and neither how such a frame is written nor how the parts are hashed is the
+ * format's to state: a layer is built over a {@link Compression} and the
+ * {@link Indexing.Hasher} that hashes the parts, each of which {@link nodeLayer}
+ * states for a program that runs on Node and {@link wasmLayer} for one that runs
+ * where `node:zlib` is not — a page, say — or which a program states one of its
+ * own as.
  */
 
 import type { CompressStream } from "@structured-world/structured-zstd";
@@ -25,6 +27,7 @@ import { Context, Effect, Layer, Schema, Sink, Stream } from "effect";
 
 import type * as Event from "#/Event.ts";
 import type * as Extra from "#/Extra.ts";
+import * as Indexing from "#/Indexing.ts";
 import { Contribution, headerSink, part, service, type PartMembers } from "#/internal/exchange.ts";
 import type * as Metric from "#/Metric.ts";
 import type * as Toolkit from "#/Toolkit.ts";
@@ -101,11 +104,12 @@ export type EncodingServices<C extends Trajectory.AnyConfig> = Schema.Union<
  *
  * **Details**
  *
- * What a recording is of is the format's: a header line, and after it one zstd
- * frame carrying one SchemaBinary frame per part ({@link Exchange.layer}). How
- * that frame is written and read is this: `compress` takes the chunks of a stream
- * and gives back the chunks of the same stream compressed, and `decompress` takes
- * the chunks of a compressed one and gives back the chunks it decompresses to.
+ * What a recording is of is the format's: a header line, after it one zstd frame
+ * carrying one SchemaBinary frame per part, and after that the digest of those
+ * frames ({@link Exchange.layer}). How that frame is written and read is this:
+ * `compress` takes the chunks of a stream and gives back the chunks of the same
+ * stream compressed, and `decompress` takes the chunks of a compressed one and
+ * gives back the chunks it decompresses to.
  *
  * Either direction reports what it failed with as {@link TrajectoryError}, since a
  * frame that cannot be written or read is a recording that failed rather than a
@@ -178,8 +182,9 @@ export const Compression: Context.Service<Compression, Compression> = Context.Se
  *
  * {@link Service.write} produces the bytes of a recording as the trajectory is
  * produced, {@link Service.metadata} reads back what a recording states about
- * itself, and {@link Service.read} turns the bytes of a recording into a
- * trajectory once the kits it was recorded with are in hand.
+ * itself, {@link Service.digest} reads the digest the recording ends with, and
+ * {@link Service.read} turns the bytes of a recording into a trajectory once the
+ * kits it was recorded with are in hand.
  *
  * What those bytes are is the layer's to say. An exchange carries no bytes of
  * its own, so what carries them is the caller's to choose. Reading is handed the
@@ -204,7 +209,9 @@ export interface Service {
    * Encodes a trajectory into the bytes of a recording.
    *
    * The trajectory is encoded as it is produced, so what it holds is never held
-   * whole, and what it states of itself is what the header line carries.
+   * whole, and what it states of itself is what the header line carries; the
+   * digest of its parts, read off the bytes those parts are carried in, follows
+   * them.
    */
   readonly write: <C extends Trajectory.AnyConfig, E, R>(
     trajectory: Trajectory.Trajectory<C, E, R>,
@@ -217,11 +224,24 @@ export interface Service {
   readonly metadata: Sink.Sink<Header, Uint8Array, Uint8Array, TrajectoryError>;
 
   /**
+   * Reads the digest a recording ends with, without reading its parts.
+   *
+   * A recording ends with the digest of the parts it carries, which
+   * {@link Service.write} writes after them, so what names a recording is read off
+   * its tail without the frame those parts are in ever being decompressed. What a
+   * recording ends with but a digest is a failure of the same kind as any other
+   * part of the format.
+   */
+  readonly digest: Sink.Sink<string, Uint8Array, never, TrajectoryError>;
+
+  /**
    * Decodes the bytes of a recording into a trajectory of the kits it is handed.
    *
    * The header line a recording starts with is read and passed by, since a
    * recording is read with the kits themselves rather than with the names the
-   * header carries; what the trajectory goes by is the metadata it is handed.
+   * header carries; what the trajectory goes by is the metadata it is handed. The
+   * digest the recording ends with is passed by too, since it follows the parts
+   * rather than being one.
    */
   readonly read: <
     Toolkit extends Toolkit.Any,
@@ -304,14 +324,18 @@ export class Exchange extends Context.Service<Exchange, Service>()("trajs/core/E
    * toolkit and kits knowable — without anything else. Everything after that line
    * is one zstd frame carrying the trajectory's parts, each encoded as one
    * SchemaBinary frame ({@link Part}), so a recording is read as it arrives rather
-   * than once it has ended.
+   * than once it has ended; the digest of those parts follows the frame, so a
+   * recording is named by its tail without that frame being read
+   * ({@link Service.digest}).
    *
    * What writes and reads that frame is the {@link Compression} the layer is
-   * provided with, so the layer requires it rather than holding one: a program
-   * states the compression it runs on where it provides its layers. The two this
-   * package states are layers of their own — {@link nodeLayer}, over `node:zlib`,
-   * and {@link wasmLayer}, over a WebAssembly codec that runs where `node:zlib` is
-   * not — and neither is loaded unless it is provided.
+   * provided with, and what hashes the parts is the {@link Indexing.Hasher}, so
+   * the layer requires both rather than holding either: a program states the
+   * compression it runs on and the hash it names a recording by where it provides
+   * its layers. The two this package states are layers of their own —
+   * {@link nodeLayer}, over `node:zlib` and a BLAKE3 binding, and
+   * {@link wasmLayer}, over WebAssembly codecs that run where `node:zlib` is not —
+   * and neither is loaded unless it is provided.
    *
    * **Example** (The exchange over the compression a page uses)
    *
@@ -332,9 +356,14 @@ export class Exchange extends Context.Service<Exchange, Service>()("trajs/core/E
    * @see {@link Compression} for what carries a recording's parts.
    * @category constructors
    */
-  static readonly layer: Layer.Layer<Exchange, never, Compression> = Layer.effect(
+  static readonly layer: Layer.Layer<Exchange, never, Compression | Indexing.Hasher> = Layer.effect(
     Exchange,
-    Effect.map(Compression, (compression) => service(headerSink(Header), compression)),
+    Effect.gen(function* () {
+      const compression = yield* Compression;
+      const hasher = yield* Indexing.Hasher;
+
+      return service(headerSink(Header), compression, hasher);
+    }),
   );
 }
 
@@ -351,23 +380,28 @@ export class Exchange extends Context.Service<Exchange, Service>()("trajs/core/E
  * **Details**
  *
  * {@link nodeLayer} is {@link Exchange.layer} over the zstd stream `node:zlib`
- * writes and reads one with, each frame written and read through one zstd stream
- * per run, so a recording is written and read as it arrives rather than once it
- * has ended. What it carries with is read when this layer is provided rather than
- * when this module is imported, so a program that never provides it — a page —
- * never loads `node:zlib`.
+ * writes and reads one with and the BLAKE3 {@link Indexing.nodeLayer} hashes with,
+ * each frame written and read through one zstd stream per run, so a recording is
+ * written and read as it arrives rather than once it has ended. What either
+ * carries with is read when this layer is provided rather than when this module is
+ * imported, so a program that never provides it — a page — loads neither
+ * `node:zlib` nor a native addon.
  *
  * What it needs of a program that runs where `node:zlib` is not is stated by
  * {@link wasmLayer} instead; the format is the same one, and a frame either
- * compression writes the other reads.
+ * compression writes the other reads, and a digest either hash writes the other
+ * agrees with.
  *
  * @see {@link Exchange.layer} for the format this carries.
  * @category layers
  */
 export const nodeLayer: Layer.Layer<Exchange> = Layer.provide(
   Exchange.layer,
-  Layer.unwrap(
-    Effect.promise(() => import("#/internal/zstd.ts")).pipe(Effect.map((zstd) => zstd.layer)),
+  Layer.merge(
+    Layer.unwrap(
+      Effect.promise(() => import("#/internal/zstd.ts")).pipe(Effect.map((zstd) => zstd.layer)),
+    ),
+    Indexing.nodeLayer,
   ),
 );
 
@@ -425,29 +459,36 @@ const carried = <E, R>(
  * **Details**
  *
  * {@link wasmLayer} is {@link Exchange.layer} over that codec, whose engine picks
- * the SIMD payload where the host has it and the scalar one where it has not. The
- * payload is a megabyte of WebAssembly, loaded when this layer is provided rather
- * than when this module is imported, and each frame is then carried through one
- * handle of it per run, so a recording is written and read as it arrives.
+ * the SIMD payload where the host has it and the scalar one where it has not, and
+ * over the WebAssembly BLAKE3 {@link Indexing.wasmLayer} hashes with. Each payload
+ * is loaded when this layer is provided rather than when this module is imported,
+ * and each frame is then carried through one handle of the codec per run, so a
+ * recording is written and read as it arrives.
  *
- * What it writes is the same zstd as `node:zlib` writes, so a frame either
- * compression writes the other reads — {@link nodeLayer} is the one of a program
- * that runs on Node, where `node:zlib` is there.
+ * What it writes is the same zstd `node:zlib` writes and the same BLAKE3 the
+ * binding computes, so a frame either compression writes the other reads and a
+ * digest either hash writes the other agrees with — {@link nodeLayer} is the one
+ * of a program that runs on Node, where `node:zlib` is there. The BLAKE3
+ * WebAssembly code is not the codec's own, so a page that writes recordings with
+ * this layer provides it the way {@link Indexing.wasmLayer} says.
  *
  * @see {@link Exchange.layer} for the format this carries.
  * @category layers
  */
 export const wasmLayer: Layer.Layer<Exchange> = Layer.provide(
   Exchange.layer,
-  Layer.unwrap(
-    Effect.promise(() => import("@structured-world/structured-zstd")).pipe(
-      Effect.map((codec) =>
-        Layer.succeed(Compression, {
-          compress: (bytes) => carried(() => codec.createCompressStream(), bytes),
-          decompress: (bytes) => carried(() => codec.createDecompressStream(), bytes),
-        }),
+  Layer.merge(
+    Layer.unwrap(
+      Effect.promise(() => import("@structured-world/structured-zstd")).pipe(
+        Effect.map((codec) =>
+          Layer.succeed(Compression, {
+            compress: (bytes) => carried(() => codec.createCompressStream(), bytes),
+            decompress: (bytes) => carried(() => codec.createDecompressStream(), bytes),
+          }),
+        ),
       ),
     ),
+    Indexing.wasmLayer,
   ),
 );
 
