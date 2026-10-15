@@ -13,24 +13,19 @@ const generatedAndVendored = [
   "apps/website/src/pages.gen.ts",
 ];
 
-// `packages/core/src/archives/` holds the generation of the core package that the
-// modules beside it replace. Nothing exports or builds it, so neither linting nor
-// formatting may report or rewrite it.
-const staleGeneration = ["packages/core/src/archives/**"];
-
 export default defineConfig({
   staged: {
     "*": "vp check --fix",
   },
   fmt: {
-    ignorePatterns: [...generatedAndVendored, ...staleGeneration],
+    ignorePatterns: [...generatedAndVendored],
     // Organize imports into Oxfmt's default groups (builtin, external,
     // internal, relative, style) and sort within each, so import order is a
     // formatter concern rather than something reviewers have to check.
     sortImports: true,
   },
   lint: {
-    ignorePatterns: [...generatedAndVendored, ...staleGeneration],
+    ignorePatterns: [...generatedAndVendored],
     jsPlugins: [
       { name: "vite-plus", specifier: "vite-plus/oxlint-plugin" },
       { name: "anti-slop", specifier: "./tools/oxlint/anti-slop/index.ts" },
