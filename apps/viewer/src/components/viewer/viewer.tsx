@@ -9,13 +9,12 @@
  * make, and `@/components/viewer/conversation` reads the selected one as the
  * conversation it ran.
  *
- * A recording is read in the page rather than by a server, so the app is the
- * whole of what it needs: the exchange is provided with
- * the compression that runs in a page — WebAssembly, rather than the `node:zlib` a
- * server would have — and nothing of the viewer goes anywhere.
+ * A recording is read in the page rather than by a server, so the app is the whole
+ * of what it needs: `@/lib/recording` reads it with the codecs a page runs —
+ * WebAssembly, rather than the `node:zlib` a server would have — and nothing of the
+ * viewer goes anywhere.
  */
 
-import { wasmLayer } from "@trajs/core/Exchange";
 import { Alert, AlertDescription, AlertTitle } from "@trajs/ui/components/alert";
 import { Button } from "@trajs/ui/components/button";
 import {
@@ -100,7 +99,7 @@ export const Viewer = () => {
 
     void source
       .bytes()
-      .then((bytes) => Effect.runPromise(Effect.provide(Effect.scoped(read(bytes)), wasmLayer)))
+      .then((bytes) => Effect.runPromise(Effect.scoped(read(bytes))))
       .then(
         (recording) => {
           if (token !== latest.current) return;

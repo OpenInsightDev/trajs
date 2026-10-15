@@ -2,15 +2,18 @@
  * The `trajs inspect` command: the header a `.trajs` file states about itself,
  * printed as JSON.
  *
- * A recording carries its header as the first line of the file, and nothing
- * before that line is compressed, so reading it does not read the trajectory:
- * the exchange's own header sink reads the line and stops. What is printed is
- * the header as the format encodes it, so the output is the recording's own
- * statement of what it was written with rather than a re-description of it.
+ * A recording carries its header as the first line of the file, and nothing before
+ * that line is compressed, so loading one does not read the trajectory: the
+ * exchange reads the head of the file and stops before the frame the parts are
+ * carried in. What is printed is the header as the format encodes it, so the output
+ * is the recording's own statement of what it was written with rather than a
+ * re-description of it.
  */
 
-import { Exchange, Header, nodeLayer } from "@trajs/core/Exchange";
-import { Console, Effect, FileSystem, Schema, Stream } from "effect";
+import { Exchange, Header } from "@trajs/core/Exchange";
+import { NodeServices } from "@trajs/platform-node";
+import { fileSystemLayer } from "@trajs/utils/Storage";
+import { Console, Effect, Layer, Schema } from "effect";
 import { Argument, CliError, Command, Flag } from "effect/cli";
 
 const json = (header: Header, indent: number): string =>
@@ -34,12 +37,11 @@ export const inspect = Command.make(
   },
   ({ file, indent }) =>
     Effect.gen(function* () {
-      const fs = yield* FileSystem.FileSystem;
       const exchange = yield* Exchange;
 
-      const header = yield* Stream.run(fs.stream(file), exchange.metadata);
+      const { metadata } = yield* exchange.load(file);
 
-      yield* Console.log(json(header, indent));
+      yield* Console.log(json(metadata, indent));
     }).pipe(
       // A file that cannot be read, or one whose first line is not a header, is
       // what the person who ran the command can act on, so it is reported as the
@@ -48,8 +50,7 @@ export const inspect = Command.make(
     ),
 ).pipe(
   Command.withDescription("Print the header of a `.trajs` file."),
-  // The header is read with the format this package ships, over `node:zlib`;
-  // the frame the parts are carried in is never reached, so nothing past the
+  // The frame the parts are carried in is never reached, so nothing past the
   // header line is decompressed.
-  Command.provide(nodeLayer),
+  Command.provide(Layer.provide(Exchange.layer, Layer.merge(NodeServices.layer, fileSystemLayer))),
 );

@@ -7,11 +7,12 @@
  * `Trajectory.Part` — and each is also available as a subpath import such as
  * `@trajs/core/Metric`.
  *
- * The exchange carries a recording's parts in a zstd frame, and what writes and
- * reads that frame is a compression the layer is built over: `Exchange.nodeLayer`
- * is over `node:zlib`, which only a program that runs on Node loads, and
- * `Exchange.wasmLayer` is over a WebAssembly codec that runs anywhere — the payload
- * is loaded when it first writes or reads a frame.
+ * The exchange carries a recording's parts in a frame, and what writes and reads
+ * that frame, what hashes the parts and where a recording is kept are
+ * `@trajs/utils`'s services: a program provides `Exchange.layer` with the layers a
+ * platform package states them with — `@trajs/platform-node`, over `node:zlib`, the
+ * BLAKE3 binding and the files of the machine, or `@trajs/platform-browser`, over
+ * WebAssembly codecs that run where `node:zlib` is not, a page say.
  */
 
 export * as Event from "#/Event.ts";

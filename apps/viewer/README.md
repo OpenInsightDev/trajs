@@ -31,11 +31,12 @@ rather than by a server: the app is the whole of what it needs, and nothing of a
 recording goes anywhere.
 
 What is read is [`@trajs/core`](../../packages/core)'s exchange, over the
-compression that runs in a page: a recording's parts are carried in a zstd frame
-(`Exchange.Compression`), and the two compressions the package states are
-`Exchange.nodeLayer`, over `node:zlib`, and `Exchange.wasmLayer`, over a
-WebAssembly codec. The viewer provides the WebAssembly one, so a page reads a
-recording with no server and no `node:zlib`.
+compression that runs in a page: its parts are carried in a frame the platform
+package states, and [`@trajs/platform-browser`](../../packages/platform-browser)
+is the one over a WebAssembly codec — where `@trajs/platform-node` is over
+`node:zlib`. The viewer provides the WebAssembly layer from
+`src/lib/recording.ts`, so a page reads a recording with no server and no
+`node:zlib`.
 
 What is shown is the sessions the recording declares, which is what
 `src/lib/recording.ts` reads it into:

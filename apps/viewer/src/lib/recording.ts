@@ -14,10 +14,45 @@
  * know.
  */
 
-import { Event, Extra, Metric, Session, Toolkit, Trajectory, View } from "@trajs/core";
+import { Session, Trajectory, View } from "@trajs/core";
 import { Exchange } from "@trajs/core/Exchange";
 import type { TrajectoryError } from "@trajs/core/TrajectoryError";
-import { Effect, Option, Scope, Stream } from "effect";
+import { BrowserServices } from "@trajs/platform-browser";
+import { makeBytes } from "@trajs/utils/Bytes";
+import { Storage, StorageError } from "@trajs/utils/Storage";
+import { Effect, Layer, Option, Sink, type Scope, Stream } from "effect";
+
+/**
+ * What reading a recording fails with: the recording's own failure, or the storage
+ * it is read from — the bytes a page was handed may not hold a recording.
+ */
+type Failure = TrajectoryError | StorageError;
+
+/** The id a page serves a recording it was handed under: a page is handed the bytes, not a name. */
+const Handed = "handed";
+
+/**
+ * The storage a page serves a recording it was handed out of: the bytes it was
+ * given, under one id. A page reads a recording rather than writing one, so what it
+ * writes through fails.
+ */
+const handed = (bytes: Uint8Array): Storage => ({
+  read: () =>
+    Effect.succeed(
+      makeBytes({
+        length: Effect.succeed(BigInt(bytes.length)),
+        read: (buffer, { offset = 0n } = {}) =>
+          Effect.sync(() => {
+            const taken = bytes.subarray(Number(offset), Number(offset) + buffer.length);
+
+            buffer.set(taken);
+
+            return taken.length;
+          }),
+      }),
+    ),
+  write: () => Sink.fail(new StorageError({ id: Handed, cause: "a page only reads a recording" })),
+});
 
 /** One turn of a session's conversation: what a model was given, and what it answered. */
 export type Turn = View.PromptTurn<Trajectory.AnyConfig>;
@@ -100,7 +135,7 @@ const turnsOf = (parts: ReadonlyArray<Part>): Effect.Effect<ReadonlyArray<Turn>>
 const readSession = (
   session: Session.AnySession,
   inherited: ReadonlyArray<Stretch>,
-): Effect.Effect<RecordedSession, TrajectoryError, Scope.Scope> =>
+): Effect.Effect<RecordedSession, Failure, Scope.Scope> =>
   Effect.gen(function* () {
     const parts = Array.from(yield* Stream.runCollect(session.parts));
     const forks = Array.from(yield* Stream.runCollect(session.forkedBy));
@@ -140,39 +175,37 @@ const readSession = (
  * **When to use**
  *
  * Use to read a `.trajs` file a page was handed — a dropped file, one fetched
- * from somewhere — as what the components show. Provide it an exchange over the
- * compression a page has (`Exchange.wasmLayer`, in the app that reads recordings)
- * and see it in a scope, since reading a recording reads its sessions as it
- * arrives rather than once it has ended.
+ * from somewhere — as what the components show. It is seen in a scope, since
+ * reading a recording reads its sessions as it arrives rather than once it has
+ * ended.
  *
  * **Details**
  *
- * The recording is read twice over the same bytes: once for the header line, so
- * that what the recording states of itself is known before any of its parts are
- * read, and once for the parts, which is what the exchange reads a recording into.
- * It takes a `Uint8Array` rather than a stream because a `.trajs` file is what a
- * page reads, and a file is read whole.
+ * The page is handed one recording, so it serves it under one id: the exchange the
+ * bytes are read through is provided with the codecs a page runs — the WebAssembly
+ * compression and hash `@trajs/platform-browser` states — and with a storage over
+ * the bytes themselves. Loading reads the head of them for what the recording
+ * states of itself, and `read` reads the parts, which is what the exchange reads a
+ * recording into. It takes a `Uint8Array` rather than a stream because a `.trajs`
+ * file is what a page reads, and a file is read whole.
  */
-export const read = (
-  bytes: Uint8Array,
-): Effect.Effect<Recording, TrajectoryError, Exchange | Scope.Scope> =>
+export const read = (bytes: Uint8Array): Effect.Effect<Recording, Failure, Scope.Scope> =>
   Effect.gen(function* () {
     const exchange = yield* Exchange;
 
-    const [header] = yield* Stream.make(bytes).pipe(Stream.peel(exchange.metadata));
+    const loaded = yield* exchange.load(Handed);
 
-    const trajectory = exchange.read({
-      toolkit: Toolkit.empty,
-      eventkit: Event.makeKit(),
-      metrickit: Metric.makeKit(),
-      extrakit: Extra.makeKit(),
-      metadata: header.metadata,
-    })(Stream.make(bytes));
-
-    const roots = yield* Stream.runCollect(Session.sessions(trajectory));
+    const roots = yield* Stream.runCollect(Session.sessions(loaded.read()));
 
     return {
-      metadata: header.metadata,
+      metadata: loaded.metadata.metadata,
       roots: yield* Effect.forEach(roots, (session) => readSession(session, [])),
     };
-  });
+  }).pipe(
+    Effect.provide(
+      Layer.provide(
+        Layer.provide(Exchange.layer, BrowserServices.layer),
+        Layer.succeed(Storage, handed(bytes)),
+      ),
+    ),
+  );

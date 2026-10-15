@@ -13,11 +13,14 @@
  * Run it from this directory with `vp run sample`.
  */
 
-import { writeFile } from "node:fs/promises";
+import { fileURLToPath } from "node:url";
 
+import { NodeServices as PlatformNode } from "@effect/platform-node";
 import { Event, Extra, Metric, Prompt, Response, Toolkit, Trajectory } from "@trajs/core";
-import { Exchange, nodeLayer } from "@trajs/core/Exchange";
-import { DateTime, Effect, Formatter, Stream } from "effect";
+import { Exchange } from "@trajs/core/Exchange";
+import { NodeServices } from "@trajs/platform-node";
+import { fileSystemLayer } from "@trajs/utils/Storage";
+import { DateTime, Effect, Formatter, Layer, Stream } from "effect";
 
 /** What a response part looks like to a toolkit of no tools: the most a recording holds. */
 type Streamed = Response.AllPartsView<{}>;
@@ -334,16 +337,25 @@ const trajectory = Object.assign(Stream.fromIterable(parts), {
 const program = Effect.gen(function* () {
   const exchange = yield* Exchange;
 
-  const encoded = yield* exchange.write(trajectory).pipe(Stream.runCollect);
+  const id = fileURLToPath(new URL("../public/sample.trajs", import.meta.url));
 
-  const bytes = Buffer.concat(Array.from(encoded));
+  // The recording is written where it is named rather than held in memory first:
+  // the storage of files is the sink the exchange writes it through.
+  yield* exchange.save(trajectory)(id);
 
-  yield* Effect.promise(() => writeFile(new URL("../public/sample.trajs", import.meta.url), bytes));
-
-  yield* Effect.log(`Wrote ${bytes.byteLength} bytes of sample.trajs`);
+  yield* Effect.log(`Wrote ${id}`);
 });
 
-void Effect.runPromise(Effect.provide(program, nodeLayer)).catch((cause) => {
+// The file storage reads through the file system `@effect/platform-node` provides.
+void Effect.runPromise(
+  Effect.provide(
+    program,
+    Layer.provide(
+      Layer.provide(Exchange.layer, Layer.merge(NodeServices.layer, fileSystemLayer)),
+      PlatformNode.layer,
+    ),
+  ),
+).catch((cause) => {
   console.error(Formatter.format(cause));
   process.exitCode = 1;
 });

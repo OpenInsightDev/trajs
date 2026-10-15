@@ -1,23 +1,15 @@
-# vite-plus-starter
+# @trajs/utils
 
-A starter for creating a Vite Plus project.
+The generic services a recording is carried and kept through, stated once so a
+platform package can say what each is over.
 
-## Development
+- `Bytes` — a byte sequence read at random, and the sequence built from the reads
+  a source serves.
+- `Storage` — where a recording is kept, what a place that could not serve one
+  failed with (`StorageError`), and the file storage this package ships.
+- `Compression` — what carries a recording's parts in a frame.
+- `StreamHash` — what reads the digest a recording is named by.
 
-- Install dependencies:
-
-```bash
-vp install
-```
-
-- Run the unit tests:
-
-```bash
-vp test
-```
-
-- Build the library:
-
-```bash
-vp pack
-```
+`@trajs/platform-node` and `@trajs/platform-browser` provide the layers these
+services are read through, and
+[`@trajs/core`](../core)'s `Exchange.layer` is built over them.

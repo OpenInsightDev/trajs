@@ -2,15 +2,25 @@ import { defineConfig } from "vite-plus";
 
 export default defineConfig({
   pack: {
-    deps: {
-      // tsdown <0.23 compatibility: resolve external dependency subpaths.
-      // Remove to preserve subpath imports as written (the new default).
-      // https://tsdown.dev/options/dependencies#deps-resolvedepsubpath
-      resolveDepSubpath: true,
-    },
+    entry: ["src/index.ts"],
+    unbundle: true,
     dts: {
       generator: "tsgo",
     },
-    exports: true,
+    exports: {
+      devExports: true,
+      customExports: (exports, { isPublish }) => ({
+        ...exports,
+        "./*": isPublish ? "./dist/*.mjs" : "./src/*.ts",
+        "./*/index": null,
+      }),
+    },
   },
+  lint: {
+    options: {
+      typeAware: true,
+      typeCheck: true,
+    },
+  },
+  fmt: {},
 });

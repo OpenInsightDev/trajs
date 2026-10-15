@@ -16,6 +16,10 @@
  * from the header line to the digest that follows them.
  */
 
+import type { Bytes } from "@trajs/utils/Bytes";
+import type { Compression, CompressionError } from "@trajs/utils/Compression";
+import type { Storage, StorageError } from "@trajs/utils/Storage";
+import type { StreamHash } from "@trajs/utils/StreamHash";
 import { Effect, Fiber, Schema, SchemaTransformation, Stream } from "effect";
 import * as Arr from "effect/Array";
 import { SchemaBinary } from "effect/encoding";
@@ -28,12 +32,6 @@ import * as Prompt from "#/Prompt.ts";
 import * as Toolkit from "#/Toolkit.ts";
 import * as Trajectory from "#/Trajectory.ts";
 import { TrajectoryError } from "#/TrajectoryError.ts";
-
-import type { Bytes } from "./Bytes.ts";
-import type { Compression } from "./Compression.ts";
-import type { StreamHash } from "./Hash.ts";
-import type { Storage } from "./Storage.ts";
-import type { StorageError } from "./StorageError.ts";
 
 /**
  * How one contribution of a kit names itself, as a recording states it: the name it
@@ -124,7 +122,7 @@ export interface Stated {
  */
 export const headerOf = <S extends Schema.ConstraintCodec<Header, unknown, never, never>>(
   header: S,
-  bytes: Bytes,
+  bytes: Bytes<StorageError>,
 ): Effect.Effect<Stated, TrajectoryError | StorageError> => {
   const line = Schema.fromJsonString(header);
 
@@ -179,7 +177,7 @@ const FrameChunk = 64 * 1024;
  * frame.
  */
 const framesOf = (
-  bytes: Bytes,
+  bytes: Bytes<StorageError>,
   from: bigint,
   to: bigint,
 ): Stream.Stream<Uint8Array, StorageError> =>
@@ -458,7 +456,9 @@ const DigestText = new RegExp(`^[0-9a-f]{${DigestBytes}}$`);
  * before the format held one, or one that was cut short — which is a recording
  * that failed rather than bytes a storage did not serve.
  */
-export const digestOf = (bytes: Bytes): Effect.Effect<string, TrajectoryError | StorageError> =>
+export const digestOf = (
+  bytes: Bytes<StorageError>,
+): Effect.Effect<string, TrajectoryError | StorageError> =>
   Effect.gen(function* () {
     const length = yield* bytes.length;
 
@@ -477,6 +477,19 @@ export const digestOf = (bytes: Bytes): Effect.Effect<string, TrajectoryError | 
   });
 
 /**
+ * What a compression failed a frame it was asked to write or read with, as the
+ * recording that failed: the bytes a frame carries are the format's, so a frame
+ * that cannot be written or read is a recording that failed rather than a
+ * compression that did.
+ */
+const framed = <E, R>(
+  bytes: Stream.Stream<Uint8Array, E | CompressionError, R>,
+): Stream.Stream<Uint8Array, E | TrajectoryError, R> =>
+  bytes.pipe(
+    Stream.catchTag("CompressionError", (cause) => Stream.fail(TrajectoryError.parse(cause))),
+  );
+
+/**
  * The exchange of the format this package ships, over where a recording is kept,
  * what carries its parts and what reads a digest off them: the header of a
  * recording is the model the layer holds, so what parses one is built from that
@@ -489,9 +502,11 @@ export const digestOf = (bytes: Bytes): Effect.Effect<string, TrajectoryError | 
  * that follows it.
  *
  * A compression reports a frame it cannot write or read as a
- * {@link TrajectoryError} itself, since which bytes a frame is refused for is the
- * compression's to say and not this side's; a storage reports what it cannot read
- * or write as a {@link StorageError}, which says nothing of the recording.
+ * {@link CompressionError}, which says nothing of a recording; a frame carries the
+ * parts of a recording, so this side reports one it cannot write or read as the
+ * {@link TrajectoryError} the recording failed with ({@link framed}). A storage
+ * reports what it cannot read or write as a {@link StorageError}, which says
+ * nothing of the recording either.
  *
  * The header model is the schema of the header the layer holds, constrained to a
  * header plain enough to read without a service of its own: what parses the line
@@ -523,7 +538,7 @@ export const service = <S extends Schema.ConstraintCodec<Header, unknown, never,
           digest: digestOf(bytes),
           read: () =>
             trajectoryOf(
-              frame.pipe(compression.decompress, decodeParts(Trajectory.anyConfig)),
+              framed(frame.pipe(compression.decompress)).pipe(decodeParts(Trajectory.anyConfig)),
               Trajectory.anyConfig,
               stated.header.metadata,
             ),
@@ -551,7 +566,7 @@ export const service = <S extends Schema.ConstraintCodec<Header, unknown, never,
           return Stream.concat(
             Stream.make(new TextEncoder().encode(`${line}\n`)),
             Stream.concat(
-              written.pipe(compression.compress),
+              framed(written.pipe(compression.compress)),
               Stream.fromEffect(
                 Fiber.join(digest).pipe(Effect.map((hex) => new TextEncoder().encode(hex))),
               ),

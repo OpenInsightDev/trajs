@@ -2,31 +2,17 @@
  * The zstd stream a recording's parts are carried in, as `node:zlib` writes and
  * reads one.
  *
- * {@link layer} is the {@link Compression} `Compression.nodeLayer` provides the
- * exchange with, over the primitives below, which write and read the stream
- * itself. What a recording is of is the format's, and what writes and reads the
- * frame it carries the parts in is this.
+ * {@link layer} is the {@link Compression} this package provides the exchange
+ * with, over the primitives below, which write and read the stream itself. What a
+ * recording is of is the format's, and what writes and reads the frame it carries
+ * the parts in is this.
  */
 
 import { createZstdCompress, createZstdDecompress, type ZstdOptions } from "node:zlib";
 
 import { pipeThroughDuplex } from "@effect/platform-node/NodeStream";
-import { Data, Layer, Stream } from "effect";
-
-import { TrajectoryError } from "#/TrajectoryError.ts";
-
-import { Compression } from "./Compression.ts";
-
-/**
- * A zstd stream failing: what was written could not be compressed, or what was
- * read could not be decompressed.
- *
- * One error covers both, since what failed is the zstd stream; which of the two
- * it was is the operation that was called.
- */
-export class CompressFailed extends Data.TaggedError("CompressFailed")<{
-  cause: unknown;
-}> {}
+import { Compression, CompressionError } from "@trajs/utils/Compression";
+import { Layer, Stream } from "effect";
 
 /**
  * Compresses a byte stream with zstd.
@@ -48,10 +34,10 @@ export class CompressFailed extends Data.TaggedError("CompressFailed")<{
  *   (`zstdDecompressSync`), and a source with nothing in it produces a frame
  *   that decodes to nothing.
  * - A failure of the source stream passes through untouched; only a failure of
- *   the zstd stream itself becomes {@link CompressFailed}.
+ *   the zstd stream itself becomes {@link CompressionError}.
  * - The zstd stream lives in the scope that runs the result, so a downstream
  *   that stops early destroys it. `node:zlib` throws on an option it refuses
- *   before any of that, which is a defect rather than a {@link CompressFailed}.
+ *   before any of that, which is a defect rather than a {@link CompressionError}.
  *
  * **Example** (Compressing and decompressing text)
  *
@@ -71,11 +57,13 @@ export class CompressFailed extends Data.TaggedError("CompressFailed")<{
  */
 export const compress =
   (options?: ZstdOptions) =>
-  <E, R>(self: Stream.Stream<Uint8Array, E, R>): Stream.Stream<Uint8Array, E | CompressFailed, R> =>
+  <E, R>(
+    self: Stream.Stream<Uint8Array, E, R>,
+  ): Stream.Stream<Uint8Array, E | CompressionError, R> =>
     self.pipe(
-      pipeThroughDuplex<Uint8Array, CompressFailed>({
+      pipeThroughDuplex<Uint8Array, CompressionError>({
         evaluate: () => createZstdCompress(options),
-        onError: (cause) => new CompressFailed({ cause }),
+        onError: (cause) => new CompressionError({ cause }),
       }),
     );
 
@@ -92,10 +80,10 @@ export const compress =
  * - Every upstream chunk is written to one zstd stream as the downstream pulls
  *   it, and each decompressed chunk is emitted as soon as it is available.
  * - What this reads is the body of a file, which is one frame: a frame that is
- *   cut short fails as {@link CompressFailed} rather than decompressing the
+ *   cut short fails as {@link CompressionError} rather than decompressing the
  *   part of it that arrived.
  * - A failure of the source stream passes through untouched; only a failure of
- *   the zstd stream itself becomes {@link CompressFailed}.
+ *   the zstd stream itself becomes {@link CompressionError}.
  *
  * It takes nothing to configure, since a frame carries what decompressing it
  * takes, where compressing takes a level.
@@ -120,37 +108,39 @@ export const compress =
  */
 export const decompress = <E, R>(
   self: Stream.Stream<Uint8Array, E, R>,
-): Stream.Stream<Uint8Array, E | CompressFailed, R> =>
+): Stream.Stream<Uint8Array, E | CompressionError, R> =>
   self.pipe(
-    pipeThroughDuplex<Uint8Array, CompressFailed>({
+    pipeThroughDuplex<Uint8Array, CompressionError>({
       evaluate: () => createZstdDecompress(),
-      onError: (cause) => new CompressFailed({ cause }),
+      onError: (cause) => new CompressionError({ cause }),
     }),
   );
 
 /**
- * The zstd stream refusing the bytes it was given, as the recording that failed.
- *
- * What the zstd stream refuses is part of the recording — the bytes of a frame are
- * the format's — so it fails as a {@link TrajectoryError} like any other part of
- * the format does, rather than as a failure of the stream that a program reading
- * the recording would have to know about.
- */
-const refused = <E, R>(
-  bytes: Stream.Stream<Uint8Array, E | CompressFailed, R>,
-): Stream.Stream<Uint8Array, E | TrajectoryError, R> =>
-  bytes.pipe(
-    Stream.catchTag("CompressFailed", (cause) => Stream.fail(TrajectoryError.parse(cause))),
-  );
-
-/**
- * The compression `Compression.nodeLayer` provides the exchange with: the zstd
+ * The compression a program on Node carries a recording's parts with: the zstd
  * stream `node:zlib` writes and reads one with, at the level zstd defaults to.
+ *
+ * **When to use**
+ *
+ * Use when a program runs on Node, where `node:zlib` is there: of the two
+ * compressions the platform packages state, it is the one that loads nothing else
+ * and the faster of the two.
+ *
+ * **Details**
+ *
+ * The stream is `node:zlib`'s, so it is loaded when this layer is provided rather
+ * than when this module is imported: a program that never provides it — a page —
+ * never reaches for it. What a program that runs where `node:zlib` is not provides
+ * instead is `@trajs/platform-browser`'s compression, and a frame either writes the
+ * other reads.
  *
  * Each frame is written and read through one zstd stream per run, so the bytes are
  * never held whole.
+ *
+ * @see {@link Compression} for the compression this provides.
+ * @category layers
  */
 export const layer: Layer.Layer<Compression> = Layer.succeed(Compression, {
-  compress: (bytes) => refused(compress()(bytes)),
-  decompress: (bytes) => refused(decompress(bytes)),
+  compress: (bytes) => compress()(bytes),
+  decompress: (bytes) => decompress(bytes),
 });

@@ -8,21 +8,15 @@
  * for the parts of a trajectory — so a sequence is read at random ({@link Bytes}).
  * What one is of is not part of what one is: a file, the range of a bucket, or
  * bytes already in memory are all read the same way, which is why every read is
- * effectful and fails as a {@link StorageError} where what it is of — a disk, a
- * socket — may fail.
+ * effectful and carries what it is of failing as `E` and what reading it takes as
+ * `R` ({@link Bytes}) rather than a failure of a place it is over.
  *
- * {@link makeBytes} builds a sequence from the reads a source serves, and
- * {@link fileBytes} builds the one a file holds, which is the sequence the storage
- * this package ships serves a recording as.
- *
- * Nothing here is published: a recording is read and written through
- * `Exchange.load` and `Exchange.save`, which take the bytes of one from the
- * storage they were provided.
+ * {@link makeBytes} builds a sequence from the reads a source serves: what a
+ * storage serves the bytes it holds as, and what a sequence of your own is built
+ * from.
  */
 
-import { Effect, FileSystem, Stream } from "effect";
-
-import { asStorageError, type StorageError } from "./StorageError.ts";
+import { Effect, Stream } from "effect";
 
 /**
  * Where and how much a byte sequence is read by.
@@ -77,10 +71,12 @@ export interface ReadOptions {
  *   too large to hold is read as it arrives rather than all at once.
  *
  * Where a byte sequence comes from is not part of what one is: a file, the range
- * of a bucket, or bytes already in memory are all read the same way. So every
- * read is effectful and fails as {@link StorageError}, since what a sequence is
- * of — a disk, a socket — is what may fail, and a sequence over memory is one
- * that never does.
+ * of a bucket, or bytes already in memory are all read the same way. So the two
+ * channels are the sequence's rather than this one's, and read as `Effect` and
+ * `Stream` read theirs: a read fails as `E`, which is what a sequence is of — a
+ * disk, a socket — failing, and requires what reading it takes as `R`. A sequence
+ * over memory is one that fails with `never`; a storage serves one that fails as
+ * the failure of a storage, and a layer of it states which.
  *
  * **Example** (A sequence of bytes read at random)
  *
@@ -109,13 +105,13 @@ export interface ReadOptions {
  * @see {@link makeBytes} for building one from the reads it takes.
  * @see {@link Storage} for what serves one.
  */
-export interface Bytes {
+export interface Bytes<out E = never, out R = never> {
   /**
    * How many bytes the sequence holds, asked when it is wanted rather than once
    * when it is made: what a sequence is of may have changed since, and the
    * length is read to tell where a read can reach.
    */
-  readonly length: Effect.Effect<bigint, StorageError>;
+  readonly length: Effect.Effect<bigint, E, R>;
 
   /**
    * Reads up to `size` bytes of the sequence beginning at `offset` into the
@@ -125,7 +121,7 @@ export interface Bytes {
    * it was: a read of `n` bytes reads into the first `n`, and a read that reaches
    * the end of the sequence before the size asked for reads fewer.
    */
-  readonly read: (buffer: Uint8Array, options?: ReadOptions) => Effect.Effect<number, StorageError>;
+  readonly read: (buffer: Uint8Array, options?: ReadOptions) => Effect.Effect<number, E, R>;
 
   /**
    * Reads up to `size` bytes of the sequence beginning at `offset` into a buffer
@@ -134,7 +130,7 @@ export interface Bytes {
    * Without a size, the read takes everything left from the offset to the end of
    * the sequence.
    */
-  readonly readAlloc: (options?: ReadOptions) => Effect.Effect<Uint8Array, StorageError>;
+  readonly readAlloc: (options?: ReadOptions) => Effect.Effect<Uint8Array, E, R>;
 
   /**
    * The whole sequence, read from its head in chunks as the consumer pulls them,
@@ -144,9 +140,7 @@ export interface Bytes {
    * A chunk is allocated as it is read, so a caller reading a recording it does not
    * hold states how much of it to hold at once.
    */
-  readonly stream: (options?: {
-    readonly chunkSize?: number;
-  }) => Stream.Stream<Uint8Array, StorageError>;
+  readonly stream: (options?: { readonly chunkSize?: number }) => Stream.Stream<Uint8Array, E, R>;
 }
 
 /** How many bytes of a sequence are read at a time when it is read as a stream. */
@@ -197,11 +191,11 @@ const Chunk = 64 * 1024;
  *
  * @see {@link Bytes} for the sequence this builds.
  */
-export const makeBytes = (bytes: {
-  readonly length: Effect.Effect<bigint, StorageError>;
-  readonly read: (buffer: Uint8Array, options?: ReadOptions) => Effect.Effect<number, StorageError>;
-}): Bytes => {
-  const readAlloc = (options?: ReadOptions): Effect.Effect<Uint8Array, StorageError> => {
+export const makeBytes = <E = never, R = never>(bytes: {
+  readonly length: Effect.Effect<bigint, E, R>;
+  readonly read: (buffer: Uint8Array, options?: ReadOptions) => Effect.Effect<number, E, R>;
+}): Bytes<E, R> => {
+  const readAlloc = (options?: ReadOptions): Effect.Effect<Uint8Array, E, R> => {
     const offset = options?.offset ?? 0n;
     const size = options?.size;
 
@@ -238,34 +232,3 @@ export const makeBytes = (bytes: {
       ),
   };
 };
-
-/**
- * The bytes a file holds, as the storage that keeps recordings in files serves
- * them.
- *
- * A read names where it starts and a file handle is read where its cursor was
- * left, so a read of one recording's bytes opens the file, moves the cursor to the
- * offset asked for, reads what was asked of it and closes the file again: what a
- * read serves holds nothing open between reads, so two reads of the same
- * recording are each their own. It is what `Exchange.nodeLayer` serves the bytes
- * of a recording as.
- */
-export const fileBytes = (files: FileSystem.FileSystem, path: string): Bytes =>
-  makeBytes({
-    length: files.stat(path).pipe(
-      Effect.map((info) => info.size),
-      Effect.mapError(asStorageError(path)),
-    ),
-    read: (buffer, { offset = 0n } = {}) =>
-      Effect.scoped(
-        Effect.gen(function* () {
-          const file = yield* files.open(path, { flag: "r" });
-
-          if (offset !== 0n) {
-            yield* file.seek(offset, "start");
-          }
-
-          return yield* file.read(buffer);
-        }),
-      ).pipe(Effect.mapError(asStorageError(path))),
-  });

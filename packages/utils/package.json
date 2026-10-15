@@ -1,27 +1,35 @@
 {
-  "name": "utils",
+  "name": "@trajs/utils",
   "version": "0.0.0",
   "private": true,
-  "description": "A starter for creating a TypeScript package.",
-  "homepage": "https://github.com/author/library#readme",
-  "bugs": {
-    "url": "https://github.com/author/library/issues"
-  },
+  "description": "The generic services a recording is carried and kept through.",
+  "homepage": "https://github.com/OpenInsightDev/trajs",
   "license": "MIT",
-  "author": "Author Name <author.name@mail.com>",
+  "author": "Bowei Wang <wozluohd@gmail.com>",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/author/library.git"
+    "url": "git+https://github.com/OpenInsightDev/trajs.git"
   },
   "files": [
     "dist"
   ],
   "type": "module",
+  "imports": {
+    "#/*": "./src/*"
+  },
   "exports": {
-    ".": "./dist/index.mjs",
-    "./package.json": "./package.json"
+    ".": "./src/index.ts",
+    "./package.json": "./package.json",
+    "./*": "./src/*.ts",
+    "./*/index": null
   },
   "publishConfig": {
+    "exports": {
+      ".": "./dist/index.mjs",
+      "./package.json": "./package.json",
+      "./*": "./dist/*.mjs",
+      "./*/index": null
+    },
     "access": "public"
   },
   "scripts": {
@@ -31,9 +39,13 @@
     "check": "vp check",
     "prepublishOnly": "vp run build"
   },
+  "dependencies": {
+    "effect": "catalog:"
+  },
   "devDependencies": {
-    "@types/node": "^26.1.1",
-    "typescript": "^7.0.2",
+    "@types/node": "catalog:",
+    "typescript": "catalog:",
+    "vite": "catalog:",
     "vite-plus": "catalog:"
   }
 }

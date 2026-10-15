@@ -28,6 +28,8 @@
   "dependencies": {
     "@effect/platform-node": "catalog:",
     "@trajs/core": "workspace:*",
+    "@trajs/platform-node": "workspace:*",
+    "@trajs/utils": "workspace:*",
     "effect": "catalog:"
   },
   "devDependencies": {

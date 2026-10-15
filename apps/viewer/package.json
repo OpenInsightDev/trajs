@@ -14,8 +14,10 @@
   "dependencies": {
     "@fontsource-variable/geist": "catalog:",
     "@trajs/core": "workspace:*",
+    "@trajs/platform-browser": "workspace:*",
     "@trajs/react": "workspace:*",
     "@trajs/ui": "workspace:*",
+    "@trajs/utils": "workspace:*",
     "cn": "catalog:",
     "effect": "catalog:",
     "lucide-react": "catalog:",
@@ -25,8 +27,10 @@
     "tw-animate-css": "catalog:"
   },
   "devDependencies": {
+    "@effect/platform-node": "catalog:",
     "@streamdown/code": "catalog:",
     "@tailwindcss/vite": "^4.1.18",
+    "@trajs/platform-node": "workspace:*",
     "@types/node": "catalog:",
     "@types/react": "^19.2.7",
     "@types/react-dom": "^19.2.3",

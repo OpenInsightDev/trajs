@@ -1,6 +1,6 @@
 /**
- * What a program keeps its recordings in: the bytes of a recording per id, and the
- * place to put them.
+ * What a program keeps its recordings in: the bytes of a recording per id, the
+ * place to put them, and the failure of a place that could not serve one.
  *
  * What a recording is read and written through is a {@link Storage}, so where
  * recordings are kept is a storage's to say rather than the format's: what a
@@ -8,16 +8,14 @@
  * is a sink, so the exchange never holds the bytes of a recording itself. A storage
  * is of a place — a directory of files, a bucket, a map in memory — and the one
  * this package states is {@link fileSystemLayer}, which keeps a recording in the
- * file it is named by.
- *
- * Nothing here is published: `Exchange.nodeLayer` carries its recordings through
- * the storage this module states, and `Exchange.wasmLayer` is provided with one.
+ * file it is named by over the file system any platform provides and serves it as
+ * {@link fileBytes}. What a place could not serve is a {@link StorageError}, told
+ * apart from the failure of the recording it was asked for.
  */
 
-import { Context, Effect, FileSystem, Layer, type Scope, Sink } from "effect";
+import { Context, Data, Effect, FileSystem, Formatter, Layer, type Scope, Sink } from "effect";
 
-import { type Bytes, fileBytes, type ReadOptions } from "./Bytes.ts";
-import { asStorageError, type StorageError } from "./StorageError.ts";
+import { type Bytes, makeBytes, type ReadOptions } from "#/Bytes.ts";
 
 /**
  * What a recording is written with.
@@ -70,7 +68,6 @@ export interface WriteOptions {
  * recordings through an exchange are the same whichever storage is provided.
  *
  * @see {@link Bytes} for what a read serves.
- * @see {@link fileSystemLayer} for the storage this package ships.
  */
 export interface Storage {
   /**
@@ -87,7 +84,10 @@ export interface Storage {
    * asks for yet: an exchange reads the whole of a recording and takes the part of
    * it it came for, so a storage may serve the whole of one.
    */
-  readonly read: (id: string, options?: ReadOptions) => Effect.Effect<Bytes, StorageError>;
+  readonly read: (
+    id: string,
+    options?: ReadOptions,
+  ) => Effect.Effect<Bytes<StorageError>, StorageError>;
 
   /**
    * The sink a recording is written into `id` through.
@@ -107,23 +107,88 @@ export interface Storage {
  *
  * **When to use**
  *
- * Use to require a storage of a program, and `Exchange.layer` — or
- * `Exchange.nodeLayer` — to read and write recordings through it. A program that
- * keeps its recordings as files provides {@link fileSystemLayer} for it.
+ * Use to require a storage of a program, and `Exchange.layer` to read and write
+ * recordings through it. A program that keeps its recordings as files provides
+ * {@link fileSystemLayer}, and one that keeps them somewhere else — a bucket, a
+ * store in a page — provides a layer of its own.
  *
  * **Details**
  *
  * What a storage is of is a place: a directory of files, a bucket, a map in
  * memory. So a layer of it is provided at the composition root of a program
- * rather than by the exchange, which reaches the bytes of a recording through the
- * service alone.
+ * rather than by the exchange, which reaches the bytes of a recording through
+ * the service alone.
  *
  * @see {@link Storage} for what the service gives.
  * @see {@link fileSystemLayer} for the storage this package ships.
  */
 export const Storage: Context.Service<Storage, Storage> = Context.Service<Storage, Storage>()(
-  "trajs/core/Exchange/Storage",
+  "trajs/utils/Storage",
 );
+
+/**
+ * What a storage failed with: bytes that could not be read, or a place they could
+ * not be written to.
+ *
+ * **When to use**
+ *
+ * Use to tell the failure of a storage apart from the failure of a recording: a
+ * storage that is missing, that refused, or that was cut short fails as this error,
+ * where bytes that do not hold what a recording is made of fail as the recording's
+ * own error.
+ *
+ * **Details**
+ *
+ * `id` names the recording the storage was asked about — the one whose bytes could
+ * not be read, or the one that could not be written — and `cause` is what the
+ * storage failed with, as it reported it: the failure of a file system, the message
+ * a bucket answered with, or the description of what a byte sequence did not hold.
+ *
+ * @see {@link Storage} for what a recording is read and written through.
+ * @category errors
+ */
+export class StorageError extends Data.TaggedError("StorageError")<{
+  id: string;
+  cause: unknown;
+}> {
+  override get message(): string {
+    return `Failed to read or write '${this.id}': ${Formatter.format(this.cause)}`;
+  }
+}
+
+/**
+ * The bytes a file holds, as the storage that keeps recordings in files serves
+ * them.
+ *
+ * A read names where it starts and a file handle is read where its cursor was left,
+ * so a read of one recording's bytes opens the file, moves the cursor to the offset
+ * asked for, reads what was asked of it and closes the file again: what a read
+ * serves holds nothing open between reads, so two reads of the same recording are
+ * each their own.
+ *
+ * @see {@link makeBytes} for the sequence this builds.
+ * @see {@link fileSystemLayer} for the storage that serves one.
+ * @category constructors
+ */
+export const fileBytes = (files: FileSystem.FileSystem, path: string): Bytes<StorageError> =>
+  makeBytes({
+    length: files.stat(path).pipe(
+      Effect.map((info) => info.size),
+      Effect.mapError((cause) => new StorageError({ id: path, cause })),
+    ),
+    read: (buffer, { offset = 0n } = {}) =>
+      Effect.scoped(
+        Effect.gen(function* () {
+          const file = yield* files.open(path, { flag: "r" });
+
+          if (offset !== 0n) {
+            yield* file.seek(offset, "start");
+          }
+
+          return yield* file.read(buffer);
+        }),
+      ).pipe(Effect.mapError((cause) => new StorageError({ id: path, cause }))),
+  });
 
 /**
  * The storage this package ships: one recording per file, named by its path.
@@ -131,8 +196,8 @@ export const Storage: Context.Service<Storage, Storage> = Context.Service<Storag
  * **When to use**
  *
  * Use when a program keeps its recordings as files — what a `.trajs` file is —
- * which is what a program that runs on Node and keeps recordings on disk wants,
- * and what `Exchange.nodeLayer` provides.
+ * which is what a program with a file system wants, whatever platform that file
+ * system is of.
  *
  * **Details**
  *
@@ -142,16 +207,17 @@ export const Storage: Context.Service<Storage, Storage> = Context.Service<Storag
  *
  * What a read serves holds no file open: a read opens the file, takes what it was
  * asked for and closes it again, so what {@link Storage.read} gives out is read at
- * random without a scope of its own, and a recording too large to hold is read
- * where the parts of it are wanted ({@link Bytes}).
+ * random without a scope of its own, and a recording too large to hold is read where
+ * the parts of it are wanted ({@link Bytes}).
  *
  * A recording is written through the file system's own sink, so its bytes are
  * written as they are produced; `overwrite` states whether a file that is already
  * there is written over ({@link WriteOptions}), which defaults to being:
- * `overwrite: false` fails where the path is taken rather than putting one
- * recording where another was.
+ * `overwrite: false` fails where the path is taken rather than putting one recording
+ * where another was.
  *
  * @see {@link Storage} for the service this provides.
+ * @category layers
  */
 export const fileSystemLayer: Layer.Layer<Storage, never, FileSystem.FileSystem> = Layer.effect(
   Storage,
@@ -163,7 +229,7 @@ export const fileSystemLayer: Layer.Layer<Storage, never, FileSystem.FileSystem>
       write: (id, options) =>
         files
           .sink(id, { flag: options?.overwrite === false ? "wx" : "w" })
-          .pipe(Sink.mapError(asStorageError(id))),
+          .pipe(Sink.mapError((cause) => new StorageError({ id, cause }))),
     };
   }),
 );

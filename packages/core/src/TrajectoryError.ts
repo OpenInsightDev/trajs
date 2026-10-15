@@ -9,39 +9,11 @@
  * its `message` and keeps what it was derived of as `cause`.
  */
 
-import { Data, Formatter, Predicate, Schema } from "effect";
+import { Data, Formatter, Schema } from "effect";
 import type { Toolkit } from "effect/ai";
 
 const listed = (members: ReadonlyArray<string>): string =>
   members.length > 0 ? members.join(", ") : "none";
-
-/**
- * What a failure was of, as it is worded: the message of an error, or the data a
- * failure was of as a formatter writes it.
- *
- * **When to use**
- *
- * Use to word what an error was derived of where one is `cause` to another: a
- * reason of a {@link TrajectoryError}, or the failure a storage read or wrote a
- * recording with.
- *
- * **Details**
- *
- * A `string` cause is a message already and is given as it stands, where
- * `Formatter.format` would quote it as the data it is; an `Error` is its own
- * message, without the name of its class; and anything else is the data it is, as
- * `Formatter.format` writes it.
- *
- * @see {@link TrajectoryError} for the errors this words.
- * @category errors
- */
-export const failure = (cause: unknown): string => {
-  if (Predicate.isString(cause)) {
-    return cause;
-  }
-
-  return cause instanceof Error ? cause.message : Formatter.format(cause);
-};
 
 /**
  * The failure of encoding a response part with the toolkit a trajectory was
@@ -145,7 +117,7 @@ export class ParseError extends Data.TaggedError("ParseError")<{
   cause: unknown;
 }> {
   override get message(): string {
-    return `Failed to read or write a recording: ${failure(this.cause)}`;
+    return `Failed to read or write a recording: ${Formatter.format(this.cause)}`;
   }
 }
 

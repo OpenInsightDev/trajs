@@ -22,22 +22,19 @@
  * digest without reading the frame between them. How such a frame is written, how
  * the parts are hashed and where a recording is kept are not the format's to
  * state: the layer is built over a compression of the parts, over a hash of them
- * and over a storage, which {@link nodeLayer} provides for a program that runs on
- * Node — over `node:zlib`, the BLAKE3 binding and the files of the machine — and
- * {@link wasmLayer} for one that runs where `node:zlib` is not, a page say.
+ * and over a storage, which are `@trajs/utils`'s services — a program provides the
+ * layer a platform package states them with, such as `@trajs/platform-node` for one
+ * that runs on Node — over `node:zlib`, the BLAKE3 binding and the files of the
+ * machine — or `@trajs/platform-browser` for one that runs where `node:zlib` is not,
+ * a page say.
  */
 
-import { Context, Effect, FileSystem, Layer, Schema } from "effect";
+import { Compression } from "@trajs/utils/Compression";
+import { Storage, type StorageError } from "@trajs/utils/Storage";
+import { StreamHash } from "@trajs/utils/StreamHash";
+import { Context, Effect, Layer, Schema } from "effect";
 
-import {
-  Compression,
-  nodeLayer as compressionNodeLayer,
-  wasmLayer as compressionWasmLayer,
-} from "#/internal/Compression.ts";
 import { Contribution, part, service, type PartMembers } from "#/internal/exchange.ts";
-import * as Hash from "#/internal/Hash.ts";
-import { fileSystemLayer, Storage } from "#/internal/Storage.ts";
-import type { StorageError } from "#/internal/StorageError.ts";
 import * as Trajectory from "#/Trajectory.ts";
 import { TrajectoryError } from "#/TrajectoryError.ts";
 
@@ -283,104 +280,27 @@ export class Exchange extends Context.Service<Exchange, Service>()("trajs/core/E
    * with, what hashes the parts is the hash it is provided with, and what holds the
    * bytes of a recording is the storage — so the layer requires all three rather
    * than holding any, and what a program provides them with is where its recordings
-   * are kept. What this package states of the three are layers of its own —
-   * {@link nodeLayer}, over `node:zlib`, a BLAKE3 binding and the files of the
-   * machine, and {@link wasmLayer}, over WebAssembly codecs that run where
-   * `node:zlib` is not — and neither is loaded unless it is provided.
+   * are kept. These are `@trajs/utils`'s services: a program provides the layer a
+   * platform package states them with, such as `@trajs/platform-node` — over
+   * `node:zlib`, a BLAKE3 binding and the files of the machine — or
+   * `@trajs/platform-browser`, over WebAssembly codecs that run where `node:zlib` is
+   * not.
    *
    * @see {@link Service} for the exchange the layer provides.
-   * @see {@link nodeLayer} for the layers this package provides it with.
    * @category constructors
    */
-  static readonly layer: Layer.Layer<Exchange, never, Storage | Compression | Hash.StreamHash> =
+  static readonly layer: Layer.Layer<Exchange, never, Storage | Compression | StreamHash> =
     Layer.effect(
       Exchange,
       Effect.gen(function* () {
         const storage = yield* Storage;
         const compression = yield* Compression;
-        const hasher = yield* Hash.StreamHash;
+        const hasher = yield* StreamHash;
 
         return service(Header, storage, compression, hasher);
       }),
     );
 }
-
-/**
- * The exchange of the format this package ships, over the zstd stream `node:zlib`
- * writes and reads one with.
- *
- * **When to use**
- *
- * Use when a program runs on Node, where `node:zlib` is there: of the two
- * compressions this package states, it is the one that loads nothing else and the
- * faster of the two.
- *
- * **Details**
- *
- * {@link nodeLayer} is {@link Exchange.layer} over the zstd stream `node:zlib`
- * writes and reads one with, over the BLAKE3 the Rust binding `@napi-rs/blake-hash`
- * computes, and over the storage this package states, which keeps a recording in
- * the file it is named by — each frame is written and read through one zstd stream
- * per run, so a recording is written and read as it arrives rather than once it has
- * ended. What either carries with is read when this layer is provided rather than
- * when this module is imported, so a program that never provides it — a page —
- * loads neither `node:zlib` nor a native addon.
- *
- * What it needs of a program that runs where `node:zlib` is not is stated by
- * {@link wasmLayer} instead; the format is the same one, and a frame either
- * compression writes the other reads, and a digest either hash writes the other
- * agrees with.
- *
- * Where a recording is kept is the storage's to say, and what this layer states is
- * the storage of a program that keeps its recordings in the files of the machine it
- * runs on: a recording per path, named by the id it is kept under. What
- * {@link wasmLayer} is provided with is where the recordings of a program that
- * keeps them elsewhere are kept.
- *
- * @see {@link Exchange.layer} for the format this carries.
- * @category layers
- */
-export const nodeLayer: Layer.Layer<Exchange, never, FileSystem.FileSystem> = Layer.provide(
-  Exchange.layer,
-  Layer.mergeAll(fileSystemLayer, compressionNodeLayer, Hash.nodeLayer),
-);
-
-/**
- * The exchange of the format this package ships, over the zstd stream the
- * WebAssembly codec `@structured-world/structured-zstd` writes and reads one with.
- *
- * **When to use**
- *
- * Use when a program runs where `node:zlib` is not — a page, a worker, Deno — or
- * when every run should write and read a recording with the same codec.
- *
- * **Details**
- *
- * {@link wasmLayer} is {@link Exchange.layer} over that codec, whose engine picks
- * the SIMD payload where the host has it and the scalar one where it has not, and
- * over the WebAssembly BLAKE3 `blake3-wasm` carries. Each payload is loaded when
- * this layer is provided rather than when this module is imported, and each frame
- * is then carried through one handle of the codec per run, so a recording is
- * written and read as it arrives.
- *
- * What it writes is the same zstd `node:zlib` writes and the same BLAKE3 the
- * binding computes, so a frame either compression writes the other reads and a
- * digest either hash writes the other agrees with — {@link nodeLayer} is the one
- * of a program that runs on Node, where `node:zlib` is there. The BLAKE3
- * WebAssembly code is not the codec's own, so a page that writes recordings with
- * this layer provides it the way the `blake3-wasm` readme says — `blake3/browser`
- * is the entry carrying it.
- *
- * What it states is how a recording is carried and how its parts are hashed, so
- * what it is provided with is where the recordings are kept.
- *
- * @see {@link Exchange.layer} for the format this carries.
- * @category layers
- */
-export const wasmLayer: Layer.Layer<Exchange, never, Storage> = Layer.provide(
-  Exchange.layer,
-  Layer.merge(compressionWasmLayer, Hash.wasmLayer),
-);
 
 /**
  * The parts of a trajectory as the frames of the format this package ships carry

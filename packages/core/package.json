@@ -42,10 +42,7 @@
     "prepublishOnly": "vp run build"
   },
   "dependencies": {
-    "@effect/platform-node": "catalog:",
-    "@napi-rs/blake-hash": "catalog:",
-    "@structured-world/structured-zstd": "catalog:",
-    "blake3-wasm": "catalog:",
+    "@trajs/utils": "workspace:*",
     "effect": "catalog:",
     "uuid": "catalog:"
   },
