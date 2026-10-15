@@ -7,7 +7,7 @@
  * recording is recorded among the parts it is about.
  */
 
-import { Effect, Stream } from "effect";
+import { Cause, Effect, Exit, Queue, Stream } from "effect";
 
 import * as Event from "#/Event.ts";
 import * as Extra from "#/Extra.ts";
@@ -18,7 +18,7 @@ import * as Tool from "#/Tool.ts";
 import * as Toolkit from "#/Toolkit.ts";
 import * as Trajectory from "#/Trajectory.ts";
 
-import type { TrajectoryError } from "./TrajectoryError.ts";
+import { TrajectoryError } from "./TrajectoryError.ts";
 
 /**
  * The parts a trajectory is recorded from: what a model was given and returned,
@@ -182,6 +182,32 @@ export const transform =
         }),
     );
 
+/**
+ * A session a run records a trajectory in.
+ *
+ * **When to use**
+ *
+ * Use to write the parts of a session while a program runs — what a model was
+ * given and returned, and the events a kit recorded — rather than to record a
+ * stream that already holds them, which is what {@link transform} reads.
+ *
+ * **Details**
+ *
+ * - A part is written where it is enqueued rather than when the run ends, so a
+ *   recording is read while the program that writes it runs, and what the part
+ *   was recorded as is returned to the caller.
+ * - `enqueuePrompt` records what a model was given and `enqueueResponse` one part
+ *   of what it returned, each with the extra data the kit declares of the part it
+ *   is — {@link Extra.ExtraRecord} — and `enqueueEvent` records an event of the
+ *   event kit.
+ * - Every part is recorded in this session: the `sessionId` of a part is the `id`
+ *   of the session that wrote it, so the parts of the sessions a run opens are
+ *   read apart.
+ *
+ * @see {@link Producer} for what hands one out.
+ * @see {@link produce} for recording a run in one.
+ * @category models
+ */
 export type ProduceSession<
   Tools extends Record<string, Tool.Any>,
   Events extends Record<string, Event.Any>,
@@ -201,6 +227,28 @@ export type ProduceSession<
   ) => Effect.Effect<Trajectory.EventPart<Event.Eventkit<Events>>>;
 }>;
 
+/**
+ * The sessions a run records a trajectory in.
+ *
+ * **When to use**
+ *
+ * Use to type what {@link produce} hands a program, or to write a program that
+ * records itself as a trajectory while it runs.
+ *
+ * **Details**
+ *
+ * `createSession` declares a session and hands back the {@link ProduceSession}
+ * that records in it, before any of the parts it holds. It fails with the
+ * {@link TrajectoryError} of a recording whose sessions cannot be read: an `id` a
+ * session has already declared would be declared after the parts of that session,
+ * and a `fork` naming a part the run has not written has nothing to continue
+ * from. What a session is declared with beyond `id` and `fork` is the extra data
+ * the kit declares of a session part.
+ *
+ * @see {@link ProduceSession} for what a session records with.
+ * @see {@link produce} for what a program is handed one by.
+ * @category models
+ */
 export type Producer<
   Tools extends Record<string, Tool.Any>,
   Events extends Record<string, Event.Any>,
@@ -217,8 +265,75 @@ type ProduceFn<
   Extras extends Record<string, Extra.Any>,
   E = never,
   R = never,
-> = (producer: Producer<Tools, Events, Extras>) => Effect.Effect<never, E, R>;
+> = (producer: Producer<Tools, Events, Extras>) => Effect.Effect<void, E, R>;
 
+/**
+ * Records what a program does with a model as a trajectory, while it runs.
+ *
+ * **When to use**
+ *
+ * Use when a recording is written as the program runs — a session opened, and the
+ * prompts a model was given, the parts it returned and the events a kit recorded
+ * enqueued as they happen — rather than read from a stream that already holds the
+ * parts, which is what {@link transform} records.
+ *
+ * **Details**
+ *
+ * - The program is handed a {@link Producer}, which hands out one
+ *   {@link ProduceSession} per session it runs. A session is declared when it is
+ *   created, before any of the parts it records, and every part enqueued is
+ *   recorded in the session that enqueued it, in the order the program enqueued
+ *   it.
+ * - The producers the metric kit was provided with are run over the parts as they
+ *   are recorded, exactly as {@link Metric.produce} runs them, and the metric
+ *   parts they derive are recorded among the parts they are about. The parts are
+ *   read once — the recording and the producers each read a branch of one
+ *   broadcast — so a program that drives a model is not run twice.
+ * - A part is recorded where it is enqueued rather than when the program ends, so
+ *   a recording is read while the program that writes it runs. The recording ends
+ *   where the program does, and a program that fails fails the recording it left,
+ *   since no more of it can arrive.
+ * - Creating a session fails rather than recording one no reader can reach: an
+ *   `id` a session has already declared would be declared after the parts of that
+ *   session, and a `fork` naming a part the run has not written has nothing to
+ *   continue from — see {@link Producer}.
+ *
+ * **Example** (Recording a run that answers a prompt)
+ *
+ * ```ts import.meta.vitest
+ * import { Effect, Stream } from "effect"
+ * import { Event, Extra, Metric, Produce, Prompt, Response, Toolkit, Trajectory } from "@trajs/core"
+ *
+ * // A kit that names no metric derives nothing of a recording, so what the run
+ * // records is the parts it writes and no metric part.
+ * const metrickit = Metric.toProducers(Metric.makeKit(), {})
+ *
+ * const recording = Produce.produce({
+ *   toolkit: Toolkit.empty,
+ *   eventkit: Event.makeKit(),
+ *   metrickit,
+ *   extrakit: Extra.makeKit(),
+ *   metadata: new Trajectory.Metadata({ name: "One answer" })
+ * })((producer) =>
+ *   Effect.gen(function* () {
+ *     const session = yield* producer.createSession({
+ *       id: "01890a5d-ac96-774b-bcce-b302099a8057"
+ *     })
+ *
+ *     yield* session.enqueuePrompt(Prompt.make("What is 2 + 2?"))
+ *     yield* session.enqueueResponse(Response.makePart("text", { text: "4" }))
+ *   })
+ * )
+ *
+ * const parts = Array.from(await Effect.runPromise(Stream.runCollect(recording)))
+ * parts.map((part) => part._tag) // => ["Session", "Prompt", "Response"]
+ * ```
+ *
+ * @see {@link Producer} for what the program is handed.
+ * @see {@link transform} for recording a stream that already holds the parts.
+ * @see {@link Metric.produce} for what a kit derives of a kind of recording.
+ * @category constructors
+ */
 export const produce =
   <
     Toolkit extends Toolkit.Any,
@@ -242,8 +357,111 @@ export const produce =
     fn: ProduceFn<Toolkit["tools"], Eventkit["events"], Extrakit["extra"], E, R>,
   ): Trajectory.Trajectory<
     Trajectory.Config<true, Toolkit, Eventkit, Metrickit, Extrakit>,
-    E,
+    E | TrajectoryError,
     R
   > => {
-    throw new Error("Not implemented");
+    type Config = Trajectory.Config<true, Toolkit, Eventkit, Metrickit, Extrakit>;
+
+    const promptPart = Trajectory.promptPart(extrakit);
+    const sessionPart = Trajectory.sessionPart(extrakit);
+    const responsePart = Trajectory.responsePart({ toolkit, extrakit, stream: true });
+    const eventPart = Trajectory.EventPart(eventkit);
+
+    // The queue only ever ends rather than fails — a run that fails fails the
+    // recording through the fork — so its failure type is the end alone.
+    const recording = Effect.gen(function* () {
+      const parts = yield* Queue.unbounded<Trajectory.Part<Config>, Cause.Done>();
+
+      const declared = new Set<string>();
+      const written = new Set<string>();
+
+      const enqueue = <P extends Trajectory.Part<Config> & { readonly uuid: string }>(
+        part: P,
+      ): Effect.Effect<P> =>
+        Effect.gen(function* () {
+          yield* Queue.offer(parts, part);
+          written.add(part.uuid);
+
+          return part;
+        });
+
+      const session = (
+        id: string,
+      ): ProduceSession<Toolkit["tools"], Eventkit["events"], Extrakit["extra"]> => ({
+        id,
+        enqueuePrompt: (prompt, extra = {}) =>
+          enqueue(promptPart({ prompt, sessionId: id, extra })),
+        enqueueResponse: (response, extra = {}) =>
+          enqueue(responsePart({ response, sessionId: id, extra })),
+        enqueueEvent: (event) => enqueue(eventPart.make({ event, sessionId: id })),
+      });
+
+      const producer: Producer<Toolkit["tools"], Eventkit["events"], Extrakit["extra"]> = {
+        createSession: ({ id, fork, ...extra }) =>
+          Effect.gen(function* () {
+            // A session is declared before the parts it records, so a declaration of
+            // an id that a session was declared under already is read after the parts
+            // of that session.
+            if (declared.has(id)) {
+              return yield* Effect.fail(TrajectoryError.session(id, "late-declaration"));
+            }
+
+            // A `fork` names a part the recording holds by the time it is read, so a
+            // part the run has not written has nothing to continue from.
+            if (fork !== undefined && !written.has(fork)) {
+              return yield* Effect.fail(TrajectoryError.session(id, "unrecorded-fork"));
+            }
+
+            declared.add(id);
+
+            // What a session is declared with beyond `id` and `fork` is the extra
+            // data the kit declares of a session part: the two name the session
+            // rather than hold data of it, and what remains is exactly that record.
+            // SAFETY: destructuring retains the kit's tags beside the record's index
+            // signature, so the rest is the extra data of a session part; TypeScript
+            // leaves the rest of an intersection unevaluated and does not see it.
+            const extraData = extra as Extra.ExtraRecord<Extrakit["extra"], "session">;
+
+            yield* enqueue(sessionPart({ id, fork, extra: extraData }));
+
+            return session(id);
+          }),
+      };
+
+      const program = fn(producer).pipe(
+        Effect.onExit((exit) =>
+          Exit.isSuccess(exit) ? Effect.asVoid(Queue.end(parts)) : Effect.void,
+        ),
+        Stream.fromEffectDrain,
+      );
+
+      return Stream.fromQueue(parts).pipe(Stream.drainFork(program));
+    });
+
+    return Stream.unwrap(recording).pipe(
+      // The recording is read twice — as the parts of the trajectory, and by the
+      // producers the metric kit runs over it — so one subscription is shared
+      // between the two readings rather than the run, which may drive a model,
+      // being run twice.
+      Stream.broadcastN({ n: 2, capacity: "unbounded" }),
+      Effect.map(([recorded, producing]) =>
+        Stream.merge(
+          recorded,
+          producing.pipe(
+            Metric.produce(metrickit),
+            Stream.map((metric) => ({ _tag: "Metric" as const, metric })),
+          ),
+        ),
+      ),
+      Stream.unwrap,
+      (parts) =>
+        Object.assign(parts, {
+          metadata,
+          stream: true as const,
+          toolkit,
+          eventkit,
+          metrickit,
+          extrakit,
+        }),
+    );
   };
