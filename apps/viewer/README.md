@@ -30,13 +30,12 @@ file picked from disk or dropped on the page. A recording is read in the page
 rather than by a server: the app is the whole of what it needs, and nothing of a
 recording goes anywhere.
 
-What is read is [`@trajs/core`](../../packages/core)'s exchange, over a
-compression a page can read with: `Exchange.Compression` is what writes and reads
-the zstd frame a recording's parts are carried in, `@trajs/core/Zstd` states it
-over `node:zlib` for a program that runs on Node, and `src/lib/compression.ts`
-states one over [`fzstd`](https://github.com/101arrowz/fzstd) for this page — a
-page has no `node:zlib`, and `DecompressionStream` carries no zstd. That decoder
-only reads, which is all a viewer does.
+What is read is [`@trajs/core`](../../packages/core)'s exchange, over the
+compression that runs in a page: a recording's parts are carried in a zstd frame
+(`Exchange.Compression`), and the two compressions the package states are
+`Exchange.nodeLayer`, over `node:zlib`, and `Exchange.wasmLayer`, over a
+WebAssembly codec. The viewer provides the WebAssembly one, so a page reads a
+recording with no server and no `node:zlib`.
 
 What is shown is the sessions the recording declares, which is what
 `src/lib/recording.ts` reads it into:

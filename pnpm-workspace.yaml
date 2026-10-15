@@ -20,13 +20,13 @@ catalog:
   "@fumapress/ai": ^1.2.1
   "@shadcn/react": ^0.3.1
   "@streamdown/code": ^2.0.0
+  "@structured-world/structured-zstd": ^0.2.0
   "@types/node": ^24
   bson: ^7.3.3
   class-variance-authority: ^0.7.1
   cmdk: ^1.1.1
   cn: ^0.4.0
   effect: ^4.0.2
-  fzstd: ^0.1.1
   gpt-tokenizer: ^4.0.0
   lucide-react: ^1.55.0
   next-themes: ^0.4.6

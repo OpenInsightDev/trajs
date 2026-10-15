@@ -16,8 +16,7 @@
 import { writeFile } from "node:fs/promises";
 
 import { Event, Extra, Metric, Prompt, Response, Toolkit, Trajectory } from "@trajs/core";
-import { Exchange } from "@trajs/core/Exchange";
-import { compression } from "@trajs/core/Zstd";
+import { Exchange, nodeLayer } from "@trajs/core/Exchange";
 import { DateTime, Effect, Formatter, Stream } from "effect";
 
 /** What a response part looks like to a toolkit of no tools: the most a recording holds. */
@@ -344,7 +343,7 @@ const program = Effect.gen(function* () {
   yield* Effect.log(`Wrote ${bytes.byteLength} bytes of sample.trajs`);
 });
 
-void Effect.runPromise(Effect.provide(program, Exchange.layer(compression()))).catch((cause) => {
+void Effect.runPromise(Effect.provide(program, nodeLayer)).catch((cause) => {
   console.error(Formatter.format(cause));
   process.exitCode = 1;
 });

@@ -1,16 +1,20 @@
 /**
- * Streaming zstd compression and decompression of byte streams, backed by the
- * zstd support in `node:zlib`.
+ * The zstd stream a recording's parts are carried in, as `node:zlib` writes and
+ * reads one.
  *
- * {@link compress} turns a stream of bytes into a stream of the same bytes
- * compressed and {@link decompress} turns one back, each writing every chunk
- * through a single zstd stream so the bytes are never held in memory.
+ * {@link layer} is the {@link Compression} `Exchange.nodeLayer` provides the
+ * exchange with, over the primitives below, which write and read the stream
+ * itself. What a recording is of is the format's, and what writes and reads the
+ * frame it carries the parts in is this.
  */
 
 import { createZstdCompress, createZstdDecompress, type ZstdOptions } from "node:zlib";
 
 import { pipeThroughDuplex } from "@effect/platform-node/NodeStream";
-import { Data, Stream } from "effect";
+import { Data, Layer, Stream } from "effect";
+
+import { Compression } from "#/Exchange.ts";
+import { TrajectoryError } from "#/TrajectoryError.ts";
 
 /**
  * A zstd stream failing: what was written could not be compressed, or what was
@@ -122,3 +126,30 @@ export const decompress = <E, R>(
       onError: (cause) => new CompressFailed({ cause }),
     }),
   );
+
+/**
+ * The zstd stream refusing the bytes it was given, as the recording that failed.
+ *
+ * What the zstd stream refuses is part of the recording — the bytes of a frame are
+ * the format's — so it fails as a {@link TrajectoryError} like any other part of
+ * the format does, rather than as a failure of the stream that a program reading
+ * the recording would have to know about.
+ */
+const refused = <E, R>(
+  bytes: Stream.Stream<Uint8Array, E | CompressFailed, R>,
+): Stream.Stream<Uint8Array, E | TrajectoryError, R> =>
+  bytes.pipe(
+    Stream.catchTag("CompressFailed", (cause) => Stream.fail(TrajectoryError.parse(cause))),
+  );
+
+/**
+ * The compression `Exchange.nodeLayer` provides the exchange with: the zstd stream
+ * `node:zlib` writes and reads one with, at the level zstd defaults to.
+ *
+ * Each frame is written and read through one zstd stream per run, so the bytes are
+ * never held whole.
+ */
+export const layer: Layer.Layer<Compression> = Layer.succeed(Compression, {
+  compress: (bytes) => refused(compress()(bytes)),
+  decompress: (bytes) => refused(decompress(bytes)),
+});

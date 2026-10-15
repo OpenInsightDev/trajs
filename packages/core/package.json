@@ -19,7 +19,6 @@
   },
   "exports": {
     ".": "./src/index.ts",
-    "./Zstd": "./src/Zstd.ts",
     "./package.json": "./package.json",
     "./*": "./src/*.ts",
     "./internal/*": null,
@@ -28,7 +27,6 @@
   "publishConfig": {
     "exports": {
       ".": "./dist/index.mjs",
-      "./Zstd": "./dist/Zstd.mjs",
       "./package.json": "./package.json",
       "./*": "./dist/*.mjs",
       "./internal/*": null,
@@ -47,6 +45,7 @@
     "@effect/ai-anthropic": "catalog:",
     "@effect/ai-openai-compat": "catalog:",
     "@effect/platform-node": "catalog:",
+    "@structured-world/structured-zstd": "catalog:",
     "effect": "catalog:",
     "uuid": "catalog:"
   },

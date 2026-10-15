@@ -9,12 +9,13 @@
  * make, and `@/components/viewer/conversation` reads the selected one as the
  * conversation it ran.
  *
- * A recording is read in the page rather than by a server, so the app is the whole
- * of what it needs: `@/lib/compression` is how a page decompresses a recording, and
- * nothing of the viewer goes anywhere.
+ * A recording is read in the page rather than by a server, so the app is the
+ * whole of what it needs: the exchange is provided with
+ * the compression that runs in a page — WebAssembly, rather than the `node:zlib` a
+ * server would have — and nothing of the viewer goes anywhere.
  */
 
-import { Exchange } from "@trajs/core/Exchange";
+import { wasmLayer } from "@trajs/core/Exchange";
 import { Alert, AlertDescription, AlertTitle } from "@trajs/ui/components/alert";
 import { Button } from "@trajs/ui/components/button";
 import {
@@ -35,7 +36,6 @@ import { Data, Effect } from "effect";
 import { Files, LayoutGrid, TriangleAlert } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { compression } from "@/lib/compression";
 import { read } from "@/lib/recording";
 import type { RecordedSession, Recording } from "@/lib/recording";
 
@@ -100,9 +100,7 @@ export const Viewer = () => {
 
     void source
       .bytes()
-      .then((bytes) =>
-        Effect.runPromise(Effect.provide(Effect.scoped(read(bytes)), Exchange.layer(compression))),
-      )
+      .then((bytes) => Effect.runPromise(Effect.provide(Effect.scoped(read(bytes)), wasmLayer)))
       .then(
         (recording) => {
           if (token !== latest.current) return;

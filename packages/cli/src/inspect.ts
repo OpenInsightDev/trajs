@@ -9,8 +9,7 @@
  * statement of what it was written with rather than a re-description of it.
  */
 
-import { Exchange, Header } from "@trajs/core/Exchange";
-import { compression } from "@trajs/core/Zstd";
+import { Exchange, Header, nodeLayer } from "@trajs/core/Exchange";
 import { Console, Effect, FileSystem, Schema, Stream } from "effect";
 import { Argument, CliError, Command, Flag } from "effect/cli";
 
@@ -52,5 +51,5 @@ export const inspect = Command.make(
   // The header is read with the format this package ships, over `node:zlib`;
   // the frame the parts are carried in is never reached, so nothing past the
   // header line is decompressed.
-  Command.provide(Exchange.layer(compression())),
+  Command.provide(nodeLayer),
 );

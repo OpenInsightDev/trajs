@@ -197,6 +197,9 @@ catalogs:
     '@streamdown/code':
       specifier: ^2.0.0
       version: 2.0.0
+    '@structured-world/structured-zstd':
+      specifier: ^0.2.0
+      version: 0.2.0
     '@types/node':
       specifier: ^24
       version: 24.19.1
@@ -212,9 +215,6 @@ catalogs:
     effect:
       specifier: ^4.0.2
       version: 4.0.2
-    fzstd:
-      specifier: ^0.1.1
-      version: 0.1.1
     gpt-tokenizer:
       specifier: ^4.0.0
       version: 4.0.0
@@ -305,9 +305,6 @@ importers:
       effect:
         specifier: 'catalog:'
         version: 4.0.2
-      fzstd:
-        specifier: 'catalog:'
-        version: 0.1.1
       lucide-react:
         specifier: 'catalog:'
         version: 1.55.0(@types/react@19.3.0)(react@19.3.0)
@@ -499,6 +496,9 @@ importers:
       '@effect/platform-node':
         specifier: 'catalog:'
         version: 4.0.2(effect@4.0.2)(redis@6.3.0)
+      '@structured-world/structured-zstd':
+        specifier: 'catalog:'
+        version: 0.2.0
       effect:
         specifier: 'catalog:'
         version: 4.0.2
@@ -2198,6 +2198,10 @@ packages:
     peerDependencies:
       react: ^18.0.0 || ^19.0.0
 
+  '@structured-world/structured-zstd@0.2.0':
+    resolution: {integrity: sha512-TwOUTiOiKTQdmyKPmMfVRDdxssP3ckoW/8Dey5xDEuvnwk3c5zdvH0l7/P20IeHYebFj2GcD8CiIIt5sGk/HAw==}
+    engines: {node: '>=18'}
+
   '@tailwindcss/node@4.3.3':
     resolution: {integrity: sha512-/T8IKEsf9VTU6tLjgC7+sv2mOPtQxzE2jMw7u4Tt40Tx+QSZxpzh95/H6cMKoja9XuW7iMdLJYBB0o9G1CaAgg==}
 
@@ -3790,9 +3794,6 @@ packages:
 
   fuzzysort@3.1.0:
     resolution: {integrity: sha512-sR9BNCjBg6LNgwvxlBd0sBABvQitkLzoVY9MYYROQVX/FvfJ4Mai9LsGhDgd8qYdds0bY77VzYd5iuB+v5rwQQ==}
-
-  fzstd@0.1.1:
-    resolution: {integrity: sha512-dkuVSOKKwh3eas5VkJy1AW1vFpet8TA/fGmVA5krThl8YcOVE/8ZIoEA1+U1vEn5ckxxhLirSdY837azmbaNHA==}
 
   gensync@1.0.0-beta.2:
     resolution: {integrity: sha512-3hN7NaskYvMDLQY55gnW3NQ+mesEAepTqlg+VEbj7zzqEMBVNhzcGYYeqFo/TlYz6eQiFcp1HcsCZO+nGgS8zg==}
@@ -5638,6 +5639,9 @@ packages:
       react-dom: ~19.3.0
       react-server-dom-webpack: ~19.3.0
 
+  wasm-feature-detect@1.9.0:
+    resolution: {integrity: sha512-zonE+xlIIYtxPy++L24ow0hAD8CICb4+FgPyROd3buyXIqsJvUEDkBgfCCoXOd1Hu3DUr0GOfnPIdcGV+YpNaA==}
+
   watchpack@2.5.2:
     resolution: {integrity: sha512-6i/00NBjP4yGPs+caKSyRfpTF/8Torsu0MOW3mMzIbhgISFder8i7xbqgHlLMwJrdiN8ndBV3UA1/AfzPSr+jg==}
     engines: {node: '>=10.13.0'}
@@ -7162,6 +7166,10 @@ snapshots:
     dependencies:
       react: 19.3.0
       shiki: 4.5.0
+
+  '@structured-world/structured-zstd@0.2.0':
+    dependencies:
+      wasm-feature-detect: 1.9.0
 
   '@tailwindcss/node@4.3.3':
     dependencies:
@@ -8689,8 +8697,6 @@ snapshots:
   function-bind@1.1.2: {}
 
   fuzzysort@3.1.0: {}
-
-  fzstd@0.1.1: {}
 
   gensync@1.0.0-beta.2: {}
 
@@ -10998,6 +11004,8 @@ snapshots:
       - unplugin-unused
       - unrun
       - yaml
+
+  wasm-feature-detect@1.9.0: {}
 
   watchpack@2.5.2:
     dependencies:

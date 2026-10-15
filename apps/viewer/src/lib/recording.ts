@@ -140,10 +140,10 @@ const readSession = (
  * **When to use**
  *
  * Use to read a `.trajs` file a page was handed — a dropped file, one fetched
- * from somewhere — as what the components show. Provide it an exchange over a
- * compression the page can read with (`@/lib/compression`, in this app) and see it
- * in a scope, since reading a recording reads its sessions as it arrives rather
- * than once it has ended.
+ * from somewhere — as what the components show. Provide it an exchange over the
+ * compression a page has (`Exchange.wasmLayer`, in the app that reads recordings)
+ * and see it in a scope, since reading a recording reads its sessions as it
+ * arrives rather than once it has ended.
  *
  * **Details**
  *

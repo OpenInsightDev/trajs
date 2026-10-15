@@ -18,7 +18,6 @@
     "@trajs/ui": "workspace:*",
     "cn": "catalog:",
     "effect": "catalog:",
-    "fzstd": "catalog:",
     "lucide-react": "catalog:",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",

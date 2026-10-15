@@ -15,12 +15,13 @@
  * layer of its own, which is the only thing that changes. Of that format, the
  * parts are carried in one zstd frame, and how such a frame is written and read
  * is not the format's to state either: a layer is built over a
- * {@link Compression}, which this package ships for `node:zlib` as
- * {@link Zstd.compression} and which a program without `node:zlib` — a page, say
- * — provides a decoder of its own as.
+ * {@link Compression}, which {@link nodeLayer} states for a program that runs on
+ * Node and {@link wasmLayer} for one that runs where `node:zlib` is not — a page,
+ * say — or which a program states one of its own as.
  */
 
-import { Context, Layer, Schema, Sink, Stream } from "effect";
+import type { CompressStream } from "@structured-world/structured-zstd";
+import { Context, Effect, Layer, Schema, Sink, Stream } from "effect";
 
 import type * as Event from "#/Event.ts";
 import type * as Extra from "#/Extra.ts";
@@ -28,7 +29,7 @@ import { Contribution, headerSink, part, service, type PartMembers } from "#/int
 import type * as Metric from "#/Metric.ts";
 import type * as Toolkit from "#/Toolkit.ts";
 import * as Trajectory from "#/Trajectory.ts";
-import type { TrajectoryError } from "#/TrajectoryError.ts";
+import { TrajectoryError } from "#/TrajectoryError.ts";
 
 /**
  * What a recording states about itself, before any of its parts.
@@ -95,9 +96,8 @@ export type EncodingServices<C extends Trajectory.AnyConfig> = Schema.Union<
  *
  * **When to use**
  *
- * Use to build a layer of the format this package ships where `node:zlib` is not
- * there to compress with — a page, say — or to state how the parts of a recording
- * are carried some other way.
+ * Use to state a compression of a recording's parts for {@link Exchange.layer}
+ * where neither of the two this package states is the one to use.
  *
  * **Details**
  *
@@ -112,17 +112,7 @@ export type EncodingServices<C extends Trajectory.AnyConfig> = Schema.Union<
  * compression that did; a failure of the chunks the stream carries is left to pass
  * through as the failure it is.
  *
- * **Example** (A layer over the compression `node:zlib` provides)
- *
- * ```ts import.meta.vitest
- * import { Exchange } from "@trajs/core"
- * import { compression } from "@trajs/core/Zstd"
- *
- * const layer = Exchange.layer(compression())
- * ```
- *
- * @see {@link Exchange.layer} for the layer it is built over.
- * @see {@link Zstd.compression} for the one this package ships.
+ * @see {@link Compression} for the service a layer takes it through.
  * @category models
  */
 export interface Compression {
@@ -141,6 +131,40 @@ export interface Compression {
     bytes: Stream.Stream<Uint8Array, E, R>,
   ) => Stream.Stream<Uint8Array, E | TrajectoryError, R>;
 }
+
+/**
+ * The compression a recording's parts are written and read with.
+ *
+ * **When to use**
+ *
+ * Use to provide a compression to {@link Exchange.layer}, which {@link nodeLayer}
+ * and {@link wasmLayer} — the two this package states — do, and which a program
+ * that carries a recording's parts some other way does with one of its own
+ * ({@link Compression}).
+ *
+ * **Details**
+ *
+ * What writes and reads the frame a recording's parts are carried in is the only
+ * thing that changes between the programs that keep recordings: what a recording
+ * is of is the format's ({@link Exchange.layer}), and a compression is what that
+ * frame is written and read with. So the layer requires this service rather than
+ * holding one itself, and a program states which one it runs on where it provides
+ * its layers.
+ *
+ * The two this package states differ in what they need to run, and neither is
+ * loaded unless the layer that uses it is provided: {@link nodeLayer} is over the
+ * zstd stream `node:zlib` writes and reads one with, which is read when that layer
+ * is provided, and {@link wasmLayer} is over a WebAssembly codec that runs where
+ * `node:zlib` is not — a page, say — whose payload is loaded when it first writes
+ * or reads a frame.
+ *
+ * @see {@link Exchange.layer} for the layer this is provided to.
+ * @category services
+ */
+export const Compression: Context.Service<Compression, Compression> = Context.Service<
+  Compression,
+  Compression
+>()("trajs/core/Exchange/Compression");
 
 /**
  * The exchange of a trajectory with the bytes a storage carries.
@@ -266,8 +290,8 @@ export class Exchange extends Context.Service<Exchange, Service>()("trajs/core/E
    *
    * **When to use**
    *
-   * Use when a program keeps recordings the way this package writes them, over
-   * the compression it has to carry them with.
+   * Use to state the format itself, and provide it with a compression of a
+   * recording's parts — one of the two this package states, or one of your own.
    *
    * **Details**
    *
@@ -282,28 +306,150 @@ export class Exchange extends Context.Service<Exchange, Service>()("trajs/core/E
    * SchemaBinary frame ({@link Part}), so a recording is read as it arrives rather
    * than once it has ended.
    *
-   * `compression` is what that frame is written and read with.
-   * {@link Zstd.compression} is the one this package ships, over `node:zlib`,
-   * taken straight as `node:zlib` takes it; a program without `node:zlib` — a
-   * page, say — builds the layer over a compression of its own, which is the only
-   * thing that changes ({@link Compression}).
+   * What writes and reads that frame is the {@link Compression} the layer is
+   * provided with, so the layer requires it rather than holding one: a program
+   * states the compression it runs on where it provides its layers. The two this
+   * package states are layers of their own — {@link nodeLayer}, over `node:zlib`,
+   * and {@link wasmLayer}, over a WebAssembly codec that runs where `node:zlib` is
+   * not — and neither is loaded unless it is provided.
    *
-   * **Example** (Setting how the parts are compressed)
+   * **Example** (The exchange over the compression a page uses)
    *
    * ```ts import.meta.vitest
-   * import { Exchange } from "@trajs/core"
-   * import { compression } from "@trajs/core/Zstd"
+   * import { Effect } from "effect"
+   * import { Exchange, wasmLayer } from "@trajs/core/Exchange"
    *
-   * const layer = Exchange.layer(compression({ chunkSize: 64 * 1024 }))
+   * const program = Effect.gen(function*() {
+   *   const exchange = yield* Exchange
+   *
+   *   return exchange
+   * })
+   *
+   * Effect.provide(program, wasmLayer)
    * ```
    *
    * @see {@link Service} for the exchange the layer provides.
    * @see {@link Compression} for what carries a recording's parts.
    * @category constructors
    */
-  static readonly layer = (compression: Compression): Layer.Layer<Exchange> =>
-    Layer.succeed(Exchange, service(headerSink(Header), compression));
+  static readonly layer: Layer.Layer<Exchange, never, Compression> = Layer.effect(
+    Exchange,
+    Effect.map(Compression, (compression) => service(headerSink(Header), compression)),
+  );
 }
+
+/**
+ * The exchange of the format this package ships, over the zstd stream `node:zlib`
+ * writes and reads one with.
+ *
+ * **When to use**
+ *
+ * Use when a program runs on Node, where `node:zlib` is there: of the two
+ * compressions this package states, it is the one that loads nothing else and the
+ * faster of the two.
+ *
+ * **Details**
+ *
+ * {@link nodeLayer} is {@link Exchange.layer} over the zstd stream `node:zlib`
+ * writes and reads one with, each frame written and read through one zstd stream
+ * per run, so a recording is written and read as it arrives rather than once it
+ * has ended. What it carries with is read when this layer is provided rather than
+ * when this module is imported, so a program that never provides it — a page —
+ * never loads `node:zlib`.
+ *
+ * What it needs of a program that runs where `node:zlib` is not is stated by
+ * {@link wasmLayer} instead; the format is the same one, and a frame either
+ * compression writes the other reads.
+ *
+ * @see {@link Exchange.layer} for the format this carries.
+ * @category layers
+ */
+export const nodeLayer: Layer.Layer<Exchange> = Layer.provide(
+  Exchange.layer,
+  Layer.unwrap(
+    Effect.promise(() => import("#/internal/zstd.ts")).pipe(Effect.map((zstd) => zstd.layer)),
+  ),
+);
+
+/** A handle of the WebAssembly codec: what one direction of a frame is written and read through. */
+type Codec = Pick<CompressStream, "push" | "finish" | "free">;
+
+/** What the WebAssembly codec refuses a frame for, as the recording that failed. */
+const refused = (cause: unknown): TrajectoryError => TrajectoryError.parse(cause);
+
+/**
+ * Carries a stream of chunks through one handle of the codec: every chunk is fed
+ * to the handle as the downstream pulls it, whatever the handle has complete is
+ * emitted, and the frame is sealed when the chunks end.
+ *
+ * The handle belongs to the run of the stream it carries, so it is freed when that
+ * stream ends — and when a downstream stops reading early, which is when it would
+ * otherwise be left to the engine's collector.
+ */
+const carried = <E, R>(
+  open: () => Promise<Codec>,
+  bytes: Stream.Stream<Uint8Array, E, R>,
+): Stream.Stream<Uint8Array, E | TrajectoryError, R> =>
+  Stream.unwrap(
+    Effect.acquireRelease(Effect.tryPromise({ try: open, catch: refused }), (handle) =>
+      Effect.sync(() => handle.free()),
+    ).pipe(
+      Effect.map((handle) =>
+        bytes.pipe(
+          // One frame is one stream the handle keeps across the chunks, so the
+          // chunks are fed to it one at a time and in the order they are read.
+          Stream.mapEffect(
+            (chunk) => Effect.try({ try: () => handle.push(chunk), catch: refused }),
+            {
+              concurrency: 1,
+            },
+          ),
+          Stream.filter((piece) => piece.length > 0),
+          Stream.concat(
+            Stream.fromEffect(Effect.try({ try: () => handle.finish(), catch: refused })),
+          ),
+        ),
+      ),
+    ),
+  );
+
+/**
+ * The exchange of the format this package ships, over the zstd stream the
+ * WebAssembly codec `@structured-world/structured-zstd` writes and reads one with.
+ *
+ * **When to use**
+ *
+ * Use when a program runs where `node:zlib` is not — a page, a worker, Deno — or
+ * when every run should write and read a recording with the same codec.
+ *
+ * **Details**
+ *
+ * {@link wasmLayer} is {@link Exchange.layer} over that codec, whose engine picks
+ * the SIMD payload where the host has it and the scalar one where it has not. The
+ * payload is a megabyte of WebAssembly, loaded when this layer is provided rather
+ * than when this module is imported, and each frame is then carried through one
+ * handle of it per run, so a recording is written and read as it arrives.
+ *
+ * What it writes is the same zstd as `node:zlib` writes, so a frame either
+ * compression writes the other reads — {@link nodeLayer} is the one of a program
+ * that runs on Node, where `node:zlib` is there.
+ *
+ * @see {@link Exchange.layer} for the format this carries.
+ * @category layers
+ */
+export const wasmLayer: Layer.Layer<Exchange> = Layer.provide(
+  Exchange.layer,
+  Layer.unwrap(
+    Effect.promise(() => import("@structured-world/structured-zstd")).pipe(
+      Effect.map((codec) =>
+        Layer.succeed(Compression, {
+          compress: (bytes) => carried(() => codec.createCompressStream(), bytes),
+          decompress: (bytes) => carried(() => codec.createDecompressStream(), bytes),
+        }),
+      ),
+    ),
+  ),
+);
 
 /**
  * The parts of a trajectory as the frames of the format this package ships carry

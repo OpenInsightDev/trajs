@@ -373,8 +373,9 @@ const trajectoryOf = <C extends Trajectory.AnyConfig, E, R>(
  * The exchange of the format this package ships, over the sink that reads what a
  * recording states itself with and the compression its parts are carried in: the
  * head of a recording is the model the layer holds, so it reads one rather than
- * stating the model again here, and what compresses a frame is the layer's, so a
- * page carries the same format with a compression of its own.
+ * stating the model again here, and what writes and reads a frame is the
+ * compression the layer was provided with, so the same format is carried by
+ * `node:zlib` in one program and by WebAssembly in another.
  *
  * A compression reports a frame it cannot write or read as a
  * {@link TrajectoryError} itself, since which bytes a frame is refused for is the

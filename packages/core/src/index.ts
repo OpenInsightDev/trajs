@@ -7,11 +7,11 @@
  * `Trajectory.Part` — and each is also available as a subpath import such as
  * `@trajs/core/Metric`.
  *
- * `Zstd` is the one module that is a subpath alone: it is the `node:zlib`
- * compression the exchange is built over, so what this entry point holds stays
- * free of `node:zlib` and the model is importable where `node:zlib` is not — a
- * page, for instance, which builds {@link Exchange.layer} over a compression of
- * its own. A program that runs on Node imports it as `@trajs/core/Zstd`.
+ * The exchange carries a recording's parts in a zstd frame, and what writes and
+ * reads that frame is a {@link Exchange.Compression} the layer is provided with:
+ * {@link Exchange.nodeLayer} is over `node:zlib`, which only a program that runs
+ * on Node loads, and {@link Exchange.wasmLayer} is over a WebAssembly codec that
+ * runs anywhere — the payload is loaded when it first writes or reads a frame.
  */
 
 export * as Event from "#/Event.ts";
