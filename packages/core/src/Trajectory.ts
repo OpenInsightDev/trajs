@@ -14,7 +14,7 @@
  * schema is therefore created for the kit it is read with ({@link PromptPart},
  * {@link SessionPart}, {@link ResponsePart}, {@link EventPart}, {@link MetricPart}),
  * and a part is built with that same kit and the fields it holds
- * ({@link promptPart}, {@link sessionPart}).
+ * ({@link promptPart}, {@link sessionPart}, {@link responsePart}).
  */
 
 import { Effect, Schema, Stream } from "effect";
@@ -390,6 +390,7 @@ type AllResponseParts<
  * part.response.type // => "text-start"
  * ```
  *
+ * @see {@link responsePart} for building a part of this schema.
  * @see {@link ResponsePartEncoded} for the encoded form of a part.
  * @see {@link Response.AllPartsView} for what the response of a part is read as.
  * @category schemas
@@ -448,6 +449,92 @@ export type ResponsePart<
 export type ResponsePartEncoded = Schema.Codec.Encoded<
   ReturnType<typeof ResponsePart<Toolkit.Any, Extra.AnyKit, true>>
 >;
+
+/**
+ * Builds a response part from one part of what a model returned.
+ *
+ * **When to use**
+ *
+ * Use where what a model returned is recorded, so that the response stands among
+ * the parts of its trajectory rather than beside them.
+ *
+ * **Details**
+ *
+ * - The kit is asked for first ({@link ResponsePart}) and the fields of the part
+ *   second, as a reader takes the kits it reads with before the bytes it reads: the
+ *   toolkit is what says how the response of the part is read and the extra kit how
+ *   its extra data is, so a part is built stating the extra data of that kit rather
+ *   than of none.
+ * - `response` is one part of what the model returned, as {@link Response.makePart}
+ *   builds one: an increment the response arrived in where the config streams, and a
+ *   part the response is whole in where it does not.
+ * - `sessionId` names the session the part is recorded in; the `timestamp` and the
+ *   `uuid` of the part are supplied where it is built, as they are for every other
+ *   part.
+ * - `extra` may be left out, and the part then states none of it, as a prompt part
+ *   that states none does.
+ *
+ * **Example** (Recording what a model returned, with what it was estimated to cost)
+ *
+ * ```ts import.meta.vitest
+ * import { Schema } from "effect"
+ * import { Extra, Response, Toolkit, Trajectory, VersionedSchema } from "@trajs/core"
+ *
+ * const estimate = new Extra.Extra({
+ *   package: "tokenize",
+ *   id: "estimate",
+ *   response: Schema.Struct({
+ *     version: Schema.Literal("0.1.0"),
+ *     tokens: Schema.Number
+ *   }).pipe(VersionedSchema.make)
+ * })
+ *
+ * const part = Trajectory.responsePart({
+ *   toolkit: Toolkit.empty,
+ *   extrakit: Extra.makeKit(estimate),
+ *   stream: false
+ * })({
+ *   response: Response.makePart("text", { text: "4" }),
+ *   sessionId: "01890a5d-ac96-774b-bcce-b302099a8057",
+ *   extra: { "tokenize/estimate": { version: "0.1.0", tokens: 3 } }
+ * })
+ *
+ * part.response.type // => "text"
+ * part.extra["tokenize/estimate"]?.tokens // => 3
+ * ```
+ *
+ * @see {@link ResponsePart} for the schema the part is built of.
+ * @see {@link Response.makePart} for building the response of a part.
+ * @category constructors
+ */
+export const responsePart =
+  <Toolkit extends Toolkit.Any, Extrakit extends Extra.AnyKit, Stream extends boolean>({
+    toolkit,
+    extrakit,
+    stream,
+  }: {
+    toolkit: Toolkit;
+    extrakit: Extrakit;
+    stream: Stream;
+  }) =>
+  ({
+    response,
+    sessionId,
+    extra = {},
+  }: {
+    response: ResponsePart<Toolkit, Extrakit, Stream>["response"];
+    sessionId: string;
+    extra?: Extra.ExtraRecord<Extrakit["extra"], "response">;
+  }): ResponsePart<Toolkit, Extrakit, Stream> =>
+    // SAFETY: `ResponsePart` selects its variant by `stream`, which the fields were
+    // read under, so what it makes is the part they state; TypeScript leaves that
+    // selection unevaluated where `stream` is a type parameter and reads the part it
+    // makes as the streaming one alone.
+    ResponsePart({ toolkit, extrakit, stream }).make({
+      response,
+      sessionId,
+      extra,
+    }) as ResponsePart<Toolkit, Extrakit, Stream>;
 
 /**
  * Creates the schema of an event part, as the event kit given reads the event it
