@@ -1,0 +1,61 @@
+packages:
+  - apps/*
+  - extensions/*
+  - packages/*
+  - tools/*
+
+catalogMode: prefer
+
+catalog:
+  "@anthropic-ai/tokenizer": ^0.0.4
+  "@base-ui/react": ^1.9.0
+  "@changesets/changelog-github": ^1.0.1
+  "@changesets/cli": ^3.0.3
+  "@effect/ai-anthropic": ^4.0.2
+  "@effect/ai-openai-compat": ^4.0.2
+  # Pinned to the `effect` release the workspace is on: the 4.0.3 line peers on
+  # `effect@^4.0.3`.
+  "@effect/platform-node": 4.0.2
+  "@fontsource-variable/geist": ^5.3.0
+  "@fumapress/ai": ^1.2.1
+  "@shadcn/react": ^0.3.1
+  "@streamdown/code": ^2.0.0
+  "@types/node": ^24
+  bson: ^7.3.3
+  class-variance-authority: ^0.7.1
+  cmdk: ^1.1.1
+  cn: ^0.4.0
+  effect: ^4.0.2
+  fzstd: ^0.1.1
+  gpt-tokenizer: ^4.0.0
+  lucide-react: ^1.55.0
+  next-themes: ^0.4.6
+  react-json-view-lite: ^2.5.0
+  react-resizable-panels: ^4.14.4
+  shadcn: ^4.21.4
+  sonner: ^2.0.8
+  streamdown: ^2.7.0
+  tw-animate-css: ^1.4.0
+  typescript: ^7.0.2
+  uuid: ^14.0.2
+  vite: npm:@voidzero-dev/vite-plus-core@1.0.0-rc.1
+  vite-plus: 1.0.0-rc.1
+  wrangler: ^4.149.0
+overrides:
+  # The platform package's shared runtime would otherwise resolve to 4.0.3,
+  # which peers on a newer `effect` than the workspace has.
+  "@effect/platform-node-shared": 4.0.2
+  vite@*: "catalog:"
+peerDependencyRules:
+  allowAny:
+    - vite
+  allowedVersions:
+    vite: "*"
+minimumReleaseAgeExclude:
+  - effect@4.0.2
+  - "@fumadocs/base-ui@16.17.3"
+  - fumadocs-core@16.17.3
+allowBuilds:
+  esbuild: true
+  # `workerd` ships the Workers runtime binary that `wrangler` runs.
+  workerd: true

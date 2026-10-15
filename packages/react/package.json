@@ -1,0 +1,56 @@
+{
+  "name": "@trajs/react",
+  "version": "0.0.0",
+  "description": "React components that render effect/ai prompts with shadcn/ui.",
+  "homepage": "https://github.com/OpenInsightDev/trajs",
+  "license": "MIT",
+  "author": "Bowei Wang <wozluohd@gmail.com>",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/OpenInsightDev/trajs.git"
+  },
+  "files": [
+    "dist",
+    "src/styles.css"
+  ],
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./package.json": "./package.json",
+    "./styles.css": "./src/styles.css"
+  },
+  "publishConfig": {
+    "exports": {
+      ".": "./dist/index.mjs",
+      "./package.json": "./package.json",
+      "./styles.css": "./src/styles.css"
+    },
+    "access": "public"
+  },
+  "scripts": {
+    "build": "vp pack",
+    "dev": "vp pack --watch",
+    "check": "vp check",
+    "prepublishOnly": "vp run build"
+  },
+  "dependencies": {
+    "@streamdown/code": "catalog:",
+    "@trajs/ui": "workspace:*",
+    "cn": "catalog:",
+    "effect": "catalog:",
+    "lucide-react": "catalog:",
+    "react-json-view-lite": "catalog:",
+    "streamdown": "catalog:"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "@types/react": "^19.2.7",
+    "react": "^19.2.0",
+    "typescript": "catalog:",
+    "vite": "catalog:",
+    "vite-plus": "catalog:"
+  },
+  "peerDependencies": {
+    "react": "^19.0.0"
+  }
+}

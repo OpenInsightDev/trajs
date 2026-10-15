@@ -1,0 +1,54 @@
+name: Release
+
+# Publishes the packages in this repository to npm. Versioning is driven by
+# Changesets: every push to `main` either opens or updates the "Version
+# Packages" pull request, and merging that pull request publishes the release.
+#
+# Authentication is npm trusted publishing: the publish exchanges this
+# workflow's GitHub OIDC token for a short-lived npm credential, so no npm token
+# is stored in the repository. npm only accepts publishes from a workflow that the
+# published package lists as a trusted publisher: repository `OpenInsightDev/trajs`,
+# workflow `release.yml`, no environment, and `npm publish` allowed.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # push the release commit and tags
+      pull-requests: write # open and update the "Version Packages" pull request
+      id-token: write # authenticate the publish with npm trusted publishing
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # The release commit and tags are pushed with the token handed to
+          # changesets/action, not with credentials kept by checkout.
+          persist-credentials: false
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 12.10.1
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec vp run ready
+      # `changeset publish` runs `pnpm publish` in each package with an
+      # unpublished version, which rewrites `catalog:` ranges and publishes
+      # through the OIDC credential. These commands run directly rather than
+      # through `vp run`, which would strip their environment.
+      - uses: changesets/action@v2.1.2
+        with:
+          version-script: pnpm exec changeset version
+          publish-script: pnpm exec changeset publish

@@ -1,0 +1,7 @@
+#!/bin/sh
+set -eu
+
+vp i
+
+mkdir -p references
+ln -sfn "$HOME/workspace/harbor" references/harbor

@@ -1,0 +1,12 @@
+# The Fumapress build writes the site to `dist/`, and the Fumadocs MDX
+# collection cache and generated route table alongside the source.
+dist/
+.source/
+src/pages.gen.ts
+
+# The deploy pointer the Fumapress build writes for `wrangler deploy`.
+.wrangler/
+
+# Environment files read by the Fumapress CLI.
+.env
+.env.local

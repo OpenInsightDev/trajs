@@ -1,0 +1,46 @@
+/* Streamdown ships the styles its own markdown is animated with; a message that
+   streams in needs them, so the mapping brings them with it. */
+@import "streamdown/styles.css";
+
+/* A message is body text read in a bubble, not a document read down a page.
+   Streamdown sets its rhythm for a 16px page and shadcn's bubble hands it 14px
+   with a relaxed leading, which is what makes a message look both small and
+   loose: its blocks are spaced for a wider measure than the one they are read
+   at. The size and the rhythm are set here instead, so a message reads as the
+   conversation it is. */
+.message-markdown {
+  font-size: 1rem;
+  line-height: 1.5;
+}
+
+.message-markdown > * + * {
+  margin-block-start: 0.75rem;
+}
+
+/* A recorded message carries no code playground: the language label, the
+   controls and the line numbers belong to a block someone is editing, and the
+   card they sit in would be a second surface inside the bubble. A code block is
+   one quiet surface whose lines wrap, since a message is read in a bubble
+   narrower than its code. */
+[data-streamdown="code-block"] {
+  margin-block: 0.75rem;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+[data-streamdown="code-block"] > div:not(:has(pre)) {
+  display: none;
+}
+
+[data-streamdown="code-block"] > div:has(pre) {
+  padding: 0.75rem 1rem;
+  border: 0;
+  border-radius: var(--radius);
+  background-color: var(--muted);
+}
+
+[data-streamdown="code-block"] pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}

@@ -1,0 +1,14 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "trajs-website",
+  // `nodejs_compat` provides `node:module`, which Vite 8's rolldown runtime
+  // imports; `new_module_registry` is what makes `import.meta.url` defined in
+  // workerd, and that runtime calls `createRequire(import.meta.url)` as it
+  // loads. Without both, the Worker dies at startup.
+  "compatibility_flags": ["nodejs_als", "nodejs_compat", "new_module_registry"],
+  "compatibility_date": "2025-11-17",
+  "assets": {
+    "binding": "ASSETS",
+    "html_handling": "drop-trailing-slash",
+  },
+}

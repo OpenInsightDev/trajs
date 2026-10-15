@@ -1,0 +1,41 @@
+{
+  "name": "viewer",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Web viewer for trajs trajectories, built with Vite and React.",
+  "type": "module",
+  "scripts": {
+    "dev": "vp dev",
+    "build": "vp build",
+    "preview": "vp preview",
+    "sample": "node scripts/sample.ts",
+    "check": "vp check"
+  },
+  "dependencies": {
+    "@fontsource-variable/geist": "catalog:",
+    "@trajs/core": "workspace:*",
+    "@trajs/react": "workspace:*",
+    "@trajs/ui": "workspace:*",
+    "cn": "catalog:",
+    "effect": "catalog:",
+    "fzstd": "catalog:",
+    "lucide-react": "catalog:",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "shadcn": "catalog:",
+    "tw-animate-css": "catalog:"
+  },
+  "devDependencies": {
+    "@streamdown/code": "catalog:",
+    "@tailwindcss/vite": "^4.1.18",
+    "@types/node": "catalog:",
+    "@types/react": "^19.2.7",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^6.1.2",
+    "streamdown": "catalog:",
+    "tailwindcss": "^4.1.18",
+    "typescript": "catalog:",
+    "vite": "catalog:",
+    "vite-plus": "catalog:"
+  }
+}
