@@ -22,6 +22,8 @@ export * as Exchange from "#/Exchange.ts";
 
 export * as Extra from "#/Extra.ts";
 
+export * as Indexing from "#/Indexing.ts";
+
 export * as Metric from "#/Metric.ts";
 
 export * as Produce from "#/Produce.ts";
