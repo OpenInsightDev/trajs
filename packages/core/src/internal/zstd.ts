@@ -2,7 +2,7 @@
  * The zstd stream a recording's parts are carried in, as `node:zlib` writes and
  * reads one.
  *
- * {@link layer} is the {@link Compression} `Exchange.nodeLayer` provides the
+ * {@link layer} is the {@link Compression} `Compression.nodeLayer` provides the
  * exchange with, over the primitives below, which write and read the stream
  * itself. What a recording is of is the format's, and what writes and reads the
  * frame it carries the parts in is this.
@@ -13,8 +13,9 @@ import { createZstdCompress, createZstdDecompress, type ZstdOptions } from "node
 import { pipeThroughDuplex } from "@effect/platform-node/NodeStream";
 import { Data, Layer, Stream } from "effect";
 
-import { Compression } from "#/Exchange.ts";
 import { TrajectoryError } from "#/TrajectoryError.ts";
+
+import { Compression } from "./Compression.ts";
 
 /**
  * A zstd stream failing: what was written could not be compressed, or what was
@@ -143,8 +144,8 @@ const refused = <E, R>(
   );
 
 /**
- * The compression `Exchange.nodeLayer` provides the exchange with: the zstd stream
- * `node:zlib` writes and reads one with, at the level zstd defaults to.
+ * The compression `Compression.nodeLayer` provides the exchange with: the zstd
+ * stream `node:zlib` writes and reads one with, at the level zstd defaults to.
  *
  * Each frame is written and read through one zstd stream per run, so the bytes are
  * never held whole.

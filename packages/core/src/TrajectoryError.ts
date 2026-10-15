@@ -22,8 +22,8 @@ const listed = (members: ReadonlyArray<string>): string =>
  * **When to use**
  *
  * Use to word what an error was derived of where one is `cause` to another: a
- * reason of a {@link TrajectoryError}, or an {@link Exchange.StorageError} that
- * could not read or write a recording.
+ * reason of a {@link TrajectoryError}, or the failure a storage read or wrote a
+ * recording with.
  *
  * **Details**
  *

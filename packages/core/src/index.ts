@@ -8,10 +8,10 @@
  * `@trajs/core/Metric`.
  *
  * The exchange carries a recording's parts in a zstd frame, and what writes and
- * reads that frame is a {@link Exchange.Compression} the layer is provided with:
- * {@link Exchange.nodeLayer} is over `node:zlib`, which only a program that runs
- * on Node loads, and {@link Exchange.wasmLayer} is over a WebAssembly codec that
- * runs anywhere — the payload is loaded when it first writes or reads a frame.
+ * reads that frame is a compression the layer is built over: `Exchange.nodeLayer`
+ * is over `node:zlib`, which only a program that runs on Node loads, and
+ * `Exchange.wasmLayer` is over a WebAssembly codec that runs anywhere — the payload
+ * is loaded when it first writes or reads a frame.
  */
 
 export * as Event from "#/Event.ts";

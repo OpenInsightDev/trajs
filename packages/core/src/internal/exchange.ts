@@ -21,22 +21,19 @@ import * as Arr from "effect/Array";
 import { SchemaBinary } from "effect/encoding";
 
 import * as Event from "#/Event.ts";
-import type {
-  Bytes,
-  Compression,
-  EncodingServices,
-  Header,
-  Service,
-  Storage,
-  StorageError,
-} from "#/Exchange.ts";
+import type { EncodingServices, Header, Service } from "#/Exchange.ts";
 import type * as Extra from "#/Extra.ts";
-import type { Hasher } from "#/Indexing.ts";
 import * as Metric from "#/Metric.ts";
 import * as Prompt from "#/Prompt.ts";
 import * as Toolkit from "#/Toolkit.ts";
 import * as Trajectory from "#/Trajectory.ts";
 import { TrajectoryError } from "#/TrajectoryError.ts";
+
+import type { Bytes } from "./Bytes.ts";
+import type { Compression } from "./Compression.ts";
+import type { StreamHash } from "./Hash.ts";
+import type { Storage } from "./Storage.ts";
+import type { StorageError } from "./StorageError.ts";
 
 /**
  * How one contribution of a kit names itself, as a recording states it: the name it
@@ -442,7 +439,7 @@ const trajectoryOf = <C extends Trajectory.AnyConfig, E, R>(
 ): Trajectory.Trajectory<C, E, R> => Object.assign(parts, { ...config, metadata });
 
 /**
- * The digest a recording ends with, as the hex a {@link Hasher} reads one off
+ * The digest a recording ends with, as the hex a {@link StreamHash} reads one off
  * with: 64 characters, as its `digest` states, and so 64 bytes at the end of
  * every recording.
  */
@@ -451,19 +448,9 @@ const DigestBytes = 64;
 const DigestText = new RegExp(`^[0-9a-f]{${DigestBytes}}$`);
 
 /**
- * The digest a recording ends with, read off the tail of the bytes it is held in:
- * Drops the digest a recording ends with: it is no part of the frame the parts
- * are carried in, so what reads that frame is handed the bytes without it.
- *
- * How many bytes to drop is known before any of them arrive ({@link DigestBytes}),
- * but which bytes they are is not: that many are held back as the chunks arrive
- * and everything before them is emitted, and whatever is still held when the
- * stream ends is left behind.
- */
-/**
- * The digest a recording ends with, read off the tail of the bytes it is held in:
- * the hex a {@link Hasher} reads one off its parts with, which is 64 characters,
- * and so 64 bytes at the end of every recording.
+ * Reads the digest a recording ends with off the tail of the bytes it is held in,
+ * which is what the recording is named by: 64 characters of hex
+ * ({@link DigestBytes}).
  *
  * The digest follows the parts rather than being one, so it is read where it lies
  * rather than by reading the frame those parts are carried in. Bytes that end in
@@ -514,7 +501,7 @@ export const service = <S extends Schema.ConstraintCodec<Header, unknown, never,
   header: S,
   storage: Storage,
   compression: Compression,
-  hasher: Hasher,
+  hasher: StreamHash,
 ): Service => {
   return {
     load: (id) =>
