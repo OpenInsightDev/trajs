@@ -45,7 +45,9 @@
     "@effect/ai-anthropic": "catalog:",
     "@effect/ai-openai-compat": "catalog:",
     "@effect/platform-node": "catalog:",
+    "@napi-rs/blake-hash": "catalog:",
     "@structured-world/structured-zstd": "catalog:",
+    "blake3-wasm": "catalog:",
     "effect": "catalog:",
     "uuid": "catalog:"
   },

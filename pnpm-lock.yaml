@@ -191,6 +191,9 @@ catalogs:
     '@fumapress/ai':
       specifier: ^1.2.1
       version: 1.2.1
+    '@napi-rs/blake-hash':
+      specifier: ^1.4.0
+      version: 1.4.0
     '@shadcn/react':
       specifier: ^0.3.1
       version: 0.3.1
@@ -203,6 +206,9 @@ catalogs:
     '@types/node':
       specifier: ^24
       version: 24.19.1
+    blake3-wasm:
+      specifier: ^2.1.5
+      version: 2.1.5
     class-variance-authority:
       specifier: ^0.7.1
       version: 0.7.1
@@ -496,9 +502,15 @@ importers:
       '@effect/platform-node':
         specifier: 'catalog:'
         version: 4.0.2(effect@4.0.2)(redis@6.3.0)
+      '@napi-rs/blake-hash':
+        specifier: 'catalog:'
+        version: 1.4.0
       '@structured-world/structured-zstd':
         specifier: 'catalog:'
         version: 0.2.0
+      blake3-wasm:
+        specifier: 'catalog:'
+        version: 2.1.5
       effect:
         specifier: 'catalog:'
         version: 4.0.2
@@ -1504,6 +1516,100 @@ packages:
   '@modelcontextprotocol/server@2.3.1':
     resolution: {integrity: sha512-e59MfWuSssj6DoQ96JCTqdW1AXT5/XtnTl0WWd6MU1Ka434fFUGGosCLJbGNySDhHGvxQWoRWK137FXYFkYNWw==}
     engines: {node: '>=20'}
+
+  '@napi-rs/blake-hash-android-arm64@1.4.0':
+    resolution: {integrity: sha512-vS8VCHXYoGrNzSal26P0jMgt6GV+sdoXLiVjmFPzAFxG3KQZOhD4rzMfq1kua1u3AEqU3kSZY5UaiuXRLZA1qw==}
+    engines: {node: '>= 22'}
+    cpu: [arm64]
+    os: [android]
+
+  '@napi-rs/blake-hash-darwin-arm64@1.4.0':
+    resolution: {integrity: sha512-Uzg1sv4LVSyCttzhMgljd81rx5DqyqACp3I0o2nZaeLy9DVuew/VHm8j6UHtQkkUN0XNqQMKpfHME/8KIM1Jfg==}
+    engines: {node: '>= 22'}
+    cpu: [arm64]
+    os: [darwin]
+
+  '@napi-rs/blake-hash-darwin-x64@1.4.0':
+    resolution: {integrity: sha512-qPpuci0ehB04xpHQWbosiqptzY60vjW+XQhw+JUWzjGgNSLrmsZdZWnKUHc1AHSaRti78xsADtef2TIDizBVXA==}
+    engines: {node: '>= 22'}
+    cpu: [x64]
+    os: [darwin]
+
+  '@napi-rs/blake-hash-freebsd-x64@1.4.0':
+    resolution: {integrity: sha512-V+LPHOaiIy6+izRoW57o4q3o0WXz1QSLLAmAkEnIC4IqZLPTOckAct2ql2mtvRv7pCuKhi9U0y1bfor+KifHiQ==}
+    engines: {node: '>= 22'}
+    cpu: [x64]
+    os: [freebsd]
+
+  '@napi-rs/blake-hash-linux-arm-gnueabihf@1.4.0':
+    resolution: {integrity: sha512-2v1sW0sLMeh6kc7mgNCup/Xu5Lmzlha8+yqqlOQGVzz7GQQxU5VT5eJvUkB+Y2x/oUHkpNNb45eFKIw4ZQOlIg==}
+    engines: {node: '>= 22'}
+    cpu: [arm]
+    os: [linux]
+
+  '@napi-rs/blake-hash-linux-arm64-gnu@1.4.0':
+    resolution: {integrity: sha512-7ayUqC+1SWXiXkgePVFyOOSMrNJdggU8y8EBzCtdCICuYtC/mIAl1p/OaddjAcRpD6HKphV8xaQgnqZ2kZ75Mg==}
+    engines: {node: '>= 22'}
+    cpu: [arm64]
+    os: [linux]
+    libc: [glibc]
+
+  '@napi-rs/blake-hash-linux-arm64-musl@1.4.0':
+    resolution: {integrity: sha512-Wg8L3KKX0fxFEO6KKm1Qrr+eD/Vj9ApbbhqUOKQYJG8HFE+je80rNU4RsAFYkzAAOSG3mPFcsPa9LOFyxg56jQ==}
+    engines: {node: '>= 22'}
+    cpu: [arm64]
+    os: [linux]
+    libc: [musl]
+
+  '@napi-rs/blake-hash-linux-ppc64-gnu@1.4.0':
+    resolution: {integrity: sha512-Ec6II7r3WETZqcpCkO4GnIgzTAcumVnM0N51+o4c86yp4sVENBq09Ucldi1EzKkjZsr/0Dyg9v32j9yX/US7GQ==}
+    engines: {node: '>= 22'}
+    cpu: [ppc64]
+    os: [linux]
+    libc: [glibc]
+
+  '@napi-rs/blake-hash-linux-s390x-gnu@1.4.0':
+    resolution: {integrity: sha512-9Ds2Yx8HXFrAATSsvPwKl9uXbmEtIqQ7UfLDWF78VJCzIlKgYVzGx09vVUbfQ8KmWPNfVPukOpOvGEZMv8AL8g==}
+    engines: {node: '>= 22'}
+    cpu: [s390x]
+    os: [linux]
+    libc: [glibc]
+
+  '@napi-rs/blake-hash-linux-x64-gnu@1.4.0':
+    resolution: {integrity: sha512-aOnhGVe2wTi7Qd0vzOgAr7aU185SFsjUTeVqmXqADiF9jad7Z4+HcINIoSXoWEtHISXhoR8/qjFGmaDz9/yasg==}
+    engines: {node: '>= 22'}
+    cpu: [x64]
+    os: [linux]
+    libc: [glibc]
+
+  '@napi-rs/blake-hash-linux-x64-musl@1.4.0':
+    resolution: {integrity: sha512-Wnad1XNfU561/avEuGnPRnRi7/ujyctMPcr1EeF8Hs16EeSoSrnOgHffUeizTFbWnNsYzK2IJSvQtuvGM+foww==}
+    engines: {node: '>= 22'}
+    cpu: [x64]
+    os: [linux]
+    libc: [musl]
+
+  '@napi-rs/blake-hash-win32-arm64-msvc@1.4.0':
+    resolution: {integrity: sha512-MXfrSl6IsJgeq+wpfvE9GUzB10P+0MRIJadymMkVwfxs0QOA2JuTC3BtfIy9uAw2r1C/K2PVzvb68drJuKLcWA==}
+    engines: {node: '>= 22'}
+    cpu: [arm64]
+    os: [win32]
+
+  '@napi-rs/blake-hash-win32-ia32-msvc@1.4.0':
+    resolution: {integrity: sha512-2g4hQ4LPLCena4p5w0Fwa9vaTc/+uvaKQ0y+FAQQI/MVpma/t5kiID6g9T5de+rjvqS5/QozJ2UdZw5/LCW6aw==}
+    engines: {node: '>= 22'}
+    cpu: [ia32]
+    os: [win32]
+
+  '@napi-rs/blake-hash-win32-x64-msvc@1.4.0':
+    resolution: {integrity: sha512-MYZFLBCo5SO55n7XCksfp6izvznFi1b+Ib0nY9gL3gUl34lbBXbUC8vwD8BpcxoRrlvZA0QQ50BuM5Lid6Oq/g==}
+    engines: {node: '>= 22'}
+    cpu: [x64]
+    os: [win32]
+
+  '@napi-rs/blake-hash@1.4.0':
+    resolution: {integrity: sha512-8eGl9rvijokp3v5BbKJLkAD5rJRjx0qxge7KvbAkSGdeH6dJjr7yINpK7Qq5CyLEqZPxGw6Z6sXrVzClUwIjCA==}
+    engines: {node: '>= 22'}
 
   '@napi-rs/wasm-runtime@1.2.5':
     resolution: {integrity: sha512-HshSvXzmBxNzqejd3k/KemgQ3hdREUYFRRrgxOZ+gPljDIsO2SDZrVZMd4Z/HsxudQbE62OVyVFE8z9BCurfjA==}
@@ -6697,6 +6803,65 @@ snapshots:
     dependencies:
       '@modelcontextprotocol/core': 2.3.1
       zod: 4.6.5
+
+  '@napi-rs/blake-hash-android-arm64@1.4.0':
+    optional: true
+
+  '@napi-rs/blake-hash-darwin-arm64@1.4.0':
+    optional: true
+
+  '@napi-rs/blake-hash-darwin-x64@1.4.0':
+    optional: true
+
+  '@napi-rs/blake-hash-freebsd-x64@1.4.0':
+    optional: true
+
+  '@napi-rs/blake-hash-linux-arm-gnueabihf@1.4.0':
+    optional: true
+
+  '@napi-rs/blake-hash-linux-arm64-gnu@1.4.0':
+    optional: true
+
+  '@napi-rs/blake-hash-linux-arm64-musl@1.4.0':
+    optional: true
+
+  '@napi-rs/blake-hash-linux-ppc64-gnu@1.4.0':
+    optional: true
+
+  '@napi-rs/blake-hash-linux-s390x-gnu@1.4.0':
+    optional: true
+
+  '@napi-rs/blake-hash-linux-x64-gnu@1.4.0':
+    optional: true
+
+  '@napi-rs/blake-hash-linux-x64-musl@1.4.0':
+    optional: true
+
+  '@napi-rs/blake-hash-win32-arm64-msvc@1.4.0':
+    optional: true
+
+  '@napi-rs/blake-hash-win32-ia32-msvc@1.4.0':
+    optional: true
+
+  '@napi-rs/blake-hash-win32-x64-msvc@1.4.0':
+    optional: true
+
+  '@napi-rs/blake-hash@1.4.0':
+    optionalDependencies:
+      '@napi-rs/blake-hash-android-arm64': 1.4.0
+      '@napi-rs/blake-hash-darwin-arm64': 1.4.0
+      '@napi-rs/blake-hash-darwin-x64': 1.4.0
+      '@napi-rs/blake-hash-freebsd-x64': 1.4.0
+      '@napi-rs/blake-hash-linux-arm-gnueabihf': 1.4.0
+      '@napi-rs/blake-hash-linux-arm64-gnu': 1.4.0
+      '@napi-rs/blake-hash-linux-arm64-musl': 1.4.0
+      '@napi-rs/blake-hash-linux-ppc64-gnu': 1.4.0
+      '@napi-rs/blake-hash-linux-s390x-gnu': 1.4.0
+      '@napi-rs/blake-hash-linux-x64-gnu': 1.4.0
+      '@napi-rs/blake-hash-linux-x64-musl': 1.4.0
+      '@napi-rs/blake-hash-win32-arm64-msvc': 1.4.0
+      '@napi-rs/blake-hash-win32-ia32-msvc': 1.4.0
+      '@napi-rs/blake-hash-win32-x64-msvc': 1.4.0
 
   '@napi-rs/wasm-runtime@1.2.5(@emnapi/core@1.11.1)(@emnapi/runtime@1.11.1)':
     dependencies:
