@@ -7,11 +7,12 @@ ATIF carries a run as one ordered list of steps — a system prompt, a user
 message, or a complete agent turn — and Harbor writes it to `trajectory.json`,
 which its results viewer reads and its agents load. `Step.steps` derives that
 list from a `@trajs/core` recording, so a recording can be read as the steps the
-format exchanges, and the extension of _Context management events_ below records
-what ATIF states of a run of its own. The document around them — the agent that
-ran, the numbering of the steps, the metrics, the JSON that is written — is what
-this package is for and does not provide yet; _What a step holds_ below says
-where the rest of the gap is.
+format exchanges, and `Document.of` reads the other way: a document is read as
+the recording it states, so a run another program recorded is a trajectory this
+package and every other reader of one reads. The extension of _Context management
+events_ below records what ATIF states of a run of its own. What a document
+states and a recording does not hold is left to whoever writes the document;
+_What a step holds_ below says where that gap is, from the side of a step.
 
 ## Usage
 
@@ -31,6 +32,58 @@ increments of a streamed response are folded into the parts they complete, and a
 response part that no prompt precedes belongs to no turn and is dropped. As in
 `View.promptTurns`, a recording that interleaves several sessions is read one
 session at a time.
+
+## Reading a document
+
+`Document.of` reads an ATIF document as the recording it states: the steps of the
+document are recorded as the turns of a trajectory with `Produce.produce`, so a
+`trajectory.json` a program that ran elsewhere wrote is a recording like any other
+— `View`, `Codec`, `Session` and the metric kits read it as one, and `Step.steps`
+reads back the steps it was read from. The document is stated as the schemas ATIF
+states it in, so what a file holds is decoded before it is read.
+
+```ts
+import { Schema } from "effect";
+import { readFile } from "node:fs/promises";
+import { Document } from "@trajs/extension-atif";
+
+const json = await readFile("trajectory.json", "utf8");
+const document = Schema.decodeUnknownSync(Document.FromJson)(json);
+const recording = Document.of(document);
+```
+
+One step of the document is one turn of the recording: a step that states a
+message opens a turn with it, and an agent step is recorded as the parts of a
+response — what the agent thought, what it said, the tools it called, and the
+results those calls were answered with, in the order the step states them. ATIF
+states one step per inference, so a step that follows the answer of a turn opens a
+turn of its own with no message in it: the model was called again on the same
+messages with the results of the calls in between, which are the parts recorded
+before it. A result that names no call answers a call of its step that no result
+has answered yet, since the calls of a step are answered in the order they were
+made — a document that leaves the id of a result out still says which call was
+answered when a step made one call. The session of the recording is the run the
+document states, or the document's own id where it states no run.
+
+What a document states beyond the conversation is not read, because a recording
+holds the parts a session ran on and what a kit derived of them rather than a
+producer's account of a run:
+
+- the ordinal of a step, the moment it happened, the model that answered it, what
+  it cost, and how many inferences it stands for. A recording times no part of a
+  conversation, names no model per turn, and counts no tokens or cost, so there is
+  nothing to read them from.
+- the tools the agent was given, which the document states in the format's own
+  terms rather than as the tools of a toolkit. The calls of a step are recorded as
+  the calls they were, and are read as the tool parts the reading toolkit does not
+  describe, since it names no tools.
+- what a step holds beyond its text — an image, a recording of speech, the
+  trajectory of a delegated subagent — which a document states by a location beside
+  it or by another document, and a recording holds as neither.
+- what a system step is answered with, which is an operation of the run rather than
+  of the conversation.
+- the context management a system step declares, which this package records as an
+  event of its own rather than as a field of a document.
 
 ## Context management events
 
@@ -90,6 +143,9 @@ step holds its tool results as `observations` rather than in the `observation`
 object ATIF wraps them in, and a step's own tool calls and results are the
 response parts of the recording rather than the `tool_calls` and
 `observation.results` those parts encode to.
+
+`Document.of` reads the other way, and leaves the same fields out of the recording
+it makes: _Reading a document_ above says of each of them what becomes of it.
 
 ## Development
 
