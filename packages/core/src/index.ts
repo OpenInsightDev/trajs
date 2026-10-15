@@ -14,6 +14,8 @@
  * its own. A program that runs on Node imports it as `@trajs/core/Zstd`.
  */
 
+export * as Codec from "#/Codec.ts";
+
 export * as Event from "#/Event.ts";
 
 export * as Exchange from "#/Exchange.ts";
