@@ -690,6 +690,43 @@ export interface Config<
 export type AnyConfig = Config<boolean, Toolkit.Any, Event.AnyKit, Metric.AnyKit, Extra.AnyKit>;
 
 /**
+ * The config a recording is read with: {@link AnyConfig} as the value of a
+ * trajectory that states nothing about itself.
+ *
+ * **When to use**
+ *
+ * Use to read a recording that was written with kits a program does not hold —
+ * what `Exchange.Service.load` reads one with — or to name the reading of a
+ * recording that states no kit of its own.
+ *
+ * **Details**
+ *
+ * Every kit of it is empty and its response parts are read as streams, so every
+ * part of a recording is read as the part it was recorded as: a response part
+ * whose tool the toolkit does not hold reads as the part it is rather than not at
+ * all, and the extra data of a part as the kit that declared it wrote it. What a
+ * recording was written with is what its header names, which is names alone —
+ * {@link AnyConfig} holds anything, so what a recording holds is read without the
+ * schemas it was written with.
+ *
+ * A recording is read as a streaming trajectory whatever it was written as, since
+ * the increments of a streamed response and the whole parts those increments
+ * complete are members of the streaming schema: one reading carries the response
+ * parts of either kind.
+ *
+ * @see {@link AnyConfig} for the type this is the value of.
+ * @see {@link Config} for what a config names.
+ * @category constants
+ */
+export const anyConfig: AnyConfig = {
+  stream: true,
+  toolkit: Toolkit.empty,
+  eventkit: Event.makeKit(),
+  metrickit: Metric.makeKit(),
+  extrakit: Extra.makeKit(),
+};
+
+/**
  * A part of a trajectory of the config given.
  *
  * **When to use**

@@ -16,10 +16,26 @@ const listed = (members: ReadonlyArray<string>): string =>
   members.length > 0 ? members.join(", ") : "none";
 
 /**
- * A `string` cause is a message already, where `Formatter.format` would quote it
- * as the data it is.
+ * What a failure was of, as it is worded: the message of an error, or the data a
+ * failure was of as a formatter writes it.
+ *
+ * **When to use**
+ *
+ * Use to word what an error was derived of where one is `cause` to another: a
+ * reason of a {@link TrajectoryError}, or an {@link Exchange.StorageError} that
+ * could not read or write a recording.
+ *
+ * **Details**
+ *
+ * A `string` cause is a message already and is given as it stands, where
+ * `Formatter.format` would quote it as the data it is; an `Error` is its own
+ * message, without the name of its class; and anything else is the data it is, as
+ * `Formatter.format` writes it.
+ *
+ * @see {@link TrajectoryError} for the errors this words.
+ * @category errors
  */
-const failure = (cause: unknown): string => {
+export const failure = (cause: unknown): string => {
   if (Predicate.isString(cause)) {
     return cause;
   }

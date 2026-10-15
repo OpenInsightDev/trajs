@@ -14,7 +14,7 @@
 import { Data, DateTime, Effect, Predicate, Schema, Stream } from "effect";
 import type { NonEmptyArray } from "effect/Array";
 
-import * as Trajectory from "#/Trajectory.ts";
+import type * as Trajectory from "#/Trajectory.ts";
 import * as VersionedSchema from "#/VersionedSchema.ts";
 
 import type { IndexByKey } from "./internal/types.ts";
