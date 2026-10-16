@@ -68,8 +68,25 @@ export const emptyKit = makeKit();
 /** The type of {@link emptyKit}. */
 export type EmptyKit = typeof emptyKit;
 
-/** The events of the kits given as one, a tag they share holding the event of the kit latest among them. */
-type EventsMerged<Ks extends ReadonlyArray<AnyKit>> = Ks extends readonly [
+/**
+ * The events of the kits given as one, a tag they share holding the event of the
+ * kit latest among them.
+ *
+ * **When to use**
+ *
+ * Use to name the events {@link mergeKit} returns, such as to type the kit a reader
+ * that knows one recording's events reads another one under.
+ *
+ * **Details**
+ *
+ * The events of every kit given are named, and where two of them name the same tag
+ * the one of the kit latest among those given that names it is the one held, as
+ * {@link makeKit} holds the events it is handed.
+ *
+ * @see {@link mergeKit} for the kit those events make.
+ * @category models
+ */
+export type EventsMerged<Ks extends ReadonlyArray<AnyKit>> = Ks extends readonly [
   infer Head extends AnyKit,
   ...infer Tail extends ReadonlyArray<AnyKit>,
 ]
@@ -400,10 +417,10 @@ type EventsWith<Config extends Trajectory.AnyConfig, Es extends ReadonlyArray<An
  *
  * **Details**
  *
- * A trajectory is read as a trajectory, so the kit, the metadata and the variant it
- * carries travel with the parts it returns — with the events given added to the
- * kit, where {@link WithEvents} says — and any other stream of parts is read as a
- * stream of them.
+ * A trajectory is read as a trajectory, so the kit and the variant it carries
+ * travel with the parts it returns — with the events given added to the kit, where
+ * {@link WithEvents} says — and any other stream of parts is read as a stream of
+ * them.
  *
  * @see {@link encode} for the function that returns one.
  * @category models
@@ -538,7 +555,6 @@ export function encode<const Es extends ReadonlyArray<Any>>(...events: Es): Read
     }
 
     return Object.assign(parts, {
-      metadata: stream.metadata,
       stream: stream.stream,
       toolkit: stream.toolkit,
       eventkit: mergeKit(stream.eventkit, eventkit),

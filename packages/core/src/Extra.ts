@@ -7,13 +7,14 @@
  * it, and the schema of what a session part holds of it, each at every version it
  * was written at: what a datum states of one part need not be what it states of
  * another, and an extension declares the schema of whichever parts it states, or
- * of several. {@link makeKit} collects extra data into a kit, and
- * {@link ExtraRecord} reads the extra data a part holds as the extra data of that
- * kit for the part it is: the data of every kind the kit declares a schema for
- * there, keyed by its tag, and the data of the kinds it declares none for there as
- * it was written. A part is read through the kit it was recorded with for the same
- * reason a response part is read through the toolkit it was recorded with: the part
- * holds the data, and the kit is what says how to read it.
+ * of several. {@link makeKit} collects extra data into a kit, {@link mergeKit} adds
+ * the extra data of one kit to another's, and {@link ExtraRecord} reads the extra
+ * data a part holds as the extra data of that kit for the part it is: the data of
+ * every kind the kit declares a schema for there, keyed by its tag, and the data of
+ * the kinds it declares none for there as it was written. A part is read through the
+ * kit it was recorded with for the same reason a response part is read through the
+ * toolkit it was recorded with: the part holds the data, and the kit is what says how
+ * to read it.
  */
 
 import { Data, Schema } from "effect";
@@ -89,6 +90,94 @@ export const emptyKit = makeKit();
 
 /** The type of {@link emptyKit}. */
 export type EmptyKit = typeof emptyKit;
+
+/**
+ * The extra data of the kits given as one, a tag they share holding the extra data
+ * of the kit latest among them.
+ *
+ * **When to use**
+ *
+ * Use to name the extra data {@link mergeKit} returns, such as to type the kit a
+ * reader that knows one recording's extra data reads another one under.
+ *
+ * **Details**
+ *
+ * The extra data of every kit given is named, and where two of them name the same
+ * tag the one of the kit latest among those given that names it is the one held, as
+ * {@link makeKit} holds the extra data it is handed.
+ *
+ * @see {@link mergeKit} for the kit those extra data make.
+ * @category models
+ */
+export type ExtrasMerged<Ks extends ReadonlyArray<AnyKit>> = Ks extends readonly [
+  infer Head extends AnyKit,
+  ...infer Tail extends ReadonlyArray<AnyKit>,
+]
+  ? Omit<Head["extra"], keyof ExtrasMerged<Tail>> & ExtrasMerged<Tail>
+  : {};
+
+/**
+ * Adds the extra data of each kit given to the ones of the kits before it.
+ *
+ * **When to use**
+ *
+ * Use when the extra data of several extensions are read together, or when a reader
+ * that knows some of a recording's extra data should read it under the ones it knows
+ * without forgetting the rest — which is what reading two recordings as one does.
+ *
+ * **Details**
+ *
+ * A tag the kits share holds the extra data of the kit latest among those given that
+ * names it, so a kit of the version an extension states now states over the one a
+ * recording was read with. The kit returned is a kit like any other: it names the
+ * extra data of every kit given and no others.
+ *
+ * **Example** (Adding the extra data of one kit to another's)
+ *
+ * ```ts import.meta.vitest
+ * import { Schema } from "effect"
+ * import { Extra, VersionedSchema } from "@trajs/core"
+ *
+ * const estimate = new Extra.Extra({
+ *   package: "tokenize",
+ *   id: "estimate",
+ *   prompt: Schema.Struct({
+ *     version: Schema.Literal("0.1.0"),
+ *     tokens: Schema.Number
+ *   }).pipe(VersionedSchema.make)
+ * })
+ *
+ * const step = new Extra.Extra({
+ *   package: "atif",
+ *   id: "step",
+ *   session: Schema.Struct({
+ *     version: Schema.Literal("0.1.0"),
+ *     index: Schema.Number
+ *   }).pipe(VersionedSchema.make)
+ * })
+ *
+ * const merged = Extra.mergeKit(Extra.makeKit(estimate), Extra.makeKit(step))
+ * Object.keys(merged.extra) // => ["tokenize/estimate", "atif/step"]
+ * ```
+ *
+ * @see {@link makeKit} for a kit of the extra data given alone.
+ * @category constructors
+ */
+export const mergeKit = <Ks extends ReadonlyArray<AnyKit>>(
+  ...kits: Ks
+): Extrakit<ExtrasMerged<Ks>> => {
+  // SAFETY: every datum of every kit is inserted under its own tag below, so what the
+  // record holds is one datum per tag the kits name.
+  const extra = {} as Record<string, Any>;
+
+  for (const kit of kits) {
+    Object.assign(extra, kit.extra);
+  }
+
+  // SAFETY: `extra` holds the datum of every tag in `Ks`, the one of the kit latest
+  // among those that names it, which is what `ExtrasMerged` reads the kits as.
+  return { extra } as Extrakit<ExtrasMerged<Ks>>;
+};
 
 /** The schema an extra declares for one part of a recording, and `never` where it declares none. */
 type Declared<X extends Any, P extends Part> = Exclude<X[P], undefined>;

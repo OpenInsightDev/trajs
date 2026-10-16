@@ -175,7 +175,7 @@ export const Viewer = () => {
       <header className="flex shrink-0 items-center gap-2 border-b px-4 py-2">
         {recording === undefined ? null : (
           <span className="truncate text-sm font-medium" title={state.name}>
-            {recording.metadata.name ?? state.name}
+            {state.name}
           </span>
         )}
         <div className="ms-auto flex items-center gap-2">

@@ -133,7 +133,6 @@ const trajectory = Object.assign(Stream.fromIterable(parts), {
   eventkit: Event.makeKit(),
   metrickit: Metric.makeKit(),
   extrakit,
-  metadata: new Trajectory.Metadata({ name: "what a recording is counted as" }),
 });
 
 /**

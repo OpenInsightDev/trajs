@@ -56,18 +56,15 @@ const contribute = <Entry>(
 const encodeHeader = ({
   extrakit,
   eventkit,
-  metadata,
   metrickit,
   toolkit,
 }: {
   extrakit: Extra.AnyKit;
   eventkit: Event.AnyKit;
-  metadata: Trajectory.Metadata;
   metrickit: Metric.AnyKit;
   toolkit: Toolkit.Any;
 }): string =>
   JSON.stringify({
-    metadata: Schema.encodeSync(Trajectory.Metadata)(metadata),
     toolkit: Toolkit.encode(toolkit),
     eventkit: contribute(eventkit.events, (event) =>
       Schema.encodeSync(Event.Metadata)(event.metadata),
@@ -425,7 +422,7 @@ const configOf = <C extends Trajectory.AnyConfig, E, R>(
 
 /**
  * The trajectory a stream of parts makes, carrying the config its parts are read
- * with and the metadata it goes by.
+ * with.
  *
  * A trajectory is its parts and what they were recorded with, so what a recording
  * was read as is stated on the stream the bytes decode to.
@@ -433,8 +430,7 @@ const configOf = <C extends Trajectory.AnyConfig, E, R>(
 const trajectoryOf = <C extends Trajectory.AnyConfig, E, R>(
   parts: Stream.Stream<Trajectory.Part<C>, E, R>,
   config: C,
-  metadata: Trajectory.Metadata,
-): Trajectory.Trajectory<C, E, R> => Object.assign(parts, { ...config, metadata });
+): Trajectory.Trajectory<C, E, R> => Object.assign(parts, config);
 
 /**
  * The digest a recording ends with, as the hex a {@link StreamHash} reads one off
@@ -534,13 +530,12 @@ export const service = <S extends Schema.ConstraintCodec<Header, unknown, never,
         return {
           // What loading a recording reads, and so what it knows of one: what it
           // states of itself, without the frame or the digest being read.
-          metadata: stated.header,
+          header: stated.header,
           digest: digestOf(bytes),
           read: () =>
             trajectoryOf(
               framed(frame.pipe(compression.decompress)).pipe(decodeParts(Trajectory.anyConfig)),
               Trajectory.anyConfig,
-              stated.header.metadata,
             ),
         };
       }),
@@ -550,7 +545,7 @@ export const service = <S extends Schema.ConstraintCodec<Header, unknown, never,
         const config = configOf(trajectory);
 
         const recording = Effect.gen(function* () {
-          const line = encodeHeader({ ...config, metadata: trajectory.metadata });
+          const line = encodeHeader(config);
 
           const frames = trajectory.pipe(Stream.mapEffect(encodePart(config), { concurrency: 1 }));
 

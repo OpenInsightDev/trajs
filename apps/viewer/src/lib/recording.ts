@@ -101,7 +101,6 @@ export interface RecordedSession {
 
 /** A recording, as the viewer reads it. */
 export interface Recording {
-  readonly metadata: Trajectory.Metadata;
   readonly roots: ReadonlyArray<RecordedSession>;
 }
 
@@ -184,8 +183,8 @@ const readSession = (
  * The page is handed one recording, so it serves it under one id: the exchange the
  * bytes are read through is provided with the codecs a page runs — the WebAssembly
  * compression and hash `@trajs/platform-browser` states — and with a storage over
- * the bytes themselves. Loading reads the head of them for what the recording
- * states of itself, and `read` reads the parts, which is what the exchange reads a
+ * the bytes themselves. Loading reads the head of them for what the recording was
+ * made with, and `read` reads the parts, which is what the exchange reads a
  * recording into. It takes a `Uint8Array` rather than a stream because a `.trajs`
  * file is what a page reads, and a file is read whole.
  */
@@ -198,7 +197,6 @@ export const read = (bytes: Uint8Array): Effect.Effect<Recording, Failure, Scope
     const roots = yield* Stream.runCollect(Session.sessions(loaded.read()));
 
     return {
-      metadata: loaded.metadata.metadata,
       roots: yield* Effect.forEach(roots, (session) => readSession(session, [])),
     };
   }).pipe(

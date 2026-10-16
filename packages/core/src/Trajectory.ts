@@ -3,10 +3,10 @@
  *
  * A trajectory is one stream of parts in total order — the prompts a model was
  * given, the responses it returned, the session each was recorded in, and the events
- * and metrics a kit recorded of them — together with what those parts are read with
- * and the metadata the recording goes by: {@link Trajectory} is that stream,
- * {@link TrajectoryStream} one that states nothing of itself, and {@link Part} what
- * a part of a config is.
+ * and metrics a kit recorded of them — together with what those parts are read with:
+ * {@link Trajectory} is that stream, {@link TrajectoryStream} one that states nothing
+ * of itself, and {@link Part} what a part of a config is. Two trajectories are read as
+ * one by {@link merge}, which adds the parts and the kits of each to the other's.
  *
  * What a part is read as is what a kit states of it: a response part's response
  * through the toolkit it was recorded with, and the extra data of a prompt, response
@@ -26,55 +26,8 @@ import * as Prompt from "#/Prompt.ts";
 import * as Response from "#/Response.ts";
 import * as Toolkit from "#/Toolkit.ts";
 
-import pkg from "../package.json" with { type: "json" };
 import { Timestamp, Uuid } from "./internal/schema.ts";
 import type { Select } from "./internal/types.ts";
-
-/**
- * The version of this package, which a recording states as the `version` of its
- * {@link Metadata} unless the caller names another.
- *
- * @see {@link Metadata} for what a recording states about itself.
- * @category constants
- */
-export const version = pkg.version;
-
-/**
- * What a recording states about itself, read before any of its parts.
- *
- * **When to use**
- *
- * Use to name a recording, or to read what one says it is.
- *
- * **Details**
- *
- * - `version` is the version of the package that wrote the recording, which
- *   {@link version} supplies unless the caller names another: it states the shape
- *   of the parts rather than the release of the program that wrote them.
- * - `name` and `description` are the caller's to set, since nothing of a
- *   recording derives them.
- *
- * A recording carries its metadata before any of its parts — see
- * {@link Exchange.Header} — so what a recording says of itself reads without
- * reading a part of it.
- *
- * @see {@link MetadataEncoded} for the form a recording carries it in.
- * @category models
- */
-export class Metadata extends Schema.Class<Metadata>("Metadata")({
-  version: Schema.String.pipe(Schema.withConstructorDefault(Effect.succeed(version))),
-  name: Schema.optional(Schema.String),
-  description: Schema.optional(Schema.String),
-}) {}
-
-/**
- * A {@link Metadata} as it is encoded: the same fields, the version among them
- * written as the string it is.
- *
- * @see {@link Metadata} for the metadata itself.
- * @category models
- */
-export type MetadataEncoded = Schema.Codec.Encoded<typeof Metadata>;
 
 /**
  * The extra data a part holds, read as the kit declares it of the part it is: a part a
@@ -825,7 +778,7 @@ export type TrajectoryStream<Config extends AnyConfig, E, R> = Stream.Stream<Par
 
 /**
  * A trajectory: the parts of a recording as one stream, carrying what they are read
- * with and the metadata the recording goes by.
+ * with.
  *
  * **When to use**
  *
@@ -834,26 +787,136 @@ export type TrajectoryStream<Config extends AnyConfig, E, R> = Stream.Stream<Par
  *
  * **Details**
  *
- * - `metadata` is what the recording states about itself, as {@link Metadata} reads
- *   it.
- * - `stream`, `toolkit`, `eventkit`, `metrickit` and `extrakit` are the
- *   {@link Config} its parts are read with, which travels with the parts rather than
- *   beside them: a function handed a trajectory has the kits its parts were read by,
- *   and reads the extra data of a part without the caller naming them again.
- * - The parts are read as they arrive rather than held whole, so what a trajectory
- *   holds is read once, while the config and the metadata are readable without
- *   reading any of it.
+ * The `stream`, `toolkit`, `eventkit`, `metrickit` and `extrakit` a trajectory is
+ * read with are the {@link Config} its parts are read with, and it carries that
+ * config rather than stating it beside the parts: a function handed a trajectory has
+ * the kits its parts were read by, and reads the extra data of a part without the
+ * caller naming them again. The parts are read as they arrive rather than held whole,
+ * so what a trajectory holds is read once, while the config is readable without
+ * reading any of it.
  *
  * @see {@link TrajectoryStream} for the parts of a trajectory alone.
  * @see {@link Exchange.Service.read} for reading a recording as one.
  * @category models
  */
 export type Trajectory<Config extends AnyConfig, E, R> = TrajectoryStream<Config, E, R> &
-  Readonly<{
-    metadata: Metadata;
-    stream: Config["stream"];
-    toolkit: Config["toolkit"];
-    eventkit: Config["eventkit"];
-    metrickit: Config["metrickit"];
-    extrakit: Config["extrakit"];
-  }>;
+  Readonly<Config>;
+
+/**
+ * The config of the trajectory two trajectories merge into: the response parts of
+ * either variant, and the kits of both.
+ *
+ * **When to use**
+ *
+ * Use to name what {@link merge} returns, such as to type a function that reads two
+ * recordings as one.
+ *
+ * **Details**
+ *
+ * - `stream` is `true` where either of the two streams, since the response parts of
+ *   a merged trajectory are those of both kinds: the increments a streamed answer
+ *   arrived in, and the whole parts those increments complete, which a trajectory
+ *   read as streaming holds either of.
+ * - A kit is the kit of both, each by the rule that kit's own merge states: the
+ *   events of the two as {@link Event.EventsMerged} reads them, the tools of the two
+ *   as `Toolkit.merge` reads them, the metrics as {@link Metric.MetrickitMerged} reads
+ *   them, and the extra data as {@link Extra.ExtrasMerged} reads them — a
+ *   contribution both name being the one of the trajectory merged second, so a kit
+ *   one of them states a newer version of states over the one the other was read
+ *   with.
+ *
+ * @see {@link merge} for the trajectory it is the config of.
+ * @category models
+ */
+export type MergedConfig<Left extends AnyConfig, Right extends AnyConfig> = Config<
+  Left["stream"] | Right["stream"],
+  Toolkit.Toolkit<Toolkit.MergedTools<readonly [Left["toolkit"], Right["toolkit"]]>>,
+  Event.Eventkit<Event.EventsMerged<readonly [Left["eventkit"], Right["eventkit"]]>>,
+  Metric.MetrickitMerged<readonly [Left["metrickit"], Right["metrickit"]]>,
+  Extra.Extrakit<Extra.ExtrasMerged<readonly [Left["extrakit"], Right["extrakit"]]>>
+>;
+
+/**
+ * Merges two trajectories into one: the parts of the left, then the parts of the
+ * right, read with the kits of both.
+ *
+ * **When to use**
+ *
+ * Use when two recordings are read together rather than side by side — two halves of
+ * a session, a run and what was recorded of it elsewhere — so that what either holds
+ * is read with the kits the other was recorded with, and their parts read as the
+ * parts of one trajectory.
+ *
+ * **Details**
+ *
+ * - The parts of the left arrive before the parts of the right, and neither is
+ *   rewritten: a part a trajectory holds is carried as it is, so what the merged
+ *   trajectory is read with is added to rather than chosen between
+ *   ({@link MergedConfig}), and the reading fails with what either of the two fails
+ *   with.
+ * - Merging is not reconciliation: the parts keep the `uuid` and the session they
+ *   were recorded with, so two parts of one `uuid` remain two parts, and a session
+ *   both trajectories declare is one session of the merged trajectory that the parts
+ *   of both belong to. What a fork names is read against the parts of the merged
+ *   trajectory, which hold every part of either.
+ * - The metric kit of the merged trajectory states the producers of the two where
+ *   both of them state theirs, and none where one of them does not, as
+ *   {@link Metric.MetrickitMerged} reads the two: a kit that states the producer of
+ *   some of its metrics alone is not one {@link Metric.produce} can run.
+ *
+ * **Example** (Reading two halves of a session as one trajectory)
+ *
+ * ```ts import.meta.vitest
+ * import { Effect, Stream } from "effect"
+ * import { Event, Extra, Metric, Produce, Prompt, Toolkit, Trajectory } from "@trajs/core"
+ *
+ * const extrakit = Extra.makeKit()
+ * const metrickit = Metric.toProducers(Metric.makeKit(), {})
+ * const sessionId = "01890a5d-ac96-774b-bcce-b302099a8057"
+ *
+ * // A half of the session: what was asked, recorded as a trajectory of its own.
+ * const half = (content: string) =>
+ *   Produce.fromSession({
+ *     toolkit: Toolkit.empty,
+ *     eventkit: Event.makeKit(),
+ *     metrickit,
+ *     extrakit
+ *   })(Stream.make(
+ *     Trajectory.promptPart(extrakit)({ prompt: Prompt.make(content), sessionId })
+ *   ))
+ *
+ * const merged = Trajectory.merge(
+ *   half("What is 2 + 2?"),
+ *   half("And 2 + 3?")
+ * )
+ *
+ * const parts = Array.from(await Effect.runPromise(Stream.runCollect(merged)))
+ * parts.map((part) => part._tag) // => ["Prompt", "Prompt"]
+ * merged.stream // => true
+ * ```
+ *
+ * @see {@link MergedConfig} for what the merged trajectory is read with.
+ * @see {@link Event.mergeKit} for how the kits of the two are added to each other.
+ * @category combinators
+ */
+export const merge = <Left extends AnyConfig, Right extends AnyConfig, E, R, E2, R2>(
+  left: Trajectory<Left, E, R>,
+  right: Trajectory<Right, E2, R2>,
+): Trajectory<MergedConfig<Left, Right>, E | E2, R | R2> => {
+  const parts = Stream.concat(left, right);
+
+  // SAFETY: the config stated here is the one `MergedConfig` reads off the two
+  // trajectories — a kit is each kit's own merge of the two, and the variant is the
+  // one either of them streams in — so what is merged is a trajectory of that
+  // config. The parts are those of both, which `Part` reads as such: the parts of a
+  // trajectory whose response parts are whole are members of the streaming schema
+  // too, and a merged trajectory that streams states nothing of the parts of one
+  // that does not.
+  return Object.assign(parts, {
+    stream: left.stream || right.stream,
+    toolkit: Toolkit.merge(left.toolkit, right.toolkit),
+    eventkit: Event.mergeKit(left.eventkit, right.eventkit),
+    metrickit: Metric.mergeKit(left.metrickit, right.metrickit),
+    extrakit: Extra.mergeKit(left.extrakit, right.extrakit),
+  }) as Trajectory<MergedConfig<Left, Right>, E | E2, R | R2>;
+};

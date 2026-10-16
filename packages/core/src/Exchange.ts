@@ -58,11 +58,10 @@ import { TrajectoryError } from "#/TrajectoryError.ts";
  * Where a recording carries it is the layer's to say, and
  * {@link Exchange.layer} says it for the one this package ships.
  *
- * @see {@link Loaded.metadata} for reading it back.
+ * @see {@link Loaded.header} for reading it back.
  * @category models
  */
 export const Header = Schema.Struct({
-  metadata: Trajectory.Metadata,
   toolkit: Schema.JsonObject,
   eventkit: Schema.Record(Schema.String, Contribution),
   metrickit: Schema.Record(Schema.String, Contribution),
@@ -109,7 +108,7 @@ export type EncodingServices<C extends Trajectory.AnyConfig> = Schema.Union<
  *
  * **Details**
  *
- * - `metadata` is what the header line a recording starts with states, decoded
+ * - `header` is what the header line a recording starts with states, decoded
  *   ({@link Header}), and is read while the recording is loaded: what a recording
  *   was made with is known without reading the frame its parts are carried in.
  * - `digest` reads the digest a recording ends with off its tail, without reading
@@ -117,9 +116,7 @@ export type EncodingServices<C extends Trajectory.AnyConfig> = Schema.Union<
  * - `read()` reads the whole recording as the trajectory its parts make, read as
  *   the most general one: any recording may be of any kind, so its response parts
  *   are read as the streams they arrived in, and its parts are read with no kit at
- *   all — see {@link Part} for what that means for the parts of either kind. The
- *   trajectory goes by the metadata the header states, which is what the load of
- *   the recording read the head of it for.
+ *   all — see {@link Part} for what that means for the parts of either kind.
  *
  * What a load reads is the head of a recording and its length, so a program that
  * asks what a recording states of itself reads neither its parts nor its tail, and
@@ -141,7 +138,7 @@ export interface Loaded {
    * What the recording states about itself, as the header line the load of it
    * read.
    */
-  readonly metadata: Header;
+  readonly header: Header;
 
   /**
    * The digest the recording ends with, which is what it is named by, read from
@@ -150,8 +147,8 @@ export interface Loaded {
   readonly digest: Effect.Effect<string, TrajectoryError | StorageError>;
 
   /**
-   * The trajectory the recording holds, carrying the metadata its header states,
-   * and the parts it is made of as the bytes they are read from.
+   * The trajectory the recording holds, and the parts it is made of as the bytes
+   * they are read from.
    */
   readonly read: () => Trajectory.Trajectory<
     Trajectory.AnyConfig,

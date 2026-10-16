@@ -70,9 +70,8 @@ import type { Document } from "./Document.ts";
  *
  * The session of the recording is named by `session_id`, or by `trajectory_id` where
  * the document states no run; a document that states neither is recorded in a session
- * of the reading's own. The recording states the agent that ran as its metadata, and
- * what a kit derives of its parts is nothing, since the kits it is read with name
- * nothing.
+ * of the reading's own. What a kit derives of its parts is nothing, since the kits
+ * it is read with name nothing.
  *
  * The trajectory fails with the {@link TrajectoryError} a recording whose session
  * cannot be declared fails with, which a document of steps that one session records
@@ -133,7 +132,6 @@ import type { Document } from "./Document.ts";
  * steps.map((step) => step.source) // => ["user", "agent", "agent"]
  * steps[1].toolCalls.map((call) => call.name) // => ["Write"]
  * steps[1].observations.map((result) => result.id) // => ["toolu_01Rmm2GPxpGq9Er31axjfYRv"]
- * recording.metadata.name // => "claude-code"
  * ```
  *
  * @see {@link Document.Document} for the document it reads.
@@ -151,8 +149,4 @@ export const of = (
     // its steps were read as and no metric part.
     metrickit: Metric.toProducers(Metric.makeKit(), {}),
     extrakit: Extra.makeKit(),
-    metadata: new Trajectory.Metadata({
-      name: document.agent.name,
-      description: `${document.schema_version} of ${document.agent.name} ${document.agent.version}`,
-    }),
   })((producer) => record(producer, document));

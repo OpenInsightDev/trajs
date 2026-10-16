@@ -327,11 +327,6 @@ const trajectory = Object.assign(Stream.fromIterable(parts), {
   eventkit: Event.makeKit(),
   metrickit: Metric.makeKit(),
   extrakit: Extra.makeKit(),
-  metadata: new Trajectory.Metadata({
-    name: "Sessions and the forks between them",
-    description:
-      "Two sessions declared as roots, one of them forked mid-conversation and forked again off that: what the viewer reads a recording as.",
-  }),
 });
 
 const program = Effect.gen(function* () {

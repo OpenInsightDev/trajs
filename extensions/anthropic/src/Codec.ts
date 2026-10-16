@@ -164,8 +164,7 @@ export type AnthropicSessions = Record<string, AnthropicConversation>;
  *   toolkit: Toolkit.empty,
  *   eventkit: Event.makeKit(),
  *   metrickit: Metric.makeKit(),
- *   extrakit,
- *   metadata: new Trajectory.Metadata({ name: "One call and its answer" })
+ *   extrakit
  * })
  *
  * const sessions = await Effect.runPromise(Codec.makeAnthropic(trajectory))

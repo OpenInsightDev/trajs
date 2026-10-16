@@ -82,7 +82,6 @@ type Recording<
   eventkit: Eventkit;
   metrickit: Metric.WithProducers<Metrickit>;
   extrakit: Extrakit;
-  metadata: Trajectory.Metadata;
 };
 
 /**
@@ -102,7 +101,6 @@ const record =
     eventkit,
     metrickit,
     extrakit,
-    metadata,
   }: Recording<Toolkit, Eventkit, Metrickit, Extrakit>) =>
   <E, R>(
     stream: Trajectory.TrajectoryStream<
@@ -135,7 +133,6 @@ const record =
       Stream.unwrap,
       (parts) =>
         Object.assign(parts, {
-          metadata,
           stream: true as const,
           toolkit,
           eventkit,
@@ -153,13 +150,13 @@ const record =
  * Use when what a model was given and returned is already a stream of parts — a
  * session recorded elsewhere, or parts a caller assembled — and it should read as
  * a trajectory rather than as the parts it holds: so that its sessions read as one
- * recording, the kits and the metadata it was recorded with travel with its parts,
- * and what a kit derives of it is recorded among the parts it is about.
+ * recording, the kits it was recorded with travel with its parts, and what a kit
+ * derives of it is recorded among the parts it is about.
  *
  * **Details**
  *
  * - Each part is recorded as it arrives, in the order the stream gives it, and the
- *   trajectory carries the kits and the metadata given.
+ *   trajectory carries the kits given.
  * - The producers the metric kit was provided with are run over the same parts as
  *   they arrive, exactly as {@link Metric.produce} runs them, and the metric parts
  *   they derive are recorded among the parts they are about. The stream is read
@@ -210,8 +207,7 @@ const record =
  *   toolkit: Toolkit.empty,
  *   eventkit: Event.makeKit(),
  *   metrickit,
- *   extrakit,
- *   metadata: new Trajectory.Metadata({ name: "One prompt" })
+ *   extrakit
  * })(Stream.make(
  *   Trajectory.promptPart(extrakit)({ prompt: Prompt.make("What is 2 + 2?"), sessionId })
  * ))
@@ -237,7 +233,6 @@ export const fromSession =
     eventkit,
     metrickit,
     extrakit,
-    metadata,
   }: Recording<Toolkit, Eventkit, Metrickit, Extrakit>) =>
   <E, R>(
     stream: PartStream<Trajectory.Config<true, Toolkit, Eventkit, Metrickit, Extrakit>, E, R>,
@@ -246,7 +241,7 @@ export const fromSession =
     E | TrajectoryError,
     R
   > =>
-    record({ toolkit, eventkit, metrickit, extrakit, metadata })(stream);
+    record({ toolkit, eventkit, metrickit, extrakit })(stream);
 
 /**
  * Records the parts of several sessions as one trajectory, with the metric parts a
@@ -257,8 +252,7 @@ export const fromSession =
  * Use when the sessions that are to read as one recording are each already a stream
  * of parts — as {@link fromSession} takes one — and it is the whole of what they did
  * that is worth reading: so that the parts of every session arrive in one stream,
- * what a kit derives of the recording is derived of every session of it, and the
- * recording goes by one metadata.
+ * what a kit derives of the recording is derived of every session of it.
  *
  * **Details**
  *
@@ -294,8 +288,7 @@ export const fromSession =
  *   toolkit: Toolkit.empty,
  *   eventkit: Event.makeKit(),
  *   metrickit,
- *   extrakit,
- *   metadata: new Trajectory.Metadata({ name: "Two sessions" })
+ *   extrakit
  * })({
  *   asking: Stream.make(
  *     Trajectory.promptPart(extrakit)({
@@ -336,7 +329,6 @@ export const fromSessions =
     eventkit,
     metrickit,
     extrakit,
-    metadata,
   }: Recording<Toolkit, Eventkit, Metrickit, Extrakit>) =>
   <E, R>(
     sessions: SessionStreams<Trajectory.Config<true, Toolkit, Eventkit, Metrickit, Extrakit>, E, R>,
@@ -347,7 +339,7 @@ export const fromSessions =
   > => {
     const sessionPart = Trajectory.sessionPart(extrakit);
 
-    return record({ toolkit, eventkit, metrickit, extrakit, metadata })(
+    return record({ toolkit, eventkit, metrickit, extrakit })(
       Stream.mergeAll(
         Object.entries(sessions).map(([id, parts]) =>
           parts.pipe(
@@ -491,8 +483,7 @@ type ProduceFn<
  *   toolkit: Toolkit.empty,
  *   eventkit: Event.makeKit(),
  *   metrickit,
- *   extrakit: Extra.makeKit(),
- *   metadata: new Trajectory.Metadata({ name: "One answer" })
+ *   extrakit: Extra.makeKit()
  * })((producer) =>
  *   Effect.gen(function* () {
  *     const session = yield* producer.createSession({
@@ -524,7 +515,6 @@ export const produce =
     eventkit,
     metrickit,
     extrakit,
-    metadata,
   }: Recording<Toolkit, Eventkit, Metrickit, Extrakit>) =>
   <E, R>(
     fn: ProduceFn<Toolkit["tools"], Eventkit["events"], Extrakit["extra"], E, R>,
@@ -611,5 +601,5 @@ export const produce =
       return Stream.fromQueue(parts).pipe(Stream.drainFork(program));
     });
 
-    return record({ toolkit, eventkit, metrickit, extrakit, metadata })(Stream.unwrap(recording));
+    return record({ toolkit, eventkit, metrickit, extrakit })(Stream.unwrap(recording));
   };

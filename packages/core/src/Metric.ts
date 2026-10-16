@@ -4,11 +4,12 @@
  *
  * A {@link Metric} is one kind of measurement an extension names, with the
  * schemas of what a producer reports of it and of what producing it fails with.
- * {@link makeKit} collects metrics into a kit, and {@link toProducers} provides a
- * kit with the producer of each of them, which {@link produce} runs over a
- * recording. {@link MetricParts} reads the parts of the metrics a kit names, and
- * {@link MetricPartsView} reads those parts while tolerating metrics the kit does
- * not name, so a recording another kit wrote still reads.
+ * {@link makeKit} collects metrics into a kit, {@link mergeKit} adds the metrics of
+ * one kit to another's, and {@link toProducers} provides a kit with the producer of
+ * each of them, which {@link produce} runs over a recording. {@link MetricParts} reads
+ * the parts of the metrics a kit names, and {@link MetricPartsView} reads those parts
+ * while tolerating metrics the kit does not name, so a recording another kit wrote still
+ * reads.
  */
 
 import { Data, DateTime, Effect, Predicate, Schema, Stream } from "effect";
@@ -76,6 +77,153 @@ export const emptyKit = makeKit();
 
 /** The type of {@link emptyKit}. */
 export type EmptyKit = typeof emptyKit;
+
+/** The metrics of the kits given as one, a tag they share holding the metric of the kit latest among them. */
+type MetricsMerged<Ks extends ReadonlyArray<AnyKit>> = Ks extends readonly [
+  infer Head extends AnyKit,
+  ...infer Tail extends ReadonlyArray<AnyKit>,
+]
+  ? Omit<Head["metrics"], keyof MetricsMerged<Tail>> & MetricsMerged<Tail>
+  : {};
+
+/**
+ * The producers of the kits given as one, where every kit given states them: a kit
+ * provided with producers states one for each of the metrics it names.
+ *
+ * A producer is held at the tag of the metric it reports, so the producers of
+ * several kits merge by the same rule as their metrics do.
+ */
+type ProducersMerged<Ks extends ReadonlyArray<WithProducers<AnyKit>>> = Ks extends readonly [
+  infer Head extends WithProducers<AnyKit>,
+  ...infer Tail extends ReadonlyArray<WithProducers<AnyKit>>,
+]
+  ? Omit<Head["producers"], keyof ProducersMerged<Tail>> & ProducersMerged<Tail>
+  : {};
+
+/**
+ * The kit the metrics of the kits given make, with the producers of its metrics
+ * where every kit given states them.
+ *
+ * **When to use**
+ *
+ * Use to name the kit {@link mergeKit} returns, such as to type a kit built over
+ * the ones of two recordings.
+ *
+ * **Details**
+ *
+ * The metrics of every kit given are named, and where two of them name the same
+ * tag the metric of the kit latest among those given that names it is the one held.
+ *
+ * A producer is what a metric is reported by rather than what a kit states of it in
+ * the same way its metrics are — {@link WithProducers} holds one for every metric of
+ * the kit it is provided to — so the merged kit states the producers of the kits
+ * given where every one of them states all of its own, and states none where any of
+ * them does not: producers that cover some of the metrics of a kit alone are not ones
+ * that kit can be run by, and {@link produce} reads the producers a kit states as all
+ * of them.
+ *
+ * @see {@link mergeKit} for the kit it types.
+ * @see {@link WithProducers} for the kit a metric is reported by a producer of.
+ * @category models
+ */
+export type MetrickitMerged<Ks extends ReadonlyArray<AnyKit>> =
+  Ks extends ReadonlyArray<WithProducers<AnyKit>>
+    ? Metrickit<MetricsMerged<Ks>> & { readonly producers: ProducersMerged<Ks> }
+    : Metrickit<MetricsMerged<Ks>>;
+
+/**
+ * Adds the metrics of each kit given to the ones of the kits before it.
+ *
+ * **When to use**
+ *
+ * Use when the metrics of several extensions are read together, or when a reader
+ * that knows some of a recording's metrics should read it under the ones it knows
+ * without forgetting the rest — which is what reading two recordings as one does.
+ *
+ * **Details**
+ *
+ * A tag the kits share holds the metric of the kit latest among those given that
+ * names it, so a kit of the version an extension states now states over the one a
+ * recording was read with. The kit returned is a kit like any other: it names the
+ * metrics of every kit given and no others.
+ *
+ * The producers the kits were provided with are added to each other the same way,
+ * but a kit is only reported by them where every kit given states all of its own:
+ * what a merged kit states of its metrics is what {@link MetrickitMerged} says, and
+ * a kit that states some of them alone is not one {@link produce} can run.
+ *
+ * **Example** (Adding the metrics of one kit to another's)
+ *
+ * ```ts import.meta.vitest
+ * import { Schema } from "effect"
+ * import { Metric, VersionedSchema } from "@trajs/core"
+ *
+ * const count = new Metric.Metric({
+ *   package: "tokenize",
+ *   id: "count",
+ *   metadata: new Metric.Metadata({ name: "Count" }),
+ *   output: Schema.Struct({
+ *     version: Schema.Literal("0.1.0"),
+ *     tokens: Schema.Number
+ *   }).pipe(VersionedSchema.make),
+ *   failure: Schema.Struct({
+ *     version: Schema.Literal("0.1.0"),
+ *     reason: Schema.String
+ *   }).pipe(VersionedSchema.make)
+ * })
+ *
+ * const cost = new Metric.Metric({
+ *   package: "pricing",
+ *   id: "cost",
+ *   metadata: new Metric.Metadata({ name: "Cost" }),
+ *   output: Schema.Struct({
+ *     version: Schema.Literal("0.1.0"),
+ *     dollars: Schema.Number
+ *   }).pipe(VersionedSchema.make),
+ *   failure: Schema.Struct({
+ *     version: Schema.Literal("0.1.0"),
+ *     reason: Schema.String
+ *   }).pipe(VersionedSchema.make)
+ * })
+ *
+ * const merged = Metric.mergeKit(Metric.makeKit(count), Metric.makeKit(cost))
+ * Object.keys(merged.metrics) // => ["tokenize/count", "pricing/cost"]
+ * ```
+ *
+ * @see {@link makeKit} for a kit of the metrics given alone.
+ * @see {@link MetrickitMerged} for the kit it returns.
+ * @category constructors
+ */
+export const mergeKit = <Ks extends ReadonlyArray<AnyKit>>(...kits: Ks): MetrickitMerged<Ks> => {
+  // SAFETY: every metric of every kit is inserted under its own tag below, so what
+  // the record holds is one metric per tag the kits name.
+  const metrics = {} as Record<string, Any>;
+
+  // SAFETY: every producer of every kit that states one is inserted under the tag
+  // of the metric it reports below, so what the record holds is one producer per
+  // tag those kits name.
+  const producers = {} as Record<string, Producer<Any>>;
+
+  let reported = true;
+
+  for (const kit of kits) {
+    Object.assign(metrics, kit.metrics);
+
+    if (!Predicate.hasProperty(kit, "producers")) {
+      reported = false;
+      continue;
+    }
+
+    // SAFETY: a kit that states producers states them keyed as its metrics are —
+    // what `WithProducers` is — so what is read off it is a record of producers.
+    Object.assign(producers, kit.producers as Record<string, Producer<Any>>);
+  }
+
+  // SAFETY: a kit that was provided with producers states all of them, which is
+  // what `MetrickitMerged` reads the kits given as where every one of them states
+  // them, and a kit merged from one that states none is read as stating none.
+  return (reported ? { metrics, producers } : { metrics }) as MetrickitMerged<Ks>;
+};
 
 export type MetricPart<Tag extends string, Data> = Readonly<{ _tag: Tag; data: Data }>;
 

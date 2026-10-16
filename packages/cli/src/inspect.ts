@@ -39,9 +39,9 @@ export const inspect = Command.make(
     Effect.gen(function* () {
       const exchange = yield* Exchange;
 
-      const { metadata } = yield* exchange.load(file);
+      const { header } = yield* exchange.load(file);
 
-      yield* Console.log(json(metadata, indent));
+      yield* Console.log(json(header, indent));
     }).pipe(
       // A file that cannot be read, or one whose first line is not a header, is
       // what the person who ran the command can act on, so it is reported as the

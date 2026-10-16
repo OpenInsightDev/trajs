@@ -7,9 +7,9 @@ without opening it in a viewer.
 
 ### `trajs inspect <file-path>`
 
-Prints the header a `.trajs` file starts with — the metadata the recording goes
-by and the toolkit and kits it was written with — as JSON. The header is written
-on one line until `--indent` says otherwise:
+Prints the header a `.trajs` file starts with — the toolkit and kits it was
+written with — as JSON. The header is written on one line until `--indent` says
+otherwise:
 
 ```bash
 trajs inspect recording.trajs

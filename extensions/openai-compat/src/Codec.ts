@@ -138,8 +138,7 @@ export type OpenAiCompatSessions = Record<string, OpenAiCompatMessage[]>;
  *   toolkit: Toolkit.empty,
  *   eventkit: Event.makeKit(),
  *   metrickit: Metric.makeKit(),
- *   extrakit,
- *   metadata: new Trajectory.Metadata({ name: "One call and its answer" })
+ *   extrakit
  * })
  *
  * const sessions = await Effect.runPromise(Codec.makeOpenAiCompat(trajectory))
