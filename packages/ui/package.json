@@ -1,6 +1,6 @@
 {
   "name": "@trajs/ui",
-  "version": "0.0.0",
+  "version": "0.0.0-alpha.0",
   "description": "The shadcn/ui components the trajs prompt components render with.",
   "homepage": "https://github.com/OpenInsightDev/trajs",
   "license": "MIT",

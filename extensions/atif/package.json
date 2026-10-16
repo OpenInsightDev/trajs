@@ -1,6 +1,6 @@
 {
   "name": "@trajs/extension-atif",
-  "version": "0.0.0",
+  "version": "0.0.0-alpha.0",
   "description": "ATIF, the Agent Trajectory Interchange Format: a recording read as the steps ATIF exchanges.",
   "homepage": "https://github.com/OpenInsightDev/trajs",
   "license": "MIT",

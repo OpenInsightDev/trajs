@@ -11,8 +11,11 @@ name: Release
 # workflow `release.yml`, no environment, and `npm publish` allowed.
 
 on:
-  push:
-    branches: [main]
+  # FIXME: re-add the `push` trigger to `main` once the release flow is no
+  # longer being debugged. Disabled so a push neither publishes nor opens a
+  # "Version Packages" PR; the workflow currently runs only on manual dispatch.
+  # push:
+  #   branches: [main]
   workflow_dispatch:
 
 permissions:

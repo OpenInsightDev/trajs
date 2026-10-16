@@ -1,6 +1,6 @@
 {
   "name": "@trajs/extension-tokenize",
-  "version": "0.0.0",
+  "version": "0.0.0-alpha.0",
   "description": "Token counts, built on Effect AI's tokenizer service.",
   "homepage": "https://github.com/OpenInsightDev/trajs",
   "license": "MIT",

@@ -1,6 +1,6 @@
 {
   "name": "@trajs/extension-openai-compat",
-  "version": "0.0.0",
+  "version": "0.0.0-alpha.0",
   "description": "A recording read as the messages a chat completions API of an OpenAI-compatible client takes.",
   "homepage": "https://github.com/OpenInsightDev/trajs",
   "license": "MIT",

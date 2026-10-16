@@ -1,7 +1,6 @@
 {
   "name": "@trajs/platform-browser",
-  "version": "0.0.0",
-  "private": true,
+  "version": "0.0.0-alpha.0",
   "description": "The browser implementations of the trajs platform services.",
   "homepage": "https://github.com/OpenInsightDev/trajs",
   "license": "MIT",

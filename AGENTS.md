@@ -42,3 +42,8 @@ Public API comments strictly follow the [Effect](https://github.com/Effect-TS/ef
 
 - Do not change the test suite unless the user explicitly asks for it.
 - Temporary unit tests written while implementing are allowed, but delete every one of them once the task is done.
+
+## Versioning
+
+- Keep every library under `packages/` on the same version via the `fixed` group in `.changeset/config.json` (`@trajs/*` excluding `@trajs/extension-*`), while packages under `extensions/` version independently.
+- Publish every package as an `alpha` prerelease: `.changeset/pre.json` holds Changesets in pre mode, so `changeset version` keeps the `X.Y.Z-alpha.N` line (`changeset pre exit` leaves pre mode).
