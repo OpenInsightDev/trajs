@@ -1,19 +1,20 @@
 /**
  * The format the exchange layer this package ships writes: the header line a
- * recording starts with, the frames the parts of a trajectory are carried in, the
- * digest those frames are read off, and the two directions of the recording's
+ * recording starts with, the frame the parts of a trajectory are carried in, the
+ * metadata the recording ends with, and the two directions of the recording's
  * bytes — written into a storage, and read out of the bytes it serves.
  *
  * Nothing here is published: a program reaches the format through
- * `Exchange.layer`, and the parts a recording holds through `Exchange.Part`. The
- * header a recording states is the layer's to state, so what reads one is built
- * from the model the layer holds; where a recording is kept is a storage's, so
- * what reads and writes one takes the bytes from there rather than carrying them.
+ * `Exchange.layer`, and the parts a recording holds through `Exchange.Part`. What
+ * a recording states of itself is the layer's to state — the header it starts with
+ * and the metadata it ends with — so what reads either is built from the model the
+ * layer holds; where a recording is kept is a storage's, so what reads and writes
+ * one takes the bytes from there rather than carrying them.
  *
  * A recording is read at random where a part of it alone is wanted — the head for
- * the header line, the tail for the digest — and as a stream where the trajectory
- * is: the parts are carried in one frame, so reading them is reading the bytes
- * from the header line to the digest that follows them.
+ * the header line, the tail for the metadata — and as a stream where the trajectory
+ * is: the parts are carried in one frame, so reading them is reading the bytes from
+ * the header line to the metadata that follows them.
  */
 
 import type { Bytes } from "@trajs/utils/Bytes";
@@ -25,13 +26,21 @@ import * as Arr from "effect/Array";
 import { SchemaBinary } from "effect/encoding";
 
 import * as Event from "#/Event.ts";
-import type { EncodingServices, Header, Service } from "#/Exchange.ts";
+import type { EncodingServices, Header, Metadata, Service } from "#/Exchange.ts";
 import type * as Extra from "#/Extra.ts";
 import * as Metric from "#/Metric.ts";
 import * as Prompt from "#/Prompt.ts";
 import * as Toolkit from "#/Toolkit.ts";
 import * as Trajectory from "#/Trajectory.ts";
 import { TrajectoryError } from "#/TrajectoryError.ts";
+
+import pkg from "../../package.json" with { type: "json" };
+
+/**
+ * The version of this package, as `package.json` states it: the version of trajs a
+ * recording states of itself, since the format a recording is in is this package's.
+ */
+const Version = pkg.version;
 
 /**
  * How one contribution of a kit names itself, as a recording states it: the name it
@@ -166,12 +175,11 @@ const FrameChunk = 64 * 1024;
 /**
  * The bytes of a recording that hold the frame the parts are carried in, from the
  * byte the frame begins at to the byte it ends before: one read at a time, and
- * never past the digest that follows it.
+ * never past the metadata that follows it.
  *
  * A range that is not a range — one that ends before it begins, which is what
- * bytes shorter than a digest hold — is read as nothing at all, so what is read
- * of a recording that is too short is nothing rather than its digest read as a
- * frame.
+ * bytes holding a metadata but no frame hold — is read as nothing at all, so what
+ * is read of such a recording is nothing rather than its metadata read as a frame.
  */
 const framesOf = (
   bytes: Bytes<StorageError>,
@@ -433,44 +441,106 @@ const trajectoryOf = <C extends Trajectory.AnyConfig, E, R>(
 ): Trajectory.Trajectory<C, E, R> => Object.assign(parts, config);
 
 /**
- * The digest a recording ends with, as the hex a {@link StreamHash} reads one off
- * with: 64 characters, as its `digest` states, and so 64 bytes at the end of
- * every recording.
+ * How many bytes state the length of the metadata a recording ends with: the four
+ * bytes it ends with rather than begins with, so what reads a recording at random
+ * reads them off the end of it and knows where the metadata before them begins.
  */
-const DigestBytes = 64;
-
-const DigestText = new RegExp(`^[0-9a-f]{${DigestBytes}}$`);
+const TrailerBytes = 4;
 
 /**
- * Reads the digest a recording ends with off the tail of the bytes it is held in,
- * which is what the recording is named by: 64 characters of hex
- * ({@link DigestBytes}).
+ * What a recording ends with: the metadata it states of its own bytes, and where
+ * the frame those bytes carry the parts in ends.
  *
- * The digest follows the parts rather than being one, so it is read where it lies
- * rather than by reading the frame those parts are carried in. Bytes that end in
- * anything else are a recording that does not end with a digest — one written
- * before the format held one, or one that was cut short — which is a recording
- * that failed rather than bytes a storage did not serve.
+ * Where the frame ends is read with the metadata rather than after it, since the
+ * metadata says where: what reads the parts reads them as far as the byte the
+ * metadata begins at, and never as part of them.
  */
-export const digestOf = (
+export interface Trailing {
+  readonly metadata: Metadata;
+  readonly end: bigint;
+}
+
+/**
+ * Reads the metadata a recording ends with off the tail of the bytes it is held in,
+ * which is what it is named by and how it states it was written: the metadata, as
+ * one SchemaBinary frame, preceded by nothing and followed by the length of that
+ * frame as four bytes, big-endian ({@link TrailerBytes}).
+ *
+ * The metadata follows the parts rather than being one, so it is read where it lies
+ * rather than by reading the frame those parts are carried in — and how much of it
+ * there is is read off the end instead, which is what states where it begins
+ * without that frame being read either. Bytes that end in anything that is not a
+ * length and a frame before it are a recording that does not end with the metadata
+ * of one — one written before the format held it, or one that was cut short —
+ * which is a recording that failed rather than bytes a storage did not serve.
+ *
+ * The model is the schema of the metadata the layer holds, so what parses the frame
+ * is built from that model rather than stated again here ({@link Metadata}).
+ */
+export const trailingOf = <S extends Schema.ConstraintCodec<Metadata, unknown, never, never>>(
+  metadata: S,
   bytes: Bytes<StorageError>,
-): Effect.Effect<string, TrajectoryError | StorageError> =>
-  Effect.gen(function* () {
+): Effect.Effect<Trailing, TrajectoryError | StorageError> => {
+  const frame = SchemaBinary.toCodec(metadata);
+
+  return Effect.gen(function* () {
     const length = yield* bytes.length;
 
-    // Bytes shorter than a digest hold none at all, so none are read of them: what
-    // is there would be read as a digest that is not one.
-    const tail =
-      length < BigInt(DigestBytes)
+    // Bytes that hold no length hold no metadata either, so none are read of them:
+    // what is there would be read as a length that is not one.
+    const trailer =
+      length < BigInt(TrailerBytes)
         ? new Uint8Array()
-        : yield* bytes.readAlloc({ offset: length - BigInt(DigestBytes), size: DigestBytes });
+        : yield* bytes.readAlloc({ offset: length - BigInt(TrailerBytes), size: TrailerBytes });
 
-    const stated = new TextDecoder().decode(tail);
+    const size =
+      trailer.length < TrailerBytes
+        ? undefined
+        : BigInt(
+            new DataView(trailer.buffer, trailer.byteOffset, trailer.byteLength).getUint32(
+              0,
+              false,
+            ),
+          );
 
-    return DigestText.test(stated)
-      ? stated
-      : yield* Effect.fail(TrajectoryError.parse("the bytes do not end with a digest"));
+    // The metadata lies before the length that states it, so bytes whose length
+    // does not fit before that length hold no metadata at all.
+    if (size === undefined || size > length - BigInt(TrailerBytes)) {
+      return yield* Effect.fail(
+        TrajectoryError.parse("the bytes do not end with the metadata of a recording"),
+      );
+    }
+
+    const start = length - BigInt(TrailerBytes) - size;
+
+    const held = yield* bytes.readAlloc({ offset: start, size: Number(size) });
+
+    const stated = yield* Schema.decodeUnknownEffect(frame)(held).pipe(
+      Effect.mapError(TrajectoryError.parse),
+    );
+
+    return { metadata: stated, end: start };
   });
+};
+
+/**
+ * The metadata a recording ends with, as the bytes it is carried in: the metadata
+ * itself, as one SchemaBinary frame, and the length of that frame as four bytes
+ * after it, big-endian ({@link TrailerBytes}), which is what says where the
+ * metadata begins to what reads a recording from its end.
+ */
+const encodeTrailing = <S extends Schema.ConstraintCodec<Metadata, unknown, never, never>>(
+  metadata: S,
+  stated: Metadata,
+): Uint8Array => {
+  const frame = Schema.encodeSync(SchemaBinary.toCodec(metadata))(stated);
+  const bytes = new Uint8Array(frame.length + TrailerBytes);
+
+  bytes.set(frame);
+  new DataView(bytes.buffer).setUint32(frame.length, frame.length, false);
+
+  return bytes;
+};
 
 /**
  * What a compression failed a frame it was asked to write or read with, as the
@@ -487,15 +557,16 @@ const framed = <E, R>(
 
 /**
  * The exchange of the format this package ships, over where a recording is kept,
- * what carries its parts and what reads a digest off them: the header of a
- * recording is the model the layer holds, so what parses one is built from that
- * model rather than stated again here, and where a recording is kept is a
- * storage's, so the bytes are read from and written into what the storage offers.
+ * what carries its parts and what reads a digest off them: the header a recording
+ * starts with and the metadata it ends with are the models the layer holds, so what
+ * parses either is built from its model rather than stated again here, and where a
+ * recording is kept is a storage's, so the bytes are read from and written into
+ * what the storage offers.
  *
- * A recording is read at random where one part of it alone is wanted — the head
- * for the header line, the tail for the digest — and as a stream where what is
- * wanted is the trajectory: the frame is read from the header line to the digest
- * that follows it.
+ * A recording is read at random where one part of it alone is wanted — the head for
+ * the header line, the tail for the metadata — and as a stream where what is wanted
+ * is the trajectory: the frame is read from the header line to the metadata that
+ * follows it.
  *
  * A compression reports a frame it cannot write or read as a
  * {@link CompressionError}, which says nothing of a recording; a frame carries the
@@ -504,12 +575,17 @@ const framed = <E, R>(
  * reports what it cannot read or write as a {@link StorageError}, which says
  * nothing of the recording either.
  *
- * The header model is the schema of the header the layer holds, constrained to a
- * header plain enough to read without a service of its own: what parses the line
- * is built from it, and what `load` gives out is typed by it.
+ * The models are the schemas of the header and of the metadata the layer holds,
+ * constrained to ones plain enough to parse without a service of their own: what
+ * parses the line a recording starts with and the metadata it ends with is built
+ * from them, and what `load` gives out is typed by them.
  */
-export const service = <S extends Schema.ConstraintCodec<Header, unknown, never, never>>(
-  header: S,
+export const service = <
+  H extends Schema.ConstraintCodec<Header, unknown, never, never>,
+  M extends Schema.ConstraintCodec<Metadata, unknown, never, never>,
+>(
+  header: H,
+  metadata: M,
   storage: Storage,
   compression: Compression,
   hasher: StreamHash,
@@ -519,22 +595,23 @@ export const service = <S extends Schema.ConstraintCodec<Header, unknown, never,
       Effect.gen(function* () {
         const bytes = yield* storage.read(id);
         const stated = yield* headerOf(header, bytes);
-        const length = yield* bytes.length;
-
-        // The parts are carried in the bytes between the line a recording states
-        // itself in and the digest it ends with, so what is read of it is the
-        // frame alone — the head and the tail are read for what they are, and
-        // never as part of it.
-        const frame = framesOf(bytes, stated.end, length - BigInt(DigestBytes));
 
         return {
-          // What loading a recording reads, and so what it knows of one: what it
-          // states of itself, without the frame or the digest being read.
           header: stated.header,
-          digest: digestOf(bytes),
+          metadata: trailingOf(metadata, bytes).pipe(Effect.map((trailing) => trailing.metadata)),
           read: () =>
             trajectoryOf(
-              framed(frame.pipe(compression.decompress)).pipe(decodeParts(Trajectory.anyConfig)),
+              // The frame lies between the header line and the metadata, so
+              // neither the head nor the tail is read as part of it.
+              Stream.unwrap(
+                trailingOf(metadata, bytes).pipe(
+                  Effect.map((trailing) =>
+                    framed(
+                      framesOf(bytes, stated.end, trailing.end).pipe(compression.decompress),
+                    ).pipe(decodeParts(Trajectory.anyConfig)),
+                  ),
+                ),
+              ),
               Trajectory.anyConfig,
             ),
         };
@@ -552,18 +629,37 @@ export const service = <S extends Schema.ConstraintCodec<Header, unknown, never,
           // The digest is of the parts, and the parts are what the compression
           // writes, so the frames are handed to both at once: one reader writes
           // them into the frame, the other reads a digest off them.
+          //
+          // FIXME: a digest can be read off fewer parts than the frame carries.
+          // `broadcastN` hands the frames over a pubsub, and a subscription ends
+          // without draining what the slower reader has not taken yet, so the
+          // digest a recording ends with can be that of a prefix of its parts —
+          // the sample the viewer opens loses its last frame here. What writes
+          // the frame and what reads a digest off them should read them in one
+          // pass instead.
           const [written, hashed] = yield* Stream.broadcastN(frames, { n: 2, capacity: 16 });
 
           const digest = yield* Effect.forkScoped(Stream.run(hashed, hasher.digest));
 
-          // The digest follows the parts it is of, so it is emitted once the
-          // compression has finished the frame it wrote for them.
+          // The metadata states what the bytes of the recording were written with
+          // and what they are named by, so it is emitted once the compression has
+          // finished the frame it wrote for them and the digest has been read off
+          // the parts it is of.
           return Stream.concat(
             Stream.make(new TextEncoder().encode(`${line}\n`)),
             Stream.concat(
               framed(written.pipe(compression.compress)),
               Stream.fromEffect(
-                Fiber.join(digest).pipe(Effect.map((hex) => new TextEncoder().encode(hex))),
+                Fiber.join(digest).pipe(
+                  Effect.map((digest) =>
+                    encodeTrailing(metadata, {
+                      compression: compression.algorithm,
+                      hash: hasher.algorithm,
+                      digest,
+                      version: Version,
+                    }),
+                  ),
+                ),
               ),
             ),
           );

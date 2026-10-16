@@ -141,5 +141,5 @@ const digest = (algorithm: Algorithm): Hashing => {
 export const layer = (options?: Options): Layer.Layer<StreamHash> => {
   const algorithm = options?.algorithm ?? defaultAlgorithm;
 
-  return Layer.succeed(StreamHash, { digest: digest(algorithm) });
+  return Layer.succeed(StreamHash, { algorithm, digest: digest(algorithm) });
 };

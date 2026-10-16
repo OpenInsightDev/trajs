@@ -4,7 +4,7 @@
  *
  * What a recording is read out of is bytes, and what reads them takes the part it
  * came for rather than the whole of it — the head of a recording for what it
- * states of itself, its tail for the digest it ends with, the frame between them
+ * states of itself, its tail for the metadata it ends with, the frame between them
  * for the parts of a trajectory — so a sequence is read at random ({@link Bytes}).
  * What one is of is not part of what one is: a file, the range of a bucket, or
  * bytes already in memory are all read the same way, which is why every read is

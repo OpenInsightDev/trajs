@@ -198,8 +198,12 @@ export const decompress =
  * @see {@link Compression} for the compression this provides.
  * @category layers
  */
-export const layer = (options?: Options): Layer.Layer<Compression> =>
-  Layer.succeed(Compression, {
-    compress: (bytes) => compress(options)(bytes),
-    decompress: (bytes) => decompress(options)(bytes),
+export const layer = (options?: Options): Layer.Layer<Compression> => {
+  const algorithm = options?.algorithm ?? defaultAlgorithm;
+
+  return Layer.succeed(Compression, {
+    algorithm,
+    compress: (bytes) => compress({ algorithm })(bytes),
+    decompress: (bytes) => decompress({ algorithm })(bytes),
   });
+};

@@ -19,7 +19,7 @@ import { blake2b } from "@noble/hashes/blake2.js";
 import { blake3 } from "@noble/hashes/blake3.js";
 import { sha256 } from "@noble/hashes/sha2.js";
 import { bytesToHex } from "@noble/hashes/utils.js";
-import { Context, Layer, Sink } from "effect";
+import { Context, Layer, Schema, Sink } from "effect";
 
 /**
  * The digest a recording is named by: the algorithm it is read with.
@@ -41,14 +41,19 @@ import { Context, Layer, Sink } from "effect";
  *
  * A digest is read by feeding one run of a hash the bytes of one stream, so what an
  * algorithm names is what two programs agree on: they name a recording the same way
- * where they state the same one, and no recording states what it was named with, so
- * what names one is the layer a program was given rather than anything the recording
- * holds.
+ * where they state the same one. Which of them named a recording is what the
+ * recording states of itself — the metadata it ends with names the algorithm its
+ * digest was read with ({@link StreamHash.algorithm}) — so a program handed a
+ * recording can tell what named it rather than naming it again by an algorithm of
+ * its own.
  *
  * @see {@link Options} for where an algorithm is stated.
+ * @see {@link StreamHash.algorithm} for what a hash states of itself.
  * @category models
  */
-export type Algorithm = "blake3" | "blake2b" | "sha256";
+export const Algorithm = Schema.Literals(["blake3", "blake2b", "sha256"]);
+
+export type Algorithm = Schema.Schema.Type<typeof Algorithm>;
 
 /**
  * The digest a hash layer is built over.
@@ -66,8 +71,10 @@ export type Algorithm = "blake3" | "blake2b" | "sha256";
  *
  * The option is stated where the layer is built rather than where a digest is read,
  * since reading one takes no choice: what a digest is of is a stream of bytes, and
- * what it is read with is the layer, so a program that reads a recording back names
- * it the way it named it when it wrote it.
+ * what it is read with is the layer. Which one read the digest of a recording is
+ * what the recording states of itself ({@link StreamHash.algorithm}), so a program
+ * that reads one back can tell whether it is naming it the way it was named when
+ * it was written.
  *
  * @see {@link Algorithm} for the digests a program may state.
  * @category models
@@ -102,18 +109,20 @@ export const defaultAlgorithm: Algorithm = "blake3";
  *
  * **Details**
  *
- * `digest` is a sink of the bytes of one stream: it consumes them to their end and
- * leaves none of them over, and what it holds when it is done is the digest, as a
- * lowercase hex string of 64 characters. The bytes a recording carries its parts in
- * are what it is given — the format's own bytes, so a part of a recording is hashed
- * the way `Exchange.Part` carries it rather than the way a program happened to read
- * it — so the digest of a trajectory is the same wherever one is computed from it.
+ * `algorithm` is which algorithm this hash reads a digest with
+ * ({@link Algorithm}), which a recording states of itself. `digest` is a sink of
+ * the bytes of one stream: it consumes them to their end and leaves none of them
+ * over, and what it holds when it is done is the digest, as a lowercase hex string
+ * of 64 characters. The bytes a recording carries its parts in are what it is given
+ * — the format's own bytes, so a part of a recording is hashed the way
+ * `Exchange.Part` carries it rather than the way a program happened to read it —
+ * so the digest of a trajectory is the same wherever one is computed from it.
  *
- * The digest is of the algorithm the layer states ({@link Algorithm}), and every
- * algorithm a layer states names a digest of 32 bytes — 64 characters of hex — so
- * what a recording ends with is the same length whichever one it was named with,
- * and a digest read through one layer is one another layer reads where the two are
- * built over the same algorithm.
+ * The digest is of the algorithm the hash states of itself
+ * ({@link StreamHash.algorithm}), and every algorithm a hash states names a digest
+ * of 32 bytes — 64 characters of hex — so what a recording ends with is the same
+ * length whichever one it was named with, and a digest read through one layer is
+ * one another layer reads where the two are built over the same algorithm.
  *
  * A hash is of a stream of bytes rather than of a program: two streams are hashed
  * by two runs of the sink, and nothing of one is held for the next. Reading a
@@ -123,6 +132,12 @@ export const defaultAlgorithm: Algorithm = "blake3";
  * @see {@link StreamHash} for the service a program reads a digest through.
  */
 export interface StreamHash {
+  /**
+   * Which algorithm this hash reads a digest with, as {@link Algorithm} names it:
+   * what a recording that was named through it states of itself.
+   */
+  readonly algorithm: Algorithm;
+
   /**
    * The digest of the bytes given to it, read once they have ended.
    */
@@ -188,15 +203,18 @@ const hashing = (algorithm: Algorithm): Sink.Sink<string, Uint8Array, never, nev
  *
  * It is what {@link layer} provides, as the value a layer is built from, so a
  * `StreamHash` built here and one provided by the layer hash the same bytes to the
- * same digest. The algorithm defaults to {@link defaultAlgorithm}, as it does for
- * every layer built over one of these hashes.
+ * same digest, and both state the same algorithm. The algorithm defaults to
+ * {@link defaultAlgorithm}, as it does for every layer built over one of these
+ * hashes.
  *
  * @see {@link layer} for the hash this builds as a layer.
  * @category constructors
  */
-export const make = (options?: Options): StreamHash => ({
-  digest: hashing(options?.algorithm ?? defaultAlgorithm),
-});
+export const make = (options?: Options): StreamHash => {
+  const algorithm = options?.algorithm ?? defaultAlgorithm;
+
+  return { algorithm, digest: hashing(algorithm) };
+};
 
 /**
  * The hash this package ships: BLAKE3, BLAKE2b or SHA-256, as `@noble/hashes`

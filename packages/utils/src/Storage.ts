@@ -53,7 +53,7 @@ export interface WriteOptions {
  *
  * - `read` serves the bytes held under an id as a {@link Bytes}, which what reads
  *   them takes what it needs from: the exchange reads the head of a recording for
- *   the header line and its tail for the digest, without reading the frame the
+ *   the header line and its tail for the metadata, without reading the frame the
  *   parts between them are carried in. An id that holds nothing fails as a
  *   {@link StorageError}.
  * - `write` gives the sink a recording of that id is written through, so its

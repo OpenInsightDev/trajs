@@ -109,6 +109,7 @@ export const layer = (options?: Options): Layer.Layer<Compression> => {
   const algorithm = options?.algorithm ?? defaultAlgorithm;
 
   return Layer.succeed(Compression, {
+    algorithm,
     compress: (bytes) => (algorithm === "none" ? bytes : carried(compressors[algorithm], bytes)),
     decompress: (bytes) =>
       algorithm === "none" ? bytes : carried(decompressors[algorithm], bytes),

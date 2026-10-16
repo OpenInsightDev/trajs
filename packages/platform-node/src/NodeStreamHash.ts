@@ -107,7 +107,11 @@ const hashing = (algorithm: Algorithm): Sink.Sink<string, Uint8Array, never, nev
  * @see {@link StreamHash} for the hash this provides.
  * @category layers
  */
-export const layer = (options?: Options): Layer.Layer<StreamHash> =>
-  Layer.succeed(StreamHash, {
-    digest: hashing(options?.algorithm ?? defaultAlgorithm),
+export const layer = (options?: Options): Layer.Layer<StreamHash> => {
+  const algorithm = options?.algorithm ?? defaultAlgorithm;
+
+  return Layer.succeed(StreamHash, {
+    algorithm,
+    digest: hashing(algorithm),
   });
+};

@@ -5,9 +5,9 @@
  * database, a bucket — holds bytes. {@link Exchange} is the seam between the two:
  * {@link Service.save} encodes a trajectory into the bytes a recording is made
  * of, and {@link Service.load} reads back what a recording states of itself, the
- * digest it ends with, and the trajectory its parts make. Those bytes are read at
- * random — the head of a recording for what it states of itself, its tail for the
- * digest it ends with — and held under an id by the storage the exchange was
+ * metadata it ends with, and the trajectory its parts make. Those bytes are read
+ * at random — the head of a recording for what it states of itself, its tail for
+ * the metadata it ends with — and held under an id by the storage the exchange was
  * provided, so an exchange performs no IO of its own: it asks that storage for the
  * bytes of a recording and for the place to write one, and where those bytes are
  * kept is the storage's to say.
@@ -17,23 +17,25 @@
  * itself — and a program that keeps recordings some other way provides a layer of
  * its own, which is the only thing that changes. Of that format, a recording
  * starts with a header line stating what it was made with, the parts follow in one
- * frame, and the digest of those parts follows them; reading at random is what
- * lets the head of a recording be read for the header line and its tail for the
- * digest without reading the frame between them. How such a frame is written, how
- * the parts are hashed and where a recording is kept are not the format's to
- * state: the layer is built over a compression of the parts, over a hash of them
- * and over a storage, which are `@trajs/utils`'s services — a program provides the
- * layer a platform package states them with, such as `@trajs/platform-node` for one
- * that runs on Node — over `node:zlib`, the hashes the Rust binding and `node:crypto`
+ * frame, and the metadata stating how that frame was written and what it is named
+ * by follows them ({@link Metadata}); reading at random is what lets the head of a
+ * recording be read for the header line and its tail for the metadata without
+ * reading the frame between them. How such a frame is written, how the parts are
+ * hashed and where a recording is kept are not the format's to state: the layer is
+ * built over a compression of the parts, over a hash of them and over a storage,
+ * which are `@trajs/utils`'s services — a program provides the layer a platform
+ * package states them with, such as `@trajs/platform-node` for one that runs on
+ * Node — over `node:zlib`, the hashes the Rust binding and `node:crypto`
  * compute, and the files of the machine — or `@trajs/platform-browser` for one that
  * runs where `node:zlib` is not, a page say. Which frame the parts are carried in,
  * and which digest names them, are the layer's to state too
- * ({@link Compression.Options}).
+ * ({@link Compression.Options}), and what it was built over is what the recording
+ * states of itself in the metadata it ends with.
  */
 
-import { Compression } from "@trajs/utils/Compression";
+import { Algorithm as CompressionAlgorithm, Compression } from "@trajs/utils/Compression";
 import { Storage, type StorageError } from "@trajs/utils/Storage";
-import { StreamHash } from "@trajs/utils/StreamHash";
+import { Algorithm as HashAlgorithm, StreamHash } from "@trajs/utils/StreamHash";
 import { Context, Effect, Layer, Schema } from "effect";
 
 import { Contribution, part, service, type PartMembers } from "#/internal/exchange.ts";
@@ -73,6 +75,44 @@ export const Header = Schema.Struct({
 export type Header = Schema.Schema.Type<typeof Header>;
 
 /**
+ * What a recording states at its end about the bytes it is made of: how that frame
+ * was written, and what the recording is named by.
+ *
+ * **When to use**
+ *
+ * Use to read what a recording was written with and what names it without reading
+ * the parts it carries, or to state the metadata of a recording of your own.
+ *
+ * **Details**
+ *
+ * - `compression` is the algorithm the parts were carried in a frame with
+ *   ({@link Compression.Algorithm}), and `hash` the algorithm their digest was read
+ *   with ({@link StreamHash.Algorithm}), so a recording states what wrote it rather
+ *   than leaving whatever reads it to assume.
+ * - `digest` is the digest of those parts, which is what the recording is named by
+ *   — the lowercase hex a {@link StreamHash} reads one off with.
+ * - `version` is the version of this package that wrote the recording, as its
+ *   `package.json` states it, so a reader can tell which of them wrote what it is
+ *   reading.
+ *
+ * Where a recording carries it is the layer's to say, and {@link Exchange.layer}
+ * says it for the one this package ships: the metadata is the last thing a
+ * recording holds, so it is read from the tail of those bytes while the frame the
+ * parts are carried in is left unread.
+ *
+ * @see {@link Loaded.metadata} for reading it back.
+ * @category models
+ */
+export const Metadata = Schema.Struct({
+  compression: CompressionAlgorithm,
+  hash: HashAlgorithm,
+  digest: Schema.String,
+  version: Schema.String,
+});
+
+export type Metadata = Schema.Schema.Type<typeof Metadata>;
+
+/**
  * The services encoding a trajectory's parts takes, as the part schemas of its
  * config state them.
  *
@@ -100,7 +140,7 @@ export type EncodingServices<C extends Trajectory.AnyConfig> = Schema.Union<
 
 /**
  * A recording a storage holds under an id, as the operations that read it: what it
- * states of itself, the digest it ends with, and the trajectory its parts make.
+ * states of itself, the metadata it ends with, and the trajectory its parts make.
  *
  * **When to use**
  *
@@ -113,24 +153,25 @@ export type EncodingServices<C extends Trajectory.AnyConfig> = Schema.Union<
  * - `header` is what the header line a recording starts with states, decoded
  *   ({@link Header}), and is read while the recording is loaded: what a recording
  *   was made with is known without reading the frame its parts are carried in.
- * - `digest` reads the digest a recording ends with off its tail, without reading
- *   that frame either.
+ * - `metadata` reads what a recording states at its end off its tail, without
+ *   reading that frame either ({@link Metadata}).
  * - `read()` reads the whole recording as the trajectory its parts make, read as
  *   the most general one: any recording may be of any kind, so its response parts
  *   are read as the streams they arrived in, and its parts are read with no kit at
  *   all — see {@link Part} for what that means for the parts of either kind.
  *
- * What a load reads is the head of a recording and its length, so a program that
- * asks what a recording states of itself reads neither its parts nor its tail, and
- * `digest` reads the tail alone ({@link Service.load}). `read` is a function rather
- * than a value because a trajectory is a stream of parts and a stream is read
- * once: each call gives the parts as they are read rather than a reading already
- * begun, and each reads the frame the parts are carried in again.
+ * What a load reads is the head of a recording alone, so a program that asks what
+ * a recording states of itself reads neither its parts nor its tail, and what reads
+ * the tail asks for the metadata and reads it alone ({@link Service.load}). `read`
+ * is a function rather than a value because a trajectory is a stream of parts and a
+ * stream is read once: each call gives the parts as they are read rather than a
+ * reading already begun, and each reads the frame the parts are carried in again —
+ * and the metadata with it, since where that frame ends is what the metadata says.
  *
  * Either of the three fails with what the recording fails with — a header line
- * that is not a header, a frame that does not decode, bytes that do not end with a
- * digest — as {@link TrajectoryError}, and with what the storage fails with as a
- * failure of its own.
+ * that is not a header, a frame that does not decode, bytes that do not end with
+ * the metadata of a recording — as {@link TrajectoryError}, and with what the
+ * storage fails with as a failure of its own.
  *
  * @see {@link Service.load} for the operation that gives these.
  * @category models
@@ -143,10 +184,11 @@ export interface Loaded {
   readonly header: Header;
 
   /**
-   * The digest the recording ends with, which is what it is named by, read from
-   * the tail of its bytes.
+   * What the recording states at its end about its own bytes — how the frame was
+   * written and what the recording is named by — read from the tail of them
+   * ({@link Metadata}).
    */
-  readonly digest: Effect.Effect<string, TrajectoryError | StorageError>;
+  readonly metadata: Effect.Effect<Metadata, TrajectoryError | StorageError>;
 
   /**
    * The trajectory the recording holds, and the parts it is made of as the bytes
@@ -196,10 +238,10 @@ export interface Service {
    * Reads a recording kept under `id` into the operations it is read by.
    *
    * What loading reads is the head of a recording — the line it states itself in
-   * — and the length of its bytes, so a recording that is not there, or whose head
-   * is not a header, fails here rather than when its trajectory is read. What is
-   * left for the operations is the frame its parts are carried in and the digest
-   * it ends with, neither of which a load reads.
+   * — so a recording that is not there, or whose head is not a header, fails here
+   * rather than when its trajectory is read. What is left for the operations is the
+   * frame its parts are carried in and the metadata it ends with, neither of which
+   * a load reads.
    */
   readonly load: (id: string) => Effect.Effect<Loaded, TrajectoryError | StorageError>;
 
@@ -212,8 +254,9 @@ export interface Service {
    *
    * The trajectory is encoded as it is produced, so what it holds is never held
    * whole: what it states of itself is what the header line carries, its parts
-   * follow in the frame they are compressed into, and the digest of those parts,
-   * read off the bytes they are carried in, follows them.
+   * follow in the frame they are compressed into, and the metadata stating how that
+   * frame was written and what the recording is named by, read off the bytes they
+   * are carried in, follows them.
    */
   readonly save: <C extends Trajectory.AnyConfig, E, R>(
     trajectory: Trajectory.Trajectory<C, E, R>,
@@ -240,9 +283,9 @@ export interface Service {
  *
  * {@link Service.save} writes a trajectory where recordings are kept, and
  * {@link Service.load} gives what one of them is read by ({@link Loaded}): what
- * it states of itself, read from its head, what it is named by, read from its
- * tail, and the trajectory it holds, read out of it as it arrives rather than
- * once it has ended.
+ * it states of itself, read from its head, what it states at its end about its own
+ * bytes, read from its tail, and the trajectory it holds, read out of it as it
+ * arrives rather than once it has ended.
  *
  * Either direction fails with the failures of what it reads — the trajectory
  * being saved, the storage being read — as `E` on top of the
@@ -271,9 +314,16 @@ export class Exchange extends Context.Service<Exchange, Service>()("trajs/core/E
    * toolkit and kits knowable — without anything else. Everything after that line
    * is one frame carrying the trajectory's parts, each encoded as one
    * SchemaBinary frame ({@link Part}), so a recording is read as it arrives rather
-   * than once it has ended; the digest of those parts follows the frame, so a
-   * recording is named by its tail without that frame being read
-   * ({@link Loaded.digest}).
+   * than once it has ended. The frame is followed by the metadata of the recording
+   * ({@link Metadata}), as one more SchemaBinary frame, and by the length of that
+   * metadata as four bytes, big-endian: what a recording is named by is its tail,
+   * and the length that ends it says where the metadata it names begins, so the
+   * metadata is read without the frame before it being read
+   * ({@link Loaded.metadata}).
+   *
+   * What the metadata states of the algorithms is what the compression and the hash
+   * state of themselves ({@link Compression.algorithm}, {@link StreamHash.algorithm}),
+   * and its version is the one this package is at, as its `package.json` states it.
    *
    * What writes and reads that frame is the compression the layer is provided
    * with, what hashes the parts is the hash it is provided with, and what holds the
@@ -296,7 +346,7 @@ export class Exchange extends Context.Service<Exchange, Service>()("trajs/core/E
         const compression = yield* Compression;
         const hasher = yield* StreamHash;
 
-        return service(Header, storage, compression, hasher);
+        return service(Header, Metadata, storage, compression, hasher);
       }),
     );
 }

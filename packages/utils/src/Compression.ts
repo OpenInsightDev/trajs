@@ -12,9 +12,12 @@
  * and `@trajs/platform-browser` is over the codecs a browser states where
  * `node:zlib` is not — a page, say — and what either writes the other reads, in
  * every one of the algorithms, so a recording either carries the other reads back.
+ * Which of them a recording was carried in is what the recording states of itself
+ * ({@link Compression.algorithm}), so what it was written with is read off the
+ * recording rather than assumed by whatever reads it.
  */
 
-import { Context, Data, Stream } from "effect";
+import { Context, Data, Schema, Stream } from "effect";
 
 /**
  * What writing or reading the frame a recording's parts are carried in failed
@@ -45,13 +48,13 @@ export class CompressionError extends Data.TaggedError("CompressionError")<{
  * **When to use**
  *
  * Use to name the frame a compression layer is built over, where a program states
- * one ({@link Options}).
+ * one ({@link Options}), or to read the one a recording states of itself.
  *
  * **Details**
  *
  * - `none` carries the bytes of a stream themselves: nothing is written around
  *   them and nothing is read off them, so what a recording holds between its header
- *   line and its digest is the parts as the format encodes them.
+ *   line and its metadata is the parts as the format encodes them.
  * - `zstd` is a zstd frame, which is what {@link defaultAlgorithm} names: it is
  *   the frame a recording has always been carried in, so a recording written
  *   before an algorithm could be stated is one a layer defaults to reading.
@@ -59,10 +62,12 @@ export class CompressionError extends Data.TaggedError("CompressionError")<{
  *   (RFC 1952) and a deflate frame as zlib wraps one (RFC 1950) — which `node:zlib`
  *   and Bun state as well.
  *
- * A frame is written and read with one algorithm, and no recording states which
- * one it was written with: what a program saves a recording with is what it must
- * load it with, so the algorithms a program can reach are the ones the layer it
- * provides states.
+ * A frame is written and read with one algorithm, and what a recording was
+ * carried in is what the recording states of itself: the metadata it ends with
+ * names the algorithm its parts were written with
+ * ({@link Compression.algorithm}), so a program handed a recording it did not
+ * write can tell what to read it with rather than guessing among the algorithms
+ * it has.
  *
  * Each algorithm is a frame the platform packages write and read with a codec
  * their platform states rather than with code this package computes, and the
@@ -71,9 +76,12 @@ export class CompressionError extends Data.TaggedError("CompressionError")<{
  * read.
  *
  * @see {@link Options} for where an algorithm is stated.
+ * @see {@link Compression.algorithm} for what a compression states of itself.
  * @category models
  */
-export type Algorithm = "none" | "zstd" | "gzip" | "deflate";
+export const Algorithm = Schema.Literals(["none", "zstd", "gzip", "deflate"]);
+
+export type Algorithm = Schema.Schema.Type<typeof Algorithm>;
 
 /**
  * The frame a compression layer is built over.
@@ -91,10 +99,11 @@ export type Algorithm = "none" | "zstd" | "gzip" | "deflate";
  *   been carried.
  *
  * The option is stated where the layer is built rather than where a recording is
- * saved or loaded, since a recording does not state what it was written with: a
- * layer writes every frame it is given and reads every frame it is asked for with
- * the one algorithm, and a recording carried in another fails to read as a frame
- * that does not decode.
+ * saved, since what writes a frame is the layer alone: a layer writes every frame
+ * it is given with the one algorithm, and that is the algorithm the recording
+ * states of itself ({@link Compression.algorithm}). What reads one is the layer
+ * built over the algorithm the recording names, since a recording carried in
+ * another is read as a frame that does not decode.
  *
  * @see {@link Algorithm} for the frames a program may state.
  * @category models
@@ -130,19 +139,27 @@ export const defaultAlgorithm: Algorithm = "zstd";
  *
  * **Details**
  *
+ * - `algorithm` is which algorithm this compression carries a frame with
+ *   ({@link Algorithm}), which a recording states of itself.
  * - `compress` takes the chunks of a stream and gives back the chunks of the same
  *   stream compressed, and `decompress` takes the chunks of a compressed one and
  *   gives back the chunks it decompresses to.
  * - Either direction reports what it failed with as {@link CompressionError}; a
  *   failure of the chunks the stream carries is left to pass through as the failure
  *   it is.
- * - Which frame the chunks are carried in — the algorithm ({@link Algorithm}) — is
- *   the layer's to state rather than the operation's ({@link Options}): one
- *   compression writes and reads the one frame.
+ * - Which frame the chunks are carried in is the layer's to state rather than the
+ *   operation's ({@link Options}): one compression writes and reads the one frame,
+ *   and states it of itself.
  *
  * @see {@link Compression} for the service the exchange is provided with.
  */
 export interface Compression {
+  /**
+   * Which algorithm this compression carries a frame with, as {@link Algorithm}
+   * names it: what a recording that was written through it states of itself.
+   */
+  readonly algorithm: Algorithm;
+
   /**
    * Compresses the chunks of a stream into the frame a recording's parts are
    * carried in.
