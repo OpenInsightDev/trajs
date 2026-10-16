@@ -690,6 +690,27 @@ export interface Config<
 export type AnyConfig = Config<boolean, Toolkit.Any, Event.AnyKit, Metric.AnyKit, Extra.AnyKit>;
 
 /**
+ * The config of a reading that names no kits: it holds no tool, event, metric or
+ * extra datum, and its response parts are read as streams.
+ *
+ * **When to use**
+ *
+ * Use to type a trajectory a program reads or writes in a format's own terms rather
+ * than in the terms of a kit.
+ *
+ * @see {@link AnyConfig} for the config of a reading that does not know the kits.
+ * @see {@link Config} for a config that names what a trajectory holds.
+ * @category models
+ */
+export type UnknownConfig = Config<
+  true,
+  Toolkit.Empty,
+  Event.EmptyKit,
+  Metric.EmptyKit,
+  Extra.EmptyKit
+>;
+
+/**
  * The config a recording is read with: {@link AnyConfig} as the value of a
  * trajectory that states nothing about itself.
  *

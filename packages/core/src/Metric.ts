@@ -70,6 +70,12 @@ export const makeKit = <Ms extends ReadonlyArray<Any>>(...metrics: Ms) => {
 
 export type AnyKit = Metrickit<Record<string, Any>>;
 
+/** A kit that declares no metric. */
+export const emptyKit = makeKit();
+
+/** The type of {@link emptyKit}. */
+export type EmptyKit = typeof emptyKit;
+
 export type MetricPart<Tag extends string, Data> = Readonly<{ _tag: Tag; data: Data }>;
 
 export const MetricPart = <Tag extends string, S extends Schema.Top>(

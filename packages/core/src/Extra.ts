@@ -84,6 +84,12 @@ export const makeKit = <Xs extends ReadonlyArray<Any>>(...extra: Xs) => {
 
 export type AnyKit = Extrakit<Record<string, Any>>;
 
+/** A kit that declares no extra data. */
+export const emptyKit = makeKit();
+
+/** The type of {@link emptyKit}. */
+export type EmptyKit = typeof emptyKit;
+
 /** The schema an extra declares for one part of a recording, and `never` where it declares none. */
 type Declared<X extends Any, P extends Part> = Exclude<X[P], undefined>;
 

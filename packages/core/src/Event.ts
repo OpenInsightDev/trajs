@@ -62,6 +62,12 @@ export const makeKit = <Es extends ReadonlyArray<Any>>(...events: Es) => {
 
 export type AnyKit = Eventkit<Record<string, Any>>;
 
+/** A kit that declares no event. */
+export const emptyKit = makeKit();
+
+/** The type of {@link emptyKit}. */
+export type EmptyKit = typeof emptyKit;
+
 /** The events of the kits given as one, a tag they share holding the event of the kit latest among them. */
 type EventsMerged<Ks extends ReadonlyArray<AnyKit>> = Ks extends readonly [
   infer Head extends AnyKit,

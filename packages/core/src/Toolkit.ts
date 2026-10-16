@@ -35,3 +35,6 @@ export const encode = (toolkit: Toolkit.Any): ToolkitEncoded =>
       ];
     }),
   );
+
+/** The type of {@link empty}: a toolkit that holds no tool. */
+export type Empty = typeof Toolkit.empty;
