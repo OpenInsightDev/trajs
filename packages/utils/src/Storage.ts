@@ -7,7 +7,7 @@
  * storage serves a recording as is a {@link Bytes}, and what it takes one through
  * is a sink, so the exchange never holds the bytes of a recording itself. A storage
  * is of a place — a directory of files, a bucket, a map in memory — and the one
- * this package states is {@link fileSystemLayer}, which keeps a recording in the
+ * this package states is {@link layerFileSystem}, which keeps a recording in the
  * file it is named by over the file system any platform provides and serves it as
  * {@link fileBytes}. What a place could not serve is a {@link StorageError}, told
  * apart from the failure of the recording it was asked for.
@@ -109,7 +109,7 @@ export interface Storage {
  *
  * Use to require a storage of a program, and `Exchange.layer` to read and write
  * recordings through it. A program that keeps its recordings as files provides
- * {@link fileSystemLayer}, and one that keeps them somewhere else — a bucket, a
+ * {@link layerFileSystem}, and one that keeps them somewhere else — a bucket, a
  * store in a page — provides a layer of its own.
  *
  * **Details**
@@ -120,7 +120,7 @@ export interface Storage {
  * the service alone.
  *
  * @see {@link Storage} for what the service gives.
- * @see {@link fileSystemLayer} for the storage this package ships.
+ * @see {@link layerFileSystem} for the storage this package ships.
  */
 export const Storage: Context.Service<Storage, Storage> = Context.Service<Storage, Storage>()(
   "trajs/utils/Storage",
@@ -157,40 +157,6 @@ export class StorageError extends Data.TaggedError("StorageError")<{
 }
 
 /**
- * The bytes a file holds, as the storage that keeps recordings in files serves
- * them.
- *
- * A read names where it starts and a file handle is read where its cursor was left,
- * so a read of one recording's bytes opens the file, moves the cursor to the offset
- * asked for, reads what was asked of it and closes the file again: what a read
- * serves holds nothing open between reads, so two reads of the same recording are
- * each their own.
- *
- * @see {@link makeBytes} for the sequence this builds.
- * @see {@link fileSystemLayer} for the storage that serves one.
- * @category constructors
- */
-export const fileBytes = (files: FileSystem.FileSystem, path: string): Bytes<StorageError> =>
-  makeBytes({
-    length: files.stat(path).pipe(
-      Effect.map((info) => info.size),
-      Effect.mapError((cause) => new StorageError({ id: path, cause })),
-    ),
-    read: (buffer, { offset = 0n } = {}) =>
-      Effect.scoped(
-        Effect.gen(function* () {
-          const file = yield* files.open(path, { flag: "r" });
-
-          if (offset !== 0n) {
-            yield* file.seek(offset, "start");
-          }
-
-          return yield* file.read(buffer);
-        }),
-      ).pipe(Effect.mapError((cause) => new StorageError({ id: path, cause }))),
-  });
-
-/**
  * The storage this package ships: one recording per file, named by its path.
  *
  * **When to use**
@@ -219,15 +185,35 @@ export const fileBytes = (files: FileSystem.FileSystem, path: string): Bytes<Sto
  * @see {@link Storage} for the service this provides.
  * @category layers
  */
-export const fileSystemLayer: Layer.Layer<Storage, never, FileSystem.FileSystem> = Layer.effect(
+export const layerFileSystem: Layer.Layer<Storage, never, FileSystem.FileSystem> = Layer.effect(
   Storage,
   Effect.gen(function* () {
-    const files = yield* FileSystem.FileSystem;
+    const fs = yield* FileSystem.FileSystem;
+
+    const fileBytes = (path: string): Bytes<StorageError> =>
+      makeBytes({
+        length: fs.stat(path).pipe(
+          Effect.map((info) => info.size),
+          Effect.mapError((cause) => new StorageError({ id: path, cause })),
+        ),
+        read: (buffer, { offset = 0n } = {}) =>
+          Effect.scoped(
+            Effect.gen(function* () {
+              const file = yield* fs.open(path, { flag: "r" });
+
+              if (offset !== 0n) {
+                yield* file.seek(offset, "start");
+              }
+
+              return yield* file.read(buffer);
+            }),
+          ).pipe(Effect.mapError((cause) => new StorageError({ id: path, cause }))),
+      });
 
     return {
-      read: (id) => Effect.succeed(fileBytes(files, id)),
+      read: (id) => Effect.succeed(fileBytes(id)),
       write: (id, options) =>
-        files
+        fs
           .sink(id, { flag: options?.overwrite === false ? "wx" : "w" })
           .pipe(Sink.mapError((cause) => new StorageError({ id, cause }))),
     };

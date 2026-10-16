@@ -19,7 +19,7 @@ import { NodeServices as PlatformNode } from "@effect/platform-node";
 import { Event, Extra, Metric, Prompt, Response, Toolkit, Trajectory } from "@trajs/core";
 import { Exchange } from "@trajs/core/Exchange";
 import { NodeServices } from "@trajs/platform-node";
-import { fileSystemLayer } from "@trajs/utils/Storage";
+import { layerFileSystem } from "@trajs/utils/Storage";
 import { DateTime, Effect, Formatter, Layer, Stream } from "effect";
 
 /** What a response part looks like to a toolkit of no tools: the most a recording holds. */
@@ -351,7 +351,7 @@ void Effect.runPromise(
   Effect.provide(
     program,
     Layer.provide(
-      Layer.provide(Exchange.layer, Layer.merge(NodeServices.layer, fileSystemLayer)),
+      Layer.provide(Exchange.layer, Layer.merge(NodeServices.layer, layerFileSystem)),
       PlatformNode.layer,
     ),
   ),

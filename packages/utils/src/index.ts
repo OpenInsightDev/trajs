@@ -7,10 +7,11 @@
  * `Storage.Storage` — and each is also available as a subpath import such as
  * `@trajs/utils/Bytes`.
  *
- * Nothing here says what any of them is over: what writes and reads a frame, what
- * reads a digest and where a recording is kept are a platform package's to state,
- * and `@trajs/platform-node` and `@trajs/platform-browser` provide the layers these
- * services are read through.
+ * Where a recording is kept and what reads a digest are stated here over what any
+ * platform provides — `Storage.layerFileSystem` and `StreamHash.layer` — and what
+ * carries a recording's parts in a frame is a platform package's to state, which is
+ * what `@trajs/platform-node`, `@trajs/platform-bun` and `@trajs/platform-browser`
+ * provide.
  */
 
 export * as Bytes from "#/Bytes.ts";

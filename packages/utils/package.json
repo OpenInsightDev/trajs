@@ -40,6 +40,7 @@
     "prepublishOnly": "vp run build"
   },
   "dependencies": {
+    "@noble/hashes": "catalog:",
     "effect": "catalog:"
   },
   "devDependencies": {
