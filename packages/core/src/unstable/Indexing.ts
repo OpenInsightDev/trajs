@@ -11,8 +11,7 @@
 import { Context, Effect, Effectable, Sink, type Schema } from "effect";
 
 import * as Trajectory from "#/Trajectory.ts";
-
-import type { TrajectoryError } from "./TrajectoryError.ts";
+import type { TrajectoryError } from "#/TrajectoryError.ts";
 
 /**
  * The sink an index holds: it reads the parts of a trajectory of the config given
@@ -85,7 +84,8 @@ type Props<
  *
  * ```ts import.meta.vitest
  * import { Effect, Schema, Sink, Stream } from "effect"
- * import { Extra, Indexing, Trajectory } from "@trajs/core"
+ * import { Extra, Trajectory } from "@trajs/core"
+ * import * as Indexing from "@trajs/core/unstable/Indexing"
  *
  * const extrakit = Extra.makeKit()
  *
