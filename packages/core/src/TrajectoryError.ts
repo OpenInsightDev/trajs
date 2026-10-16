@@ -107,8 +107,9 @@ export class SessionError extends Data.TaggedError("SessionError")<{
  * **Details**
  *
  * `cause` is what the recording failed with, as the layer that failed reported
- * it: the `SchemaError` of a part or of the header line, the zstd stream's own
- * failure, or the description of the bytes ending before a header line.
+ * it: the `SchemaError` of a part or of the header line, the failure of the codec
+ * the frame is carried in, or the description of the bytes ending before a header
+ * line.
  *
  * @see {@link TrajectoryError.parse} for the error that carries it.
  * @category errors

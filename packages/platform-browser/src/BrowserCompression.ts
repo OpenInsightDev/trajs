@@ -1,12 +1,13 @@
 /**
- * The compression a program computes anywhere with: the zstd frame the WebAssembly
- * codec `@structured-world/structured-zstd` writes and reads one with.
+ * The compression a program computes anywhere with: a frame the streams a browser
+ * states write and read one with — gzip and deflate — a zstd frame carried by the
+ * WebAssembly codec `@structured-world/structured-zstd`, or the bytes as they are.
  *
  * {@link layer} is the {@link Compression} this package provides the exchange with,
- * over the codec, which runs where `node:zlib` is not — a page, say. What it writes
- * is the same zstd `node:zlib` writes, so a frame either writes the other reads. The
- * codec is imported with this module, which only a program that depends on this
- * package imports.
+ * over those codecs, which run where `node:zlib` is not — a page, say. What each of
+ * them writes is the same frame the other platform packages write for the same
+ * algorithm, so a frame either writes the others read. The codecs are imported with
+ * this module, which only a program that depends on this package imports.
  */
 
 import {
@@ -14,13 +15,24 @@ import {
   createDecompressStream,
   type CompressStream,
 } from "@structured-world/structured-zstd";
-import { Compression, CompressionError } from "@trajs/utils/Compression";
+import {
+  Compression,
+  CompressionError,
+  defaultAlgorithm,
+  type Algorithm,
+  type Options,
+} from "@trajs/utils/Compression";
 import { Effect, Layer, Stream } from "effect";
 
 /** A handle of the WebAssembly codec: what one direction of a frame is written and read through. */
-type Codec = Pick<CompressStream, "push" | "finish" | "free">;
+type Handle = Pick<CompressStream, "push" | "finish" | "free">;
 
-/** What the WebAssembly codec refuses a frame for, as the compression that failed. */
+/** One direction of a frame: the chunks of a stream in, the chunks of the frame out. */
+type Frame = <E, R>(
+  bytes: Stream.Stream<Uint8Array, E, R>,
+) => Stream.Stream<Uint8Array, E | CompressionError, R>;
+
+/** What the codecs refuse a frame for, as the compression that failed. */
 const refused = (cause: unknown): CompressionError => new CompressionError({ cause });
 
 /**
@@ -33,7 +45,7 @@ const refused = (cause: unknown): CompressionError => new CompressionError({ cau
  * otherwise be left to the engine's collector.
  */
 const carried = <E, R>(
-  open: () => Promise<Codec>,
+  open: () => Promise<Handle>,
   bytes: Stream.Stream<Uint8Array, E, R>,
 ): Stream.Stream<Uint8Array, E | CompressionError, R> =>
   Stream.unwrap(
@@ -60,28 +72,117 @@ const carried = <E, R>(
   );
 
 /**
- * The compression a program computes anywhere with, over the WebAssembly codec
- * `@structured-world/structured-zstd` carries.
+ * Carries a stream of chunks through one of the streams a browser states itself:
+ * the codec is handed the chunks as the downstream pulls them and what it writes is
+ * emitted as it is available, so the bytes are carried rather than held.
+ *
+ * What a browser states is one call over a whole `ReadableStream`, so the stream the
+ * chunks arrive in is handed to it — which is where the back pressure between the
+ * two travels.
+ */
+const piped = <E, R>(
+  open: (bytes: ReadableStream<Uint8Array>) => ReadableStream<Uint8Array>,
+  bytes: Stream.Stream<Uint8Array, E, R>,
+): Stream.Stream<Uint8Array, E | CompressionError, R> =>
+  Stream.unwrap(
+    Stream.toReadableStreamEffect(bytes).pipe(
+      Effect.map((source) =>
+        Stream.fromReadableStream({ evaluate: () => open(source), onError: refused }),
+      ),
+    ),
+  );
+
+/**
+ * A browser's codec as the pair of streams a frame is carried through: the binary of
+ * a recording's parts is what is written into it and what is read back from it.
+ */
+type Pair = ReadableWritablePair<Uint8Array, Uint8Array>;
+
+/**
+ * A browser's codec as the pair this side carries a frame through.
+ *
+ * The writable of `CompressionStream` and `DecompressionStream` is declared a
+ * `WritableStream<BufferSource>` — any binary a caller may hand one — where the
+ * chunks a recording's frame arrives in are `Uint8Array` over buffers this side does
+ * not name; what the pair states is what the codec reads and writes at run time,
+ * which its own declaration cannot state.
+ */
+const asPair = (codec: CompressionStream | DecompressionStream): Pair => {
+  // SAFETY: a browser's codec reads and writes any binary, and a chunk of a frame is
+  // binary; the declaration is wider than the `Uint8Array` this side carries.
+  const pair = codec as Pair;
+
+  return pair;
+};
+
+/**
+ * One direction of a frame as a browser states it: `CompressionStream` writes a gzip
+ * or deflate frame, and `DecompressionStream` reads one.
+ */
+const web =
+  (format: "gzip" | "deflate", direction: "compress" | "decompress"): Frame =>
+  (bytes) =>
+    piped(
+      (source) =>
+        source.pipeThrough(
+          asPair(
+            direction === "compress"
+              ? new CompressionStream(format)
+              : new DecompressionStream(format),
+          ),
+        ),
+      bytes,
+    );
+
+/**
+ * The algorithms a codec is needed for: every one the compression states but the
+ * bytes carried as they are.
+ */
+type CodedAlgorithm = Exclude<Algorithm, "none">;
+
+const compressors: Record<CodedAlgorithm, Frame> = {
+  deflate: web("deflate", "compress"),
+  gzip: web("gzip", "compress"),
+  zstd: (bytes) => carried(() => createCompressStream(), bytes),
+};
+
+const decompressors: Record<CodedAlgorithm, Frame> = {
+  deflate: web("deflate", "decompress"),
+  gzip: web("gzip", "decompress"),
+  zstd: (bytes) => carried(() => createDecompressStream(), bytes),
+};
+
+/**
+ * The compression a program computes anywhere with, over the codecs a browser
+ * states and the WebAssembly zstd codec.
  *
  * **When to use**
  *
  * Use when a program runs where `node:zlib` is not — a page, a worker, Deno — or
- * when every run should write and read a recording with the same codec.
+ * when every run should write and read a recording with the same codecs.
  *
  * **Details**
  *
- * The codec's engine picks the SIMD payload where the host has it and the scalar
- * one where it has not; each frame is then carried through one handle of the codec
- * per run, so a recording is written and read as it arrives.
+ * gzip and deflate are the frames `CompressionStream` and `DecompressionStream`
+ * write and read, and zstd is the WebAssembly codec's, whose engine picks the SIMD
+ * payload where the host has it and the scalar one where it has not. Each frame is
+ * carried through one codec per run, so a recording is written and read as it
+ * arrives — as it is on Node, where `node:zlib` is what the algorithms are stated
+ * over.
  *
- * What it writes is the same zstd `node:zlib` writes, so a frame either writes the
- * other reads — `@trajs/platform-node`'s compression is the one of a program that
- * runs on Node, where `node:zlib` is there.
+ * `none` carries the parts as the format encodes them, which is the frame that costs
+ * nothing to write and the most to keep. The algorithm is the layer's to state
+ * ({@link Options}), and defaults to zstd, the frame a recording has always been
+ * carried in.
  *
  * @see {@link Compression} for the compression this provides.
  * @category layers
  */
-export const layer: Layer.Layer<Compression> = Layer.succeed(Compression, {
-  compress: (bytes) => carried(() => createCompressStream(), bytes),
-  decompress: (bytes) => carried(() => createDecompressStream(), bytes),
-});
+export const layer = (options?: Options): Layer.Layer<Compression> => {
+  const algorithm = options?.algorithm ?? defaultAlgorithm;
+
+  return Layer.succeed(Compression, {
+    compress: (bytes) => (algorithm === "none" ? bytes : compressors[algorithm](bytes)),
+    decompress: (bytes) => (algorithm === "none" ? bytes : decompressors[algorithm](bytes)),
+  });
+};

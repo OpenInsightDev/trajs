@@ -1,22 +1,100 @@
 /**
- * The BLAKE3 hash a recording is named by: the digest of the bytes it carries its
- * parts in.
+ * The hash a recording is named by: the digest of the bytes it carries its parts
+ * in.
  *
  * What reads a digest off a stream of bytes is a {@link StreamHash}, and the
  * exchange is built over one, so what hashes a recording is a layer's to say
  * rather than the format's: nothing of how a digest is read changes when another
- * hash is provided. The one this package ships is {@link layer}, which is the BLAKE3
- * `@noble/hashes` computes, in JavaScript, so it runs wherever JavaScript does. The
- * layers over what a platform provides are a platform package's to state —
- * `@trajs/platform-node` and `@trajs/platform-bun` are over the Rust binding
- * `@napi-rs/blake-hash`, and `@trajs/platform-browser` is over the WebAssembly BLAKE3
- * `blake3-wasm` carries — and BLAKE3 is what every one of them computes, so a digest
- * one layer reads the others agree with.
+ * hash is provided. Which digest is read — BLAKE3, BLAKE2b or SHA-256
+ * ({@link Algorithm}) — is stated where the layer is built ({@link Options}), and
+ * what computes it is a platform package's to state: `@trajs/platform-node` and
+ * `@trajs/platform-bun` are over the Rust binding `@napi-rs/blake-hash` and
+ * `node:crypto`, and `@trajs/platform-browser` is over the WebAssembly BLAKE3
+ * `blake3-wasm` carries, over WebCrypto and over the hash this package ships. The
+ * digest of one algorithm is one every layer agrees with, so a recording one
+ * platform names is a recording another recognises.
  */
 
+import { blake2b } from "@noble/hashes/blake2.js";
 import { blake3 } from "@noble/hashes/blake3.js";
+import { sha256 } from "@noble/hashes/sha2.js";
 import { bytesToHex } from "@noble/hashes/utils.js";
 import { Context, Layer, Sink } from "effect";
+
+/**
+ * The digest a recording is named by: the algorithm it is read with.
+ *
+ * **When to use**
+ *
+ * Use to name the digest a hash layer is built over, where a program states one
+ * ({@link Options}).
+ *
+ * **Details**
+ *
+ * - `blake3` is BLAKE3, which is what {@link defaultAlgorithm} names: it is the
+ *   digest a recording has always been named by, and the one every platform package
+ *   states a codec for.
+ * - `blake2b` is BLAKE2b with a digest of 32 bytes — the same length as BLAKE3's,
+ *   which is not the 64 bytes an unconfigured BLAKE2b computes — so a recording is
+ *   named by 64 characters of hex whichever of the two is stated.
+ * - `sha256` is SHA-256.
+ *
+ * A digest is read by feeding one run of a hash the bytes of one stream, so what an
+ * algorithm names is what two programs agree on: they name a recording the same way
+ * where they state the same one, and no recording states what it was named with, so
+ * what names one is the layer a program was given rather than anything the recording
+ * holds.
+ *
+ * @see {@link Options} for where an algorithm is stated.
+ * @category models
+ */
+export type Algorithm = "blake3" | "blake2b" | "sha256";
+
+/**
+ * The digest a hash layer is built over.
+ *
+ * **When to use**
+ *
+ * Use where a program states what names its recordings, or to type what a hash
+ * layer is built with.
+ *
+ * **Details**
+ *
+ * - `algorithm` is the digest a stream is hashed to ({@link Algorithm}), and
+ *   defaults to {@link defaultAlgorithm} — `blake3` — so a program that states
+ *   nothing names its recordings the way they have always been named.
+ *
+ * The option is stated where the layer is built rather than where a digest is read,
+ * since reading one takes no choice: what a digest is of is a stream of bytes, and
+ * what it is read with is the layer, so a program that reads a recording back names
+ * it the way it named it when it wrote it.
+ *
+ * @see {@link Algorithm} for the digests a program may state.
+ * @category models
+ */
+export interface Options {
+  readonly algorithm?: Algorithm;
+}
+
+/**
+ * The algorithm a digest is read with when a program states none: `blake3`.
+ *
+ * **When to use**
+ *
+ * Use where a hash layer resolves the option it was built with ({@link Options}),
+ * so that what a program stating nothing gets is stated once rather than by each
+ * layer.
+ *
+ * **Details**
+ *
+ * It is the digest a recording has always been named by, so a program that states
+ * no algorithm names a recording the way a program that stated none named it, and
+ * names one written before an algorithm could be stated the way it is named at all.
+ *
+ * @see {@link Algorithm} for what it names.
+ * @category constants
+ */
+export const defaultAlgorithm: Algorithm = "blake3";
 
 /**
  * A hash of a stream of bytes: the bytes are given to it as a sink, and the digest
@@ -30,6 +108,12 @@ import { Context, Layer, Sink } from "effect";
  * are what it is given — the format's own bytes, so a part of a recording is hashed
  * the way `Exchange.Part` carries it rather than the way a program happened to read
  * it — so the digest of a trajectory is the same wherever one is computed from it.
+ *
+ * The digest is of the algorithm the layer states ({@link Algorithm}), and every
+ * algorithm a layer states names a digest of 32 bytes — 64 characters of hex — so
+ * what a recording ends with is the same length whichever one it was named with,
+ * and a digest read through one layer is one another layer reads where the two are
+ * built over the same algorithm.
  *
  * A hash is of a stream of bytes rather than of a program: two streams are hashed
  * by two runs of the sink, and nothing of one is held for the next. Reading a
@@ -67,13 +151,61 @@ export const StreamHash: Context.Service<StreamHash, StreamHash> = Context.Servi
   StreamHash
 >()("trajs/utils/StreamHash");
 
+/** One run of a hash of one algorithm, its bytes fed to it as the sink runs. */
+const hashing = (algorithm: Algorithm): Sink.Sink<string, Uint8Array, never, never> =>
+  Sink.reduce(
+    () => {
+      switch (algorithm) {
+        case "blake2b":
+          // BLAKE2b of the length the other two digests are of, rather than the 64
+          // bytes one computes where its length is not stated.
+          return blake2b.create({ dkLen: 32 });
+        case "sha256":
+          return sha256.create();
+        default:
+          return blake3.create();
+      }
+    },
+    (hashed, chunk: Uint8Array) => {
+      hashed.update(chunk);
+
+      return hashed;
+    },
+  ).pipe(Sink.map((hashed) => bytesToHex(hashed.digest())));
+
 /**
- * The hash this package ships: the BLAKE3 `@noble/hashes` computes.
+ * A hash of one algorithm as the service it is read through: the digest of a
+ * stream the layer is built over ({@link StreamHash}).
+ *
+ * **When to use**
+ *
+ * Use where a layer is stated over a hash of this package rather than over the one
+ * a platform provides — `@trajs/platform-browser` is over this for BLAKE2b, which a
+ * browser states no codec for — or where a program provides the service itself
+ * rather than through a layer.
+ *
+ * **Details**
+ *
+ * It is what {@link layer} provides, as the value a layer is built from, so a
+ * `StreamHash` built here and one provided by the layer hash the same bytes to the
+ * same digest. The algorithm defaults to {@link defaultAlgorithm}, as it does for
+ * every layer built over one of these hashes.
+ *
+ * @see {@link layer} for the hash this builds as a layer.
+ * @category constructors
+ */
+export const make = (options?: Options): StreamHash => ({
+  digest: hashing(options?.algorithm ?? defaultAlgorithm),
+});
+
+/**
+ * The hash this package ships: BLAKE3, BLAKE2b or SHA-256, as `@noble/hashes`
+ * computes them.
  *
  * **When to use**
  *
  * Use when a program hashes a recording without a platform package — a page, a
- * worker, a script — or when every run should hash a recording with the same code
+ * worker, a script — or when every run should hash a recording with the same code,
  * whatever it is run on: it is the one hash that needs no native addon to be loaded
  * by the machine and no WebAssembly module to be carried, so a program that
  * provides it hashes wherever JavaScript runs.
@@ -81,27 +213,22 @@ export const StreamHash: Context.Service<StreamHash, StreamHash> = Context.Servi
  * **Details**
  *
  * `@noble/hashes` is JavaScript with no dependencies of its own, so what computes
- * the digest is a module like any other of this package's rather than a binding
- * resolved where the layer is provided: a bundle of a program carries it, which is
- * what a page and a worker can run.
+ * the digest is a module like any other of this package's rather than a binding or
+ * a WebAssembly module resolved where the layer is provided: a bundle of a program
+ * carries it, which is what a page and a worker can run. The cost of that is the
+ * code and the speed of JavaScript against a codec the machine states itself, which
+ * is what the platform packages are for.
  *
  * Bytes are fed to one hash as they arrive and the digest is read off it once they
- * have ended, which is how the platform layers read one too: BLAKE3 is what it
- * computes, so a recording hashed through it is the recording
- * `@trajs/platform-node`, `@trajs/platform-bun` and `@trajs/platform-browser` read,
- * and a digest one layer reads another agrees with — a recording one wrote is a
- * recording the others load.
+ * have ended, which is how the platform layers read one too: what it computes for an
+ * algorithm is what the codecs of the platforms compute for the same one, so a
+ * recording hashed through it is the recording `@trajs/platform-node`,
+ * `@trajs/platform-bun` and `@trajs/platform-browser` name — a recording one wrote
+ * is a recording the others load.
  *
  * @see {@link StreamHash} for the hash this provides.
+ * @see {@link make} for the same hash as the service rather than as the layer.
  * @category layers
  */
-export const layer: Layer.Layer<StreamHash> = Layer.succeed(StreamHash, {
-  digest: Sink.reduce(
-    () => blake3.create(),
-    (hashing, chunk: Uint8Array) => {
-      hashing.update(chunk);
-
-      return hashing;
-    },
-  ).pipe(Sink.map((hashing) => bytesToHex(hashing.digest()))),
-});
+export const layer = (options?: Options): Layer.Layer<StreamHash> =>
+  Layer.succeed(StreamHash, make(options));

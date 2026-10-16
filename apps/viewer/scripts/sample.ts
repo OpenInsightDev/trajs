@@ -346,7 +346,7 @@ void Effect.runPromise(
   Effect.provide(
     program,
     Layer.provide(
-      Layer.provide(Exchange.layer, Layer.merge(NodeServices.layer, layerFileSystem)),
+      Layer.provide(Exchange.layer, Layer.merge(NodeServices.layer(), layerFileSystem)),
       PlatformNode.layer,
     ),
   ),

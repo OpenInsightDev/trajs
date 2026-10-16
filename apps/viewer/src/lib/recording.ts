@@ -202,7 +202,7 @@ export const read = (bytes: Uint8Array): Effect.Effect<Recording, Failure, Scope
   }).pipe(
     Effect.provide(
       Layer.provide(
-        Layer.provide(Exchange.layer, BrowserServices.layer),
+        Layer.provide(Exchange.layer, BrowserServices.layer()),
         Layer.succeed(Storage, handed(bytes)),
       ),
     ),

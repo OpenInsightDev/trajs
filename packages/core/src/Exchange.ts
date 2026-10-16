@@ -17,16 +17,18 @@
  * itself — and a program that keeps recordings some other way provides a layer of
  * its own, which is the only thing that changes. Of that format, a recording
  * starts with a header line stating what it was made with, the parts follow in one
- * zstd frame, and the digest of those parts follows them; reading at random is what
+ * frame, and the digest of those parts follows them; reading at random is what
  * lets the head of a recording be read for the header line and its tail for the
  * digest without reading the frame between them. How such a frame is written, how
  * the parts are hashed and where a recording is kept are not the format's to
  * state: the layer is built over a compression of the parts, over a hash of them
  * and over a storage, which are `@trajs/utils`'s services — a program provides the
  * layer a platform package states them with, such as `@trajs/platform-node` for one
- * that runs on Node — over `node:zlib`, the BLAKE3 binding and the files of the
- * machine — or `@trajs/platform-browser` for one that runs where `node:zlib` is not,
- * a page say.
+ * that runs on Node — over `node:zlib`, the hashes the Rust binding and `node:crypto`
+ * compute, and the files of the machine — or `@trajs/platform-browser` for one that
+ * runs where `node:zlib` is not, a page say. Which frame the parts are carried in,
+ * and which digest names them, are the layer's to state too
+ * ({@link Compression.Options}).
  */
 
 import { Compression } from "@trajs/utils/Compression";
@@ -267,7 +269,7 @@ export class Exchange extends Context.Service<Exchange, Service>()("trajs/core/E
    * A recording starts with one plain-text line, the encoded {@link Header}, and
    * nothing before it is compressed, so the head of a file is readable — and its
    * toolkit and kits knowable — without anything else. Everything after that line
-   * is one zstd frame carrying the trajectory's parts, each encoded as one
+   * is one frame carrying the trajectory's parts, each encoded as one
    * SchemaBinary frame ({@link Part}), so a recording is read as it arrives rather
    * than once it has ended; the digest of those parts follows the frame, so a
    * recording is named by its tail without that frame being read
@@ -279,7 +281,7 @@ export class Exchange extends Context.Service<Exchange, Service>()("trajs/core/E
    * than holding any, and what a program provides them with is where its recordings
    * are kept. These are `@trajs/utils`'s services: a program provides the layer a
    * platform package states them with, such as `@trajs/platform-node` — over
-   * `node:zlib`, a BLAKE3 binding and the files of the machine — or
+   * `node:zlib`, the Rust binding and `node:crypto` — or
    * `@trajs/platform-browser`, over WebAssembly codecs that run where `node:zlib` is
    * not.
    *

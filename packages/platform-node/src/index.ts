@@ -1,7 +1,8 @@
 /**
  * The implementations of `@trajs/utils`'s services that a program on Node runs
- * with: its parts carried in a frame `node:zlib` writes and reads, and the digest
- * read off them by the Rust binding `@napi-rs/blake-hash`.
+ * with: its parts carried in a zstd, gzip, deflate or none frame `node:zlib` writes
+ * and reads, and the BLAKE3, BLAKE2b or SHA-256 digest the Rust binding
+ * `@napi-rs/blake-hash` and `node:crypto` read off them.
  *
  * Every module is re-exported as a namespace — `NodeCompression.layer`,
  * `NodeStreamHash.layer` — and each is also available as a subpath import such

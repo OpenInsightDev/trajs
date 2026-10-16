@@ -11,8 +11,8 @@
  * that frame, what hashes the parts and where a recording is kept are
  * `@trajs/utils`'s services: a program provides `Exchange.layer` with the layers a
  * platform package states them with — `@trajs/platform-node`, over `node:zlib`, the
- * BLAKE3 binding and the files of the machine, or `@trajs/platform-browser`, over
- * WebAssembly codecs that run where `node:zlib` is not, a page say.
+ * Rust binding and `node:crypto`, or `@trajs/platform-browser`, over WebAssembly
+ * codecs that run where `node:zlib` is not, a page say.
  */
 
 export * as Event from "#/Event.ts";

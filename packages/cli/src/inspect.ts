@@ -52,5 +52,7 @@ export const inspect = Command.make(
   Command.withDescription("Print the header of a `.trajs` file."),
   // The frame the parts are carried in is never reached, so nothing past the
   // header line is decompressed.
-  Command.provide(Layer.provide(Exchange.layer, Layer.merge(NodeServices.layer, layerFileSystem))),
+  Command.provide(
+    Layer.provide(Exchange.layer, Layer.merge(NodeServices.layer(), layerFileSystem)),
+  ),
 );
