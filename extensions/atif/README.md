@@ -5,14 +5,16 @@ the Agent Trajectory Interchange Format Harbor records agents with.
 
 ATIF carries a run as one ordered list of steps — a system prompt, a user
 message, or a complete agent turn — and Harbor writes it to `trajectory.json`,
-which its results viewer reads and its agents load. `Step.steps` derives that
-list from a `@trajs/core` recording, so a recording can be read as the steps the
-format exchanges, and `Document.of` reads the other way: a document is read as
-the recording it states, so a run another program recorded is a trajectory this
-package and every other reader of one reads. The extension of _Context management
-events_ below records what ATIF states of a run of its own. What a document
-states and a recording does not hold is left to whoever writes the document;
-_What a step holds_ below says where that gap is, from the side of a step.
+which its results viewer reads and its agents load. `Document` states that
+format, as the schemas a `trajectory.json` is decoded by. `Step.steps` derives
+that list from a `@trajs/core` recording, so a recording can be read as the steps
+the format exchanges, and `Recording.of` reads the other way: a document is read
+as the recording it states, so a run another program recorded is a trajectory
+this package and every other reader of one reads. The extension of _Context
+management events_ below records what ATIF states of a run of its own. What a
+document states and a recording does not hold is left to whoever writes the
+document; _What a step holds_ below says where that gap is, from the side of a
+step.
 
 ## Usage
 
@@ -35,7 +37,7 @@ session at a time.
 
 ## Reading a document
 
-`Document.of` reads an ATIF document as the recording it states: the steps of the
+`Recording.of` reads an ATIF document as the recording it states: the steps of the
 document are recorded as the turns of a trajectory with `Produce.produce`, so a
 `trajectory.json` a program that ran elsewhere wrote is a recording like any other
 — `View`, `Session`, the codec extensions and the metric kits read it as one, and
@@ -45,11 +47,11 @@ schemas ATIF states it in, so what a file holds is decoded before it is read.
 ```ts
 import { Schema } from "effect";
 import { readFile } from "node:fs/promises";
-import { Document } from "@trajs/extension-atif";
+import { Document, Recording } from "@trajs/extension-atif";
 
 const json = await readFile("trajectory.json", "utf8");
 const document = Schema.decodeUnknownSync(Document.FromJson)(json);
-const recording = Document.of(document);
+const recording = Recording.of(document);
 ```
 
 One step of the document is one turn of the recording: a step that states a
@@ -144,7 +146,7 @@ object ATIF wraps them in, and a step's own tool calls and results are the
 response parts of the recording rather than the `tool_calls` and
 `observation.results` those parts encode to.
 
-`Document.of` reads the other way, and leaves the same fields out of the recording
+`Recording.of` reads the other way, and leaves the same fields out of the recording
 it makes: _Reading a document_ above says of each of them what becomes of it.
 
 ## Development
