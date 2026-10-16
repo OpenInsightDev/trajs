@@ -26,6 +26,8 @@ import type { Prompt, Tool } from "effect/ai";
  * Who contributed a step: the system prompt a model was given, the user, or the
  * agent that answered them.
  *
+ * ATIF RFC 0001 v1.8, Section II "StepObject", the values of its `source`.
+ *
  * **When to use**
  *
  * Use when a step is read by who contributed it rather than by what it holds.
@@ -45,6 +47,9 @@ export type StepSource = "system" | "user" | "agent";
 /**
  * One step of a trajectory: a message a model was given, or the turn the model
  * answered it with.
+ *
+ * ATIF RFC 0001 v1.8, Section II "StepObject", of which a step here states what
+ * a recording holds.
  *
  * **When to use**
  *

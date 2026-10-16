@@ -35,6 +35,8 @@ const boundaries = ["replace", "append", "truncate"] as const;
 /**
  * The kind of transformation a context management event states.
  *
+ * ATIF RFC 0001 v1.8, Section VII "Context Management Convention".
+ *
  * **When to use**
  *
  * Use when building a context management event, or when reading what one states.
@@ -59,6 +61,8 @@ export type ContextManagementType = (typeof types)[number];
 /**
  * How a context management event bounds the agent's context for the steps after
  * it.
+ *
+ * ATIF RFC 0001 v1.8, Section VII "Context Management Convention".
  *
  * **When to use**
  *
@@ -134,6 +138,8 @@ export const contextManagementEvent = new Event.Event({
 /**
  * The context management event at the newest version of the event's data.
  *
+ * ATIF RFC 0001 v1.8, Section VII "Context Management Convention".
+ *
  * **When to use**
  *
  * Use when building the datum a context management event carries, or when reading
@@ -161,6 +167,8 @@ export const ContextManagement = contextManagementEvent.schema.self;
 /**
  * A context management event as the package records it, at the newest version of
  * the event's data.
+ *
+ * ATIF RFC 0001 v1.8, Section VII "Context Management Convention".
  *
  * @see {@link contextManagementEvent} for the event the datum belongs to.
  * @category models

@@ -10,7 +10,14 @@
  * The schemas state the format rather than a program's reading of it: a step is a
  * {@link StepObject}, the results it was answered with are an {@link Observation},
  * and what a message says is {@link Content}, which states the text alone or the
- * parts a message holds where it holds more than text.
+ * parts a message holds where it holds more than text. A part that holds more than
+ * text states where its bytes are rather than the bytes themselves — an
+ * {@link ImageSource} for an image, an {@link AudioSource} for a recording.
+ *
+ * The format stated here is ATIF RFC 0001 at v1.8, kept at
+ * `references/harbor/rfcs/0001-trajectory-format.md`, and every schema below names
+ * the section of it that states the type, quoting the section's heading as the RFC
+ * writes it.
  */
 
 import { Schema } from "effect";
@@ -29,55 +36,171 @@ const versions = [
 
 const sources = ["system", "user", "agent"] as const;
 
+/** The types ATIF states for an image. */
+const imageMediaTypes = ["image/jpeg", "image/png", "image/gif", "image/webp"] as const;
+
+/** The types ATIF states for audio, as it writes them. */
+const audioMediaTypes = [
+  "audio/wav",
+  "audio/mpeg",
+  "audio/mp4",
+  "audio/aac",
+  "audio/ogg",
+  "audio/flac",
+  "audio/webm",
+  "audio/aiff",
+] as const;
+
 /**
- * A part of a message that is not text: an image (v1.6+) or a recording of speech
- * (v1.8+).
+ * What a producer writes for an audio type where a provider's API documents or
+ * returns a spelling of its own, such as the `audio/mp3` of the Gemini API, which
+ * ATIF tells a consumer to accept beside the type it states.
+ */
+const audioMediaTypeSpellings = [
+  "audio/mp3",
+  "audio/mpga",
+  "audio/x-mpeg",
+  "audio/x-wav",
+  "audio/wave",
+  "audio/vnd.wave",
+  "audio/x-m4a",
+  "audio/m4a",
+  "audio/x-aac",
+  "audio/x-flac",
+  "audio/x-aiff",
+] as const;
+
+/**
+ * A field ATIF states for one kind of part alone, declared on the kinds of part
+ * that must omit it, so that a document which writes one is rejected as the format
+ * says rather than read with the field dropped out of what it states.
+ */
+const omitted = Schema.optional(Schema.Never);
+
+/**
+ * Where the bytes of an image a part states are: the type of the image, and the
+ * path or the URL they are at (v1.6+).
+ *
+ * ATIF RFC 0001 v1.8, Section II "ImageSourceSchema (v1.6+)".
  *
  * **When to use**
  *
- * Use when reading what ATIF states of a message that holds more than its text.
+ * Use when reading where the image of an {@link ImagePart} is, or when stating
+ * one — an image is referenced by a location rather than carried by its bytes.
  *
  * **Details**
  *
- * ATIF states such a part by a location rather than by its bytes: `source` is an
- * `ImageSourceSchema` — a `media_type` of `image/jpeg`, `image/png`, `image/gif`
- * or `image/webp` together with a `path` or a URL beside the document — where the
- * part is an image, and an `AudioSourceSchema` — a `media_type` of `audio/wav`,
- * `audio/mpeg`, `audio/mp4`, `audio/aac`, `audio/ogg`, `audio/flac`,
- * `audio/webm` or `audio/aiff`, a `path`, and the `duration_sec` of the recording
- * where the producer knew it — where it is audio.
+ * `media_type` is what the image is, which ATIF states as one of `image/jpeg`,
+ * `image/png`, `image/gif` or `image/webp`, and `path` is where its bytes are: a
+ * file path relative to the document, an absolute path, or a URL. Images are
+ * written beside the trajectory file by convention — the `images/` of the
+ * directory a `trajectory.json` sits in — which the format leaves to the producer
+ * rather than stating.
  *
- * @see {@link Content} for the message a part of this kind is a part of.
+ * @see {@link ImagePart} for the part that states where an image is.
  * @category schemas
  */
-export const MediaPart = Schema.Struct({
-  /** What the part is: an image, or a recording of speech. */
-  type: Schema.Literals(["image", "audio"]),
-  /** Where the bytes are: the media type, the path or URL, and what a producer added to it. */
-  source: Schema.Unknown,
+export const ImageSource = Schema.Struct({
+  /** The type of the image: one of the four types ATIF states for an image. */
+  media_type: Schema.Literals(imageMediaTypes),
+  /** Where the bytes are: a path relative to the document, an absolute path, or a URL. */
+  path: Schema.String,
 });
 
 /**
- * A {@link MediaPart} as it is read: the kind of part, and where its bytes are.
+ * An {@link ImageSource} as it is read.
  *
- * @see {@link MediaPart} for the schema it is read by.
+ * ATIF RFC 0001 v1.8, Section II "ImageSourceSchema (v1.6+)".
+ *
+ * @see {@link ImageSource} for the schema it is read by.
  * @category models
  */
-export type MediaPart = Schema.Schema.Type<typeof MediaPart>;
+export type ImageSource = Schema.Schema.Type<typeof ImageSource>;
+
+/**
+ * Where the bytes of a recording of speech a part states are: the type of the
+ * recording, the path or the URL they are at, and how long it is (v1.8+).
+ *
+ * ATIF RFC 0001 v1.8, Section II "AudioSourceSchema (v1.8+)".
+ *
+ * **When to use**
+ *
+ * Use when reading where the recording of an {@link AudioPart} is, or when
+ * stating one — audio is referenced by a location rather than carried by its
+ * bytes.
+ *
+ * **Details**
+ *
+ * `media_type` is what the recording is, in the spelling the document states it
+ * as: one of `audio/wav`, `audio/mpeg`, `audio/mp4`, `audio/aac`, `audio/ogg`,
+ * `audio/flac`, `audio/webm` or `audio/aiff`, or one of the spellings ATIF tells a
+ * consumer to accept beside them, such as the `audio/mp3` a provider's API
+ * returns. A part states the spelling it was written with rather than one this
+ * package chose, since normalizing it is what a consumer does when it reads the
+ * type for a purpose of its own. `path` locates the bytes as {@link ImageSource}
+ * locates an image, in an `audio/` beside the document by convention, and
+ * `duration_sec` is how long the recording is, where the producer knew it: several
+ * providers bill audio by the second and dataset statistics need it, while it
+ * cannot be recovered from the bytes without decoding them.
+ *
+ * Streaming and realtime audio is out of the format — raw PCM and G.711 are not
+ * self-describing — and so is video. A transcript of a recording is a
+ * {@link TextPart} beside it rather than a field here.
+ *
+ * @see {@link AudioPart} for the part that states where a recording is.
+ * @category schemas
+ */
+export const AudioSource = Schema.Struct({
+  /** The type of the recording, as ATIF states it or as it tells a consumer to accept it. */
+  media_type: Schema.Literals([...audioMediaTypes, ...audioMediaTypeSpellings]),
+  /** Where the bytes are: a path relative to the document, an absolute path, or a URL. */
+  path: Schema.String,
+  /** How long the recording is in seconds, where the producer knew it. */
+  duration_sec: Schema.optional(Schema.NullOr(Schema.Number)),
+});
+
+/**
+ * An {@link AudioSource} as it is read.
+ *
+ * ATIF RFC 0001 v1.8, Section II "AudioSourceSchema (v1.8+)".
+ *
+ * @see {@link AudioSource} for the schema it is read by.
+ * @category models
+ */
+export type AudioSource = Schema.Schema.Type<typeof AudioSource>;
 
 /**
  * The text of a message or of a result, as ATIF states it.
+ *
+ * ATIF RFC 0001 v1.8, Section II "ContentPartSchema (v1.6+)".
+ *
+ * **When to use**
+ *
+ * Use when reading the part of a {@link Content} that is text, or when stating
+ * one.
+ *
+ * **Details**
+ *
+ * A part of `type` `"text"` states the `text` it holds and no `source`: the
+ * format states a source for the parts whose bytes are referenced, so a document
+ * that writes one beside a text part is rejected rather than read without it.
  *
  * @see {@link Content} for the message a part of this kind is a part of.
  * @category schemas
  */
 export const TextPart = Schema.Struct({
+  /** What the part is: the text of a message or of a result. */
   type: Schema.Literal("text"),
+  /** The text the part states. */
   text: Schema.String,
+  /** Must be omitted: a text part states no source of bytes. */
+  source: omitted,
 });
 
 /**
  * A {@link TextPart} as it is read.
+ *
+ * ATIF RFC 0001 v1.8, Section II "ContentPartSchema (v1.6+)".
  *
  * @see {@link TextPart} for the schema it is read by.
  * @category models
@@ -85,8 +208,130 @@ export const TextPart = Schema.Struct({
 export type TextPart = Schema.Schema.Type<typeof TextPart>;
 
 /**
+ * An image a message or a result states, by the location of its bytes (v1.6+).
+ *
+ * ATIF RFC 0001 v1.8, Section II "ContentPartSchema (v1.6+)".
+ *
+ * **When to use**
+ *
+ * Use when reading the part of a {@link Content} that holds an image, or when
+ * stating one.
+ *
+ * **Details**
+ *
+ * A part of `type` `"image"` states where its bytes are as an
+ * {@link ImageSource}, and states no `text`: the format states a text beside a
+ * media part as a part of its own — see {@link TextPart} — so a document that
+ * writes one here is rejected rather than read with it dropped. The `source` must
+ * be of the kind the `type` states, so a document whose image part carries the
+ * source of a recording is rejected rather than read as an image it is not.
+ *
+ * @see {@link MediaPart} for the parts a message holds where it holds no text.
+ * @category schemas
+ */
+export const ImagePart = Schema.Struct({
+  /** What the part is: an image the message or the result holds. */
+  type: Schema.Literal("image"),
+  /** Where the bytes of the image are. */
+  source: ImageSource,
+  /** Must be omitted: an image part states where an image is, not what is said of it. */
+  text: omitted,
+});
+
+/**
+ * An {@link ImagePart} as it is read.
+ *
+ * ATIF RFC 0001 v1.8, Section II "ContentPartSchema (v1.6+)".
+ *
+ * @see {@link ImagePart} for the schema it is read by.
+ * @category models
+ */
+export type ImagePart = Schema.Schema.Type<typeof ImagePart>;
+
+/**
+ * A recording of speech a message or a result states, by the location of its
+ * bytes (v1.8+).
+ *
+ * ATIF RFC 0001 v1.8, Section II "ContentPartSchema (v1.6+)".
+ *
+ * **When to use**
+ *
+ * Use when reading the part of a {@link Content} that holds a recording, or when
+ * stating one.
+ *
+ * **Details**
+ *
+ * A part of `type` `"audio"` states where its bytes are as an
+ * {@link AudioSource}, and states no `text`: a transcript is a part of its own
+ * that the recording stands beside, so a document that writes one here is
+ * rejected rather than read with it dropped. The `source` must be of the kind the
+ * `type` states, so a document whose audio part carries the source of an image is
+ * rejected rather than read as a recording it is not.
+ *
+ * @see {@link MediaPart} for the parts a message holds where it holds no text.
+ * @category schemas
+ */
+export const AudioPart = Schema.Struct({
+  /** What the part is: a recording the message or the result holds. */
+  type: Schema.Literal("audio"),
+  /** Where the bytes of the recording are. */
+  source: AudioSource,
+  /** Must be omitted: a transcript of the recording is a part of its own. */
+  text: omitted,
+});
+
+/**
+ * An {@link AudioPart} as it is read.
+ *
+ * ATIF RFC 0001 v1.8, Section II "ContentPartSchema (v1.6+)".
+ *
+ * @see {@link AudioPart} for the schema it is read by.
+ * @category models
+ */
+export type AudioPart = Schema.Schema.Type<typeof AudioPart>;
+
+/**
+ * A part of a message that is not text: an image (v1.6+), or a recording of
+ * speech (v1.8+).
+ *
+ * ATIF RFC 0001 v1.8, Section II "ContentPartSchema (v1.6+)".
+ *
+ * **When to use**
+ *
+ * Use when reading what ATIF states of a message that holds more than its text.
+ *
+ * **Details**
+ *
+ * ATIF states such a part by a location rather than by its bytes, and says what
+ * the location holds by the `type` of the part: an {@link ImagePart} is an image,
+ * whose {@link ImageSource} is one of the types the format states for an image
+ * together with a path or a URL beside the document, and an {@link AudioPart} is a
+ * recording, whose {@link AudioSource} is one of the types it states for audio
+ * together with a path and, where the producer knew it, the length of the
+ * recording.
+ *
+ * @see {@link Content} for the message a part of this kind is a part of.
+ * @category schemas
+ */
+export const MediaPart = Schema.Union([ImagePart, AudioPart]);
+
+/**
+ * A {@link MediaPart} as it is read: an image, or a recording of speech.
+ *
+ * ATIF RFC 0001 v1.8, Section II "ContentPartSchema (v1.6+)".
+ *
+ * @see {@link MediaPart} for the schema it is read by.
+ * @category models
+ */
+export type MediaPart = Schema.Schema.Type<typeof MediaPart>;
+
+/**
  * What a message says, or what a result answered with: the text itself, or the
  * parts it is stated as where it holds more than text (v1.6+).
+ *
+ * ATIF RFC 0001 v1.8, Section II: the `message` field of "StepObject", the
+ * `content` field of "ObservationResultSchema", and the parts those fields hold,
+ * "ContentPartSchema (v1.6+)".
  *
  * **When to use**
  *
@@ -97,8 +342,11 @@ export type TextPart = Schema.Schema.Type<typeof TextPart>;
  *
  * A text-only content is the string itself; a multimodal one is an array of
  * {@link TextPart} and {@link MediaPart} objects, in the order they are written. A
- * part of `type` `"text"` carries the `text` it states and nothing else — the
- * other fields are stated by the {@link MediaPart}s among the parts.
+ * part states the one field its `type` calls for — the `text` a text part holds, or
+ * the `source` an image or a recording is referenced by — since the format states
+ * each of the two for one kind of part alone: a document that writes the other
+ * beside one is rejected rather than read with the field it does not state
+ * dropped.
  *
  * @see {@link MediaPart} for the parts a message can state beyond its text.
  * @category schemas
@@ -111,6 +359,10 @@ export const Content = Schema.Union([
 /**
  * A {@link Content} as it is read.
  *
+ * ATIF RFC 0001 v1.8, Section II: the `message` field of "StepObject", the
+ * `content` field of "ObservationResultSchema", and the parts those fields hold,
+ * "ContentPartSchema (v1.6+)".
+ *
  * @see {@link Content} for the schema it is read by.
  * @category models
  */
@@ -118,6 +370,8 @@ export type Content = Schema.Schema.Type<typeof Content>;
 
 /**
  * A call a step made of a tool.
+ *
+ * ATIF RFC 0001 v1.8, Section II "ToolCallSchema".
  *
  * **When to use**
  *
@@ -148,6 +402,8 @@ export const ToolCall = Schema.Struct({
 /**
  * A {@link ToolCall} as it is read.
  *
+ * ATIF RFC 0001 v1.8, Section II "ToolCallSchema".
+ *
  * @see {@link ToolCall} for the schema it is read by.
  * @category models
  */
@@ -156,6 +412,8 @@ export type ToolCall = Schema.Schema.Type<typeof ToolCall>;
 /**
  * One result a step was answered with: what a tool call returned, or what an action
  * of the agent that is not a call produced.
+ *
+ * ATIF RFC 0001 v1.8, Section II "ObservationResultSchema".
  *
  * **When to use**
  *
@@ -193,6 +451,8 @@ export const ObservationResult = Schema.Struct({
 /**
  * An {@link ObservationResult} as it is read.
  *
+ * ATIF RFC 0001 v1.8, Section II "ObservationResultSchema".
+ *
  * @see {@link ObservationResult} for the schema it is read by.
  * @category models
  */
@@ -201,6 +461,8 @@ export type ObservationResult = Schema.Schema.Type<typeof ObservationResult>;
 /**
  * What a step was answered with: the results of the calls it made, or of the actions
  * it took.
+ *
+ * ATIF RFC 0001 v1.8, Section II "ObservationSchema".
  *
  * **When to use**
  *
@@ -225,6 +487,8 @@ export const Observation = Schema.Struct({
 /**
  * An {@link Observation} as it is read.
  *
+ * ATIF RFC 0001 v1.8, Section II "ObservationSchema".
+ *
  * @see {@link Observation} for the schema it is read by.
  * @category models
  */
@@ -232,6 +496,8 @@ export type Observation = Schema.Schema.Type<typeof Observation>;
 
 /**
  * The agent that ran, as the document states it.
+ *
+ * ATIF RFC 0001 v1.8, Section II "AgentSchema".
  *
  * **When to use**
  *
@@ -264,6 +530,8 @@ export const Agent = Schema.Struct({
 /**
  * An {@link Agent} as it is read.
  *
+ * ATIF RFC 0001 v1.8, Section II "AgentSchema".
+ *
  * @see {@link Agent} for the schema it is read by.
  * @category models
  */
@@ -271,6 +539,8 @@ export type Agent = Schema.Schema.Type<typeof Agent>;
 
 /**
  * One step of a document: a system prompt, a user message, or a complete agent turn.
+ *
+ * ATIF RFC 0001 v1.8, Section II "StepObject".
  *
  * **When to use**
  *
@@ -331,6 +601,8 @@ export const StepObject = Schema.Struct({
 /**
  * A {@link StepObject} as it is read.
  *
+ * ATIF RFC 0001 v1.8, Section II "StepObject".
+ *
  * @see {@link StepObject} for the schema it is read by.
  * @category models
  */
@@ -338,6 +610,8 @@ export type StepObject = Schema.Schema.Type<typeof StepObject>;
 
 /**
  * An ATIF document: one run of an agent, as the format carries it.
+ *
+ * ATIF RFC 0001 v1.8, Section II "Root-Level Metadata".
  *
  * **When to use**
  *
@@ -399,6 +673,8 @@ export const Document = Schema.Struct({
 /**
  * A {@link Document} as it is read.
  *
+ * ATIF RFC 0001 v1.8, Section II "Root-Level Metadata".
+ *
  * @see {@link Document} for the schema it is read by.
  * @category models
  */
@@ -406,6 +682,8 @@ export type Document = Schema.Schema.Type<typeof Document>;
 
 /**
  * The document as the JSON a `trajectory.json` holds.
+ *
+ * ATIF RFC 0001 v1.8, Section II "Root-Level Metadata", whose JSON this reads.
  *
  * **When to use**
  *
