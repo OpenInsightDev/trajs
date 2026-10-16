@@ -6,9 +6,10 @@
  * is a property of the model that will read them rather than of the recording,
  * and the parts a model produced carry no count of their own — the only usage
  * Effect AI reports is the whole-request figure of a `finish` part. This module
- * declares the `@trajs/extension-tokenize/Estimate` metric, whose output is the
- * {@link Estimate} of one part, so a recording can state what each of its parts
- * is worth without the tokenizer that produced the number, and the
+ * declares the `@trajs/extension-tokenize/Estimate` metric, whose output states
+ * the {@link Estimate} of one part — the count of that part, and what its session
+ * had been worth up to it — so a recording can state what each of its parts is
+ * worth without the tokenizer that produced the number, and the
  * {@link makeProducer} that derives that output. The package entry re-exports
  * this module directly, so what it declares is what the package offers.
  *
@@ -21,32 +22,75 @@
  *
  * An estimate is anchored to the part it was computed for: the producer attaches
  * its datum to the part's `uuid`, so the datum carries only what the part cannot
- * — how many tokens it is worth, how much of that count a rule on a payload that
- * is not text priced, and which family priced it when one was named.
+ * — the count of that part, and what the session it belongs to was worth up to
+ * and including it.
+ *
+ * A count is more than a number, so the datum holds one: {@link Estimate.count} is
+ * a `Tokens.TokenCount`, the union of the shapes a count is stated as, which a
+ * reader branches on by its tag. It is a field rather than the output itself
+ * because the data a metric's output states has to be a struct with a `version` of
+ * its own, and a union is not one. {@link Estimate.total} is the other half:
+ * the tokens the session of the part had been worth up to it, so that a recording
+ * can be read for what it cost at any point of it without summing what came
+ * before.
  *
  * The metric is named by the package that declares it: the `package` of its tag
  * is the `name` of this package, so what a recording states of a count is the
- * package that wrote it rather than a name the package made up. The shapes it
- * states are versioned the way any metric's are. The metric declares two
- * versioned schemas: the {@link Estimate} its producer yields for a part, and the
- * {@link Uncounted} failure of one it could not count. `0.1.0` is written out as
- * the oldest version of each and `0.1.1` derives the estimate from it once, with
- * `VersionedSchema.upgrade` of `@trajs/core`; {@link tokenEstimate} is the metric
- * that derives the newest of each, {@link Estimate} and {@link Uncounted} are its
- * shapes — taken off the schemas rather than written again, so a version moves
- * them — and {@link metrics} is the kit it is an entry of.
+ * package that wrote it rather than a name the package made up. The metric
+ * declares two versioned schemas: the {@link Estimate} its producer yields for a
+ * part, and the {@link Uncounted} failure of one it could not count. `0.1.0` is
+ * written out as the oldest version of each, and is the only version stated so
+ * far; {@link tokenEstimate} is the metric, {@link Estimate} and {@link Uncounted}
+ * are its shapes — taken off the schemas rather than written again, so a version
+ * moves them — and {@link metrickit} is the kit it is an entry of.
  */
 
 import { Metric, VersionedSchema } from "@trajs/core";
-import type { Trajectory } from "@trajs/core";
-import { Effect, Predicate, Result, Schema, SchemaGetter, Stream } from "effect";
+import { Effect, Schema, Stream } from "effect";
 import { AiError, Tokenizer } from "effect/ai";
 
-import { type Counted, carriesAnyOf, countedOf, type PartTag } from "#/internal/count.ts";
-import { mediaRuleIds, mediaRuleOf, type MediaRuleId } from "#/internal/media.ts";
-import type { CountedPart } from "#/internal/part.ts";
+import type { PartTag } from "#/internal/count.ts";
+import { type MediaRuleId } from "#/internal/media.ts";
+import { type Measured, sessions, stepOf } from "#/internal/producer.ts";
+import { TokenCount } from "#/Tokens.ts";
 
 import pkg from "../package.json" with { type: "json" };
+
+/**
+ * How the output of the metric is derived from a recording.
+ *
+ * **When to use**
+ *
+ * Use when a recording should be counted for the parts that carry a kind of
+ * message part rather than for every part of it, such as for the parts that carry
+ * an image, or when a payload that is not text is to be priced the way a named
+ * family's model prices it.
+ *
+ * **Details**
+ *
+ * `tags` names the kinds of message part a datum is derived for: a part is counted
+ * when its messages carry one of them, which for a response part means the one
+ * part it is. Every part a tokenizer can count is counted when it is absent.
+ *
+ * The count is the part's own either way: naming kinds decides which parts are
+ * counted rather than what a count covers, so a recording read later holds one
+ * count per part whichever kinds were asked for.
+ *
+ * `media` names the family a payload that is not text is priced with. Only a
+ * family this package names can be given, because a rule of the caller's own
+ * cannot be named by a recording: what it priced is stated in the count, and a
+ * reader would have no way to tell which rule that was.
+ *
+ * @see {@link Count.CountOptions} for the rules and their numbers.
+ * @see {@link EstimateTag} for the kinds a call accepts.
+ * @category models
+ */
+export interface ProducerOptions {
+  /** Kinds of message part a datum is derived for. Defaults to every part. */
+  readonly tags?: ReadonlyArray<EstimateTag>;
+  /** Family a payload that is not text is priced with. */
+  readonly media?: MediaRuleId;
+}
 
 /**
  * A kind of message part a count is taken for.
@@ -71,55 +115,26 @@ import pkg from "../package.json" with { type: "json" };
 export type EstimateTag = PartTag;
 
 /**
- * How the output of the metric is derived from a recording.
+ * The estimate at data version `0.1.0`, the oldest and only version of its shape.
  *
- * **When to use**
- *
- * Use when a recording should be counted for the parts that carry a kind of
- * message part rather than for every part of it, such as for the parts that carry
- * an image, or when a payload that is not text is to be priced the way a named
- * family's model prices it.
- *
- * **Details**
- *
- * `tags` names the kinds of message part a datum is derived for: a part is counted
- * when its messages carry one of them, which for a response part means the one
- * part it is. Every part a tokenizer can count is counted when it is absent.
- *
- * The count is the part's own either way: naming kinds decides which parts are
- * counted rather than what a count covers, so a recording read later holds one
- * number per part whichever kinds were asked for.
- *
- * `media` names the family a payload that is not text is priced with, and is
- * recorded with the datum. Only a family this package names can be given, because
- * the datum states which one priced the count; a rule of the caller's own is
- * `Count`'s alone, because a recording cannot name it.
- *
- * @see {@link Count.CountOptions} for the rules and their numbers.
- * @see {@link EstimateTag} for the kinds a call accepts.
- * @category models
+ * A version is added by deriving this shape once, as `VersionedSchema.upgrade` of
+ * `@trajs/core` does: a field the version adds is optional in the shape, with its
+ * absence meaning the datum predates the version rather than standing for a
+ * default.
  */
-export interface ProducerOptions {
-  /** Kinds of message part a datum is derived for. Defaults to every part. */
-  readonly tags?: ReadonlyArray<EstimateTag>;
-  /** Family a payload that is not text is priced with. */
-  readonly media?: MediaRuleId;
-}
-
-/** The estimate at data version `0.1.0`, the oldest version of its shape. */
 const estimate010 = Schema.Struct({
   /**
    * Version of the metric's output this datum conforms to.
    */
   version: Schema.Literal("0.1.0"),
   /**
-   * Estimated number of tokens the part is worth.
+   * What the part is worth: the count of the kind of part it was taken for.
    */
-  tokens: Schema.Number,
+  count: TokenCount,
   /**
-   * Family a payload that is not text was priced with, if one was named.
+   * Tokens the session of the part had been worth up to and including it.
    */
-  media: Schema.optional(Schema.Literals(mediaRuleIds)),
+  total: Schema.Number,
 }).pipe(VersionedSchema.make);
 
 /** The uncounted failure at data version `0.1.0`, the only version of its shape. */
@@ -133,30 +148,6 @@ const uncounted010 = Schema.Struct({
    */
   reason: AiError.AiError,
 }).pipe(VersionedSchema.make);
-
-// A version is added by deriving the shape once — the fields the version changes,
-// and how a datum of the version before it reads as that one. A field the mapping
-// cannot fill is optional in the shape, and stands for data that predates the
-// version rather than for a default.
-/**
- * The estimate's shape at data version `0.1.1`, derived from `0.1.0`: one that
- * also states how much of its count a rule priced.
- *
- * The number is not in a datum of `0.1.0` and cannot be recovered from one, so
- * the field is optional and its absence means the datum was recorded before this
- * version rather than that no rule priced anything. A datum this version writes
- * states it, `0` included.
- */
-const estimate011 = estimate010.pipe(
-  VersionedSchema.upgrade(
-    (fields) => ({
-      ...fields,
-      version: Schema.Literal("0.1.1"),
-      mediaTokens: Schema.optional(Schema.Number),
-    }),
-    { decode: SchemaGetter.transform((from) => ({ ...from, version: "0.1.1" as const })) },
-  ),
-);
 
 /**
  * The metric this package reports: the tokens each part of a recording is
@@ -189,7 +180,7 @@ export const tokenEstimate = new Metric.Metric({
     name: "Token estimate",
     description: "The estimated token count of a trajectory part.",
   }),
-  output: estimate011,
+  output: estimate010,
   failure: uncounted010,
 });
 
@@ -209,17 +200,16 @@ export const tokenEstimate = new Metric.Metric({
  * named by the datum's `attach`, so restating its kind or its content here would
  * be a second copy that can disagree with the first.
  *
- * - `tokens` is the estimated count of the whole part. It is an estimate and not
- *   the usage a provider reported: exact usage is whole-request data that belongs
- *   to a `finish` response part, and is not recorded here.
- * - `media` is the family that priced a payload that is not text, and is absent
- *   when no family was named, in which case `Count`'s 85 and 100 token placeholder
- *   priced any such payload. A count a rule changed can therefore be told from one
- *   it did not.
- * - `mediaTokens` is how many of `tokens` such a rule priced, and is `0` when
- *   nothing was. It is the part of the count that is neither text nor exact, so a
- *   reader can see what a count rests on. A datum recorded at `0.1.0` does not
- *   state it, and its absence means that rather than zero.
+ * - `count` is what the part is worth, as the shape of the kind of part it was
+ *   taken for — see `Tokens` for the members of the union and what each of them
+ *   states. It is an estimate and not the usage a provider reported: exact usage
+ *   is whole-request data that belongs to a `finish` response part, and is not
+ *   recorded here.
+ * - `total` is the tokens the session of the part had been worth up to and
+ *   including it: the sum of what `count` states for every part of that session
+ *   the producer counted, this one among them. It is what the session had cost at
+ *   the point of this part without summing the parts before it. A part the
+ *   producer did not count leaves it unchanged.
  *
  * Which tokenizer took the count is not among them: a tokenizer states no name,
  * and which one a run was provided with is a property of the run rather than of
@@ -291,6 +281,13 @@ export type Uncounted = Schema.Schema.Type<typeof Uncounted>;
  * is the part's own however the kinds were named: what `tags` decides is which
  * parts are counted rather than what a count covers.
  *
+ * The producer reads the parts in the order the trajectory holds them and carries
+ * what a session has been worth from one part to the next, so that every estimate
+ * states the session's running total — {@link Estimate.total} — and a tool
+ * result states what the call it answers is worth beside it. A part the producer
+ * does not count is carried over, leaving that total as it was rather than
+ * resetting it.
+ *
  * The producer is built with a tokenizer: this asks the run it is built in for
  * one, so the tokenizer a recording is counted under is chosen where the producer
  * is built — `Effect.provide` with its layer — and travels with the producer
@@ -328,14 +325,24 @@ export const makeProducer = (
   options?: ProducerOptions,
 ): Effect.Effect<Metric.Producer<typeof tokenEstimate>, never, Tokenizer.Tokenizer> =>
   Effect.gen(function* () {
-    const tokenizer = yield* Tokenizer.Tokenizer;
+    const step = yield* stepOf(options);
 
     // What a producer is: a reading of a trajectory for the output the metric
-    // states. The tokenizer the run was provided with is read here and closed
-    // over, so what a recording is counted under travels with the producer rather
-    // than with the kit that runs it.
+    // states. The step the run was provided with a tokenizer for is read here and
+    // closed over, so what a recording is counted under travels with the producer
+    // rather than with the kit that runs it. What a session has been worth is
+    // carried by the stream rather than by this closure, so a producer run over two
+    // recordings counts each of them from its own beginning rather than continuing
+    // one into the other.
     const producer: Metric.Producer<typeof tokenEstimate> = (trajectory) =>
-      trajectory.pipe(Stream.filterMapEffect((part) => estimateOf(tokenizer, part, options)));
+      trajectory.pipe(
+        Stream.mapAccumEffect(sessions, (state, part) =>
+          step(state, part).pipe(
+            Effect.mapError((failure) => uncounted(failure.attach, failure.reason)),
+            Effect.map(([next, measured]) => [next, measured.map(outputOf)] as const),
+          ),
+        ),
+      );
 
     return producer;
   });
@@ -364,74 +371,31 @@ export const makeProducer = (
 export const metrickit = Metric.makeKit(tokenEstimate);
 
 /**
- * Whether a part of a trajectory is one a count is taken from: what a model was
- * given, or what it returned. Every other part of a trajectory — a session
- * declaration, an event, an estimate already derived — holds nothing a tokenizer
- * answers for.
- */
-const isCounted = (part: Trajectory.Part<Trajectory.AnyConfig>): part is CountedPart =>
-  Predicate.isTagged("Prompt")(part) || Predicate.isTagged("Response")(part);
-
-/**
- * The output one part of a recording is worth, or nothing when it is not a part a
- * call names a kind of.
+ * The output the metric records for one part, as the producer reports it.
  *
- * A part a call does not name a kind of — a session declaration, an event, an
- * estimate already derived, or one whose messages carry no named kind — is skipped
- * rather than counted as nothing, so a kit derives a datum for the parts it
- * counted and no others. A response part is one message part itself, so it is
- * counted by the kind it carries rather than by the kinds of a message. A part the
- * tokenizer cannot count fails as {@link Uncounted}, naming that part.
+ * The count the step derived is wrapped into the metric's own datum here rather
+ * than where it was measured, because the shapes are this module's: what a part is
+ * worth is measured in terms of the schemas of `Tokens`, and what a recording
+ * holds of it is in terms of the metric's versioned output.
  */
-const estimateOf = (
-  tokenizer: Tokenizer.Service,
-  part: Trajectory.Part<Trajectory.AnyConfig>,
-  options?: ProducerOptions,
-): Effect.Effect<
-  Result.Result<Metric.ProducerOutput<typeof tokenEstimate>, void>,
-  Metric.ProducerFailure<typeof tokenEstimate>
-> =>
-  Effect.gen(function* () {
-    if (!isCounted(part)) return Result.failVoid;
-
-    const tags = options?.tags;
-
-    if (tags !== undefined && !carriesAnyOf(part, tags)) return Result.failVoid;
-
-    const counted = yield* countedOf(part, mediaRuleOf(options?.media)).pipe(
-      Effect.provideService(Tokenizer.Tokenizer, tokenizer),
-      Effect.mapError((error) => uncounted(part, error)),
-    );
-
-    return Result.succeed(
-      Metric.makeOutput<typeof tokenEstimate>(datum(counted, options?.media), {
-        attach: [part.uuid],
-      }),
-    );
-  });
+const outputOf = (measured: Measured): Metric.ProducerOutput<typeof tokenEstimate> =>
+  Metric.makeOutput<typeof tokenEstimate>(
+    Estimate.make({
+      version: Estimate.fields.version.literal,
+      count: measured.count,
+      total: measured.total,
+    }),
+    { attach: [measured.attach] },
+  );
 
 /**
  * The failure of one part that could not be counted, naming the part it is about.
  */
 const uncounted = (
-  part: CountedPart,
+  attach: string,
   reason: AiError.AiError,
 ): Metric.ProducerFailure<typeof tokenEstimate> =>
   Metric.makeFailure<typeof tokenEstimate>(
     Uncounted.make({ version: Uncounted.fields.version.literal, reason }),
-    { attach: [part.uuid] },
+    { attach: [attach] },
   );
-
-/**
- * The datum one estimate is, with the family left out rather than set to
- * `undefined`, so a recorded datum has no key for it unless one was named.
- */
-const datum = (counted: Counted, media: MediaRuleId | undefined): Estimate => {
-  const described = Estimate.make({
-    version: Estimate.fields.version.literal,
-    tokens: counted.tokens,
-    mediaTokens: counted.mediaTokens,
-  });
-
-  return media === undefined ? described : Estimate.make({ ...described, media });
-};

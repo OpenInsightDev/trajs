@@ -14,6 +14,7 @@
 import { Data, DateTime, Effect, Predicate, Schema, Stream } from "effect";
 import type { NonEmptyArray } from "effect/Array";
 
+import { foldParts } from "#/internal/folding.ts";
 import type * as Trajectory from "#/Trajectory.ts";
 import * as VersionedSchema from "#/VersionedSchema.ts";
 
@@ -277,10 +278,14 @@ export const makeFailure = <Ext extends Any>(
  * the key it is held at in a kit does, and that key is the tag of a metric of
  * that kit.
  *
- * The trajectory it reads is one of any config — {@link Trajectory.AnyConfig} —
- * since a producer measures the parts of a recording without knowing the toolkit,
- * the kits or the variant it was recorded with: the response part of either kind
- * of trajectory is one of the parts a producer reads.
+ * The trajectory it reads is one whose response parts are whole —
+ * {@link Trajectory.NonStreamConfig} — since what a producer measures is the parts
+ * a model was given and returned rather than the increments an answer arrived in:
+ * the parts of a streamed answer are folded into the whole parts they complete
+ * before a producer reads them, which {@link produce} does for the kit it runs. The
+ * kits a recording was read with are the reading's rather than the producer's, so a
+ * producer measures a recording without knowing the toolkit, the kits or the
+ * variant it was recorded with.
  *
  * What a run of a producer requires is what the trajectory it reads requires, so
  * a producer asks for no service of its own: a service it is built with is
@@ -292,7 +297,7 @@ export const makeFailure = <Ext extends Any>(
  * @category models
  */
 export type Producer<Ext extends Any> = <E, R>(
-  trajectory: Trajectory.TrajectoryStream<Trajectory.AnyConfig, E, R>,
+  trajectory: Trajectory.TrajectoryStream<Trajectory.NonStreamConfig, E, R>,
 ) => Stream.Stream<ProducerOutput<Ext>, E | TrajectoryError | ProducerFailure<Ext>, R>;
 
 /**
@@ -595,9 +600,13 @@ const isProducerFailure = (value: unknown): value is ProducerFailure<Any> =>
  * shared between the producers rather than read by each of them, so the recording
  * is broadcast and every one of them reads the same parts.
  *
- * The parts are read as they were recorded, whichever variant the recording was
- * written with, since a producer measures a recording without knowing it — see
- * {@link Producer}.
+ * The parts a producer reads are the recording's own, with the increments a
+ * streamed response arrived in folded into the whole parts they complete: a
+ * producer measures what a model was given and returned, so it reads a part as it
+ * was said rather than as it was recorded — see {@link Producer}. The folding is
+ * the one `View` reads a streamed answer with, and a folded part carries the `uuid`
+ * of the increment that completed it, so what a report attaches to is a part the
+ * recording holds.
  *
  * What is emitted is one report of a metric with the tag of the metric it
  * belongs to, which is the part a recording holds a report as, as
@@ -683,7 +692,7 @@ export const produce =
       return Stream.empty;
     }
 
-    return recorded.pipe(
+    return foldParts(recorded).pipe(
       // A producer reads the recording for the parts it measures, so the parts are
       // served to the producers rather than read by each of them: a stream serves
       // a single reading, and a recording read for what a kit derives of it

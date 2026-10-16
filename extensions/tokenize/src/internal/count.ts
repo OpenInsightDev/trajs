@@ -9,6 +9,12 @@
  * per-tool overhead, the content multiplier, and the cost of a tool's schema —
  * are not part of it, because trajs records no such configuration.
  *
+ * Every contribution is attributed to a kind, and the kinds partition a part's
+ * count: text and reasoning are their own text, a tool call is its name and
+ * parameters, a tool result is its identifier and its result, and a payload that
+ * is not text is a fixed estimate. The kinds are the buckets a prompt's count
+ * states, and what a tool result's count pairs with — see {@link Counted}.
+ *
  * Text is what a tokenizer can actually answer for. A payload that is not text is
  * only estimated, because what it costs is a property of the model that reads it
  * and of the payload's own pixels, not of the tokenizer: the rule a caller names
@@ -34,16 +40,53 @@ import type {
 } from "#/internal/part.ts";
 
 /**
- * What one part is worth before it is counted: text to count under a tokenizer,
- * or a fixed estimate for a payload that is not text.
+ * The kinds of information a count is attributed to, which are the buckets a
+ * prompt's count states.
+ *
+ * A kind is named the way the datum states it rather than the way a message part
+ * names it, so a `tool-call` part contributes to `toolCall` and a `file` part —
+ * the one kind that is priced by a rule rather than the tokenizer — to `media`.
  */
-export type Contribution = string | number;
+export interface KindTokens {
+  /** Tokens the text of a part is worth. */
+  readonly text: number;
+  /** Tokens the reasoning of a part is worth. */
+  readonly reasoning: number;
+  /** Tokens the calls of a part are worth: each name and the JSON of its parameters. */
+  readonly toolCall: number;
+  /** Tokens the results of a part are worth: each identifier and its result. */
+  readonly toolResult: number;
+  /** Tokens a rule priced for a payload that is not text, which a `file` carries. */
+  readonly media: number;
+}
 
-const add = (
-  contributions: Array<Contribution>,
-  contribution: string | number | undefined,
-): void => {
-  if (contribution !== undefined) contributions.push(contribution);
+/** The name of one of the kinds a count is attributed to. */
+export type CountKind = keyof KindTokens;
+
+/**
+ * What one contribution to a part's count is: text to count under a tokenizer,
+ * or a fixed estimate for a payload that is not text.
+ *
+ * A contribution of a tool call carries the call's `id`, so that what one call
+ * is worth is known rather than only the total of every call a part carries — a
+ * tool result pairs with the call it answers by that id.
+ */
+type Contribution =
+  | { readonly kind: CountKind; readonly text: string; readonly call?: string }
+  | { readonly kind: CountKind; readonly estimate: number };
+
+/**
+ * The kind the message parts of a given tag contribute to.
+ *
+ * A part is tagged the way `effect/ai` tags it and the count is bucketed the way
+ * the datum states it, so the two are mapped rather than spelled alike.
+ */
+const kindOf: Record<PartTag, CountKind> = {
+  text: "text",
+  reasoning: "reasoning",
+  "tool-call": "toolCall",
+  "tool-result": "toolResult",
+  file: "media",
 };
 
 /** The JSON text of a payload, or nothing when the payload is absent. */
@@ -67,7 +110,7 @@ type AnyPartTag = Prompt.Part["type"] | ResponseContentPart["type"];
  * a tokenizer answers for, so a count is not taken from them and a recording is
  * not annotated by them.
  */
-const contentTags = ["text", "reasoning", "tool-call", "tool-result", "file"] as const;
+export const contentTags = ["text", "reasoning", "tool-call", "tool-result", "file"] as const;
 
 /**
  * A kind of message part a count can be taken from.
@@ -117,39 +160,54 @@ const contentContributions = (
 ): void => {
   if (!isContentTag(part.type)) return;
 
+  const kind = kindOf[part.type];
+
   switch (part.type) {
     case "text":
     case "reasoning":
-      add(contributions, part.text);
+      contributions.push({ kind, text: part.text });
       break;
-    case "tool-call":
-      add(contributions, part.name);
-      add(contributions, jsonText(part.params));
+    case "tool-call": {
+      contributions.push({ kind, text: part.name, call: part.id });
+
+      const params = jsonText(part.params);
+
+      if (params !== undefined) contributions.push({ kind, text: params, call: part.id });
+
       break;
-    case "tool-result":
-      add(contributions, part.id);
-      add(contributions, payloadText(part.result));
+    }
+
+    case "tool-result": {
+      contributions.push({ kind, text: part.id });
+
+      const result = payloadText(part.result);
+
+      if (result !== undefined) contributions.push({ kind, text: result });
+
       break;
+    }
+
     case "file":
-      add(contributions, media(part, imageSize(part.data)));
+      contributions.push({ kind, estimate: media(part, imageSize(part.data)) });
       break;
   }
 };
 
 /**
- * What a prompt part is worth: the role of each message, then its content.
+ * What a prompt part is worth: the content of each of its messages.
  *
- * A system message carries its content directly; the other messages carry
- * content parts, which {@link contentContributions} reads one by one.
+ * A system message carries its content directly, as text; the other messages
+ * carry content parts, which {@link contentContributions} reads one by one. The
+ * role of a message is not counted: it is framing a provider adds around what was
+ * said rather than information the recording holds, so the kinds partition what a
+ * prompt carries without a bucket for it.
  */
 export const promptContributions = (part: PromptPart, media: MediaRule): Array<Contribution> => {
   const contributions: Array<Contribution> = [];
 
   for (const message of part.messages) {
-    add(contributions, message.role);
-
     if (message.role === "system") {
-      add(contributions, message.content);
+      contributions.push({ kind: "text", text: message.content });
 
       continue;
     }
@@ -172,9 +230,18 @@ export const responseContributions = (
   return contributions;
 };
 
+/** What one tool call a part carries is worth, and which call it is. */
+export interface CallCount {
+  /** Identifier of the call, which a tool result answers. */
+  readonly id: string;
+  /** Tokens the call is worth: its name and the JSON of its parameters. */
+  readonly tokens: number;
+}
+
 /**
  * A part's estimated tokens, split by how each of them is estimated: the total,
- * and the part of it a rule priced.
+ * the kind of information each of them came from, and what each call the part
+ * carries is worth on its own.
  */
 export interface Counted {
   /** Estimated tokens of the whole part. */
@@ -184,6 +251,10 @@ export interface Counted {
    * the tokenizer.
    */
   readonly mediaTokens: number;
+  /** Of those, the tokens of each kind of information the part carries. */
+  readonly kinds: KindTokens;
+  /** What each tool call the part carries is worth, by the call's identifier. */
+  readonly calls: ReadonlyArray<CallCount>;
 }
 
 /**
@@ -193,27 +264,41 @@ export interface Counted {
  * The tokenizer is read from the run rather than taken as an argument, so which
  * one a count is taken with is chosen where the run is provided with a layer.
  *
- * Every contribution that is not text is the one a rule priced, which is what the
- * split rests on: `contentContributions` adds no number of its own.
+ * Every contribution is attributed to its kind, and the kinds partition the count
+ * because {@link contentContributions} attributes every contribution it makes. A
+ * contribution of a call is summed per call as well, so a part carrying several
+ * calls still states what each of them is worth.
  */
 export const countContributions = (
   contributions: ReadonlyArray<Contribution>,
 ): Effect.Effect<Counted, AiError.AiError, Tokenizer.Tokenizer> =>
   Effect.gen(function* () {
     const tokenizer = yield* Tokenizer.Tokenizer;
+    const kinds = { text: 0, reasoning: 0, toolCall: 0, toolResult: 0, media: 0 };
+    const calls = new Map<string, number>();
+
     let tokens = 0;
-    let mediaTokens = 0;
 
     for (const contribution of contributions) {
-      if (Predicate.isString(contribution)) {
-        tokens += (yield* tokenizer.tokenize(contribution)).length;
-      } else {
-        tokens += contribution;
-        mediaTokens += contribution;
-      }
+      const counted =
+        "text" in contribution
+          ? (yield* tokenizer.tokenize(contribution.text)).length
+          : contribution.estimate;
+
+      tokens += counted;
+      kinds[contribution.kind] += counted;
+
+      const call = "call" in contribution ? contribution.call : undefined;
+
+      if (call !== undefined) calls.set(call, (calls.get(call) ?? 0) + counted);
     }
 
-    return { tokens, mediaTokens };
+    return {
+      tokens,
+      mediaTokens: kinds.media,
+      kinds,
+      calls: Array.from(calls, ([id, counted]) => ({ id, tokens: counted })),
+    };
   });
 
 /** What one of the recorded kinds of part is worth, under one rule. */

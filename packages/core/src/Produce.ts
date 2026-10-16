@@ -125,6 +125,8 @@ const record =
         Stream.merge(
           recorded,
           producing.pipe(
+            // The config here streams, and a producer reads whole parts:
+            // `Metric.produce` folds the increments before a producer reads them.
             Metric.produce(metrickit),
             Stream.map((metric) => ({ _tag: "Metric" as const, metric })),
           ),

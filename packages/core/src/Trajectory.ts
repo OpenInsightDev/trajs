@@ -690,6 +690,28 @@ export interface Config<
 export type AnyConfig = Config<boolean, Toolkit.Any, Event.AnyKit, Metric.AnyKit, Extra.AnyKit>;
 
 /**
+ * The config of a reading whose response parts are the whole parts a model
+ * returned.
+ *
+ * **When to use**
+ *
+ * Use to type a reading that measures a recording rather than acting on what it
+ * holds, since what a measurement is of is the parts a model was given and
+ * returned rather than the increments an answer arrived in.
+ *
+ * **Details**
+ *
+ * It is {@link AnyConfig} with `stream` off, so the increments a streamed answer
+ * arrived in are not members of its response parts. An answer that arrived in
+ * increments is folded into the whole parts they complete before such a reading
+ * sees it — see {@link Metric.produce}.
+ *
+ * @see {@link AnyConfig} for the config that holds anything.
+ * @category models
+ */
+export type NonStreamConfig = Config<false, Toolkit.Any, Event.AnyKit, Metric.AnyKit, Extra.AnyKit>;
+
+/**
  * The config of a reading that names no kits: it holds no tool, event, metric or
  * extra datum, and its response parts are read as streams.
  *

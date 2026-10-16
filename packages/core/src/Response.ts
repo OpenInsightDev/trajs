@@ -355,22 +355,51 @@ export const isAnyToolPart = (u: unknown): u is RuntimeAnyToolPart =>
   isAnyToolCallPart(u) || isAnyToolResultPart(u);
 
 /**
+ * The fields a tolerant tool result part is built from.
+ *
+ * It is what {@link ConstructorParams} states, with the two fields the decoded
+ * part derives rather than takes: what a result is encoded as is the result
+ * itself — a tolerant result is carried as it is — and a result is not
+ * preliminary unless the caller says so. They may still be given, for a part
+ * decoded and built again.
+ */
+type AnyToolResultParams = Omit<
+  ConstructorParams<ToolResultPart<string, unknown, unknown>>,
+  "encodedResult" | "preliminary"
+> & {
+  readonly encodedResult?: unknown;
+  readonly preliminary?: boolean;
+};
+
+/**
  * Constructs a tool result part whose name and result are unrestricted.
  *
  * **When to use**
  *
  * Use when recording a tool result for a tool that is not part of a toolkit.
  *
+ * **Details**
+ *
+ * What a result is encoded as is derived from the result, the way decoding a part
+ * derives it: the two fields the decoded part holds beyond what a caller states
+ * are filled in here, so that the part built is the part a recording reads back —
+ * which is what `Trajectory.responsePart` refuses a part built without them to
+ * be.
+ *
+ * @see {@link AnyToolResultPart} for the schema the part is read by.
  * @category constructors
  */
-export const anyToolResultPart = <
-  const Params extends ConstructorParams<ToolResultPart<string, unknown, unknown>>,
->(
+export const anyToolResultPart = <const Params extends AnyToolResultParams>(
   params: Params,
 ): AnyToolResultPart =>
-  Object.assign(toolResultPart(params), {
-    [AnyToolResultPartTypeId]: AnyToolResultPartTypeId,
-  });
+  Object.assign(
+    toolResultPart({
+      ...params,
+      encodedResult: params.encodedResult ?? params.result,
+      preliminary: params.preliminary ?? false,
+    }),
+    { [AnyToolResultPartTypeId]: AnyToolResultPartTypeId },
+  );
 
 /**
  * Schema for a tool result whose name and result are not restricted by a
