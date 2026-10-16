@@ -342,15 +342,17 @@ const program = Effect.gen(function* () {
 });
 
 // The file storage reads through the file system `@effect/platform-node` provides.
-void Effect.runPromise(
-  Effect.provide(
-    program,
-    Layer.provide(
-      Layer.provide(Exchange.layer, Layer.merge(NodeServices.layer(), layerFileSystem)),
-      PlatformNode.layer,
+void program
+  .pipe(
+    Effect.provide(
+      Layer.provide(
+        Layer.provide(Exchange.layer, Layer.merge(NodeServices.layer(), layerFileSystem)),
+        PlatformNode.layer,
+      ),
     ),
-  ),
-).catch((cause) => {
-  console.error(Formatter.format(cause));
-  process.exitCode = 1;
-});
+    Effect.runPromise,
+  )
+  .catch((cause) => {
+    console.error(Formatter.format(cause));
+    process.exitCode = 1;
+  });

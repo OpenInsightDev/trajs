@@ -593,7 +593,7 @@ export const produce =
 
       const program = fn(producer).pipe(
         Effect.onExit((exit) =>
-          Exit.isSuccess(exit) ? Effect.asVoid(Queue.end(parts)) : Effect.void,
+          Exit.isSuccess(exit) ? Queue.end(parts).pipe(Effect.asVoid) : Effect.void,
         ),
         Stream.fromEffectDrain,
       );
@@ -601,5 +601,5 @@ export const produce =
       return Stream.fromQueue(parts).pipe(Stream.drainFork(program));
     });
 
-    return record({ toolkit, eventkit, metrickit, extrakit })(Stream.unwrap(recording));
+    return record({ toolkit, eventkit, metrickit, extrakit })(recording.pipe(Stream.unwrap));
   };

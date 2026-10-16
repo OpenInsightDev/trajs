@@ -120,7 +120,8 @@ const partsUpTo = (parts: ReadonlyArray<Part>, uuid: string): ReadonlyArray<Part
 
 /** The turns a session's parts were recorded in, folded the way a recording is read. */
 const turnsOf = (parts: ReadonlyArray<Part>): Effect.Effect<ReadonlyArray<Turn>> =>
-  Stream.runCollect(View.promptTurns(Stream.fromIterable(parts))).pipe(
+  View.promptTurns(Stream.fromIterable(parts)).pipe(
+    Stream.runCollect,
     Effect.map((turns) => Array.from(turns)),
   );
 
@@ -194,7 +195,7 @@ export const read = (bytes: Uint8Array): Effect.Effect<Recording, Failure, Scope
 
     const loaded = yield* exchange.load(Handed);
 
-    const roots = yield* Stream.runCollect(Session.sessions(loaded.read()));
+    const roots = yield* Session.sessions(loaded.read()).pipe(Stream.runCollect);
 
     return {
       roots: yield* Effect.forEach(roots, (session) => readSession(session, [])),

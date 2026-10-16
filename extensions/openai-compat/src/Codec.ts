@@ -153,15 +153,17 @@ export type OpenAiCompatSessions = Record<string, OpenAiCompatMessage[]>;
 export const makeOpenAiCompat = <Config extends Trajectory.AnyConfig, E, R>(
   trajectory: Trajectory.Trajectory<Config, E, R>,
 ): Effect.Effect<OpenAiCompatSessions, E | TrajectoryError, R> =>
-  Effect.map(View.conversations(trajectory), (sessions) => {
-    const encoded: OpenAiCompatSessions = {};
+  View.conversations(trajectory).pipe(
+    Effect.map((sessions) => {
+      const encoded: OpenAiCompatSessions = {};
 
-    for (const [id, messages] of Object.entries(sessions)) {
-      encoded[id] = openAiCompatMessages(messages);
-    }
+      for (const [id, messages] of Object.entries(sessions)) {
+        encoded[id] = openAiCompatMessages(messages);
+      }
 
-    return encoded;
-  });
+      return encoded;
+    }),
+  );
 
 /** The text of the parts given. */
 const textOf = (parts: ReadonlyArray<Prompt.Part>): string => {

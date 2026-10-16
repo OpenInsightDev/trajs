@@ -131,12 +131,9 @@ export const readPrompt = <Config extends Trajectory.AnyConfig, E, R>(
     Stream.runFold(
       () => Prompt.empty,
       (folded, turn) =>
-        Prompt.concat(
-          folded,
-          Prompt.concat(
-            Prompt.fromMessages(turn.prompt.messages),
-            Prompt.fromResponseParts(turn.response),
-          ),
+        folded.pipe(
+          Prompt.concat(Prompt.fromMessages(turn.prompt.messages)),
+          Prompt.concat(Prompt.fromResponseParts(turn.response)),
         ),
     ),
   );
@@ -150,7 +147,7 @@ export const readConversations = <Config extends Trajectory.AnyConfig, E, R>(
   trajectory: Trajectory.TrajectoryStream<Config, E, R>,
 ): Effect.Effect<Record<string, Conversation>, E | TrajectoryError, R> =>
   Effect.gen(function* () {
-    const roots = yield* Stream.runCollect(Session.sessions(trajectory));
+    const roots = yield* Session.sessions(trajectory).pipe(Stream.runCollect);
 
     const read = yield* Effect.forEach(roots, (session) => readSession(session, []));
 

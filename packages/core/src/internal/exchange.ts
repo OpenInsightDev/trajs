@@ -326,8 +326,10 @@ const decodeParts =
             ),
         ),
         Stream.concat(
-          Stream.unwrap(
-            parser.end.pipe(Effect.mapError(TrajectoryError.parse), Effect.as(Stream.empty)),
+          parser.end.pipe(
+            Effect.mapError(TrajectoryError.parse),
+            Effect.as(Stream.empty),
+            Stream.unwrap,
           ),
         ),
       );
@@ -603,14 +605,13 @@ export const service = <
             trajectoryOf(
               // The frame lies between the header line and the metadata, so
               // neither the head nor the tail is read as part of it.
-              Stream.unwrap(
-                trailingOf(metadata, bytes).pipe(
-                  Effect.map((trailing) =>
-                    framed(
-                      framesOf(bytes, stated.end, trailing.end).pipe(compression.decompress),
-                    ).pipe(decodeParts(Trajectory.anyConfig)),
-                  ),
+              trailingOf(metadata, bytes).pipe(
+                Effect.map((trailing) =>
+                  framed(
+                    framesOf(bytes, stated.end, trailing.end).pipe(compression.decompress),
+                  ).pipe(decodeParts(Trajectory.anyConfig)),
                 ),
+                Stream.unwrap,
               ),
               Trajectory.anyConfig,
             ),
@@ -639,27 +640,25 @@ export const service = <
           // pass instead.
           const [written, hashed] = yield* Stream.broadcastN(frames, { n: 2, capacity: 16 });
 
-          const digest = yield* Effect.forkScoped(Stream.run(hashed, hasher.digest));
+          const digest = yield* Stream.run(hashed, hasher.digest).pipe(Effect.forkScoped);
 
           // The metadata states what the bytes of the recording were written with
           // and what they are named by, so it is emitted once the compression has
           // finished the frame it wrote for them and the digest has been read off
           // the parts it is of.
-          return Stream.concat(
-            Stream.make(new TextEncoder().encode(`${line}\n`)),
+          return Stream.make(new TextEncoder().encode(`${line}\n`)).pipe(
+            Stream.concat(framed(written.pipe(compression.compress))),
             Stream.concat(
-              framed(written.pipe(compression.compress)),
-              Stream.fromEffect(
-                Fiber.join(digest).pipe(
-                  Effect.map((digest) =>
-                    encodeTrailing(metadata, {
-                      compression: compression.algorithm,
-                      hash: hasher.algorithm,
-                      digest,
-                      version: Version,
-                    }),
-                  ),
+              Fiber.join(digest).pipe(
+                Effect.map((digest) =>
+                  encodeTrailing(metadata, {
+                    compression: compression.algorithm,
+                    hash: hasher.algorithm,
+                    digest,
+                    version: Version,
+                  }),
                 ),
+                Stream.fromEffect,
               ),
             ),
           );
@@ -667,7 +666,7 @@ export const service = <
 
         // What holds the bytes of a recording is held open for as long as they are
         // written, so the sink is run in the scope of the save itself.
-        return Effect.scoped(Stream.run(recording, storage.write(id)));
+        return Stream.run(recording, storage.write(id)).pipe(Effect.scoped);
       },
   };
 };

@@ -99,7 +99,7 @@ export const Viewer = () => {
 
     void source
       .bytes()
-      .then((bytes) => Effect.runPromise(Effect.scoped(read(bytes))))
+      .then((bytes) => read(bytes).pipe(Effect.scoped, Effect.runPromise))
       .then(
         (recording) => {
           if (token !== latest.current) return;

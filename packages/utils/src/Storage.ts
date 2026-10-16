@@ -197,17 +197,18 @@ export const layerFileSystem: Layer.Layer<Storage, never, FileSystem.FileSystem>
           Effect.mapError((cause) => new StorageError({ id: path, cause })),
         ),
         read: (buffer, { offset = 0n } = {}) =>
-          Effect.scoped(
-            Effect.gen(function* () {
-              const file = yield* fs.open(path, { flag: "r" });
+          Effect.gen(function* () {
+            const file = yield* fs.open(path, { flag: "r" });
 
-              if (offset !== 0n) {
-                yield* file.seek(offset, "start");
-              }
+            if (offset !== 0n) {
+              yield* file.seek(offset, "start");
+            }
 
-              return yield* file.read(buffer);
-            }),
-          ).pipe(Effect.mapError((cause) => new StorageError({ id: path, cause }))),
+            return yield* file.read(buffer);
+          }).pipe(
+            Effect.scoped,
+            Effect.mapError((cause) => new StorageError({ id: path, cause })),
+          ),
       });
 
     return {

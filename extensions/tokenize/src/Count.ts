@@ -166,7 +166,7 @@ export const promptPart = (
   part: PromptPart,
   options?: CountOptions,
 ): Effect.Effect<PromptTokens, AiError.AiError, Tokenizer.Tokenizer> =>
-  Effect.map(countedOf(part, mediaRuleOf(options?.media)), promptCount);
+  countedOf(part, mediaRuleOf(options?.media)).pipe(Effect.map(promptCount));
 
 /**
  * Counts what one part a model returned is worth.
@@ -225,6 +225,6 @@ export const responsePart = (
   part: ResponsePart,
   options?: CountOptions,
 ): Effect.Effect<Option.Option<TokenCount>, AiError.AiError, Tokenizer.Tokenizer> =>
-  Effect.map(countedOf(part, mediaRuleOf(options?.media)), (counted) =>
-    responseDatum(part, counted, noCalls),
+  countedOf(part, mediaRuleOf(options?.media)).pipe(
+    Effect.map((counted) => responseDatum(part, counted, noCalls)),
   );

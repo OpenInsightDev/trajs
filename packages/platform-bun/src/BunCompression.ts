@@ -66,15 +66,14 @@ const carried = <E, R>(
   whole: (bytes: Uint8Array) => Uint8Array | Promise<Uint8Array>,
   bytes: Stream.Stream<Uint8Array, E, R>,
 ): Stream.Stream<Uint8Array, E | CompressionError, R> =>
-  Stream.fromEffect(
-    bytes.pipe(
-      Stream.runCollect,
-      Effect.flatMap((chunks) =>
-        // A codec that returns at once throws where it refuses a frame, so what it
-        // writes is taken as a promise either way.
-        Effect.tryPromise({ try: async () => whole(held(chunks)), catch: refused }),
-      ),
+  bytes.pipe(
+    Stream.runCollect,
+    Effect.flatMap((chunks) =>
+      // A codec that returns at once throws where it refuses a frame, so what it
+      // writes is taken as a promise either way.
+      Effect.tryPromise({ try: async () => whole(held(chunks)), catch: refused }),
     ),
+    Stream.fromEffect,
   );
 
 /**

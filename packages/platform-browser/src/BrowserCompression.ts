@@ -48,27 +48,23 @@ const carried = <E, R>(
   open: () => Promise<Handle>,
   bytes: Stream.Stream<Uint8Array, E, R>,
 ): Stream.Stream<Uint8Array, E | CompressionError, R> =>
-  Stream.unwrap(
-    Effect.acquireRelease(Effect.tryPromise({ try: open, catch: refused }), (handle) =>
-      Effect.sync(() => handle.free()),
-    ).pipe(
-      Effect.map((handle) =>
-        bytes.pipe(
-          // One frame is one stream the handle keeps across the chunks, so the
-          // chunks are fed to it one at a time and in the order they are read.
-          Stream.mapEffect(
-            (chunk) => Effect.try({ try: () => handle.push(chunk), catch: refused }),
-            {
-              concurrency: 1,
-            },
-          ),
-          Stream.filter((piece) => piece.length > 0),
-          Stream.concat(
-            Stream.fromEffect(Effect.try({ try: () => handle.finish(), catch: refused })),
-          ),
+  Effect.acquireRelease(Effect.tryPromise({ try: open, catch: refused }), (handle) =>
+    Effect.sync(() => handle.free()),
+  ).pipe(
+    Effect.map((handle) =>
+      bytes.pipe(
+        // One frame is one stream the handle keeps across the chunks, so the
+        // chunks are fed to it one at a time and in the order they are read.
+        Stream.mapEffect((chunk) => Effect.try({ try: () => handle.push(chunk), catch: refused }), {
+          concurrency: 1,
+        }),
+        Stream.filter((piece) => piece.length > 0),
+        Stream.concat(
+          Effect.try({ try: () => handle.finish(), catch: refused }).pipe(Stream.fromEffect),
         ),
       ),
     ),
+    Stream.unwrap,
   );
 
 /**
@@ -84,12 +80,11 @@ const piped = <E, R>(
   open: (bytes: ReadableStream<Uint8Array>) => ReadableStream<Uint8Array>,
   bytes: Stream.Stream<Uint8Array, E, R>,
 ): Stream.Stream<Uint8Array, E | CompressionError, R> =>
-  Stream.unwrap(
-    Stream.toReadableStreamEffect(bytes).pipe(
-      Effect.map((source) =>
-        Stream.fromReadableStream({ evaluate: () => open(source), onError: refused }),
-      ),
+  Stream.toReadableStreamEffect(bytes).pipe(
+    Effect.map((source) =>
+      Stream.fromReadableStream({ evaluate: () => open(source), onError: refused }),
     ),
+    Stream.unwrap,
   );
 
 /**

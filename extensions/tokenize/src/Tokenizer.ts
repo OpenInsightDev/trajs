@@ -92,15 +92,15 @@ export interface OpenAiOptions {
  */
 export const layerAnthropic: Layer.Layer<AiTokenizer.Tokenizer> = Layer.effect(
   AiTokenizer.Tokenizer,
-  Effect.map(
-    Effect.acquireRelease(
-      Effect.sync(() => getTokenizer()),
-      (tokenizer) => Effect.sync(() => tokenizer.free()),
-    ),
-    (tokenizer) =>
+  Effect.acquireRelease(
+    Effect.sync(() => getTokenizer()),
+    (tokenizer) => Effect.sync(() => tokenizer.free()),
+  ).pipe(
+    Effect.map((tokenizer) =>
       makeTokenizer("AnthropicTokenizer", (text) =>
         Array.from(tokenizer.encode(text.normalize("NFKC"), "all")),
       ),
+    ),
   ),
 );
 
@@ -135,9 +135,8 @@ export const layerAnthropic: Layer.Layer<AiTokenizer.Tokenizer> = Layer.effect(
 export const layerOpenAi = (options: OpenAiOptions): Layer.Layer<AiTokenizer.Tokenizer> =>
   Layer.effect(
     AiTokenizer.Tokenizer,
-    Effect.map(
-      Effect.promise(() => loadEncoding(encodingOf(options.model))),
-      (encoding) => makeTokenizer("OpenAiTokenizer", (text) => encoding.encode(text)),
+    Effect.promise(() => loadEncoding(encodingOf(options.model))).pipe(
+      Effect.map((encoding) => makeTokenizer("OpenAiTokenizer", (text) => encoding.encode(text))),
     ),
   );
 
