@@ -1,8 +1,8 @@
 /**
- * A recorded tool payload, as a JSON tree.
+ * A tool payload a trajectory holds, as a JSON tree.
  *
  * A payload is `unknown` to `effect/ai` — the toolkit that would name its shape
- * is not the one a recording is read with — so {@link ToolPayload} is where it is
+ * is not the one a trajectory is read with — so {@link ToolPayload} is where it is
  * read: `Predicate.isObjectOrArray` narrows it to a tree, and a payload that is
  * neither an object nor an array has nothing to open and is shown as the JSON
  * value it is.
@@ -39,17 +39,17 @@ const styles: JsonViewStyles = {
   collapsedContent: "cursor-pointer select-none text-muted-foreground after:content-['…']",
   // `ariaLables` is the library's own spelling of the key.
   ariaLables: { collapseJson: "Collapse JSON", expandJson: "Expand JSON" },
-  // Shown as the JSON string a payload recorded, not as the value it may hold.
+  // Shown as the JSON string a payload produced, not as the value it may hold.
   stringifyStringValues: false,
 };
 
 /**
- * A recorded tool payload — the parameters of a call, or the result of one — as
+ * A tool payload a trajectory holds — the parameters of a call, or the result of one — as
  * a JSON tree.
  *
  * **When to use**
  *
- * Use for the payload a tool part recorded, which only the tool that recorded it
+ * Use for the payload a tool part produced, which only the tool that produced it
  * knows the shape of.
  *
  * **Details**

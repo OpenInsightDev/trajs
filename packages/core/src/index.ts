@@ -1,14 +1,14 @@
 /**
  * The core package: what a trajectory is and the kits that describe what
  * extensions contribute to one, and the exchange that carries a trajectory as
- * the bytes of a recording.
+ * the bytes of a trajectory.
  *
  * Every module is re-exported as a namespace — `Metric.Metric`,
  * `Trajectory.Part` — and each is also available as a subpath import such as
  * `@trajs/core/Metric`.
  *
- * The exchange carries a recording's parts in a frame, and what writes and reads
- * that frame, what hashes the parts and where a recording is kept are
+ * The exchange carries a trajectory's parts in a frame, and what writes and reads
+ * that frame, what hashes the parts and where a trajectory is kept are
  * `@trajs/utils`'s services: a program provides `Exchange.layer` with the layers a
  * platform package states them with — `@trajs/platform-node`, over `node:zlib`, the
  * Rust binding and `node:crypto`, or `@trajs/platform-browser`, over WebAssembly

@@ -1,15 +1,15 @@
 /**
- * The parts a recording is made of, and the trajectory they arrive in.
+ * The parts a trajectory is made of, and the trajectory they arrive in.
  *
  * A trajectory is one stream of parts in total order — the prompts a model was
- * given, the responses it returned, the session each was recorded in, and the events
- * and metrics a kit recorded of them — together with what those parts are read with:
+ * given, the responses it returned, the session each was produced in, and the events
+ * and metrics a kit produced of them — together with what those parts are read with:
  * {@link Trajectory} is that stream, {@link TrajectoryStream} one that states nothing
  * of itself, and {@link Part} what a part of a config is. Two trajectories are read as
  * one by {@link merge}, which adds the parts and the kits of each to the other's.
  *
  * What a part is read as is what a kit states of it: a response part's response
- * through the toolkit it was recorded with, and the extra data of a prompt, response
+ * through the toolkit it was produced with, and the extra data of a prompt, response
  * or session part through the extra kit — see {@link Extra.ExtraRecord}. A part
  * schema is therefore created for the kit it is read with ({@link PromptPart},
  * {@link SessionPart}, {@link ResponsePart}, {@link EventPart}, {@link MetricPart}),
@@ -31,7 +31,7 @@ import type { Select } from "./internal/types.ts";
 
 /**
  * The extra data a part holds, read as the kit declares it of the part it is: a part a
- * recording states no extra data of holds none.
+ * trajectory states no extra data of holds none.
  */
 const extraField = <K extends Extra.AnyKit, P extends Extra.Part>(extrakit: K, part: P) =>
   Extra.ExtraRecord(extrakit, part).pipe(Schema.withDecodingDefault(Effect.succeed({})));
@@ -41,19 +41,19 @@ const extraField = <K extends Extra.AnyKit, P extends Extra.Part>(extrakit: K, p
  *
  * **When to use**
  *
- * Use to read or write the prompt parts of a recording, or to build a schema of
+ * Use to read or write the prompt parts of a trajectory, or to build a schema of
  * your own over this one — one whose messages are carried the way a file carries
  * them, say, as {@link Exchange.Part} does.
  *
  * **Details**
  *
  * - `messages` are the messages a model was given, as `effect/ai` states them, and
- *   `sessionId` the session the part was recorded in.
+ *   `sessionId` the session the part was produced in.
  * - `uuid` identifies the part itself, and is what the `fork` of a
  *   {@link SessionPart} names; `.make` gives a part a fresh one.
  * - `extra` is the extra data the kit declares of a prompt part, keyed by the tag
- *   of each kind: {@link Extra.ExtraRecord}. A part recorded stating none holds
- *   none, so a recording written before an extension declared its data still reads.
+ *   of each kind: {@link Extra.ExtraRecord}. A part produced stating none holds
+ *   none, so a trajectory written before an extension declared its data still reads.
  *
  * A datum of a kind the kit declares of another part alone is carried as it was
  * written rather than read, since what a kit states of a prompt part is all it knows
@@ -82,7 +82,7 @@ export type PromptPart<K extends Extra.AnyKit> = Schema.Schema.Type<
 >;
 
 /**
- * A {@link PromptPart} as it is encoded: the messages as a recording states them,
+ * A {@link PromptPart} as it is encoded: the messages as a trajectory states them,
  * and the extra data of every kind the kit declares of the part.
  *
  * @see {@link PromptPart} for the part itself.
@@ -95,7 +95,7 @@ export type PromptPartEncoded = Schema.Codec.Encoded<ReturnType<typeof PromptPar
  *
  * **When to use**
  *
- * Use where what a model was given is recorded, so that the prompt stands among the
+ * Use where what a model was given is produced, so that the prompt stands among the
  * parts of its trajectory rather than beside them.
  *
  * **Details**
@@ -105,12 +105,12 @@ export type PromptPartEncoded = Schema.Codec.Encoded<ReturnType<typeof PromptPar
  *   kit is what says how the extra data of the part is read, so a part is built
  *   stating the extra data of that kit rather than of none.
  * - `messages` are the content of the prompt given, and `sessionId` the session the
- *   part is recorded in.
+ *   part is produced in.
  * - `extra` may be left out, and the part then states none of it. A datum the kit
  *   does not declare of a prompt part is refused where the part is built, since a
  *   kit reads back what it states and nothing else.
  *
- * **Example** (Recording what a model was given, with what it was estimated to cost)
+ * **Example** (Producing what a model was given, with what it was estimated to cost)
  *
  * ```ts import.meta.vitest
  * import { Schema } from "effect"
@@ -158,18 +158,18 @@ export const promptPart =
  *
  * **When to use**
  *
- * Use to read or write the session declarations of a recording, or to build a
+ * Use to read or write the session declarations of a trajectory, or to build a
  * schema of your own over this one.
  *
  * **Details**
  *
- * - `id` names the session the parts after the declaration are recorded in, and
+ * - `id` names the session the parts after the declaration are produced in, and
  *   `uuid` identifies the declaration itself.
  * - `fork` names the part a session continues from, where it is one that continues
  *   from another: it is the `uuid` of a part of the session forked from rather than
  *   the id of that session, so a fork relates two parts and the sessions holding
- *   them. A session is declared before the parts it records, so a fork names a part
- *   the recording has already reached — see {@link TrajectoryError.SessionError}
+ *   them. A session is declared before the parts it produces, so a fork names a part
+ *   the trajectory has already reached — see {@link TrajectoryError.SessionError}
  *   for what reading one fails with where it has not.
  * - `extra` is the extra data the kit declares of a session part, as
  *   {@link Extra.ExtraRecord} reads it.
@@ -198,7 +198,7 @@ export type SessionPart<K extends Extra.AnyKit> = Schema.Schema.Type<
 
 /**
  * A {@link SessionPart} as it is encoded: the id of the session and the part it
- * forks from as a recording states them, and the extra data of the part.
+ * forks from as a trajectory states them, and the extra data of the part.
  *
  * @see {@link SessionPart} for the part itself.
  * @category models
@@ -206,11 +206,11 @@ export type SessionPart<K extends Extra.AnyKit> = Schema.Schema.Type<
 export type SessionPartEncoded = Schema.Codec.Encoded<ReturnType<typeof SessionPart<Extra.AnyKit>>>;
 
 /**
- * Builds a session part: the declaration of a session a trajectory records in.
+ * Builds a session part: the declaration of a session a trajectory produces in.
  *
  * **When to use**
  *
- * Use where a recording declares the session its parts belong to, or the fork a
+ * Use where a trajectory declares the session its parts belong to, or the fork a
  * session continues from.
  *
  * **Details**
@@ -301,23 +301,23 @@ type AllResponseParts<
  *
  * **When to use**
  *
- * Use to read or write the response parts of a recording: what a model answered a
+ * Use to read or write the response parts of a trajectory: what a model answered a
  * prompt with, whether it answered it whole or arrived at that answer in increments.
  *
  * **Details**
  *
  * - `stream` says what the `response` of a part is: `true` reads every part a
  *   response may hold — the increments a streamed response arrived in and the whole
- *   parts those increments complete — and `false` the whole parts alone. A recording
+ *   parts those increments complete — and `false` the whole parts alone. A trajectory
  *   is read as the most general trajectory, so the parts of a folded one are members
  *   of the streaming schema too — see {@link Exchange.Part}.
  * - `toolkit` is what the response is read by: the tool call and tool result parts of
  *   its tools as those tools state them, and a part naming a tool the toolkit no
- *   longer holds as the part it was recorded as rather than not at all — see
+ *   longer holds as the part it was produced as rather than not at all — see
  *   {@link Response.AllPartsView}.
  * - `extrakit` reads the extra data of the part as {@link Extra.ExtraRecord} reads it,
  *   and `timestamp`, `sessionId` and `uuid` are the fields every response part is
- *   recorded with.
+ *   produced with.
  *
  * The response of a part is read through the toolkit, so encoding one takes what
  * those tools state — see {@link Exchange.EncodingServices}.
@@ -381,22 +381,22 @@ export type ResponsePart<
 > = Schema.Schema.Type<AllResponseParts<Toolkit, Extrakit, Stream>>;
 
 /**
- * A {@link ResponsePart} as it is encoded, in the variant a recording states.
+ * A {@link ResponsePart} as it is encoded, in the variant a trajectory states.
  *
  * **When to use**
  *
- * Use to type what a recording holds of a response part, such as to carry one in a
+ * Use to type what a trajectory holds of a response part, such as to carry one in a
  * format of your own.
  *
  * **Details**
  *
- * A recording is read as the most general trajectory, whose response parts are the
+ * A trajectory is read as the most general trajectory, whose response parts are the
  * streams they arrived in, so the encoded part is stated as the streaming variant:
  * the folded response parts of a trajectory of another kind are members of that
  * schema too, as {@link ResponsePart} says.
  *
  * @see {@link ResponsePart} for the part itself.
- * @see {@link Exchange.Part} for the parts a recording carries.
+ * @see {@link Exchange.Part} for the parts a trajectory carries.
  * @category models
  */
 export type ResponsePartEncoded = Schema.Codec.Encoded<
@@ -408,7 +408,7 @@ export type ResponsePartEncoded = Schema.Codec.Encoded<
  *
  * **When to use**
  *
- * Use where what a model returned is recorded, so that the response stands among
+ * Use where what a model returned is produced, so that the response stands among
  * the parts of its trajectory rather than beside them.
  *
  * **Details**
@@ -421,13 +421,13 @@ export type ResponsePartEncoded = Schema.Codec.Encoded<
  * - `response` is one part of what the model returned, as {@link Response.makePart}
  *   builds one: an increment the response arrived in where the config streams, and a
  *   part the response is whole in where it does not.
- * - `sessionId` names the session the part is recorded in; the `timestamp` and the
+ * - `sessionId` names the session the part is produced in; the `timestamp` and the
  *   `uuid` of the part are supplied where it is built, as they are for every other
  *   part.
  * - `extra` may be left out, and the part then states none of it, as a prompt part
  *   that states none does.
  *
- * **Example** (Recording what a model returned, with what it was estimated to cost)
+ * **Example** (Producing what a model returned, with what it was estimated to cost)
  *
  * ```ts import.meta.vitest
  * import { Schema } from "effect"
@@ -495,17 +495,17 @@ export const responsePart =
  *
  * **When to use**
  *
- * Use to read or write the events of a recording — what a run recorded of itself
+ * Use to read or write the events of a trajectory — what a run produced of itself
  * rather than what was said — or to build a schema of your own over this one.
  *
  * **Details**
  *
  * - `event` is the event of the kit the part names, read as
  *   {@link Event.EventPartsView} reads one: by the schema of the event at the version
- *   the part was written at, or as the pair it was recorded as where the kit names
+ *   the part was written at, or as the pair it was produced as where the kit names
  *   no such event or the data no longer states that version.
- * - `timestamp` is when the event was recorded, which `.make` supplies as the time
- *   the part is built, and `sessionId` and `uuid` say where it was recorded and
+ * - `timestamp` is when the event was produced, which `.make` supplies as the time
+ *   the part is built, and `sessionId` and `uuid` say where it was produced and
  *   which part it is.
  *
  * An event part holds no extra data: a kit states what an event is, and what an
@@ -534,7 +534,7 @@ export type EventPart<K extends Event.AnyKit> = Schema.Schema.Type<ReturnType<ty
 
 /**
  * An {@link EventPart} as it is encoded: the tag of the event it names and the data
- * of that event as a recording states them.
+ * of that event as a trajectory states them.
  *
  * @see {@link EventPart} for the part itself.
  * @category models
@@ -547,8 +547,8 @@ export type EventPartEncoded = Schema.Codec.Encoded<ReturnType<typeof EventPart<
  *
  * **When to use**
  *
- * Use to read or write what a kit derived of a recording — a count, a cost, a score
- * — so that what a recording is worth reads back without the producers that derived
+ * Use to read or write what a kit derived of a trajectory — a count, a cost, a score
+ * — so that what a trajectory is worth reads back without the producers that derived
  * it.
  *
  * **Details**
@@ -561,7 +561,7 @@ export type EventPartEncoded = Schema.Codec.Encoded<ReturnType<typeof EventPart<
  * A metric part holds no extra data, as an event part does not.
  *
  * @see {@link Metric.MetricPartsView} for what a part is read as.
- * @see {@link Metric.produce} for deriving the parts of a kit from a recording.
+ * @see {@link Metric.produce} for deriving the parts of a kit from a trajectory.
  * @category schemas
  */
 export const MetricPart = <K extends Metric.AnyKit>(kit: K) =>
@@ -582,7 +582,7 @@ export type MetricPart<K extends Metric.AnyKit> = Schema.Schema.Type<
 
 /**
  * A {@link MetricPart} as it is encoded: the tag of the metric it reports and the
- * output or failure that metric derived, as a recording states them.
+ * output or failure that metric derived, as a trajectory states them.
  *
  * @see {@link MetricPart} for the part itself.
  * @category models
@@ -603,7 +603,7 @@ export type MetricPartEncoded = Schema.Codec.Encoded<ReturnType<typeof MetricPar
  * - `stream` says what a response part is: `true` reads one as every part a response
  *   may hold, and `false` as the whole parts alone — see {@link ResponsePart}.
  * - `toolkit` is what the responses were returned by, `eventkit` the events a
- *   recording may name, `metrickit` the metrics derived of it, and `extrakit` the
+ *   trajectory may name, `metrickit` the metrics derived of it, and `extrakit` the
  *   extra data of its prompt, response and session parts.
  *
  * Every type parameter defaults to `never`, so a config names what it holds; the
@@ -633,8 +633,8 @@ export interface Config<
  *
  * **When to use**
  *
- * Use to type a reading that does not know the kits a recording was written with —
- * one that measures, displays or migrates a recording rather than acting on what it
+ * Use to type a reading that does not know the kits a trajectory was written with —
+ * one that measures, displays or migrates a trajectory rather than acting on what it
  * holds.
  *
  * @see {@link Config} for a config that names what a trajectory holds.
@@ -648,7 +648,7 @@ export type AnyConfig = Config<boolean, Toolkit.Any, Event.AnyKit, Metric.AnyKit
  *
  * **When to use**
  *
- * Use to type a reading that measures a recording rather than acting on what it
+ * Use to type a reading that measures a trajectory rather than acting on what it
  * holds, since what a measurement is of is the parts a model was given and
  * returned rather than the increments an answer arrived in.
  *
@@ -686,26 +686,26 @@ export type UnknownConfig = Config<
 >;
 
 /**
- * The config a recording is read with: {@link AnyConfig} as the value of a
+ * The config a trajectory is read with: {@link AnyConfig} as the value of a
  * trajectory that states nothing about itself.
  *
  * **When to use**
  *
- * Use to read a recording that was written with kits a program does not hold —
+ * Use to read a trajectory that was written with kits a program does not hold —
  * what `Exchange.Service.load` reads one with — or to name the reading of a
- * recording that states no kit of its own.
+ * trajectory that states no kit of its own.
  *
  * **Details**
  *
  * Every kit of it is empty and its response parts are read as streams, so every
- * part of a recording is read as the part it was recorded as: a response part
+ * part of a trajectory is read as the part it was produced as: a response part
  * whose tool the toolkit does not hold reads as the part it is rather than not at
  * all, and the extra data of a part as the kit that declared it wrote it. What a
- * recording was written with is what its header names, which is names alone —
- * {@link AnyConfig} holds anything, so what a recording holds is read without the
+ * trajectory was written with is what its header names, which is names alone —
+ * {@link AnyConfig} holds anything, so what a trajectory holds is read without the
  * schemas it was written with.
  *
- * A recording is read as a streaming trajectory whatever it was written as, since
+ * A trajectory is read as a streaming trajectory whatever it was written as, since
  * the increments of a streamed response and the whole parts those increments
  * complete are members of the streaming schema: one reading carries the response
  * parts of either kind.
@@ -727,7 +727,7 @@ export const anyConfig: AnyConfig = {
  *
  * **When to use**
  *
- * Use to type a stream of parts, or to tell the parts of a recording apart by the
+ * Use to type a stream of parts, or to tell the parts of a trajectory apart by the
  * tag each carries.
  *
  * **Details**
@@ -746,7 +746,7 @@ export const anyConfig: AnyConfig = {
  * happens to hold — see {@link View.promptTurns} for a reading of a trajectory by
  * the tags of its parts.
  *
- * @see {@link Trajectory} for the stream the parts of a recording arrive in.
+ * @see {@link Trajectory} for the stream the parts of a trajectory arrive in.
  * @category models
  */
 export type Part<Config extends AnyConfig> =
@@ -777,13 +777,13 @@ export type Part<Config extends AnyConfig> =
 export type TrajectoryStream<Config extends AnyConfig, E, R> = Stream.Stream<Part<Config>, E, R>;
 
 /**
- * A trajectory: the parts of a recording as one stream, carrying what they are read
+ * A trajectory: the parts of a trajectory as one stream, carrying what they are read
  * with.
  *
  * **When to use**
  *
- * Use to read a recording that was decoded, or to write one: a trajectory is what
- * an {@link Exchange.Service} reads a recording as, and what it writes one from.
+ * Use to read a trajectory that was decoded, or to write one: a trajectory is what
+ * an {@link Exchange.Service} reads a trajectory as, and what it writes one from.
  *
  * **Details**
  *
@@ -796,7 +796,7 @@ export type TrajectoryStream<Config extends AnyConfig, E, R> = Stream.Stream<Par
  * reading any of it.
  *
  * @see {@link TrajectoryStream} for the parts of a trajectory alone.
- * @see {@link Exchange.Service.read} for reading a recording as one.
+ * @see {@link Exchange.Service.read} for reading a trajectory as one.
  * @category models
  */
 export type Trajectory<Config extends AnyConfig, E, R> = TrajectoryStream<Config, E, R> &
@@ -809,7 +809,7 @@ export type Trajectory<Config extends AnyConfig, E, R> = TrajectoryStream<Config
  * **When to use**
  *
  * Use to name what {@link merge} returns, such as to type a function that reads two
- * recordings as one.
+ * trajectories as one.
  *
  * **Details**
  *
@@ -842,9 +842,9 @@ export type MergedConfig<Left extends AnyConfig, Right extends AnyConfig> = Conf
  *
  * **When to use**
  *
- * Use when two recordings are read together rather than side by side — two halves of
- * a session, a run and what was recorded of it elsewhere — so that what either holds
- * is read with the kits the other was recorded with, and their parts read as the
+ * Use when two trajectories are read together rather than side by side — two halves of
+ * a session, a run and what was produced of it elsewhere — so that what either holds
+ * is read with the kits the other was produced with, and their parts read as the
  * parts of one trajectory.
  *
  * **Details**
@@ -855,7 +855,7 @@ export type MergedConfig<Left extends AnyConfig, Right extends AnyConfig> = Conf
  *   ({@link MergedConfig}), and the reading fails with what either of the two fails
  *   with.
  * - Merging is not reconciliation: the parts keep the `uuid` and the session they
- *   were recorded with, so two parts of one `uuid` remain two parts, and a session
+ *   were produced with, so two parts of one `uuid` remain two parts, and a session
  *   both trajectories declare is one session of the merged trajectory that the parts
  *   of both belong to. What a fork names is read against the parts of the merged
  *   trajectory, which hold every part of either.
@@ -874,7 +874,7 @@ export type MergedConfig<Left extends AnyConfig, Right extends AnyConfig> = Conf
  * const metrickit = Metric.toProducers(Metric.makeKit(), {})
  * const sessionId = "01890a5d-ac96-774b-bcce-b302099a8057"
  *
- * // A half of the session: what was asked, recorded as a trajectory of its own.
+ * // A half of the session: what was asked, produced as a trajectory of its own.
  * const half = (content: string) =>
  *   Produce.fromSession({
  *     toolkit: Toolkit.empty,

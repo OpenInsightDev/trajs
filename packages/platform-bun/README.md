@@ -8,7 +8,7 @@ Bun runs with.
   `Bun.deflateSync` and `Bun.inflateSync` do.
 - `BunServices` — the compression and the BLAKE3, BLAKE2b or SHA-256 digest
   `@trajs/platform-node` reads through the Rust binding, as one layer provided
-  beside the storage where a program on Bun keeps a recording.
+  beside the storage where a program on Bun keeps a trajectory.
 
 Bun states no BLAKE3 of its own, so this package stands on
 [`@trajs/platform-node`](../platform-node) for the digests the way

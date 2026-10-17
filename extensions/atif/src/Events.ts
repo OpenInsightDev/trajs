@@ -1,23 +1,23 @@
 /**
- * The events ATIF's own conventions are recorded as.
+ * The events ATIF's own conventions are produced as.
  *
- * ATIF records what happens of a run, rather than what is said, as system steps,
+ * ATIF produces what happens of a run, rather than what is said, as system steps,
  * and states what some of them do as a convention of its own. The one ATIF v1.8
  * defines is context management: a system step that transforms the agent's
  * context window declares a `context_management` object saying what the
  * transformation was and how it bounds the steps after it. This module declares
- * the event the package records that convention as and collects it into the kit
- * the package records with, so a run that transforms its context records it among
+ * the event the package produces that convention as and collects it into the kit
+ * the package produces with, so a run that transforms its context produces it among
  * the events of its trajectory rather than in a field beside it, and the package
  * entry re-exports this module directly, so what it declares is what the package
  * offers beside {@link Step.Step}.
  *
  * An event is named by the package that declares it: the `package` of its tag is
- * the `name` of this package, so what a recording states of an event is the
+ * the `name` of this package, so what a trajectory states of an event is the
  * package that wrote it rather than a name the package made up. Nothing of a
- * recording is derived from an event — transforming a context is something a run
+ * trajectory is derived from an event — transforming a context is something a run
  * does rather than something a kit reads off the parts — so each is declared with
- * a schema alone, and the one an event records is read back with the kit the
+ * a schema alone, and the one an event produces is read back with the kit the
  * events are collected into, {@link eventkit}.
  */
 
@@ -49,7 +49,7 @@ const boundaries = ["replace", "append", "truncate"] as const;
  * - `pruning` — older turns were removed from the context.
  * - `injection` — external knowledge was added to the context.
  *
- * ATIF leaves the set open to a producer, so a recording may state a kind beyond
+ * ATIF leaves the set open to a producer, so a trajectory may state a kind beyond
  * these three; one is read by a version of this event's schema that names it, and
  * not by the version declared here.
  *
@@ -81,7 +81,7 @@ export type ContextManagementType = (typeof types)[number];
  *
  * The event states which of them happened rather than the context that results:
  * the content a `replace` bound leaves is what the steps around the event carry,
- * which ATIF records as an observation and a recording holds as the messages of
+ * which ATIF produces as an observation and a trajectory holds as the messages of
  * the conversation.
  *
  * @see {@link ContextManagementType} for what the transformation was.
@@ -90,19 +90,19 @@ export type ContextManagementType = (typeof types)[number];
 export type ContextManagementBoundary = (typeof boundaries)[number];
 
 /**
- * The event the package records ATIF's context management convention as.
+ * The event the package produces ATIF's context management convention as.
  *
  * **When to use**
  *
- * Use as an entry of the kit a recording that transforms its context is written
+ * Use as an entry of the kit a trajectory that transforms its context is written
  * or read with — {@link eventkit} — or to read the metadata of the event and the
- * tag it is recorded under.
+ * tag it is produced under.
  *
  * **Details**
  *
  * `package` is the `name` of this package as `package.json` states it, and `id`
- * names the event within the package, so the tag the event is recorded under is
- * the package's own name followed by `ContextManagement`: what a recording states
+ * names the event within the package, so the tag the event is produced under is
+ * the package's own name followed by `ContextManagement`: what a trajectory states
  * of an event is the package that wrote it rather than a name the package made
  * up. `metadata` describes the event itself, and `schema` is the data of one
  * event at every version it was written at, which here is the single version
@@ -143,7 +143,7 @@ export const contextManagementEvent = new Event.Event({
  * **When to use**
  *
  * Use when building the datum a context management event carries, or when reading
- * one that was recorded at the newest version. A recording may hold a datum of an
+ * one that was produced at the newest version. A trajectory may hold a datum of an
  * older version, so read one through the event's schema — {@link contextManagementEvent}
  * — rather than with this shape alone.
  *
@@ -155,7 +155,7 @@ export const contextManagementEvent = new Event.Event({
  * - `boundary` is how it bounds the steps after it — see
  *   {@link ContextManagementBoundary}.
  *
- * The event is what ATIF records of a system step that transformed the context,
+ * The event is what ATIF produces of a system step that transformed the context,
  * and states what the run did rather than the context it left: what a `replace`
  * bound leaves is read off the steps around the event, not off this shape.
  *
@@ -165,7 +165,7 @@ export const contextManagementEvent = new Event.Event({
 export const ContextManagement = contextManagementEvent.schema.self;
 
 /**
- * A context management event as the package records it, at the newest version of
+ * A context management event as the package produces it, at the newest version of
  * the event's data.
  *
  * ATIF RFC 0001 v1.8, Section VII "Context Management Convention".
@@ -176,7 +176,7 @@ export const ContextManagement = contextManagementEvent.schema.self;
 export type ContextManagement = Schema.Schema.Type<typeof ContextManagement>;
 
 /**
- * Records an event that transformed the agent's context.
+ * Produces an event that transformed the agent's context.
  *
  * **When to use**
  *
@@ -186,14 +186,14 @@ export type ContextManagement = Schema.Schema.Type<typeof ContextManagement>;
  *
  * **Details**
  *
- * What is returned is what a session records of the event: the tag it is recorded
+ * What is returned is what a session produces of the event: the tag it is produced
  * under together with the context management datum, which is what a session's
- * stream carries. `Produce.ProduceSession.enqueueEvent` records one as an event
+ * stream carries. `Produce.ProduceSession.enqueueEvent` produces one as an event
  * part of the trajectory where it happened.
  *
  * A run transforms its context by acting on the conversation, so the event states
  * the transformation rather than the context it left: what a `replace` bound
- * leaves is read off the messages the session recorded after the event.
+ * leaves is read off the messages the session produced after the event.
  *
  * **Example** (Stating that the agent's context was replaced)
  *
@@ -219,20 +219,20 @@ export const contextManagement = (
 });
 
 /**
- * The events this package records with, collected into a kit.
+ * The events this package produces with, collected into a kit.
  *
  * **When to use**
  *
- * Use as the events of the kit a recording is written or read with — the
- * `eventkit` of the run that records it — so that the events this package records
- * are read back by it rather than as the JSON they were recorded as.
+ * Use as the events of the kit a trajectory is written or read with — the
+ * `eventkit` of the run that produces it — so that the events this package produces
+ * are read back by it rather than as the JSON they were produced as.
  *
  * **Details**
  *
  * The kit is an `Eventkit` of every event this package declares, each held under
- * the tag it is recorded under — here {@link contextManagementEvent}, the one
+ * the tag it is produced under — here {@link contextManagementEvent}, the one
  * event the package declares so far. It is extended rather than replaced when
- * other packages' events are recorded with the same trajectory, and it is what a
+ * other packages' events are produced with the same trajectory, and it is what a
  * reader installs to get the events back with their types.
  *
  * @see {@link contextManagementEvent} for the event it holds.

@@ -35,8 +35,8 @@
  * Either implementation counts the text a prompt carries — the text of its
  * messages, the name and parameters of a tool call, the identifier and result of
  * a tool result — and not the framing a provider adds around messages, because
- * nothing a recording holds states that framing. `Count` estimates a recorded
- * part the same way, one contribution at a time.
+ * nothing a trajectory holds states that framing. `Count` estimates a part a
+ * trajectory holds the same way, one contribution at a time.
  */
 
 import { getTokenizer } from "@anthropic-ai/tokenizer";
@@ -51,7 +51,7 @@ export * from "effect/ai/Tokenizer";
  *
  * **When to use**
  *
- * Use when the OpenAI model a recording was made against is known, which is
+ * Use when the OpenAI model a trajectory was made against is known, which is
  * what ties a count to the tokens that model would see.
  *
  * **Details**
@@ -75,9 +75,9 @@ export interface OpenAiOptions {
  *
  * **When to use**
  *
- * Use when the tokens a Claude model would see are what a recording should be
+ * Use when the tokens a Claude model would see are what a trajectory should be
  * measured by, such as to check a prompt against a context window or to compare
- * the parts of a recording by size.
+ * the parts of a trajectory by size.
  *
  * **Details**
  *
@@ -109,7 +109,7 @@ export const layerAnthropic: Layer.Layer<AiTokenizer.Tokenizer> = Layer.effect(
  *
  * **When to use**
  *
- * Use when the tokens a model of one OpenAI family would see are what a recording
+ * Use when the tokens a model of one OpenAI family would see are what a trajectory
  * should be measured by, which is why the model is named: two families count the
  * same text into different tokens.
  *

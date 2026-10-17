@@ -1,7 +1,7 @@
 /**
- * The sessions of a recording, as the tree the forks make them: every session the
- * recording declares as a root sits beside the other roots, and every session forked
- * off one is nested under the session that recorded the part it continues from.
+ * The sessions of a trajectory, as the tree the forks make them: every session the
+ * trajectory declares as a root sits beside the other roots, and every session forked
+ * off one is nested under the session that produced the part it continues from.
  *
  * A session is one row — the id it goes by, and where it continues from one of them,
  * the session it was forked off — and nothing beside it: the nesting is the fork, the
@@ -14,14 +14,14 @@ import { cn } from "cn";
 import { Option } from "effect";
 import { Fragment } from "react";
 
-import type { RecordedSession } from "@/lib/recording";
+import type { TrajectorySession } from "@/lib/trajectory";
 
 const SessionRow = ({
   session,
   selected,
   onSelect,
 }: {
-  session: RecordedSession;
+  session: TrajectorySession;
   selected: string | undefined;
   onSelect: (id: string) => void;
 }) => (
@@ -60,7 +60,7 @@ export const SessionTree = ({
   selected,
   onSelect,
 }: {
-  roots: ReadonlyArray<RecordedSession>;
+  roots: ReadonlyArray<TrajectorySession>;
   selected: string | undefined;
   onSelect: (id: string) => void;
 }) => (

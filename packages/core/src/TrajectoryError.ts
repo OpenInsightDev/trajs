@@ -3,8 +3,8 @@
  *
  * A trajectory fails as a {@link TrajectoryError}, whose `reason` names what
  * failed: a response part the toolkit cannot encode or decode
- * ({@link ToolEncodeError}, {@link ToolDecodeError}), a session a recording does
- * not hold what reading it needs ({@link SessionError}), or a recording whose bytes
+ * ({@link ToolEncodeError}, {@link ToolDecodeError}), a session a trajectory does
+ * not hold what reading it needs ({@link SessionError}), or a trajectory whose bytes
  * cannot be read or written ({@link ParseError}). Every reason says what failed in
  * its `message` and keeps what it was derived of as `cause`.
  */
@@ -17,7 +17,7 @@ const listed = (members: ReadonlyArray<string>): string =>
 
 /**
  * The failure of encoding a response part with the toolkit a trajectory was
- * recorded with.
+ * produced with.
  *
  * @see {@link TrajectoryError.encodeTool} for the error that carries it.
  * @category errors
@@ -55,38 +55,38 @@ export class ToolDecodeError extends Data.TaggedError("ToolDecodeError")<{
  *
  * **Details**
  *
- * - `"unrecorded-fork"`: the session continues from a part the recording does not
- *   hold. A `fork` names a part recorded before the declaration that reads it, so
- *   a session that continues from a part the recording has not reached cannot be
+ * - `"unproduced-fork"`: the session continues from a part the trajectory does not
+ *   hold. A `fork` names a part produced before the declaration that reads it, so
+ *   a session that continues from a part the trajectory has not reached cannot be
  *   read — which is also what a cycle of forks is, no session in it being
  *   reachable without a fork into the future.
- * - `"late-declaration"`: the session was declared after the parts it recorded. A
- *   session is declared before the parts it recorded, so there is no declaration
+ * - `"late-declaration"`: the session was declared after the parts it produced. A
+ *   session is declared before the parts it produced, so there is no declaration
  *   left to wait for.
- * - `"several-sessions"`: the recording declares a session after the parts of
+ * - `"several-sessions"`: the trajectory declares a session after the parts of
  *   another one, so it does not hold the parts of one session alone — which is
- *   what {@link View.prompt} reads a recording as.
+ *   what {@link View.prompt} reads a trajectory as.
  *
  * @see {@link SessionError} for the error that carries one.
  * @category models
  */
-export type SessionErrorReason = "unrecorded-fork" | "late-declaration" | "several-sessions";
+export type SessionErrorReason = "unproduced-fork" | "late-declaration" | "several-sessions";
 
 /** What each reason says is wrong with the session it names, as {@link SessionError} words it. */
 const sessionFailure: Record<SessionErrorReason, string> = {
-  "unrecorded-fork": "it continues from a part the recording does not hold",
-  "late-declaration": "it was declared after the parts it recorded",
-  "several-sessions": "the recording declares more than one session",
+  "unproduced-fork": "it continues from a part the trajectory does not hold",
+  "late-declaration": "it was declared after the parts it produced",
+  "several-sessions": "the trajectory declares more than one session",
 };
 
 /**
- * The failure of reading a session a recording does not hold what reading it
+ * The failure of reading a session a trajectory does not hold what reading it
  * needs.
  *
  * **Details**
  *
  * `id` names the session and `reason` what is wrong with it, as
- * {@link SessionErrorReason} reads it: a recording that does not hold what reading
+ * {@link SessionErrorReason} reads it: a trajectory that does not hold what reading
  * a session needs, or one that holds more than the session being read.
  *
  * @see {@link TrajectoryError.session} for the error that carries it.
@@ -102,13 +102,13 @@ export class SessionError extends Data.TaggedError("SessionError")<{
 }
 
 /**
- * The failure of reading or writing a recording.
+ * The failure of reading or writing a trajectory.
  *
  * **Details**
  *
- * `cause` is what the recording failed with, as the layer that failed reported
+ * `cause` is what the trajectory failed with, as the layer that failed reported
  * it: the `SchemaError` of a part, of the header line or of the metadata a
- * recording ends with, the failure of the codec the frame is carried in, or the
+ * trajectory ends with, the failure of the codec the frame is carried in, or the
  * description of the bytes ending before a header line or before that metadata.
  *
  * @see {@link TrajectoryError.parse} for the error that carries it.
@@ -118,7 +118,7 @@ export class ParseError extends Data.TaggedError("ParseError")<{
   cause: unknown;
 }> {
   override get message(): string {
-    return `Failed to read or write a recording: ${Formatter.format(this.cause)}`;
+    return `Failed to read or write a trajectory: ${Formatter.format(this.cause)}`;
   }
 }
 
@@ -201,7 +201,7 @@ export class TrajectoryError extends Data.TaggedError("TrajectoryError")<{
     new TrajectoryError({ reason: new SessionError({ id, reason }) });
 
   /**
-   * Creates the error for a recording that failed with `cause`.
+   * Creates the error for a trajectory that failed with `cause`.
    *
    * @category constructors
    */

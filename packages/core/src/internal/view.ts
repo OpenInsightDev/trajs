@@ -1,7 +1,7 @@
 /**
  * The reading behind {@link View.promptTurns}, {@link View.prompt} and
  * {@link View.conversations}: one pass over a trajectory groups its parts into the
- * turns they were recorded in, folding the increments of a streamed response into
+ * turns they were produced in, folding the increments of a streamed response into
  * the parts they complete, and the turns are folded back into the prompt one
  * session's model was given — or, session by session, into the conversation each of
  * them ran in.
@@ -46,7 +46,7 @@ const assemble = <Config extends Trajectory.AnyConfig>(
   switch (part._tag) {
     case "Prompt":
       // A prompt opens a turn and closes the one before it, whether or not that one
-      // was answered, so the turns are emitted in the order they were recorded in.
+      // was answered, so the turns are emitted in the order they were produced in.
       return [opened(part), turnsOf(assembly.turn)];
 
     case "Response": {
@@ -73,8 +73,8 @@ const assemble = <Config extends Trajectory.AnyConfig>(
  * A trajectory read as the parts of one session alone: it fails where it declares
  * a session after a part of the session the trajectory reads.
  *
- * A session is declared before the parts it recorded, so the declarations a
- * trajectory opens with are the ones it makes before recording anything; a
+ * A session is declared before the parts it produced, so the declarations a
+ * trajectory opens with are the ones it makes before trajectory anything; a
  * declaration read after a part is the declaration of another session, or of one
  * declared twice, so the stream holds the parts of more than one session — which is
  * what {@link readPrompt} refuses to fold.
@@ -85,25 +85,23 @@ const oneSession = <Config extends Trajectory.AnyConfig, E, R>(
   Stream.suspend(() => {
     // A reading of the stream starts afresh, so whether a part has been read is
     // held per reading rather than by the combinator.
-    let recording = false;
+    let seen = false;
 
     const check = (part: Trajectory.Part<Config>): Effect.Effect<void, TrajectoryError> => {
       if (part._tag !== "Session") {
-        recording = true;
+        seen = true;
 
         return Effect.void;
       }
 
-      return recording
-        ? Effect.fail(TrajectoryError.session(part.id, "several-sessions"))
-        : Effect.void;
+      return seen ? Effect.fail(TrajectoryError.session(part.id, "several-sessions")) : Effect.void;
     };
 
     return trajectory.pipe(Stream.tap(check));
   });
 
 /**
- * Reads a trajectory as the turns its conversation was recorded in: a prompt part
+ * Reads a trajectory as the turns its conversation was produced in: a prompt part
  * opens a turn, the response parts that follow it are folded into that turn, and a
  * turn is closed by the prompt after it, or by the trajectory ending.
  */
@@ -112,8 +110,8 @@ export const readTurns = <Config extends Trajectory.AnyConfig, E, R>(
 ): Stream.Stream<PromptTurn<Config>, E, R> =>
   trajectory.pipe(
     Stream.mapAccum(closed<Config>, assemble, {
-      // The turn a recording ends in has no prompt after it to close it, so the
-      // recording ending is what closes it.
+      // The turn a trajectory ends in has no prompt after it to close it, so the
+      // trajectory ending is what closes it.
       onHalt: (assembly) => turnsOf(assembly.turn),
     }),
   );
@@ -140,7 +138,7 @@ export const readPrompt = <Config extends Trajectory.AnyConfig, E, R>(
 
 /**
  * The conversation of every session of a trajectory, by session id: the messages
- * each of them recorded, preceded by what it inherited from the sessions it
+ * each of them produced, preceded by what it inherited from the sessions it
  * continues from.
  */
 export const readConversations = <Config extends Trajectory.AnyConfig, E, R>(
@@ -159,7 +157,7 @@ export const readConversations = <Config extends Trajectory.AnyConfig, E, R>(
  * of their conversations.
  *
  * `inherited` is the conversation the session continues from, which is read from
- * the session that recorded the part a fork names rather than from the fork: a fork
+ * the session that produced the part a fork names rather than from the fork: a fork
  * holds none of the parts of the session it continues from.
  */
 const readSession = <Config extends Trajectory.AnyConfig, E, R>(
@@ -181,7 +179,7 @@ const readSession = <Config extends Trajectory.AnyConfig, E, R>(
           onNone: () => Effect.succeed(inherited),
           onSome: (from) =>
             messagesOf(upTo(parts, uuidOf(from.part))).pipe(
-              Effect.map((recorded) => [...inherited, ...recorded]),
+              Effect.map((produced) => [...inherited, ...produced]),
             ),
         });
 
@@ -211,8 +209,8 @@ const upTo = <Config extends Trajectory.AnyConfig>(
 };
 
 /**
- * The messages the parts of one session were recorded as, folded the way a
- * recording is read back into the prompt its model was given.
+ * The messages the parts of one session were produced as, folded the way a
+ * trajectory is read back into the prompt its model was given.
  *
  * A declaration is read past rather than folded: it declares the session, and what
  * a model was given of a session is its prompts and the responses to them.

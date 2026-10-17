@@ -17,7 +17,7 @@
   margin-block-start: 0.75rem;
 }
 
-/* A recorded message carries no code playground: the language label, the
+/* A message a trajectory holds carries no code playground: the language label, the
    controls and the line numbers belong to a block someone is editing, and the
    card they sit in would be a second surface inside the bubble. A code block is
    one quiet surface whose lines wrap, since a message is read in a bubble

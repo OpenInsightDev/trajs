@@ -1,7 +1,7 @@
 /**
- * The schemas a count of a trajectory part is recorded as.
+ * The schemas a count of a trajectory part is produced as.
  *
- * A recording holds the parts a session ran on but not what they cost, and what a
+ * A trajectory holds the parts a session ran on but not what they cost, and what a
  * part costs depends on what kind of part it is. A prompt is many messages at
  * once, so its count is stated kind by kind — the text it carries, the reasoning
  * of a model, the calls of tools and their results, and a payload that is not
@@ -21,11 +21,11 @@
  * The members are the union {@link TokenCount}, which is what a metric's output
  * holds as a field of its own rather than being the union itself: the data a
  * metric's output states has to be a struct with a `version` of its own, and a
- * union is not one — see {@link Metrics} for the output the union is recorded in,
+ * union is not one — see {@link Metrics} for the output the union is produced in,
  * and {@link Count} for the functions that take a count.
  *
  * These are shapes of a count rather than versioned data of their own: only the
- * output a count is recorded in is versioned, since it is the datum a recording
+ * output a count is produced in is versioned, since it is the datum a trajectory
  * holds. A field added to a count is therefore a new version of the metric's
  * output rather than a version of the count — see {@link Metrics}.
  */
@@ -69,7 +69,7 @@ export const PromptTokens = Schema.TaggedStruct("prompt", {
 });
 
 /**
- * A count of a prompt part, as the package records it.
+ * A count of a prompt part, as the package produces it.
  *
  * @see {@link PromptTokens} for the schema the datum is read by.
  * @category models
@@ -142,7 +142,7 @@ export type ReasoningTokens = Schema.Schema.Type<typeof ReasoningTokens>;
  * The count is the tokens of the call's name and of the JSON of its parameters,
  * which is what a tokenizer answers for. What the result that answers the call is
  * worth is stated by the result's own count — {@link ToolResultTokens} — because
- * the two are recorded as parts of their own.
+ * the two are produced as parts of their own.
  *
  * @see {@link TokenCount} for the union the shape is a member of.
  * @category schemas
@@ -170,16 +170,16 @@ export type ToolCallTokens = Schema.Schema.Type<typeof ToolCallTokens>;
  * - `tokens` and `mediaTokens` are the result's own.
  * - `toolCallTokens` is what the call and its result are worth together — the
  *   whole call-result — so that what a tool cost is read from its result alone.
- *   A result always answers a call, which is the call of the same `id` recorded
+ *   A result always answers a call, which is the call of the same `id` produced
  *   before it; the two are counted as one number here because a caller reads the
  *   cost of a tool from the result that closes it.
  *
- * The call is not counted here but read from the recording the result belongs to,
+ * The call is not counted here but read from the trajectory the result belongs to,
  * by the identifier the two share. A reading that does not hold the call — a
- * recording that begins after it was made — is one no count is taken from, rather
+ * trajectory that begins after it was made — is one no count is taken from, rather
  * than one whose call-result is guessed, so `Count` gives back nothing for a tool
  * result it is handed on its own while the metric's producer, which reads a whole
- * recording, states the pair.
+ * trajectory, states the pair.
  *
  * @see {@link TokenCount} for the union the shape is a member of.
  * @category schemas
@@ -211,7 +211,7 @@ export type ToolResultTokens = Schema.Schema.Type<typeof ToolResultTokens>;
  * A payload that is not text is the one thing a tokenizer cannot answer for, so
  * the whole count is what a rule estimated it at and `mediaTokens` is the same
  * number as `tokens` rather than `0`. Which rule priced it is not stated: the
- * estimation is a property of the run that counted rather than of the recording —
+ * estimation is a property of the run that counted rather than of the trajectory —
  * see {@link Count.CountOptions.media}.
  *
  * @see {@link TokenCount} for the union the shape is a member of.
@@ -228,11 +228,11 @@ export const FileTokens = Schema.TaggedStruct("file", contentFields);
 export type FileTokens = Schema.Schema.Type<typeof FileTokens>;
 
 /**
- * The union a count of one part is recorded as.
+ * The union a count of one part is produced as.
  *
  * **When to use**
  *
- * Use to read a recorded count without knowing which kind of part it was taken
+ * Use to read a count a trajectory holds without knowing which kind of part it was taken
  * for, which is what a metric's output does with it, or to type a count a
  * function takes of one part.
  *

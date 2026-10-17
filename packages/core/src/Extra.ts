@@ -12,8 +12,8 @@
  * data a part holds as the extra data of that kit for the part it is: the data of
  * every kind the kit declares a schema for there, keyed by its tag, and the data of
  * the kinds it declares none for there as it was written. A part is read through the
- * kit it was recorded with for the same reason a response part is read through the
- * toolkit it was recorded with: the part holds the data, and the kit is what says how
+ * kit it was produced with for the same reason a response part is read through the
+ * toolkit it was produced with: the part holds the data, and the kit is what says how
  * to read it.
  */
 
@@ -24,7 +24,7 @@ import * as VersionedSchema from "#/VersionedSchema.ts";
 import type { IndexByKey } from "./internal/types.ts";
 
 /**
- * The part of a recording extra data is attached to: what a datum states of a
+ * The part of a trajectory extra data is attached to: what a datum states of a
  * prompt part is read by the schema an extension declares it with for `prompt`,
  * what one states of a response part by the schema it declares for `response`, and
  * what one states of a session part by the schema it declares for `session`.
@@ -98,7 +98,7 @@ export type EmptyKit = typeof emptyKit;
  * **When to use**
  *
  * Use to name the extra data {@link mergeKit} returns, such as to type the kit a
- * reader that knows one recording's extra data reads another one under.
+ * reader that knows one trajectory's extra data reads another one under.
  *
  * **Details**
  *
@@ -122,14 +122,14 @@ export type ExtrasMerged<Ks extends ReadonlyArray<AnyKit>> = Ks extends readonly
  * **When to use**
  *
  * Use when the extra data of several extensions are read together, or when a reader
- * that knows some of a recording's extra data should read it under the ones it knows
- * without forgetting the rest — which is what reading two recordings as one does.
+ * that knows some of a trajectory's extra data should read it under the ones it knows
+ * without forgetting the rest — which is what reading two trajectories as one does.
  *
  * **Details**
  *
  * A tag the kits share holds the extra data of the kit latest among those given that
  * names it, so a kit of the version an extension states now states over the one a
- * recording was read with. The kit returned is a kit like any other: it names the
+ * trajectory was read with. The kit returned is a kit like any other: it names the
  * extra data of every kit given and no others.
  *
  * **Example** (Adding the extra data of one kit to another's)
@@ -179,21 +179,21 @@ export const mergeKit = <Ks extends ReadonlyArray<AnyKit>>(
   return { extra } as Extrakit<ExtrasMerged<Ks>>;
 };
 
-/** The schema an extra declares for one part of a recording, and `never` where it declares none. */
+/** The schema an extra declares for one part of a trajectory, and `never` where it declares none. */
 type Declared<X extends Any, P extends Part> = Exclude<X[P], undefined>;
 
-/** What a tag holds on one part of a recording, and `unknown` where the kit declares no schema for that tag there. */
+/** What a tag holds on one part of a trajectory, and `unknown` where the kit declares no schema for that tag there. */
 type Datum<X extends Any, P extends Part> = [Declared<X, P>] extends [never]
   ? unknown
   : Schema.Schema.Type<Declared<X, P>>;
 
-/** {@link Datum} as a recording is written. */
+/** {@link Datum} as a trajectory is written. */
 type DatumEncoded<X extends Any, P extends Part> = [Declared<X, P>] extends [never]
   ? unknown
   : Schema.Codec.Encoded<Declared<X, P>>;
 
 /**
- * The extra data one part of a recording holds: the data of every kind of extra
+ * The extra data one part of a trajectory holds: the data of every kind of extra
  * data, keyed by the tag of the kind it is the data of.
  *
  * **When to use**
@@ -207,7 +207,7 @@ type DatumEncoded<X extends Any, P extends Part> = [Declared<X, P>] extends [nev
  *   every version it was written at into that one.
  * - A tag the kit declares no schema for on this part — a kind it does not name,
  *   or one it declares for another part alone — holds what it was written with,
- *   so a recording another kit wrote still reads, and so does a datum of a kind
+ *   so a trajectory another kit wrote still reads, and so does a datum of a kind
  *   read on the part it was not declared for. Nothing is known of such a datum
  *   beyond its presence, which is why it is read as `unknown`.
  * - A tag the kit declares a schema for on this part whose data no longer matches
@@ -235,12 +235,12 @@ export type ExtraRecordEncoded<Extras extends Record<string, Any>, P extends Par
 } & { readonly [tag: string]: unknown }; // oxlint-disable-line anti-slop/no-unsafe-dictionary-type -- an undeclared tag holds what it was written with
 
 /**
- * Creates a Schema for the extra data one part of a recording holds, read as the
+ * Creates a Schema for the extra data one part of a trajectory holds, read as the
  * extra data a kit declares of the part it is.
  *
  * **When to use**
  *
- * Use for the `extra` field of a part, so that what a kit declares of a recording
+ * Use for the `extra` field of a part, so that what a kit declares of a trajectory
  * is read as the data of that kind rather than as the data it was written with.
  *
  * **Details**
@@ -249,8 +249,8 @@ export type ExtraRecordEncoded<Extras extends Record<string, Any>, P extends Par
  *   its tag: a datum of any version of it reads as its newest one, as
  *   {@link VersionedSchema.VersionedSchema} reads one.
  * - A kind the kit declares no schema for on this part is carried through as it
- *   was read and as it is written, so re-writing a recording a kit wrote does not
- *   change it, and a kit reads a recording another kit wrote without knowing what
+ *   was read and as it is written, so re-writing a trajectory a kit wrote does not
+ *   change it, and a kit reads a trajectory another kit wrote without knowing what
  *   it holds.
  * - A kind the kit declares a schema for on this part is read by it or not at all:
  *   a part whose datum no longer matches is not read as some other shape, which is
@@ -286,7 +286,7 @@ export type ExtraRecordEncoded<Extras extends Record<string, Any>, P extends Par
  * })
  * onResponse["tokenize/estimate"]?.mediaTokens // => 0
  *
- * // The kit declares no schema for a prompt part of an event an extension records,
+ * // The kit declares no schema for a prompt part of an event an extension produces,
  * // so what one holds is left as it was written.
  * const onPrompt = Schema.decodeUnknownSync(Extra.ExtraRecord(kit, "prompt"))({
  *   "tokenize/estimate": { version: "0.1.0", tokens: 3, mediaTokens: 0 },

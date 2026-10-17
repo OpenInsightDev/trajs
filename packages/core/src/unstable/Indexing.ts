@@ -1,10 +1,10 @@
 /**
- * Indexing a trajectory: a recording read into memory once, so that what it holds
+ * Indexing a trajectory: a trajectory read into memory once, so that what it holds
  * is asked of the index rather than read out of the stream it arrived in.
  *
  * A trajectory is one stream of parts in total order — see {@link Trajectory} — so
- * every question about a recording that is not about the parts as they arrive is
- * answered by reading the recording to its end first. An {@link Index} is that
+ * every question about a trajectory that is not about the parts as they arrive is
+ * answered by reading the trajectory to its end first. An {@link Index} is that
  * reading: the sink that holds it, which a program yields to obtain.
  */
 
@@ -51,7 +51,7 @@ type Props<
 
 /**
  * An index of a trajectory of the config given: what it holds, the sink that holds
- * it, and what reading a recording into it requires.
+ * it, and what reading a trajectory into it requires.
  *
  * **When to use**
  *
@@ -65,22 +65,22 @@ type Props<
  *   globally, and two packages may state indexes of the same id.
  * - `schema` states what the index holds, and `sink` is what holds it: one
  *   reading of a trajectory's parts to their end, so nothing of a part is held
- *   before the whole recording is. It is a plain schema rather than a
+ *   before the whole trajectory is. It is a plain schema rather than a
  *   {@link VersionedSchema.VersionedSchema}, since an index is derived from a
- *   recording rather than recorded.
+ *   trajectory rather than produced.
  * - `config` is what the parts of a trajectory are read with, so an index is of a
- *   reading of a recording rather than of a recording: an index of
- *   {@link Trajectory.anyConfig} reads the parts of any recording, whichever kits
+ *   reading of a trajectory rather than of a trajectory: an index of
+ *   {@link Trajectory.anyConfig} reads the parts of any trajectory, whichever kits
  *   it was written with, and an index of a config of your own reads what that
  *   config states of a part alone.
  * - `dependencies` names the services the sink requires to be run, so what a
- *   program must provide to read a recording is stated by the index rather than
+ *   program must provide to read a trajectory is stated by the index rather than
  *   read off the sink's type: yielding the index requires them.
  *
  * An index is itself an effect: `yield*` gives the sink the index holds and
  * requires the dependencies it declares, which the sink is then run with.
  *
- * **Example** (Reading a recording into the ids of its sessions)
+ * **Example** (Reading a trajectory into the ids of its sessions)
  *
  * ```ts import.meta.vitest
  * import { Effect, Schema, Sink, Stream } from "effect"
@@ -119,7 +119,7 @@ type Props<
  * await Effect.runPromise(read) // => ["asking", "replying"]
  * ```
  *
- * @see {@link Trajectory.anyConfig} for the config an index of any recording is
+ * @see {@link Trajectory.anyConfig} for the config an index of any trajectory is
  * of.
  * @category models
  */

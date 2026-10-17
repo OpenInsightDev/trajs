@@ -22,7 +22,7 @@ import type { ImageSize } from "#/internal/image.ts";
 import type { ResponseContentPart } from "#/internal/part.ts";
 
 /**
- * A payload that is not text, as a prompt message or a response part records it.
+ * A payload that is not text, as a prompt message or a response part produces it.
  */
 export type MediaPart = Prompt.FilePart | Extract<ResponseContentPart, { type: "file" }>;
 
@@ -296,7 +296,7 @@ export interface OpenAiPatchNumbers {
  *
  * **When to use**
  *
- * Use when a recording is counted for a model that counts images in patches —
+ * Use when a trajectory is counted for a model that counts images in patches —
  * `gpt-5.6-sol`, `gpt-5.5`, `gpt-5.4`, `gpt-5.2` or `gpt-4.1-mini` — rather than
  * for one of the models that count in tiles, which {@link openAiRule} covers.
  *
@@ -366,7 +366,7 @@ export interface AnthropicNumbers {
  *
  * **When to use**
  *
- * Use when a recording is counted for a Claude model, which reads an image in
+ * Use when a trajectory is counted for a Claude model, which reads an image in
  * 28px patches rather than charging it by its pixels.
  *
  * **Details**

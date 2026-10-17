@@ -35,7 +35,7 @@ import {
 import { Option } from "effect";
 import { Fragment } from "react";
 
-import type { RecordedSession, Stretch, Turn } from "@/lib/recording";
+import type { TrajectorySession, Stretch, Turn } from "@/lib/trajectory";
 
 /**
  * What a model answered a turn with, as its side of the conversation: a response
@@ -61,7 +61,7 @@ const Answer = ({ parts }: { parts: ReadonlyArray<AnyResponsePart> }) => (
 /**
  * One turn: the messages a model was given, and what it answered with. A prompt
  * that no response follows is a turn a model was given and did not answer, which
- * is what a recording of a turn that was cut short holds.
+ * is what a trajectory of a turn that was cut short holds.
  */
 const TurnView = ({ turn, id }: { turn: Turn; id: string }) => (
   <MessageScrollerItem messageId={id}>
@@ -71,7 +71,7 @@ const TurnView = ({ turn, id }: { turn: Turn; id: string }) => (
       ))}
       {turn.response.length === 0 ? (
         <Marker variant="separator">
-          <MarkerContent>no answer was recorded</MarkerContent>
+          <MarkerContent>no answer was produced</MarkerContent>
         </Marker>
       ) : (
         <Answer parts={turn.response} />
@@ -100,9 +100,9 @@ const StretchView = ({ stretch, note }: { stretch: Stretch; note?: string }) => 
 
 /**
  * The conversation a session ran: what it inherited from the sessions it continues
- * from — each stretch read from the session that recorded it — then its own turns.
+ * from — each stretch read from the session that produced it — then its own turns.
  */
-export const Conversation = ({ session }: { session: RecordedSession }) => {
+export const Conversation = ({ session }: { session: TrajectorySession }) => {
   // What a session continues from is said where its own turns begin, which is where
   // a reader meets it — and not at all where it reads its own turns alone, since
   // there is then nothing to tell one stretch of the conversation from another.
@@ -111,7 +111,7 @@ export const Conversation = ({ session }: { session: RecordedSession }) => {
     : undefined;
 
   return (
-    // A session is read from the top: a recording has already happened, so what is
+    // A session is read from the top: a trajectory has already happened, so what is
     // newest is not what a reader came for.
     <MessageScrollerProvider defaultScrollPosition="start">
       <MessageScroller>

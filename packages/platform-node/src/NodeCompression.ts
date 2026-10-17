@@ -1,10 +1,10 @@
 /**
- * The frame a recording's parts are carried in, as `node:zlib` writes and reads one:
+ * The frame a trajectory's parts are carried in, as `node:zlib` writes and reads one:
  * a zstd, gzip or deflate frame, or the bytes as they are.
  *
  * {@link layer} is the {@link Compression} this package provides the exchange
  * with, over the primitives below, which write and read the stream itself. What a
- * recording is of is the format's, and what writes and reads the frame it carries
+ * trajectory is of is the format's, and what writes and reads the frame it carries
  * the parts in is this.
  */
 
@@ -168,7 +168,7 @@ export const decompress =
   };
 
 /**
- * The compression a program on Node carries a recording's parts with: the streams
+ * The compression a program on Node carries a trajectory's parts with: the streams
  * `node:zlib` writes and reads a frame with.
  *
  * **When to use**
@@ -181,12 +181,12 @@ export const decompress =
  *
  * What it writes for an algorithm is what the other platform packages write for the
  * same one — the gzip and deflate a browser states itself, and the zstd
- * `Bun.zstdCompress` and the WebAssembly codec write — so a recording one wrote is
- * a recording the others load. `none` carries the parts as the format encodes them,
+ * `Bun.zstdCompress` and the WebAssembly codec write — so a trajectory one wrote is
+ * a trajectory the others load. `none` carries the parts as the format encodes them,
  * which is the frame that costs nothing to write and the most to keep.
  *
  * The algorithm is the layer's to state ({@link Options}), and defaults to zstd,
- * the frame a recording has always been carried in.
+ * the frame a trajectory has always been carried in.
  *
  * The streams are `node:zlib`'s, so they are loaded when this layer is provided
  * rather than when this module is imported: a program that never provides it — a

@@ -8,5 +8,5 @@ Node runs with.
 - `NodeStreamHash` — the BLAKE3, BLAKE2b or SHA-256 digest the Rust binding
   `@napi-rs/blake-hash` and `node:crypto` compute.
 - `NodeServices` — the two as one layer, at the algorithms it is built with,
-  provided beside the storage where a program on Node keeps a recording
+  provided beside the storage where a program on Node keeps a trajectory
   ([`@trajs/core`](../core)'s `Exchange.layer` takes all three).

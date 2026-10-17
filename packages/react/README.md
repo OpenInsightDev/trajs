@@ -33,13 +33,13 @@ import { PromptView } from "@trajs/react";
 | `PromptTextVariant`          | the bubble variants `PromptText` accepts          |
 
 Prompts and responses are built with `effect/ai`'s own constructors; nothing here
-requests a model or reads a recording.
+requests a model or reads a trajectory.
 
 ## Responses
 
 A response is the other half of a turn: the parts a model returned, which
 `effect/ai` types as its own union. Wherever a response part and a prompt part
-record the same thing, the components above read both — a response's text reads
+produce the same thing, the components above read both — a response's text reads
 as the assistant's bubble, its tool call as the call it was — and `ResponsePart`
 dispatches over the response union the way `PromptPart` does, so a part only a
 response carries is the only thing left to render.
@@ -54,7 +54,7 @@ import { ResponsePart } from "@trajs/react";
 | -------------------- | ---------------------------------------------------- |
 | `ResponsePart`       | one response part, dispatched on its `type`          |
 | `ResponseSource`     | a document or URL the answer was given from          |
-| `ResponseMetadata`   | what the response recorded about itself, folded away |
+| `ResponseMetadata`   | what the response produced about itself, folded away |
 | `ResponseFinish`     | why it stopped, and what the turn cost in tokens     |
 | `ResponseStream`     | an answer that is still arriving, from its parts     |
 | `ResponseToolParams` | the parameters of a call that is still being written |
@@ -94,7 +94,7 @@ fragments they are arriving as, and `ResponseError` is what a stream reports
 instead of an answer.
 
 [`@trajs/core`](../core) folds the same increments into the parts they complete
-when it reads a recording, because a recording has ended and nothing of it is
+when it reads a trajectory, because a trajectory has ended and nothing of it is
 still open. Here it is what is open that is worth showing.
 
 ## Installing
@@ -121,7 +121,7 @@ import { PromptView } from "@trajs/react";
 
 `styles.css` carries the two things the mapping decides rather than inherits: a
 message is read at the size and with the rhythm of the conversation it sits in
-rather than of a document, and a code block in a recorded message is one quiet
+rather than of a document, and a code block in a message a trajectory holds is one quiet
 surface with no playground around it. It also imports Streamdown's own
 stylesheet, which is what the markdown is animated with.
 
@@ -133,7 +133,7 @@ the same elements. Its code blocks are highlighted by Shiki through
 [`@streamdown/code`](https://streamdown.ai/docs/plugins/code).
 
 A tool part's parameters and result are `unknown`: `effect/ai` types them by the
-toolkit the part was built from, and a recorded part is read without one.
+toolkit the part was built from, and a part a trajectory holds is read without one.
 `ToolPayload` renders them with
 [`react-json-view-lite`](https://github.com/AnyRoad/react-json-view-lite), whose
 own stylesheet is not used — the tree is drawn with the app's tokens instead, so

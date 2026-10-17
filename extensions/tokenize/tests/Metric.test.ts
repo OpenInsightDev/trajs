@@ -1,10 +1,10 @@
 /**
- * What the tokenize metric reports of a recording, end to end.
+ * What the tokenize metric reports of a trajectory, end to end.
  *
  * The trajectory below is built with the core's own constructors and read by the
  * metric's own kit and producer, with the tokenizer this package ships, so what is
- * exercised is the way a recording is counted rather than one function of the
- * package: the parts in, the reports a kit records of them out.
+ * exercised is the way a trajectory is counted rather than one function of the
+ * package: the parts in, the reports a kit produces of them out.
  *
  * A count is estimated from the text of a part, so the tokens a case asserts are
  * related to one another rather than pinned to numbers a tokenizer's encoding
@@ -18,18 +18,18 @@ import { describe, expect, it } from "vite-plus/test";
 import { makeProducer, metrickit, Tokenizer, tokenEstimate } from "../src/index.ts";
 import type { Estimate } from "../src/index.ts";
 
-/** The session the first half of the recording runs in, and the one it forks to. */
+/** The session the first half of the trajectory runs in, and the one it forks to. */
 const asking = "01890a5d-ac96-774b-bcce-b302099a8057";
 
 const answering = "01890a5d-ac96-774b-bcce-b302099a8058";
 
 const extrakit = Extra.makeKit();
 
-/** A prompt part, as a recording holds one. */
+/** A prompt part, as a trajectory holds one. */
 const promptPart = (prompt: Prompt.Prompt, sessionId: string) =>
   Trajectory.promptPart(extrakit)({ prompt, sessionId });
 
-/** A response part that was recorded whole, as a recording holds one. */
+/** A response part that was produced whole, as a trajectory holds one. */
 const responsePart = Trajectory.responsePart({
   toolkit: Toolkit.empty,
   extrakit,
@@ -117,14 +117,14 @@ const image = responsePart({
   sessionId: answering,
 });
 
-/** The recording's parts, in the one order a trajectory carries them in. */
+/** The trajectory's parts, in the one order a trajectory carries them in. */
 const parts = [declared, question, answer, call, result, stopped, forked, carried, image];
 
 /**
  * What the metric is run over: the parts above, as the trajectory they make.
  *
  * Its response parts are whole — `Trajectory.NonStreamConfig` — because that is the
- * recording a producer is given: the increments a streamed response arrived in are
+ * trajectory a producer is given: the increments a streamed response arrived in are
  * folded into the parts they complete before a kit counts one.
  */
 const trajectory = Object.assign(Stream.fromIterable(parts), {
@@ -136,10 +136,10 @@ const trajectory = Object.assign(Stream.fromIterable(parts), {
 });
 
 /**
- * Runs the metric over the recording, as a kit does: the producer the package builds
- * with a tokenizer, provided to the kit that records what it derives.
+ * Runs the metric over the trajectory, as a kit does: the producer the package builds
+ * with a tokenizer, provided to the kit that produces what it derives.
  *
- * The media of the recording is priced with `"openai"` so that the count of the
+ * The media of the trajectory is priced with `"openai"` so that the count of the
  * image is a number the package publishes rather than one a family's rules moved.
  */
 const report = async (): Promise<Map<string, Estimate>> => {
@@ -176,7 +176,7 @@ const of = (byPart: Map<string, Estimate>, part: { uuid: string }): Estimate => 
   return reported;
 };
 
-describe("the metric over a recording", () => {
+describe("the metric over a trajectory", () => {
   it("reports a count for the parts a count is taken from, and no other", async () => {
     const byPart = await report();
 
@@ -276,7 +276,7 @@ describe("the metric over a recording", () => {
       expect(of(byPart, part).total).toBe(total);
     }
 
-    // A recording holds several sessions, and each is counted from its own
+    // A trajectory holds several sessions, and each is counted from its own
     // beginning: the first part counted in the second states only itself.
     expect(of(byPart, carried).total).toBe(of(byPart, carried).count.tokens);
     expect(of(byPart, image).total).toBe(

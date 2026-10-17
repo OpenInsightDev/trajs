@@ -4,8 +4,8 @@
  * A count is taken from what a model was given — the messages a prompt part holds
  * — and from what it returned — the one content part a response part carries.
  * Both are read as the parts of the most general trajectory,
- * `Trajectory.AnyConfig`: a recording is counted without knowing the toolkit, the
- * kits or the variant it was recorded with, so a part is read for the content it
+ * `Trajectory.AnyConfig`: a trajectory is counted without knowing the toolkit, the
+ * kits or the variant it was produced with, so a part is read for the content it
  * carries and for nothing else.
  *
  * The aliases below name the three shapes a count reads, so that the rules of

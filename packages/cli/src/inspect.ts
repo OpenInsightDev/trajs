@@ -2,11 +2,11 @@
  * The `trajs inspect` command: the header a `.trajs` file states about itself,
  * printed as JSON.
  *
- * A recording carries its header as the first line of the file, and nothing before
+ * A trajectory carries its header as the first line of the file, and nothing before
  * that line is compressed, so loading one does not read the trajectory: the
  * exchange reads the head of the file and stops before the frame the parts are
  * carried in. What is printed is the header as the format encodes it, so the output
- * is the recording's own statement of what it was written with rather than a
+ * is the trajectory's own statement of what it was written with rather than a
  * re-description of it.
  */
 
@@ -20,7 +20,7 @@ const json = (header: Header, indent: number): string =>
   JSON.stringify(Schema.encodeSync(Header)(header), null, indent);
 
 /**
- * The `inspect` command: reads a recording's header and prints it.
+ * The `inspect` command: reads a trajectory's header and prints it.
  */
 export const inspect = Command.make(
   "inspect",

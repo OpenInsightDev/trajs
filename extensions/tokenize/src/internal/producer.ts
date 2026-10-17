@@ -1,7 +1,7 @@
 /**
  * What a producer of a count carries from one part of a trajectory to the next.
  *
- * A count of one part is not the whole of what a recording states of it. What a
+ * A count of one part is not the whole of what a trajectory states of it. What a
  * session had been worth up to that part is a property of the parts before it as
  * well, and so is what a tool result's call is worth beside the result. The
  * producer of the metric therefore reads a trajectory in one pass, and this
@@ -9,10 +9,10 @@
  * part adds to it.
  *
  * The state is one running count per session, keyed by the `sessionId` the parts
- * of a trajectory carry rather than by the sessions a recording declares, because
+ * of a trajectory carry rather than by the sessions a trajectory declares, because
  * the parts are read in one pass rather than grouped by session. It is made where
  * a stream starts rather than by the producer, so a producer run over two
- * recordings counts each of them from its own beginning.
+ * trajectories counts each of them from its own beginning.
  */
 
 import type { Trajectory } from "@trajs/core";
@@ -31,9 +31,9 @@ import type { TokenCount } from "#/Tokens.ts";
  * What one part of a trajectory is worth, and what its session had been worth up
  * to it.
  *
- * A part is named by its `uuid` rather than carried: what the metric records of a
+ * A part is named by its `uuid` rather than carried: what the metric produces of a
  * part is a report about that part, and the part itself is already in the
- * recording — see `Metrics` for the output a measurement becomes.
+ * trajectory — see `Metrics` for the output a measurement becomes.
  */
 export interface Measured {
   /** `uuid` of the part the count is about. */
@@ -126,7 +126,7 @@ export interface UncountedFailure {
  *
  * The step is built with a tokenizer: this asks the run it is built in for one,
  * closes over it, and returns a step that asks the run for no service of its own,
- * so that which tokenizer a recording is counted under is chosen where the step
+ * so that which tokenizer a trajectory is counted under is chosen where the step
  * is built and travels with it rather than with the kit that runs it.
  */
 export const stepOf = Effect.fn("stepOf")(function* (

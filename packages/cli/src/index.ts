@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * The `trajs` command line: what a `.trajs` recording states about itself,
+ * The `trajs` command line: what a `.trajs` trajectory states about itself,
  * without opening it in a viewer.
  *
  * The commands are built with `effect/cli` and run on Node through
@@ -18,15 +18,15 @@ import pkg from "../package.json" with { type: "json" };
 import { inspect } from "./inspect.ts";
 
 const cli = Command.make("trajs").pipe(
-  Command.withDescription("Read what a `.trajs` recording states about itself."),
+  Command.withDescription("Read what a `.trajs` trajectory states about itself."),
   Command.withSubcommands([inspect]),
   Command.withExamples([
     {
-      command: "trajs inspect recording.trajs",
-      description: "Print the header a recording states, on one line",
+      command: "trajs inspect trajectory.trajs",
+      description: "Print the header a trajectory states, on one line",
     },
     {
-      command: "trajs inspect recording.trajs --indent 2",
+      command: "trajs inspect trajectory.trajs --indent 2",
       description: "Print the header indented by two spaces",
     },
   ]),

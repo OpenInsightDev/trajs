@@ -343,7 +343,7 @@ export type MediaPart = Schema.Schema.Type<typeof MediaPart>;
  * A text-only content is the string itself; a multimodal one is an array of
  * {@link TextPart} and {@link MediaPart} objects, in the order they are written. A
  * part states the one field its `type` calls for — the `text` a text part holds, or
- * the `source` an image or a recording is referenced by — since the format states
+ * the `source` an image or a trajectory is referenced by — since the format states
  * each of the two for one kind of part alone: a document that writes the other
  * beside one is rejected rather than read with the field it does not state
  * dropped.

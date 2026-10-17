@@ -5,7 +5,7 @@
  *
  * {@link layer} is the {@link StreamHash} this package provides the exchange with.
  * What each digest is agrees with what every other platform package computes for the
- * same algorithm, so a recording one layer names the others recognise. The codecs
+ * same algorithm, so a trajectory one layer names the others recognise. The codecs
  * are imported with this module, which only a program that depends on this package
  * imports.
  */
@@ -45,7 +45,7 @@ const held = (chunks: ReadonlyArray<Uint8Array>): Uint8Array<ArrayBuffer> => {
   return bytes;
 };
 
-/** The digest of bytes as the lowercase hex a recording ends with. */
+/** The digest of bytes as the lowercase hex a trajectory ends with. */
 const hex = (bytes: Uint8Array): string => {
   let text = "";
 
@@ -115,7 +115,7 @@ const digest = (algorithm: Algorithm): Hashing => {
  * **When to use**
  *
  * Use when a program runs where a native addon cannot be loaded — a page, a worker
- * — or when every run should hash a recording with the same code.
+ * — or when every run should hash a trajectory with the same code.
  *
  * **Details**
  *
@@ -129,11 +129,11 @@ const digest = (algorithm: Algorithm): Hashing => {
  * SHA-256 is the digest WebCrypto reads, over the bytes of a whole stream rather
  * than as they arrive, and BLAKE2b is the one algorithm a browser states no codec
  * for: it is the JavaScript hash `@trajs/utils` ships, computed where JavaScript
- * runs. The three digests are of 32 bytes each, so a recording is named by the same
+ * runs. The three digests are of 32 bytes each, so a trajectory is named by the same
  * 64 characters of hex whichever one is stated.
  *
  * The algorithm is the layer's to state ({@link Options}), and defaults to BLAKE3,
- * the digest a recording has always been named by.
+ * the digest a trajectory has always been named by.
  *
  * @see {@link StreamHash} for the hash this provides.
  * @category layers

@@ -1,5 +1,5 @@
 /**
- * What a recorded trajectory part is worth, before a tokenizer counts it.
+ * What a part of a trajectory is worth, before a tokenizer counts it.
  *
  * The estimate follows `ai-tokenizer`'s `sdk.ts`: a part contributes the text it
  * carries, a tool call contributes its name and the JSON of its parameters, a
@@ -7,7 +7,7 @@
  * not text contributes a fixed number of tokens. The overheads a model's own
  * token configuration adds — the base overhead of a request, a per-message or
  * per-tool overhead, the content multiplier, and the cost of a tool's schema —
- * are not part of it, because trajs records no such configuration.
+ * are not part of it, because trajs produces no such configuration.
  *
  * Every contribution is attributed to a kind, and the kinds partition a part's
  * count: text and reasoning are their own text, a tool call is its name and
@@ -97,7 +97,7 @@ const jsonText = <Payload>(payload: Payload): string | undefined =>
 const payloadText = <Payload>(payload: Payload): string | undefined =>
   Predicate.isString(payload) ? payload : jsonText(payload);
 
-/** The kind of every message part a prompt message or a recorded response part declares. */
+/** The kind of every message part a prompt message or a response part a trajectory holds declares. */
 type AnyPartTag = Prompt.Part["type"] | ResponseContentPart["type"];
 
 /**
@@ -107,7 +107,7 @@ type AnyPartTag = Prompt.Part["type"] | ResponseContentPart["type"];
  * of a tool call, the identifier and result of a tool result, and a payload that
  * is not text. The kinds that carry meta information instead — the approval of a
  * tool call, the source of a response, its metadata and its finish — hold nothing
- * a tokenizer answers for, so a count is not taken from them and a recording is
+ * a tokenizer answers for, so a count is not taken from them and a trajectory is
  * not annotated by them.
  */
 export const contentTags = ["text", "reasoning", "tool-call", "tool-result", "file"] as const;
@@ -115,7 +115,7 @@ export const contentTags = ["text", "reasoning", "tool-call", "tool-result", "fi
 /**
  * A kind of message part a count can be taken from.
  *
- * These are the kinds a recording is annotated by, so what a caller names is the
+ * These are the kinds a trajectory is annotated by, so what a caller names is the
  * content it wants an estimate for rather than the kind of part carrying it.
  */
 export type PartTag = (typeof contentTags)[number];
@@ -199,7 +199,7 @@ const contentContributions = (
  * A system message carries its content directly, as text; the other messages
  * carry content parts, which {@link contentContributions} reads one by one. The
  * role of a message is not counted: it is framing a provider adds around what was
- * said rather than information the recording holds, so the kinds partition what a
+ * said rather than information the trajectory holds, so the kinds partition what a
  * prompt carries without a bucket for it.
  */
 export const promptContributions = (part: PromptPart, media: MediaRule): Array<Contribution> => {
@@ -301,7 +301,7 @@ export const countContributions = (
     };
   });
 
-/** What one of the recorded kinds of part is worth, under one rule. */
+/** What one of the kinds of part a trajectory holds is worth, under one rule. */
 export const countedOf = (
   part: CountedPart,
   media: MediaRule,

@@ -66,7 +66,7 @@ import { ToolPayload } from "./tool-payload.tsx";
 
 /**
  * A component reads the fields of a part rather than the part as `effect/ai`
- * types it: a response part records the same things a prompt part does, and the
+ * types it: a response part produces the same things a prompt part does, and the
  * two unions differ in the type id they carry, not in what they say. Each
  * component is therefore typed by the fields it reads, which both unions
  * satisfy — a response's file part carries bytes and no file name, which the
@@ -96,7 +96,7 @@ type ToolApprovalRequestPart = Pick<Prompt.ToolApprovalRequestPart, "approvalId"
 export type PromptTextVariant = NonNullable<ComponentProps<typeof Bubble>["variant"]>;
 
 /**
- * A recorded file payload is a URL, raw bytes or the text of the file; nothing
+ * A file payload a trajectory holds is a URL, raw bytes or the text of the file; nothing
  * decodes it, so its size is shown beside the media type instead.
  */
 const fileDataOf = (data: Prompt.FilePart["data"]): string => {
@@ -179,7 +179,7 @@ export const PromptText = ({
  *
  * **When to use**
  *
- * Use to show the thinking a model recorded, kept out of the way of its answer.
+ * Use to show the thinking a model produced, kept out of the way of its answer.
  *
  * **Details**
  *
@@ -230,8 +230,8 @@ export const PromptReasoning = ({
  *
  * **When to use**
  *
- * Use to show a file a message carried, named by the file name it recorded or
- * by its media type where it recorded none.
+ * Use to show a file a message carried, named by the file name it produced or
+ * by its media type where it produced none.
  *
  * **Details**
  *
@@ -264,9 +264,9 @@ export const PromptFile = ({ part }: { part: FilePart }) => (
  *
  * **Details**
  *
- * The parameters are a recorded `unknown`, so they are shown as the JSON tree
+ * The parameters are an `unknown` a trajectory holds, so they are shown as the JSON tree
  * {@link ToolPayload} renders rather than read as the toolkit's own types. A
- * response's tool call records the same call, and its parameters are read the
+ * response's tool call produces the same call, and its parameters are read the
  * same way.
  *
  * @see {@link PromptToolResult} for the result the call is answered with.
@@ -298,8 +298,8 @@ export const PromptToolCall = ({ part }: { part: ToolCallPart }) => (
  *
  * **Details**
  *
- * The answer is a recorded value rather than the toolkit's own type, whether it
- * was recorded by a prompt or returned by a response.
+ * The answer is a value a trajectory holds rather than the toolkit's own type, whether it
+ * was produced by a prompt or returned by a response.
  *
  * @see {@link PromptToolCall} for the call it answers, named by the same id.
  * @category components
@@ -327,11 +327,11 @@ export const PromptToolResult = ({ part }: { part: ToolResultPart }) => (
  *
  * **When to use**
  *
- * Use to show that a recorded call paused for a person to allow it.
+ * Use to show that a call a trajectory holds paused for a person to allow it.
  *
  * **Details**
  *
- * A response asks for a call to be approved the same way a prompt records that
+ * A response asks for a call to be approved the same way a prompt produces that
  * it was, so one component reads both.
  *
  * @see {@link PromptToolApprovalResponse} for the decision it was answered with.
@@ -381,7 +381,7 @@ const unmapped = (part: never): never => part;
  * **When to use**
  *
  * Use to render a message whose parts are known only as the union `effect/ai`
- * gives them, such as one read out of a recording.
+ * gives them, such as one read out of a trajectory.
  *
  * **Details**
  *
@@ -475,7 +475,7 @@ const bodyOf = (message: Prompt.Message, variant: PromptTextVariant): ReactNode 
  * **Details**
  *
  * Who contributed the message picks the side it sits on and who it is labelled
- * by, and its parts are rendered in the order they were recorded by
+ * by, and its parts are rendered in the order they were produced by
  * {@link PromptPart}. A prompt part carries no id of its own, so parts are keyed
  * by their position, which is stable for a prompt that is not rewritten under
  * the view.
@@ -506,8 +506,8 @@ export const PromptMessage = ({ message }: { message: Prompt.Message }) => {
  *
  * **When to use**
  *
- * Use to render the messages a model was given and the answers recorded for
- * them, such as to read a recorded turn as the dialogue it ran as.
+ * Use to render the messages a model was given and the answers produced for
+ * them, such as to read a turn as the dialogue it ran as.
  *
  * @see {@link PromptMessage} for the rows it is made of.
  * @category components

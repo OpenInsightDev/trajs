@@ -1,5 +1,5 @@
 /**
- * The frame a recording's parts are carried in, as Bun writes and reads one: a
+ * The frame a trajectory's parts are carried in, as Bun writes and reads one: a
  * zstd, gzip or deflate frame, or the bytes as they are.
  *
  * {@link layer} is the {@link Compression} this package provides the exchange with,
@@ -59,7 +59,7 @@ const held = (chunks: ReadonlyArray<Uint8Array>): Uint8Array => {
  * whole, handed to `whole` at once, and what it gives back is emitted as one chunk.
  *
  * Bun states its codecs as whole-buffer operations rather than streams — the zstd
- * pair as a promise, the other four as calls that return at once — so a recording's
+ * pair as a promise, the other four as calls that return at once — so a trajectory's
  * parts are held while it is written or read rather than carried as they arrive.
  */
 const carried = <E, R>(
@@ -77,7 +77,7 @@ const carried = <E, R>(
   );
 
 /**
- * The compression a program on Bun carries a recording's parts with: the codecs Bun
+ * The compression a program on Bun carries a trajectory's parts with: the codecs Bun
  * states itself.
  *
  * **When to use**
@@ -90,15 +90,15 @@ const carried = <E, R>(
  *
  * What it writes for an algorithm is what the other platform packages write for the
  * same one — the gzip and deflate a browser states itself, and the zstd `node:zlib`
- * writes — so a recording one wrote is a recording the others load. `none` carries
+ * writes — so a trajectory one wrote is a trajectory the others load. `none` carries
  * the parts as the format encodes them, which is the frame that costs nothing to
  * write and the most to keep.
  *
  * The algorithm is the layer's to state ({@link Options}), and defaults to zstd, the
- * frame a recording has always been carried in.
+ * frame a trajectory has always been carried in.
  *
  * Bun states its codecs as whole-buffer operations rather than streams, so a
- * recording's parts are held while the frame is written or read — which is what this
+ * trajectory's parts are held while the frame is written or read — which is what this
  * layer costs over the streaming compressions the other platform packages state.
  *
  * @see {@link Compression} for the compression this provides.

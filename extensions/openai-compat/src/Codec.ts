@@ -1,30 +1,30 @@
 /**
- * Reading a recording as the conversations a chat completions API of an
+ * Reading a trajectory as the conversations a chat completions API of an
  * OpenAI-compatible client takes.
  *
- * A trajectory holds every session a recording ran in one stream of parts — see
+ * A trajectory holds every session that ran, in one stream of parts — see
  * `Trajectory` of `@trajs/core` — and what a chat completions API is handed is not
  * that stream: it is one conversation per session, holding the messages the
- * session's model was given and answered in the order they were recorded, and what
+ * session's model was given and answered in the order they were produced, and what
  * the session inherited from the one it continues from. {@link makeOpenAiCompat}
- * reads a recording as those conversations.
+ * reads a trajectory as those conversations.
  *
  * The conversations are read with `View.conversations` of `@trajs/core`, one session
  * at a time, and each of their messages is then written as this API states it.
- * Reading a recording this way needs the sessions it declares, so a recording whose
+ * Reading a trajectory this way needs the sessions it declares, so a trajectory whose
  * sessions cannot be read fails the way one read by `@trajs/core` does: an
- * unrecorded fork, or a late declaration, is what reading one here fails with.
+ * unproduced fork, or a late declaration, is what reading one here fails with.
  *
  * **What is not carried**
  *
- * What a recording holds and no message states is left out rather than invented:
+ * What a trajectory holds and no message states is left out rather than invented:
  *
  * - A model's reasoning, since this API states none per message.
  * - A tool a provider executed itself, and the result it answered with, since those
  *   are the provider's own record of a call it made — see `providerExecuted`.
  * - A file part that is not an image, and an image the API does not read — a
  *   document, a media type of the caller's own — which the API refers to in ways of
- *   its own rather than by the bytes a recording holds.
+ *   its own rather than by the bytes a trajectory holds.
  * - The approval of a tool call, which is part of a handshake with the program that
  *   ran the tools rather than of the conversation the API was given.
  */
@@ -40,48 +40,48 @@ import * as Base64 from "effect/encoding/Base64";
 /**
  * A message of the chat completions API of an OpenAI-compatible client.
  *
- * @see {@link makeOpenAiCompat} for the operation that reads a recording as them.
+ * @see {@link makeOpenAiCompat} for the operation that reads a trajectory as them.
  * @category models
  */
 export type OpenAiCompatMessage = OpenAiClient.ChatCompletionRequestMessage;
 
 /**
- * The messages of every session of a recording, keyed by the id of the session.
+ * The messages of every session of a trajectory, keyed by the id of the session.
  *
- * @see {@link makeOpenAiCompat} for the operation that reads a recording as them.
+ * @see {@link makeOpenAiCompat} for the operation that reads a trajectory as them.
  * @category models
  */
 export type OpenAiCompatSessions = Record<string, OpenAiCompatMessage[]>;
 
 /**
- * Reads a recording as the conversations a chat completions API of an
+ * Reads a trajectory as the conversations a chat completions API of an
  * OpenAI-compatible client takes, one conversation per session.
  *
  * **When to use**
  *
- * Use when a recorded conversation is handed to a model over an OpenAI-compatible
+ * Use when a conversation read from a trajectory is handed to a model over an OpenAI-compatible
  * API — to continue it, or to run it against another model — rather than read in
  * `@trajs/core`'s own terms.
  *
  * **Details**
  *
- * - The conversation of a session holds the messages the session recorded and the
- *   messages it inherited: what the sessions it continues from recorded up to the
+ * - The conversation of a session holds the messages the session produced and the
+ *   messages it inherited: what the sessions it continues from produced up to the
  *   part it continues from, from the root of the fork down.
  * - A prompt message is carried as the message of its own role, and the response
- *   parts of a turn as the messages they were recorded as — the text and the tool
+ *   parts of a turn as the messages they were produced as — the text and the tool
  *   calls a model answered with in one `assistant` message, and each tool result
  *   in a `tool` message of its own, which is where this API states one.
- * - A system message is left where it was recorded rather than read as part of a
+ * - A system message is left where it was produced rather than read as part of a
  *   conversation, since this API takes one anywhere.
  * - The text of a message is carried as the string it is, and the images it was
  *   given as the parts of its content, where any of them is an image.
  *
  * The effect fails with what reading the trajectory's sessions fails with — `E` on
- * top of the {@link TrajectoryError} a recording whose sessions cannot be read
+ * top of the {@link TrajectoryError} a trajectory whose sessions cannot be read
  * fails with — and requires the services `R` names.
  *
- * **Example** (Reading a recording as the messages of a call and its answer)
+ * **Example** (Reading a trajectory as the messages of a call and its answer)
  *
  * ```ts import.meta.vitest
  * import { Codec } from "@trajs/extension-openai-compat"
@@ -92,7 +92,7 @@ export type OpenAiCompatSessions = Record<string, OpenAiCompatMessage[]>;
  * const extrakit = Extra.makeKit()
  * const response = Trajectory.ResponsePart({ toolkit: Toolkit.empty, extrakit, stream: false })
  *
- * // A recorded exchange: what a model was given, the tool it called for it, the
+ * // An exchange a trajectory holds: what a model was given, the tool it called for it, the
  * // result that call was answered with, and what it answered of that result.
  * const parts = [
  *   Trajectory.sessionPart(extrakit)({ id: sessionId }),
@@ -195,8 +195,8 @@ const resultText = (result: Prompt.ToolResultPart["result"]): string =>
   Predicate.isString(result) ? result : (JSON.stringify(result) ?? String(result));
 
 /**
- * The media type an image is stated as: the one the part records, and JPEG where it
- * records only that the part is an image.
+ * The media type an image is stated as: the one the part produces, and JPEG where it
+ * produces only that the part is an image.
  */
 const mediaTypeOf = (part: Prompt.FilePart): string =>
   part.mediaType === "image/*" ? "image/jpeg" : part.mediaType;

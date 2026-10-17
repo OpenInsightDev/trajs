@@ -1,23 +1,23 @@
 /**
- * The metric a recording's parts are counted by, and the producer that derives
+ * The metric a trajectory's parts are counted by, and the producer that derives
  * it.
  *
- * A recording holds the parts a session ran on, but not what they cost: a count
- * is a property of the model that will read them rather than of the recording,
+ * A trajectory holds the parts a session ran on, but not what they cost: a count
+ * is a property of the model that will read them rather than of the trajectory,
  * and the parts a model produced carry no count of their own — the only usage
  * Effect AI reports is the whole-request figure of a `finish` part. This module
  * declares the `@trajs/extension-tokenize/Estimate` metric, whose output states
  * the {@link Estimate} of one part — the count of that part, and what its session
- * had been worth up to it — so a recording can state what each of its parts is
+ * had been worth up to it — so a trajectory can state what each of its parts is
  * worth without the tokenizer that produced the number, and the
  * {@link makeProducer} that derives that output. The package entry re-exports
  * this module directly, so what it declares is what the package offers.
  *
- * Deriving the output of a recording is all this package contributes to one: the
+ * Deriving the output of a trajectory is all this package contributes to one: the
  * producer counts the messages a model was given and returned and names the part
- * each count was taken for, and the rest of what a recording needs — recording
+ * each count was taken for, and the rest of what a trajectory needs — trajectory
  * each count as a metric part of its own, reading one back with the kit it was
- * written with, and what the recording is kept in — belongs to the kit that runs
+ * written with, and what the trajectory is kept in — belongs to the kit that runs
  * the producer.
  *
  * An estimate is anchored to the part it was computed for: the producer attaches
@@ -30,12 +30,12 @@
  * reader branches on by its tag. It is a field rather than the output itself
  * because the data a metric's output states has to be a struct with a `version` of
  * its own, and a union is not one. {@link Estimate.total} is the other half:
- * the tokens the session of the part had been worth up to it, so that a recording
+ * the tokens the session of the part had been worth up to it, so that a trajectory
  * can be read for what it cost at any point of it without summing what came
  * before.
  *
  * The metric is named by the package that declares it: the `package` of its tag
- * is the `name` of this package, so what a recording states of a count is the
+ * is the `name` of this package, so what a trajectory states of a count is the
  * package that wrote it rather than a name the package made up. The metric
  * declares two versioned schemas: the {@link Estimate} its producer yields for a
  * part, and the {@link Uncounted} failure of one it could not count. `0.1.0` is
@@ -57,11 +57,11 @@ import { TokenCount } from "#/Tokens.ts";
 import pkg from "../package.json" with { type: "json" };
 
 /**
- * How the output of the metric is derived from a recording.
+ * How the output of the metric is derived from a trajectory.
  *
  * **When to use**
  *
- * Use when a recording should be counted for the parts that carry a kind of
+ * Use when a trajectory should be counted for the parts that carry a kind of
  * message part rather than for every part of it, such as for the parts that carry
  * an image, or when a payload that is not text is to be priced the way a named
  * family's model prices it.
@@ -73,12 +73,12 @@ import pkg from "../package.json" with { type: "json" };
  * part it is. Every part a tokenizer can count is counted when it is absent.
  *
  * The count is the part's own either way: naming kinds decides which parts are
- * counted rather than what a count covers, so a recording read later holds one
+ * counted rather than what a count covers, so a trajectory read later holds one
  * count per part whichever kinds were asked for.
  *
  * `media` names the family a payload that is not text is priced with. Only a
  * family this package names can be given, because a rule of the caller's own
- * cannot be named by a recording: what it priced is stated in the count, and a
+ * cannot be named by a trajectory: what it priced is stated in the count, and a
  * reader would have no way to tell which rule that was.
  *
  * @see {@link Count.CountOptions} for the rules and their numbers.
@@ -97,7 +97,7 @@ export interface ProducerOptions {
  *
  * **When to use**
  *
- * Use when naming the kinds of message part a recording is counted for, such as
+ * Use when naming the kinds of message part a trajectory is counted for, such as
  * for the parts that carry an image.
  *
  * **Details**
@@ -150,20 +150,20 @@ const uncounted010 = Schema.Struct({
 }).pipe(VersionedSchema.make);
 
 /**
- * The metric this package reports: the tokens each part of a recording is
+ * The metric this package reports: the tokens each part of a trajectory is
  * estimated to be worth.
  *
  * **When to use**
  *
- * Use as an entry of the kit a recording is written or read with — {@link metrickit}
- * — or to read the metadata of the metric and the tag its output is recorded
+ * Use as an entry of the kit a trajectory is written or read with — {@link metrickit}
+ * — or to read the metadata of the metric and the tag its output is produced
  * under.
  *
  * **Details**
  *
  * `package` is the `name` of this package as `package.json` states it, and `id`
- * names the metric within the package, so the tag an estimate is recorded under is
- * the package's own name followed by `Estimate`: what a recording states of a count
+ * names the metric within the package, so the tag an estimate is produced under is
+ * the package's own name followed by `Estimate`: what a trajectory states of a count
  * is the package that wrote it rather than a name the package made up. `metadata`
  * describes the metric itself, and `output` and `failure` are the two shapes it
  * states — what a producer yields of a part, and what it fails with for a part it
@@ -190,7 +190,7 @@ export const tokenEstimate = new Metric.Metric({
  * **When to use**
  *
  * Use when building the datum an estimate carries, or when reading one that was
- * recorded at the newest version. A recording may hold a datum of an older
+ * produced at the newest version. A trajectory may hold a datum of an older
  * version, so read one through the metric's schema — {@link tokenEstimate} —
  * rather than with this shape alone.
  *
@@ -204,7 +204,7 @@ export const tokenEstimate = new Metric.Metric({
  *   taken for — see `Tokens` for the members of the union and what each of them
  *   states. It is an estimate and not the usage a provider reported: exact usage
  *   is whole-request data that belongs to a `finish` response part, and is not
- *   recorded here.
+ *   produced here.
  * - `total` is the tokens the session of the part had been worth up to and
  *   including it: the sum of what `count` states for every part of that session
  *   the producer counted, this one among them. It is what the session had cost at
@@ -213,11 +213,11 @@ export const tokenEstimate = new Metric.Metric({
  *
  * Which tokenizer took the count is not among them: a tokenizer states no name,
  * and which one a run was provided with is a property of the run rather than of
- * the recording.
+ * the trajectory.
  *
  * The shape is the metric's own, read off its schema rather than written again,
  * so deriving a version moves it: the datum an estimate carries becomes the newer
- * one, and a datum recorded at an older version still reads as it.
+ * one, and a datum produced at an older version still reads as it.
  *
  * @see {@link tokenEstimate} for the metric the shape is declared by.
  * @category schemas
@@ -225,7 +225,7 @@ export const tokenEstimate = new Metric.Metric({
 export const Estimate = tokenEstimate.output.self;
 
 /**
- * An estimate as the package records it, at the newest version of the metric's
+ * An estimate as the package produces it, at the newest version of the metric's
  * output.
  *
  * @see {@link tokenEstimate} for the metric the datum belongs to.
@@ -238,7 +238,7 @@ export type Estimate = Schema.Schema.Type<typeof Estimate>;
  *
  * **When to use**
  *
- * Use when reading what a recorded run could not count, or when building the
+ * Use when reading what a run's producer could not count, or when building the
  * failure a producer reports for a part.
  *
  * **Details**
@@ -253,7 +253,7 @@ export type Estimate = Schema.Schema.Type<typeof Estimate>;
 export const Uncounted = tokenEstimate.failure.self;
 
 /**
- * A part no count was recorded for, as the package states it, at the newest
+ * A part no count was produced for, as the package states it, at the newest
  * version of the metric's failure schema.
  *
  * @see {@link tokenEstimate} for the metric the failure belongs to.
@@ -262,11 +262,11 @@ export const Uncounted = tokenEstimate.failure.self;
 export type Uncounted = Schema.Schema.Type<typeof Uncounted>;
 
 /**
- * Builds the producer that derives the metric's output from a recording.
+ * Builds the producer that derives the metric's output from a trajectory.
  *
  * **When to use**
  *
- * Use when a recording should carry what each of its parts costs, so the counts
+ * Use when a trajectory should carry what each of its parts costs, so the counts
  * can be summed, compared or read back without the tokenizer, such as to see which
  * turn of a session dominates it or whether it fits a context window. Name kinds
  * of message part with `tags` to derive a count for the parts that carry those
@@ -276,7 +276,7 @@ export type Uncounted = Schema.Schema.Type<typeof Uncounted>;
  *
  * The producer is run by the kit the metric is an entry of — the `metrickit` of a
  * run — over the parts of a trajectory, and yields one datum of the metric for
- * every part it counts, naming that part by its `uuid`: the kit records the datum
+ * every part it counts, naming that part by its `uuid`: the kit produces the datum
  * as a metric part of the trajectory, about the part it was counted for. The count
  * is the part's own however the kinds were named: what `tags` decides is which
  * parts are counted rather than what a count covers.
@@ -289,11 +289,11 @@ export type Uncounted = Schema.Schema.Type<typeof Uncounted>;
  * resetting it.
  *
  * The producer is built with a tokenizer: this asks the run it is built in for
- * one, so the tokenizer a recording is counted under is chosen where the producer
+ * one, so the tokenizer a trajectory is counted under is chosen where the producer
  * is built — `Effect.provide` with its layer — and travels with the producer
  * rather than with the kit that runs it. A part the tokenizer cannot count derives
  * no count: the producer fails with {@link Uncounted}, naming that part and
- * carrying the `AiError` the tokenizer failed with. A recording that fails fails
+ * carrying the `AiError` the tokenizer failed with. A trajectory that fails fails
  * the run too, because a producer reads the parts of one.
  *
  * **Example** (Providing the kit with the producer of its metric)
@@ -303,7 +303,7 @@ export type Uncounted = Schema.Schema.Type<typeof Uncounted>;
  * import { Metric } from "@trajs/core"
  * import { Tokenizer, makeProducer, metrickit, tokenEstimate } from "@trajs/extension-tokenize"
  *
- * // The tokenizer a recording is counted under is chosen here, where the producer
+ * // The tokenizer a trajectory is counted under is chosen here, where the producer
  * // is built, and the kit that runs it is told nothing of it.
  * const producer = await Effect.runPromise(
  *   makeProducer().pipe(Effect.provide(Tokenizer.layerOpenAi({ model: "gpt-4o" })))
@@ -317,7 +317,7 @@ export type Uncounted = Schema.Schema.Type<typeof Uncounted>;
  * ```
  *
  * @see {@link metrickit} for the kit the metric is an entry of.
- * @see {@link Count} for counting one part without recording it.
+ * @see {@link Count} for counting one part without trajectory it.
  * @see {@link EstimateTag} for the kinds a call accepts.
  * @category constructors
  */
@@ -329,10 +329,10 @@ export const makeProducer = (
 
     // What a producer is: a reading of a trajectory for the output the metric
     // states. The step the run was provided with a tokenizer for is read here and
-    // closed over, so what a recording is counted under travels with the producer
+    // closed over, so what a trajectory is counted under travels with the producer
     // rather than with the kit that runs it. What a session has been worth is
     // carried by the stream rather than by this closure, so a producer run over two
-    // recordings counts each of them from its own beginning rather than continuing
+    // trajectories counts each of them from its own beginning rather than continuing
     // one into the other.
     const producer: Metric.Producer<typeof tokenEstimate> = (trajectory) =>
       trajectory.pipe(
@@ -352,16 +352,16 @@ export const makeProducer = (
  *
  * **When to use**
  *
- * Use as the metrics of the kit a recording is written or read with — the
- * `metrickit` of the run that records it — so that the estimates this package
- * derives are recorded as metric parts of the trajectory, and read back by it.
+ * Use as the metrics of the kit a trajectory is written or read with — the
+ * `metrickit` of the run that produces it — so that the estimates this package
+ * derives are produced as metric parts of the trajectory, and read back by it.
  *
  * **Details**
  *
  * The kit is a `Metrickit` of every metric this package declares, each held under
- * the tag it is recorded under — here {@link tokenEstimate}, the one metric the
+ * the tag it is produced under — here {@link tokenEstimate}, the one metric the
  * package reports. It is extended rather than replaced when other packages'
- * metrics are recorded with the same trajectory, and it is what a reader installs
+ * metrics are produced with the same trajectory, and it is what a reader installs
  * to get the estimates back with their types.
  *
  * @see {@link tokenEstimate} for the metric it holds.
@@ -371,11 +371,11 @@ export const makeProducer = (
 export const metrickit = Metric.makeKit(tokenEstimate);
 
 /**
- * The output the metric records for one part, as the producer reports it.
+ * The output the metric produces for one part, as the producer reports it.
  *
  * The count the step derived is wrapped into the metric's own datum here rather
  * than where it was measured, because the shapes are this module's: what a part is
- * worth is measured in terms of the schemas of `Tokens`, and what a recording
+ * worth is measured in terms of the schemas of `Tokens`, and what a trajectory
  * holds of it is in terms of the metric's versioned output.
  */
 const outputOf = (measured: Measured): Metric.ProducerOutput<typeof tokenEstimate> =>

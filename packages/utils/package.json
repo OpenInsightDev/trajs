@@ -1,7 +1,7 @@
 {
   "name": "@trajs/utils",
   "version": "0.0.0-alpha.0",
-  "description": "The generic services a recording is carried and kept through.",
+  "description": "The generic services a trajectory is carried and kept through.",
   "homepage": "https://github.com/OpenInsightDev/trajs",
   "license": "MIT",
   "author": "Bowei Wang <wozluohd@gmail.com>",

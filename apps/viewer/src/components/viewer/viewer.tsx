@@ -2,15 +2,15 @@
  * The viewer: a page that reads a `.trajs` file and shows it as the sessions it
  * holds.
  *
- * A recording is opened three ways — the one bundled with the app, a file picked
+ * A trajectory is opened three ways — the one bundled with the app, a file picked
  * from disk, and a file dropped on the page — and each of them ends in the same
- * place: the bytes are read into the sessions and turns `@/lib/recording` states,
+ * place: the bytes are read into the sessions and turns `@/lib/trajectory` states,
  * `@/components/viewer/session-tree` lays the sessions out as the tree their forks
  * make, and `@/components/viewer/conversation` reads the selected one as the
  * conversation it ran.
  *
- * A recording is read in the page rather than by a server, so the app is the whole
- * of what it needs: `@/lib/recording` reads it with the codecs a page runs —
+ * A trajectory is read in the page rather than by a server, so the app is the whole
+ * of what it needs: `@/lib/trajectory` reads it with the codecs a page runs —
  * WebAssembly, rather than the `node:zlib` a server would have — and nothing of the
  * viewer goes anywhere.
  */
@@ -35,8 +35,8 @@ import { Data, Effect } from "effect";
 import { Files, LayoutGrid, TriangleAlert } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { read } from "@/lib/recording";
-import type { RecordedSession, Recording } from "@/lib/recording";
+import { read } from "@/lib/trajectory";
+import type { TrajectorySession, Trajectory } from "@/lib/trajectory";
 
 import { Conversation } from "./conversation";
 import { SessionTree } from "./session-tree";
@@ -44,7 +44,7 @@ import { SessionTree } from "./session-tree";
 /** The file the viewer opens by itself, written by `scripts/sample.ts`. */
 const sample = `${import.meta.env.BASE_URL}sample.trajs`;
 
-/** A recording to read: what to call it, and the bytes when they arrive. */
+/** A trajectory to read: what to call it, and the bytes when they arrive. */
 interface Source {
   readonly name: string;
   readonly bytes: () => Promise<Uint8Array>;
@@ -52,7 +52,7 @@ interface Source {
 
 type State =
   | { readonly _tag: "Reading"; readonly name: string }
-  | { readonly _tag: "Loaded"; readonly name: string; readonly recording: Recording }
+  | { readonly _tag: "Loaded"; readonly name: string; readonly trajectory: Trajectory }
   | { readonly _tag: "Failed"; readonly name: string; readonly message: string };
 
 const State = Data.taggedEnum<State>();
@@ -61,12 +61,12 @@ const failureOf = (cause: unknown): string =>
   cause instanceof Error ? cause.message : String(cause);
 
 /** Every session of a tree of them, forks included, so one can be found by id. */
-const flattened = (sessions: ReadonlyArray<RecordedSession>): ReadonlyArray<RecordedSession> =>
+const flattened = (sessions: ReadonlyArray<TrajectorySession>): ReadonlyArray<TrajectorySession> =>
   sessions.flatMap((session) => [session, ...flattened(session.forks)]);
 
 const OpenFileButton = ({ onChoose }: { onChoose: () => void }) => (
   <Button size="sm" variant="outline" onClick={onChoose}>
-    Open a recording…
+    Open a trajectory…
   </Button>
 );
 
@@ -81,7 +81,7 @@ const OpenAnother = ({ onChoose, onSample }: { onChoose: () => void; onSample: (
 );
 
 /**
- * The page: what is opened, and the state of opening it. A recording is read once
+ * The page: what is opened, and the state of opening it. A trajectory is read once
  * per opening, and the reading that is not the last one to start is dropped rather
  * than shown — opening another file while one is being read is not a race.
  */
@@ -101,11 +101,11 @@ export const Viewer = () => {
       .bytes()
       .then((bytes) => read(bytes).pipe(Effect.scoped, Effect.runPromise))
       .then(
-        (recording) => {
+        (trajectory) => {
           if (token !== latest.current) return;
 
-          setSelected(recording.roots[0]?.id);
-          setState(State.Loaded({ name: source.name, recording }));
+          setSelected(trajectory.roots[0]?.id);
+          setState(State.Loaded({ name: source.name, trajectory }));
         },
         (cause: unknown) => {
           if (token !== latest.current) return;
@@ -142,13 +142,13 @@ export const Viewer = () => {
   // before anything of anyone's own is handed to it.
   useEffect(() => openSample(), [openSample]);
 
-  const recording = State.$is("Loaded")(state) ? state.recording : undefined;
+  const trajectory = State.$is("Loaded")(state) ? state.trajectory : undefined;
   const failure = State.$is("Failed")(state) ? state.message : undefined;
 
   const session =
-    recording === undefined
+    trajectory === undefined
       ? undefined
-      : flattened(recording.roots).find((candidate) => candidate.id === selected);
+      : flattened(trajectory.roots).find((candidate) => candidate.id === selected);
 
   return (
     <main
@@ -170,10 +170,10 @@ export const Viewer = () => {
         if (chosen !== undefined) openFile(chosen);
       }}
     >
-      {/* What the recording is called, and what it was read from, which is on
+      {/* What the trajectory is called, and what it was read from, which is on
           request rather than beside it. */}
       <header className="flex shrink-0 items-center gap-2 border-b px-4 py-2">
-        {recording === undefined ? null : (
+        {trajectory === undefined ? null : (
           <span className="truncate text-sm font-medium" title={state.name}>
             {state.name}
           </span>
@@ -207,10 +207,10 @@ export const Viewer = () => {
         type="file"
       />
 
-      {recording !== undefined && session !== undefined ? (
+      {trajectory !== undefined && session !== undefined ? (
         <ResizablePanelGroup className="min-h-0 flex-1" orientation="horizontal">
           <ResizablePanel defaultSize="300px" maxSize="520px" minSize="180px">
-            <SessionTree onSelect={setSelected} roots={recording.roots} selected={selected} />
+            <SessionTree onSelect={setSelected} roots={trajectory.roots} selected={selected} />
           </ResizablePanel>
           <ResizableHandle withHandle />
           <ResizablePanel className="min-h-0">
@@ -235,7 +235,7 @@ export const Viewer = () => {
           </EmptyContent>
           <OpenAnother onChoose={() => picker.current?.click()} onSample={openSample} />
         </Empty>
-      ) : recording === undefined ? (
+      ) : trajectory === undefined ? (
         <Empty className="flex-1">
           <EmptyHeader>
             <EmptyMedia variant="icon">
@@ -250,7 +250,7 @@ export const Viewer = () => {
             <EmptyMedia variant="icon">
               <Files />
             </EmptyMedia>
-            <EmptyTitle>This recording holds no sessions</EmptyTitle>
+            <EmptyTitle>This trajectory holds no sessions</EmptyTitle>
           </EmptyHeader>
           <OpenAnother onChoose={() => picker.current?.click()} onSample={openSample} />
         </Empty>

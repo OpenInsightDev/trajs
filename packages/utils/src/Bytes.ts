@@ -1,9 +1,9 @@
 /**
  * A byte sequence read at random, and the sequences this package builds of one:
- * what a storage serves a recording as.
+ * what a storage serves a trajectory as.
  *
- * What a recording is read out of is bytes, and what reads them takes the part it
- * came for rather than the whole of it — the head of a recording for what it
+ * What a trajectory is read out of is bytes, and what reads them takes the part it
+ * came for rather than the whole of it — the head of a trajectory for what it
  * states of itself, its tail for the metadata it ends with, the frame between them
  * for the parts of a trajectory — so a sequence is read at random ({@link Bytes}).
  * What one is of is not part of what one is: a file, the range of a bucket, or
@@ -49,11 +49,11 @@ export interface ReadOptions {
 
 /**
  * A sequence of bytes that can be read at random: what a storage serves of a
- * recording.
+ * trajectory.
  *
  * **When to use**
  *
- * Use to read a recording without holding it whole — or to read part of one, such
+ * Use to read a trajectory without holding it whole — or to read part of one, such
  * as its head or its tail — and to type what a storage serves
  * ({@link Storage.read}) or what a sequence of your own reads by
  * ({@link makeBytes}).
@@ -67,7 +67,7 @@ export interface ReadOptions {
  * - `readAlloc` reads the same way into a buffer it allocates, and yields that
  *   buffer, cut to what was read where the sequence ended before the size asked
  *   for.
- * - `stream` reads the whole sequence from its head, in chunks, so a recording
+ * - `stream` reads the whole sequence from its head, in chunks, so a trajectory
  *   too large to hold is read as it arrives rather than all at once.
  *
  * Where a byte sequence comes from is not part of what one is: a file, the range
@@ -137,7 +137,7 @@ export interface Bytes<out E = never, out R = never> {
    * so what a sequence holds is read as it arrives rather than all at once.
    *
    * `chunkSize` states how many bytes are read at a time, and defaults to 64 KiB.
-   * A chunk is allocated as it is read, so a caller reading a recording it does not
+   * A chunk is allocated as it is read, so a caller reading a trajectory it does not
    * hold states how much of it to hold at once.
    */
   readonly stream: (options?: { readonly chunkSize?: number }) => Stream.Stream<Uint8Array, E, R>;

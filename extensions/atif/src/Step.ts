@@ -1,18 +1,18 @@
 /**
- * A recording read as the steps ATIF exchanges.
+ * A trajectory read as the steps ATIF exchanges.
  *
  * ATIF — the Agent Trajectory Interchange Format — carries an agent's run as one
  * ordered list of steps, each of them a system prompt, a user message or a
- * complete agent turn. This module derives that list from a recording:
+ * complete agent turn. This module derives that list from a trajectory:
  * {@link steps} groups the parts of a trajectory into the turns they were
- * recorded as, with `View.promptTurns` of `@trajs/core`, and reads one step per
+ * produced as, with `View.promptTurns` of `@trajs/core`, and reads one step per
  * message of a turn and one more for the turn itself. {@link Step} says what a
  * step holds and {@link StepSource} who contributed one.
  *
- * A step holds what a recording holds of the turn it is read from, which is less
- * than ATIF's `StepObject` states: a recording names no model per turn, counts no
+ * A step holds what a trajectory holds of the turn it is read from, which is less
+ * than ATIF's `StepObject` states: a trajectory names no model per turn, counts no
  * tokens or cost, numbers no step and marks none as copied or as deterministic.
- * {@link Step} says of each field what ATIF states and what a recording does, so
+ * {@link Step} says of each field what ATIF states and what a trajectory does, so
  * that what is left to whoever writes the document is read off it.
  */
 
@@ -49,11 +49,11 @@ export type StepSource = "system" | "user" | "agent";
  * answered it with.
  *
  * ATIF RFC 0001 v1.8, Section II "StepObject", of which a step here states what
- * a recording holds.
+ * a trajectory holds.
  *
  * **When to use**
  *
- * Use when a recording is to be read or carried step by step — one message or one
+ * Use when a trajectory is to be read or carried step by step — one message or one
  * turn at a time — such as to display it, to score it, or to hand it to the
  * ATIF document a program exchanges trajectories in.
  *
@@ -74,10 +74,10 @@ export type StepSource = "system" | "user" | "agent";
  * reads the conversation rather than the increments a streamed response arrived
  * in.
  *
- * A step carries what a recording holds of the turn it is read from. What a
- * recording does not hold is left to a reader to supply: a model's name, the
+ * A step carries what a trajectory holds of the turn it is read from. What a
+ * trajectory does not hold is left to a reader to supply: a model's name, the
  * tokens or the cost of a turn, a step's ordinal position and the markers that
- * tell copied or deterministic steps apart are not part of a recording.
+ * tell copied or deterministic steps apart are not part of a trajectory.
  *
  * @see {@link steps} for the steps a trajectory is read as.
  * @see {@link StepSource} for who contributed one.
@@ -91,7 +91,7 @@ export type Step<Tools extends Record<string, Tool.Any>> = Readonly<{
    *
    * TODO: read the content parts of a message, which ATIF added in v1.6. A part
    * that is not text carries no path a `ContentPart` could name, and a
-   * recording holds its bytes instead, so the parts a step cannot state are not
+   * trajectory holds its bytes instead, so the parts a step cannot state are not
    * stated rather than being written out as references nothing resolves.
    */
   message: string;
@@ -197,7 +197,7 @@ const stepsOf = <Config extends Trajectory.AnyConfig>(
  *
  * **When to use**
  *
- * Use when a recording is to be read or carried step by step — one message or one
+ * Use when a trajectory is to be read or carried step by step — one message or one
  * turn at a time — such as to display it, to score it, or to hand it to a program
  * that reads a trajectory as its steps, such as the results viewer of the Harbor
  * framework, which displays the steps of an ATIF document.
@@ -206,25 +206,25 @@ const stepsOf = <Config extends Trajectory.AnyConfig>(
  *
  * One turn is read as a step for each message of its prompt, followed by one
  * `agent` step for the parts the turn produced — where it produced any — so the
- * steps are in the order the conversation was recorded in: the system prompt and
+ * steps are in the order the conversation was produced in: the system prompt and
  * the user message a model was given, then the turn that answered them.
  *
  * A step is derived from a turn, so it inherits how a turn is read: the increments
  * of a streamed response are folded into the parts they complete, a prompt part
  * with no response reads as its messages alone, and a response part that no
- * prompt precedes belongs to no turn and is dropped. The turns of a recording
+ * prompt precedes belongs to no turn and is dropped. The turns of a trajectory
  * that interleaves several sessions are likewise read one session at a time.
  *
  * ATIF numbers the steps of a document from `1` and requires the numbers to stay
- * sequential; a recording holds no such number, so the steps here are emitted in
+ * sequential; a trajectory holds no such number, so the steps here are emitted in
  * order and unnumbered, and whoever writes the document numbers them by their
  * position.
  *
  * The stream fails with the trajectory's failure — `E` on top of the
- * {@link TrajectoryError} a recorded trajectory fails with — and requires the
+ * {@link TrajectoryError} a produced trajectory fails with — and requires the
  * services `R` names.
  *
- * **Example** (Reading a recording as its steps)
+ * **Example** (Reading a trajectory as its steps)
  *
  * ```ts import.meta.vitest
  * import { Effect, Stream } from "effect"
@@ -235,14 +235,14 @@ const stepsOf = <Config extends Trajectory.AnyConfig>(
  * const extrakit = Extra.makeKit()
  * const response = Trajectory.ResponsePart({ toolkit: Toolkit.empty, extrakit, stream: false })
  *
- * // A recording of one exchange: what a model was given, and what it returned for
+ * // A trajectory of one exchange: what a model was given, and what it returned for
  * // it as one whole part.
- * const recording = Stream.make(
+ * const trajectory = Stream.make(
  *   Trajectory.promptPart(extrakit)({ prompt: Prompt.make("What is 2 + 2?"), sessionId }),
  *   response.make({ response: Response.makePart("text", { text: "4" }), sessionId, extra: {} })
  * )
  *
- * const steps = await Effect.runPromise(Stream.runCollect(Step.steps(recording)))
+ * const steps = await Effect.runPromise(Stream.runCollect(Step.steps(trajectory)))
  *
  * Array.from(steps).map((step) => step.source) // => ["user", "agent"]
  * ```

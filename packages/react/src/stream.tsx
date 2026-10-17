@@ -9,11 +9,11 @@
  * A stream part is not rendered one at a time: the increments of one chunk say the
  * text of one part, so reading them apart would read one bubble per increment.
  * A `*-start` opens a chunk where it is first written, its `*-delta` parts add to
- * it and its `*-end` closes it — the rule `@trajs/core` folds a recorded stream
+ * it and its `*-end` closes it — the rule `@trajs/core` folds a stream
  * by — and an increment whose start is not among the parts read belongs to no
  * chunk. What a stream that has not ended has to say is what is left over: a chunk
  * that is still open reads as what has been written of it, and an error part,
- * which a recording of a finished turn carries nothing of, reads as itself.
+ * which a trajectory of a finished turn carries nothing of, reads as itself.
  */
 
 import { Alert, AlertDescription, AlertTitle } from "@trajs/ui/components/alert";
@@ -36,8 +36,8 @@ import type { AnyResponsePart } from "./response.tsx";
 import { ToolPayload } from "./tool-payload.tsx";
 
 /**
- * A streaming response part, as a recording carries it: the toolkit a part was
- * recorded with is not the toolkit it is read with, so the tool a part names is
+ * A streaming response part, as a trajectory carries it: the toolkit a part was
+ * produced with is not the toolkit it is read with, so the tool a part names is
  * left unconstrained.
  *
  * **When to use**
@@ -89,7 +89,7 @@ type Streamed =
 
 /**
  * The parts a stream has written so far, as the entries to read them by, in the
- * order the stream recorded them in.
+ * order the stream produced them in.
  *
  * A chunk is opened by its first increment and takes its place among the entries
  * there, so the rest of its increments write into an entry already in position and
@@ -209,7 +209,7 @@ const streamed = (parts: ReadonlyArray<AnyStreamPart>): ReadonlyArray<Streamed> 
  * **When to use**
  *
  * Use to show a call while it is still being written, before the call itself is
- * recorded: the parameters arrive as the JSON fragments a model is writing, and
+ * produced: the parameters arrive as the JSON fragments a model is writing, and
  * the call arrives whole once they are done.
  *
  * **Details**
@@ -219,9 +219,9 @@ const streamed = (parts: ReadonlyArray<AnyStreamPart>): ReadonlyArray<Streamed> 
  * half of one reads better as what the model is writing. Whether the call has
  * finished having its parameters written is what `streaming` says.
  *
- * A stream records the parameters a call is written with and the call itself as
+ * A stream produces the parameters a call is written with and the call itself as
  * two parts, so what this reads is the writing of the parameters and not the call
- * they are the parameters of: a call is read where it is recorded, by
+ * they are the parameters of: a call is read where it is produced, by
  * {@link PromptToolCall}.
  *
  * @see {@link PromptToolCall} for the call these parameters belong to.
@@ -258,10 +258,10 @@ export const ResponseToolParams = ({
  *
  * **Details**
  *
- * What a provider recorded as the error is its own, so it is read as the JSON
+ * What a provider produced as the error is its own, so it is read as the JSON
  * value it is rather than as a message. An error part belongs to a stream and not
  * to a response: the parts a response is made of do not include one, so a
- * recording of a finished turn reads past it.
+ * trajectory of a finished turn reads past it.
  *
  * @see {@link ResponseStream} for the stream that reads it.
  * @category components
@@ -308,7 +308,7 @@ const StreamedEntry = ({ entry }: { entry: Streamed }) => {
  *
  * **Details**
  *
- * The parts are read in the order they were recorded in, and the increments of one
+ * The parts are read in the order they were produced in, and the increments of one
  * chunk are one entry: a chunk is opened where its first increment sits, so an
  * answer reads down the page the way it was written, and a chunk keeps its place
  * in it for as long as the stream is read, since a stream only ever adds to the

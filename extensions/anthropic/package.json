@@ -1,7 +1,7 @@
 {
   "name": "@trajs/extension-anthropic",
   "version": "0.0.0-alpha.0",
-  "description": "A recording read as the conversations the Anthropic Messages API takes.",
+  "description": "A trajectory read as the conversations the Anthropic Messages API takes.",
   "homepage": "https://github.com/OpenInsightDev/trajs",
   "license": "MIT",
   "author": "Bowei Wang <wozluohd@gmail.com>",

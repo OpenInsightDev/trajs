@@ -1,10 +1,10 @@
 /**
- * Recording what a program does with a model as a trajectory.
+ * Producing what a program does with a model as a trajectory.
  *
- * {@link fromSession} records the parts of a session that is already a stream as a
- * trajectory, {@link fromSessions} records the streams of several sessions as one,
- * and {@link produce} records a run as it happens. Each runs the producers of the
- * metric kit over what it records, so what a kit derives of a recording is recorded
+ * {@link fromSession} produces the parts of a session that is already a stream as a
+ * trajectory, {@link fromSessions} produces the streams of several sessions as one,
+ * and {@link produce} produces a run as it happens. Each runs the producers of the
+ * metric kit over what it produces, so what a kit derives of a trajectory is produced
  * among the parts it is about.
  */
 
@@ -22,24 +22,24 @@ import * as Trajectory from "#/Trajectory.ts";
 import { TrajectoryError } from "./TrajectoryError.ts";
 
 /**
- * The parts a trajectory is recorded from: what a model was given and returned,
- * and the events a kit recorded of the session.
+ * The parts a trajectory is produced from: what a model was given and returned,
+ * and the events a kit produced of the session.
  *
  * **When to use**
  *
- * Use to type what {@link fromSession} records.
+ * Use to type what {@link fromSession} produces.
  *
  * **Details**
  *
- * A part is stated as the trajectory records it — a prompt, response or event
- * part, carrying the `uuid` it is named by and the session it was recorded in — so
+ * A part is stated as the trajectory produces it — a prompt, response or event
+ * part, carrying the `uuid` it is named by and the session it was produced in — so
  * a stream of them holds the parts themselves rather than the messages they were
  * built from. A session declaration is not among them: a part names the session it
- * belongs to, and a recording is read by the sessions its parts name whether or not
+ * belongs to, and a trajectory is read by the sessions its parts name whether or not
  * one of them is declared.
  *
- * @see {@link fromSession} for the function that records them.
- * @see {@link SessionStreams} for the streams of the sessions a recording holds one of
+ * @see {@link fromSession} for the function that produces them.
+ * @see {@link SessionStreams} for the streams of the sessions a trajectory holds one of
  * each.
  * @category models
  */
@@ -52,27 +52,27 @@ export type PartStream<Config extends Trajectory.AnyConfig, E = never, R = never
 >;
 
 /**
- * The streams the sessions of a trajectory are recorded from: the parts of one
+ * The streams the sessions of a trajectory are produced from: the parts of one
  * session under the id the session is named by.
  *
  * **When to use**
  *
- * Use to type what {@link fromSessions} records.
+ * Use to type what {@link fromSessions} produces.
  *
  * **Details**
  *
  * A stream holds the parts of one session, as {@link PartStream} reads them, and the
- * id it is keyed by is the session they were recorded in, which every part states of
+ * id it is keyed by is the session they were produced in, which every part states of
  * itself as `sessionId`.
  *
- * @see {@link fromSessions} for the function that records them.
+ * @see {@link fromSessions} for the function that produces them.
  * @category models
  */
 export type SessionStreams<Config extends Trajectory.AnyConfig, E = never, R = never> = Readonly<
   Record<string, PartStream<Config, E, R>>
 >;
 
-type Recording<
+type Kits<
   Toolkit extends Toolkit.Any,
   Eventkit extends Event.AnyKit,
   Metrickit extends Metric.AnyKit,
@@ -85,12 +85,12 @@ type Recording<
 };
 
 /**
- * Every recording this module makes is of parts that were already read — the parts of
+ * Every trajectory this module makes is of parts that were already read — the parts of
  * one session that is a stream, of several such sessions, and the parts a run
- * enqueued — so what a recording is of the kits given, and how what a kit derives of
- * it is recorded among its parts, is stated here once.
+ * enqueued — so what a trajectory is of the kits given, and how what a kit derives of
+ * it is produced among its parts, is stated here once.
  */
-const record =
+const produceWith =
   <
     Toolkit extends Toolkit.Any,
     Eventkit extends Event.AnyKit,
@@ -101,7 +101,7 @@ const record =
     eventkit,
     metrickit,
     extrakit,
-  }: Recording<Toolkit, Eventkit, Metrickit, Extrakit>) =>
+  }: Kits<Toolkit, Eventkit, Metrickit, Extrakit>) =>
   <E, R>(
     stream: Trajectory.TrajectoryStream<
       Trajectory.Config<true, Toolkit, Eventkit, Metrickit, Extrakit>,
@@ -114,14 +114,14 @@ const record =
     R
   > =>
     stream.pipe(
-      // The recording is read twice — as the parts of the trajectory, and by the
+      // The trajectory is read twice — as the parts of the trajectory, and by the
       // producers the metric kit runs over it — so one subscription is shared
-      // between the two readings rather than what records them, which may drive a
+      // between the two readings rather than the producer behind them, which may drive a
       // model, being run twice.
       Stream.broadcastN({ n: 2, capacity: "unbounded" }),
-      Effect.map(([recorded, producing]) =>
+      Effect.map(([produced, producing]) =>
         Stream.merge(
-          recorded,
+          produced,
           producing.pipe(
             // The config here streams, and a producer reads whole parts:
             // `Metric.produce` folds the increments before a producer reads them.
@@ -142,31 +142,31 @@ const record =
     );
 
 /**
- * Records the parts of a session as a trajectory, with the metric parts a kit
+ * Produces the parts of a session as a trajectory, with the metric parts a kit
  * derives of them.
  *
  * **When to use**
  *
  * Use when what a model was given and returned is already a stream of parts — a
- * session recorded elsewhere, or parts a caller assembled — and it should read as
+ * session produced elsewhere, or parts a caller assembled — and it should read as
  * a trajectory rather than as the parts it holds: so that its sessions read as one
- * recording, the kits it was recorded with travel with its parts, and what a kit
- * derives of it is recorded among the parts it is about.
+ * trajectory, the kits it was produced with travel with its parts, and what a kit
+ * derives of it is produced among the parts it is about.
  *
  * **Details**
  *
- * - Each part is recorded as it arrives, in the order the stream gives it, and the
+ * - Each part is produced as it arrives, in the order the stream gives it, and the
  *   trajectory carries the kits given.
  * - The producers the metric kit was provided with are run over the same parts as
  *   they arrive, exactly as {@link Metric.produce} runs them, and the metric parts
- *   they derive are recorded among the parts they are about. The stream is read
+ *   they derive are produced among the parts they are about. The stream is read
  *   once — the parts and the producers each read a branch of one broadcast — so a
  *   stream that drives a model is not run twice.
- * - The failure a producer reports of a part is recorded as the failure of its
- *   metric rather than failing the recording; a failure of the run itself fails the
+ * - The failure a producer reports of a part is produced as the failure of its
+ *   metric rather than failing the trajectory; a failure of the run itself fails the
  *   trajectory, as {@link Metric.produce} states.
  *
- * **Example** (Recording the parts of a session, with what a kit derives of them)
+ * **Example** (Producing the parts of a session, with what a kit derives of them)
  *
  * ```ts import.meta.vitest
  * import { Effect, Schema, Stream } from "effect"
@@ -187,8 +187,8 @@ const record =
  * })
  *
  * // What the metric is reported by: one count of each part the kit reads. The
- * // producer is run by the kit beside the stream that records the parts, so the
- * // counts it derives are recorded among them.
+ * // producer is run by the kit beside the stream that produces the parts, so the
+ * // counts it derives are produced among them.
  * const counting: Metric.Producer<typeof count> = (parts) =>
  *   parts.pipe(Stream.map(() =>
  *     Metric.makeOutput<typeof count>({ version: "0.1.0", tokens: 1 }, {
@@ -203,7 +203,7 @@ const record =
  * const extrakit = Extra.makeKit()
  * const sessionId = "01890a5d-ac96-774b-bcce-b302099a8057"
  *
- * const recorded = Produce.fromSession({
+ * const produced = Produce.fromSession({
  *   toolkit: Toolkit.empty,
  *   eventkit: Event.makeKit(),
  *   metrickit,
@@ -212,14 +212,14 @@ const record =
  *   Trajectory.promptPart(extrakit)({ prompt: Prompt.make("What is 2 + 2?"), sessionId })
  * ))
  *
- * const parts = Array.from(await Effect.runPromise(Stream.runCollect(recorded)))
+ * const parts = Array.from(await Effect.runPromise(Stream.runCollect(produced)))
  * parts.map((part) => part._tag) // => ["Prompt", "Metric"]
  * ```
  *
- * @see {@link PartStream} for the parts it records.
- * @see {@link fromSessions} for recording the streams of several sessions as one.
- * @see {@link produce} for recording a run as it happens.
- * @see {@link Metric.produce} for what a kit derives of a kind of recording.
+ * @see {@link PartStream} for the parts it produces.
+ * @see {@link fromSessions} for trajectory the streams of several sessions as one.
+ * @see {@link produce} for trajectory a run as it happens.
+ * @see {@link Metric.produce} for what a kit derives of a kind of trajectory.
  * @category constructors
  */
 export const fromSession =
@@ -233,7 +233,7 @@ export const fromSession =
     eventkit,
     metrickit,
     extrakit,
-  }: Recording<Toolkit, Eventkit, Metrickit, Extrakit>) =>
+  }: Kits<Toolkit, Eventkit, Metrickit, Extrakit>) =>
   <E, R>(
     stream: PartStream<Trajectory.Config<true, Toolkit, Eventkit, Metrickit, Extrakit>, E, R>,
   ): Trajectory.Trajectory<
@@ -241,50 +241,50 @@ export const fromSession =
     E | TrajectoryError,
     R
   > =>
-    record({ toolkit, eventkit, metrickit, extrakit })(stream);
+    produceWith({ toolkit, eventkit, metrickit, extrakit })(stream);
 
 /**
- * Records the parts of several sessions as one trajectory, with the metric parts a
+ * Produces the parts of several sessions as one trajectory, with the metric parts a
  * kit derives of them.
  *
  * **When to use**
  *
- * Use when the sessions that are to read as one recording are each already a stream
+ * Use when the sessions that are to read as one trajectory are each already a stream
  * of parts — as {@link fromSession} takes one — and it is the whole of what they did
  * that is worth reading: so that the parts of every session arrive in one stream,
- * what a kit derives of the recording is derived of every session of it.
+ * what a kit derives of the trajectory is derived of every session of it.
  *
  * **Details**
  *
  * - The record given is keyed by session: the id a stream is given is the session its
- *   parts were recorded in, and that session is declared among the parts before the
- *   parts of its stream arrive. Every part states the session it was recorded in of
+ *   parts were produced in, and that session is declared among the parts before the
+ *   parts of its stream arrive. Every part states the session it was produced in of
  *   itself, as {@link PartStream} reads one, so a session whose stream gives no part
- *   is still declared, and read among the sessions of the recording.
- * - The streams are read together rather than one after another, so the recording
+ *   is still declared, and read among the sessions of the trajectory.
+ * - The streams are read together rather than one after another, so the trajectory
  *   interleaves the sessions: the parts of one session are not necessarily
  *   contiguous, though the parts of each keep the order its own stream gave them.
- * - Every part is recorded as {@link fromSession} records one, and the producers the
+ * - Every part is produced as {@link fromSession} produces one, and the producers the
  *   metric kit was provided with are run over the parts of every session as they
- *   arrive, so what a kit derives of the recording is derived of all its sessions.
- *   Each stream is read once, however many readings the recording takes, and the
- *   failure a producer reports of a part is recorded as the failure of its metric
- *   rather than failing the recording.
- * - The recording fails with what any of the streams fails with, and requires the
+ *   arrive, so what a kit derives of the trajectory is derived of all its sessions.
+ *   Each stream is read once, however many readings the trajectory takes, and the
+ *   failure a producer reports of a part is produced as the failure of its metric
+ *   rather than failing the trajectory.
+ * - The trajectory fails with what any of the streams fails with, and requires the
  *   services any of them requires.
  *
- * **Example** (Recording two sessions as one trajectory)
+ * **Example** (Producing two sessions as one trajectory)
  *
  * ```ts import.meta.vitest
  * import { Effect, Stream } from "effect"
  * import { Event, Extra, Metric, Produce, Prompt, Trajectory, Toolkit } from "@trajs/core"
  *
- * // A kit that names no metric derives nothing of a recording, so the recording
+ * // A kit that names no metric derives nothing of a trajectory, so the trajectory
  * // holds the parts the sessions gave and no metric part.
  * const metrickit = Metric.toProducers(Metric.makeKit(), {})
  * const extrakit = Extra.makeKit()
  *
- * const recording = Produce.fromSessions({
+ * const trajectory = Produce.fromSessions({
  *   toolkit: Toolkit.empty,
  *   eventkit: Event.makeKit(),
  *   metrickit,
@@ -304,18 +304,18 @@ export const fromSession =
  *   )
  * })
  *
- * // Both sessions are declared and both prompts are recorded, each in the session
+ * // Both sessions are declared and both prompts are produced, each in the session
  * // that gave it: the parts of a session are read apart from the one order the
- * // parts of the recording arrive in.
- * const parts = Array.from(await Effect.runPromise(Stream.runCollect(recording)))
+ * // parts of the trajectory arrive in.
+ * const parts = Array.from(await Effect.runPromise(Stream.runCollect(trajectory)))
  * parts.map((part) => (part._tag === "Session" ? part.id : part.sessionId)).sort()
  * // => ["answering", "answering", "asking", "asking"]
  * ```
  *
- * @see {@link SessionStreams} for what it records.
- * @see {@link fromSession} for recording one session that is already a stream.
- * @see {@link produce} for recording the sessions a run opens.
- * @see {@link Metric.produce} for what a kit derives of a kind of recording.
+ * @see {@link SessionStreams} for what it produces.
+ * @see {@link fromSession} for trajectory one session that is already a stream.
+ * @see {@link produce} for trajectory the sessions a run opens.
+ * @see {@link Metric.produce} for what a kit derives of a kind of trajectory.
  * @category constructors
  */
 export const fromSessions =
@@ -329,7 +329,7 @@ export const fromSessions =
     eventkit,
     metrickit,
     extrakit,
-  }: Recording<Toolkit, Eventkit, Metrickit, Extrakit>) =>
+  }: Kits<Toolkit, Eventkit, Metrickit, Extrakit>) =>
   <E, R>(
     sessions: SessionStreams<Trajectory.Config<true, Toolkit, Eventkit, Metrickit, Extrakit>, E, R>,
   ): Trajectory.Trajectory<
@@ -339,7 +339,7 @@ export const fromSessions =
   > => {
     const sessionPart = Trajectory.sessionPart(extrakit);
 
-    return record({ toolkit, eventkit, metrickit, extrakit })(
+    return produceWith({ toolkit, eventkit, metrickit, extrakit })(
       Stream.mergeAll(
         Object.entries(sessions).map(([id, parts]) =>
           parts.pipe(
@@ -354,29 +354,29 @@ export const fromSessions =
   };
 
 /**
- * A session a run records a trajectory in.
+ * A session a run produces a trajectory in.
  *
  * **When to use**
  *
  * Use to write the parts of a session while a program runs — what a model was
- * given and returned, and the events a kit recorded — rather than to record a
+ * given and returned, and the events a kit produced — rather than to produce a
  * stream that already holds them, which is what {@link fromSession} reads.
  *
  * **Details**
  *
  * - A part is written where it is enqueued rather than when the run ends, so a
- *   recording is read while the program that writes it runs, and what the part
- *   was recorded as is returned to the caller.
- * - `enqueuePrompt` records what a model was given and `enqueueResponse` one part
+ *   trajectory is read while the program that writes it runs, and what the part
+ *   was produced as is returned to the caller.
+ * - `enqueuePrompt` produces what a model was given and `enqueueResponse` one part
  *   of what it returned, each with the extra data the kit declares of the part it
- *   is — {@link Extra.ExtraRecord} — and `enqueueEvent` records an event of the
+ *   is — {@link Extra.ExtraRecord} — and `enqueueEvent` produces an event of the
  *   event kit.
- * - Every part is recorded in this session: the `sessionId` of a part is the `id`
+ * - Every part is produced in this session: the `sessionId` of a part is the `id`
  *   of the session that wrote it, so the parts of the sessions a run opens are
  *   read apart.
  *
  * @see {@link Producer} for what hands one out.
- * @see {@link produce} for recording a run in one.
+ * @see {@link produce} for trajectory a run in one.
  * @category models
  */
 export type ProduceSession<
@@ -399,24 +399,24 @@ export type ProduceSession<
 }>;
 
 /**
- * The sessions a run records a trajectory in.
+ * The sessions a run produces a trajectory in.
  *
  * **When to use**
  *
  * Use to type what {@link produce} hands a program, or to write a program that
- * records itself as a trajectory while it runs.
+ * produces itself as a trajectory while it runs.
  *
  * **Details**
  *
  * `createSession` declares a session and hands back the {@link ProduceSession}
- * that records in it, before any of the parts it holds. It fails with the
- * {@link TrajectoryError} of a recording whose sessions cannot be read: an `id` a
+ * that produces in it, before any of the parts it holds. It fails with the
+ * {@link TrajectoryError} of a trajectory whose sessions cannot be read: an `id` a
  * session has already declared would be declared after the parts of that session,
  * and a `fork` naming a part the run has not written has nothing to continue
  * from. What a session is declared with beyond `id` and `fork` is the extra data
  * the kit declares of a session part.
  *
- * @see {@link ProduceSession} for what a session records with.
+ * @see {@link ProduceSession} for what a session produces with.
  * @see {@link produce} for what a program is handed one by.
  * @category models
  */
@@ -439,47 +439,47 @@ type ProduceFn<
 > = (producer: Producer<Tools, Events, Extras>) => Effect.Effect<void, E, R>;
 
 /**
- * Records what a program does with a model as a trajectory, while it runs.
+ * Produces what a program does with a model as a trajectory, while it runs.
  *
  * **When to use**
  *
- * Use when a recording is written as the program runs — a session opened, and the
- * prompts a model was given, the parts it returned and the events a kit recorded
+ * Use when a trajectory is written as the program runs — a session opened, and the
+ * prompts a model was given, the parts it returned and the events a kit produced
  * enqueued as they happen — rather than read from a stream that already holds the
- * parts, which is what {@link fromSession} records.
+ * parts, which is what {@link fromSession} produces.
  *
  * **Details**
  *
  * - The program is handed a {@link Producer}, which hands out one
  *   {@link ProduceSession} per session it runs. A session is declared when it is
- *   created, before any of the parts it records, and every part enqueued is
- *   recorded in the session that enqueued it, in the order the program enqueued
+ *   created, before any of the parts it produces, and every part enqueued is
+ *   produced in the session that enqueued it, in the order the program enqueued
  *   it.
  * - The producers the metric kit was provided with are run over the parts as they
- *   are recorded, exactly as {@link Metric.produce} runs them, and the metric
- *   parts they derive are recorded among the parts they are about. The parts are
- *   read once — the recording and the producers each read a branch of one
+ *   are produced, exactly as {@link Metric.produce} runs them, and the metric
+ *   parts they derive are produced among the parts they are about. The parts are
+ *   read once — the trajectory and the producers each read a branch of one
  *   broadcast — so a program that drives a model is not run twice.
- * - A part is recorded where it is enqueued rather than when the program ends, so
- *   a recording is read while the program that writes it runs. The recording ends
- *   where the program does, and a program that fails fails the recording it left,
+ * - A part is produced where it is enqueued rather than when the program ends, so
+ *   a trajectory is read while the program that writes it runs. The trajectory ends
+ *   where the program does, and a program that fails fails the trajectory it left,
  *   since no more of it can arrive.
- * - Creating a session fails rather than recording one no reader can reach: an
+ * - Creating a session fails rather than trajectory one no reader can reach: an
  *   `id` a session has already declared would be declared after the parts of that
  *   session, and a `fork` naming a part the run has not written has nothing to
  *   continue from — see {@link Producer}.
  *
- * **Example** (Recording a run that answers a prompt)
+ * **Example** (Producing a run that answers a prompt)
  *
  * ```ts import.meta.vitest
  * import { Effect, Stream } from "effect"
  * import { Event, Extra, Metric, Produce, Prompt, Response, Toolkit, Trajectory } from "@trajs/core"
  *
- * // A kit that names no metric derives nothing of a recording, so what the run
- * // records is the parts it writes and no metric part.
+ * // A kit that names no metric derives nothing of a trajectory, so what the run
+ * // produces is the parts it writes and no metric part.
  * const metrickit = Metric.toProducers(Metric.makeKit(), {})
  *
- * const recording = Produce.produce({
+ * const trajectory = Produce.produce({
  *   toolkit: Toolkit.empty,
  *   eventkit: Event.makeKit(),
  *   metrickit,
@@ -495,13 +495,13 @@ type ProduceFn<
  *   })
  * )
  *
- * const parts = Array.from(await Effect.runPromise(Stream.runCollect(recording)))
+ * const parts = Array.from(await Effect.runPromise(Stream.runCollect(trajectory)))
  * parts.map((part) => part._tag) // => ["Session", "Prompt", "Response"]
  * ```
  *
  * @see {@link Producer} for what the program is handed.
- * @see {@link fromSession} for recording a stream that already holds the parts.
- * @see {@link Metric.produce} for what a kit derives of a kind of recording.
+ * @see {@link fromSession} for trajectory a stream that already holds the parts.
+ * @see {@link Metric.produce} for what a kit derives of a kind of trajectory.
  * @category constructors
  */
 export const produce =
@@ -515,7 +515,7 @@ export const produce =
     eventkit,
     metrickit,
     extrakit,
-  }: Recording<Toolkit, Eventkit, Metrickit, Extrakit>) =>
+  }: Kits<Toolkit, Eventkit, Metrickit, Extrakit>) =>
   <E, R>(
     fn: ProduceFn<Toolkit["tools"], Eventkit["events"], Extrakit["extra"], E, R>,
   ): Trajectory.Trajectory<
@@ -531,8 +531,8 @@ export const produce =
     const eventPart = Trajectory.EventPart(eventkit);
 
     // The queue only ever ends rather than fails — a run that fails fails the
-    // recording through the fork — so its failure type is the end alone.
-    const recording = Effect.gen(function* () {
+    // trajectory through the fork — so its failure type is the end alone.
+    const trajectory = Effect.gen(function* () {
       const parts = yield* Queue.unbounded<Trajectory.Part<Config>, Cause.Done>();
 
       const declared = new Set<string>();
@@ -562,17 +562,17 @@ export const produce =
       const producer: Producer<Toolkit["tools"], Eventkit["events"], Extrakit["extra"]> = {
         createSession: ({ id, fork, ...extra }) =>
           Effect.gen(function* () {
-            // A session is declared before the parts it records, so a declaration of
+            // A session is declared before the parts it produces, so a declaration of
             // an id that a session was declared under already is read after the parts
             // of that session.
             if (declared.has(id)) {
               return yield* Effect.fail(TrajectoryError.session(id, "late-declaration"));
             }
 
-            // A `fork` names a part the recording holds by the time it is read, so a
+            // A `fork` names a part the trajectory holds by the time it is read, so a
             // part the run has not written has nothing to continue from.
             if (fork !== undefined && !written.has(fork)) {
-              return yield* Effect.fail(TrajectoryError.session(id, "unrecorded-fork"));
+              return yield* Effect.fail(TrajectoryError.session(id, "unproduced-fork"));
             }
 
             declared.add(id);
@@ -601,5 +601,5 @@ export const produce =
       return Stream.fromQueue(parts).pipe(Stream.drainFork(program));
     });
 
-    return record({ toolkit, eventkit, metrickit, extrakit })(recording.pipe(Stream.unwrap));
+    return produceWith({ toolkit, eventkit, metrickit, extrakit })(trajectory.pipe(Stream.unwrap));
   };

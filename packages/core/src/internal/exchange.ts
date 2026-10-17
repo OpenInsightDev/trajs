@@ -1,17 +1,17 @@
 /**
  * The format the exchange layer this package ships writes: the header line a
- * recording starts with, the frame the parts of a trajectory are carried in, the
- * metadata the recording ends with, and the two directions of the recording's
+ * trajectory starts with, the frame the parts of a trajectory are carried in, the
+ * metadata the trajectory ends with, and the two directions of the trajectory's
  * bytes — written into a storage, and read out of the bytes it serves.
  *
  * Nothing here is published: a program reaches the format through
- * `Exchange.layer`, and the parts a recording holds through `Exchange.Part`. What
- * a recording states of itself is the layer's to state — the header it starts with
+ * `Exchange.layer`, and the parts a trajectory holds through `Exchange.Part`. What
+ * a trajectory states of itself is the layer's to state — the header it starts with
  * and the metadata it ends with — so what reads either is built from the model the
- * layer holds; where a recording is kept is a storage's, so what reads and writes
+ * layer holds; where a trajectory is kept is a storage's, so what reads and writes
  * one takes the bytes from there rather than carrying them.
  *
- * A recording is read at random where a part of it alone is wanted — the head for
+ * A trajectory is read at random where a part of it alone is wanted — the head for
  * the header line, the tail for the metadata — and as a stream where the trajectory
  * is: the parts are carried in one frame, so reading them is reading the bytes from
  * the header line to the metadata that follows them.
@@ -38,30 +38,30 @@ import pkg from "../../package.json" with { type: "json" };
 
 /**
  * The version of this package, as `package.json` states it: the version of trajs a
- * recording states of itself, since the format a recording is in is this package's.
+ * trajectory states of itself, since the format a trajectory is in is this package's.
  */
 const Version = pkg.version;
 
 /**
- * How one contribution of a kit names itself, as a recording states it: the name it
+ * How one contribution of a kit names itself, as a trajectory states it: the name it
  * goes by and what it is for.
  *
  * What a kit states of each of its contributions is all a reader is handed: nothing
- * of the schemas a contribution is recorded with travels with it.
+ * of the schemas a contribution is produced with travels with it.
  */
 export const Contribution = Schema.Struct({
   name: Schema.optional(Schema.String),
   description: Schema.optional(Schema.String),
 });
 
-/** What each contribution of a kit states of itself, keyed by the tag it is recorded under. */
+/** What each contribution of a kit states of itself, keyed by the tag it is produced under. */
 const contribute = <Entry>(
   contributions: Readonly<Record<string, Entry>>,
   stated: (entry: Entry) => Schema.Schema.Type<typeof Contribution>,
 ): Record<string, Schema.Schema.Type<typeof Contribution>> =>
   Object.fromEntries(Object.entries(contributions).map(([tag, entry]) => [tag, stated(entry)]));
 
-/** The header line a recording starts with, as the JSON text it is carried in. */
+/** The header line a trajectory starts with, as the JSON text it is carried in. */
 const encodeHeader = ({
   extrakit,
   eventkit,
@@ -91,18 +91,18 @@ const encodeHeader = ({
 const Newline = 0x0a;
 
 /**
- * How many bytes of the head of a recording are read at a time while the header
+ * How many bytes of the head of a trajectory are read at a time while the header
  * line is looked for: a line is read in the order it is carried, so what is read
  * of it first is where it starts.
  */
 const HeaderChunk = 4 * 1024;
 
 /**
- * The header a recording states, and how much of the recording it takes to state
- * it: the line a recording starts with, and the offset just past it, which is
+ * The header a trajectory states, and how much of the trajectory it takes to state
+ * it: the line a trajectory starts with, and the offset just past it, which is
  * where the frame the parts are carried in begins.
  *
- * The line is read to be read again as what it describes — a recording is read
+ * The line is read to be read again as what it describes — a trajectory is read
  * with no kit of its own — so where it ends is kept with it rather than read a
  * second time to find.
  */
@@ -112,17 +112,17 @@ export interface Stated {
 }
 
 /**
- * Reads the header line a recording starts with, as the head of the bytes it is
+ * Reads the header line a trajectory starts with, as the head of the bytes it is
  * held in.
  *
  * The line ends wherever the newline fell, which is not known before it is read,
- * so the head of the recording is read a chunk at a time until one of them holds
+ * so the head of the trajectory is read a chunk at a time until one of them holds
  * that newline ({@link HeaderChunk}); the length of the bytes is not read to tell
  * where that is, since a line is short and one read of the head answers it.
  *
  * Bytes that end before a newline, and a line that is not a header, fail as
- * {@link TrajectoryError}: what a recording is of is the format's, so bytes that
- * do not hold its first line are a recording that failed rather than bytes a
+ * {@link TrajectoryError}: what a trajectory is of is the format's, so bytes that
+ * do not hold its first line are a trajectory that failed rather than bytes a
  * storage did not serve. The services are the ones the header's own schemas
  * state, so a model of plain schemas needs none.
  */
@@ -173,13 +173,13 @@ export const headerOf = <S extends Schema.ConstraintCodec<Header, unknown, never
 const FrameChunk = 64 * 1024;
 
 /**
- * The bytes of a recording that hold the frame the parts are carried in, from the
+ * The bytes of a trajectory that hold the frame the parts are carried in, from the
  * byte the frame begins at to the byte it ends before: one read at a time, and
  * never past the metadata that follows it.
  *
  * A range that is not a range — one that ends before it begins, which is what
  * bytes holding a metadata but no frame hold — is read as nothing at all, so what
- * is read of such a recording is nothing rather than its metadata read as a frame.
+ * is read of such a trajectory is nothing rather than its metadata read as a frame.
  */
 const framesOf = (
   bytes: Bytes<StorageError>,
@@ -208,7 +208,7 @@ const framesOf = (
  * A schema as the format states it: the part it reads and writes, and the services
  * of none.
  *
- * A part of a recording is rebuilt from plain schemas, so what those schemas state
+ * A part of a trajectory is rebuilt from plain schemas, so what those schemas state
  * is the services of none; a response part is the one that is not, and keeps what
  * the toolkit's own schemas state of it.
  */
@@ -226,14 +226,14 @@ export type PartMembers<C extends Trajectory.AnyConfig> = readonly [
   ServiceFree<ReturnType<typeof Trajectory.MetricPart<C["metrickit"]>>>,
 ];
 
-/** The part a recording holds, as the format reads and writes one. */
-type RecordedPart<C extends Trajectory.AnyConfig> = Schema.Union<PartMembers<C>>["Type"];
+/** The part a trajectory holds, as the format reads and writes one. */
+type ProducedPart<C extends Trajectory.AnyConfig> = Schema.Union<PartMembers<C>>["Type"];
 
 /**
  * A part schema as the format reads and writes it: the same part, stated as one that
  * needs no service of its own.
  *
- * A part of a recording is rebuilt from plain schemas, so what one takes is no
+ * A part of a trajectory is rebuilt from plain schemas, so what one takes is no
  * service of its own; a response part is the one that is not, so it is not passed
  * through here.
  */
@@ -252,14 +252,14 @@ const serviceFree = <A, I>(
  * data tagged — see below for why a binary layout cannot carry the data as it is —
  * and every other part of the trajectory keeping its own layout, and its response
  * parts stated as {@link Trajectory.ResponsePart} states them for a streaming
- * trajectory: a recording is read as the most general trajectory, whose response
+ * trajectory: a trajectory is read as the most general trajectory, whose response
  * parts are streams, and the response parts of any other kind are the members of
  * that schema too, so one schema carries the response parts of every kind.
  *
- * A part is written through the schemas of the toolkit it was recorded with, so
+ * A part is written through the schemas of the toolkit it was produced with, so
  * encoding one takes what those schemas state; what the other parts state is the
- * services of none, since a recording is rebuilt from plain schemas rather than read
- * as the schemas it was recorded with.
+ * services of none, since a trajectory is rebuilt from plain schemas rather than read
+ * as the schemas it was produced with.
  */
 export const part = <C extends Trajectory.AnyConfig>(config: C): Schema.Union<PartMembers<C>> => {
   const members: PartMembers<C> = [
@@ -267,7 +267,7 @@ export const part = <C extends Trajectory.AnyConfig>(config: C): Schema.Union<Pa
     // is what that kit states of it rather than what the call alone infers.
     serviceFree(PromptPartTagged<C["extrakit"]>(config.extrakit)),
     serviceFree(Trajectory.SessionPart<C["extrakit"]>(config.extrakit)),
-    // What a recording is read as, whatever it was written as.
+    // What a trajectory is read as, whatever it was written as.
     Trajectory.ResponsePart<C["toolkit"], C["extrakit"], true>({
       toolkit: config.toolkit,
       extrakit: config.extrakit,
@@ -284,13 +284,13 @@ export const part = <C extends Trajectory.AnyConfig>(config: C): Schema.Union<Pa
  * Encodes one part of a trajectory as a SchemaBinary frame.
  *
  * The schema is the one the trajectory's own config describes — {@link part} — so a
- * part recorded against a tool the toolkit no longer holds still encodes as the
- * unrestricted part it was recorded as.
+ * part produced for a tool the toolkit no longer holds still encodes as the
+ * unrestricted part it was produced as.
  */
 const encodePart = <C extends Trajectory.AnyConfig>(config: C) => {
   const encode = Schema.encodeEffect(SchemaBinary.toCodec(part(config)));
 
-  return (part: RecordedPart<C>): Effect.Effect<Uint8Array, TrajectoryError, EncodingServices<C>> =>
+  return (part: ProducedPart<C>): Effect.Effect<Uint8Array, TrajectoryError, EncodingServices<C>> =>
     encode(part).pipe(
       Effect.mapError((cause) => TrajectoryError.parse(cause)),
       // Frames may be views into one arena that the next encode reuses, and the
@@ -304,7 +304,7 @@ const encodePart = <C extends Trajectory.AnyConfig>(config: C) => {
  *
  * A part is one frame, and a frame can span chunks or share one with the frames
  * around it, so the body is fed to one parser as it arrives: the parts come out in
- * the order they were recorded, and a body that ends in the middle of a frame fails
+ * the order they were produced, and a body that ends in the middle of a frame fails
  * as a {@link TrajectoryError} rather than losing the part. The parser belongs to a
  * run, since it is the state one body is read with.
  */
@@ -312,7 +312,7 @@ const decodeParts =
   <C extends Trajectory.AnyConfig>(config: C) =>
   <E, R>(
     body: Stream.Stream<Uint8Array, E, R>,
-  ): Stream.Stream<RecordedPart<C>, E | TrajectoryError, R> =>
+  ): Stream.Stream<ProducedPart<C>, E | TrajectoryError, R> =>
     Stream.suspend(() => {
       const parser = SchemaBinary.parser(part(config));
 
@@ -434,7 +434,7 @@ const configOf = <C extends Trajectory.AnyConfig, E, R>(
  * The trajectory a stream of parts makes, carrying the config its parts are read
  * with.
  *
- * A trajectory is its parts and what they were recorded with, so what a recording
+ * A trajectory is its parts and what they were produced with, so what a trajectory
  * was read as is stated on the stream the bytes decode to.
  */
 const trajectoryOf = <C extends Trajectory.AnyConfig, E, R>(
@@ -443,14 +443,14 @@ const trajectoryOf = <C extends Trajectory.AnyConfig, E, R>(
 ): Trajectory.Trajectory<C, E, R> => Object.assign(parts, config);
 
 /**
- * How many bytes state the length of the metadata a recording ends with: the four
- * bytes it ends with rather than begins with, so what reads a recording at random
+ * How many bytes state the length of the metadata a trajectory ends with: the four
+ * bytes it ends with rather than begins with, so what reads a trajectory at random
  * reads them off the end of it and knows where the metadata before them begins.
  */
 const TrailerBytes = 4;
 
 /**
- * What a recording ends with: the metadata it states of its own bytes, and where
+ * What a trajectory ends with: the metadata it states of its own bytes, and where
  * the frame those bytes carry the parts in ends.
  *
  * Where the frame ends is read with the metadata rather than after it, since the
@@ -463,7 +463,7 @@ export interface Trailing {
 }
 
 /**
- * Reads the metadata a recording ends with off the tail of the bytes it is held in,
+ * Reads the metadata a trajectory ends with off the tail of the bytes it is held in,
  * which is what it is named by and how it states it was written: the metadata, as
  * one SchemaBinary frame, preceded by nothing and followed by the length of that
  * frame as four bytes, big-endian ({@link TrailerBytes}).
@@ -472,9 +472,9 @@ export interface Trailing {
  * rather than by reading the frame those parts are carried in — and how much of it
  * there is is read off the end instead, which is what states where it begins
  * without that frame being read either. Bytes that end in anything that is not a
- * length and a frame before it are a recording that does not end with the metadata
+ * length and a frame before it are a trajectory that does not end with the metadata
  * of one — one written before the format held it, or one that was cut short —
- * which is a recording that failed rather than bytes a storage did not serve.
+ * which is a trajectory that failed rather than bytes a storage did not serve.
  *
  * The model is the schema of the metadata the layer holds, so what parses the frame
  * is built from that model rather than stated again here ({@link Metadata}).
@@ -509,7 +509,7 @@ export const trailingOf = <S extends Schema.ConstraintCodec<Metadata, unknown, n
     // does not fit before that length hold no metadata at all.
     if (size === undefined || size > length - BigInt(TrailerBytes)) {
       return yield* Effect.fail(
-        TrajectoryError.parse("the bytes do not end with the metadata of a recording"),
+        TrajectoryError.parse("the bytes do not end with the metadata of a trajectory"),
       );
     }
 
@@ -526,10 +526,10 @@ export const trailingOf = <S extends Schema.ConstraintCodec<Metadata, unknown, n
 };
 
 /**
- * The metadata a recording ends with, as the bytes it is carried in: the metadata
+ * The metadata a trajectory ends with, as the bytes it is carried in: the metadata
  * itself, as one SchemaBinary frame, and the length of that frame as four bytes
  * after it, big-endian ({@link TrailerBytes}), which is what says where the
- * metadata begins to what reads a recording from its end.
+ * metadata begins to what reads a trajectory from its end.
  */
 const encodeTrailing = <S extends Schema.ConstraintCodec<Metadata, unknown, never, never>>(
   metadata: S,
@@ -546,8 +546,8 @@ const encodeTrailing = <S extends Schema.ConstraintCodec<Metadata, unknown, neve
 
 /**
  * What a compression failed a frame it was asked to write or read with, as the
- * recording that failed: the bytes a frame carries are the format's, so a frame
- * that cannot be written or read is a recording that failed rather than a
+ * trajectory that failed: the bytes a frame carries are the format's, so a frame
+ * that cannot be written or read is a trajectory that failed rather than a
  * compression that did.
  */
 const framed = <E, R>(
@@ -558,28 +558,28 @@ const framed = <E, R>(
   );
 
 /**
- * The exchange of the format this package ships, over where a recording is kept,
- * what carries its parts and what reads a digest off them: the header a recording
+ * The exchange of the format this package ships, over where a trajectory is kept,
+ * what carries its parts and what reads a digest off them: the header a trajectory
  * starts with and the metadata it ends with are the models the layer holds, so what
  * parses either is built from its model rather than stated again here, and where a
- * recording is kept is a storage's, so the bytes are read from and written into
+ * trajectory is kept is a storage's, so the bytes are read from and written into
  * what the storage offers.
  *
- * A recording is read at random where one part of it alone is wanted — the head for
+ * A trajectory is read at random where one part of it alone is wanted — the head for
  * the header line, the tail for the metadata — and as a stream where what is wanted
  * is the trajectory: the frame is read from the header line to the metadata that
  * follows it.
  *
  * A compression reports a frame it cannot write or read as a
- * {@link CompressionError}, which says nothing of a recording; a frame carries the
- * parts of a recording, so this side reports one it cannot write or read as the
- * {@link TrajectoryError} the recording failed with ({@link framed}). A storage
+ * {@link CompressionError}, which says nothing of a trajectory; a frame carries the
+ * parts of a trajectory, so this side reports one it cannot write or read as the
+ * {@link TrajectoryError} the trajectory failed with ({@link framed}). A storage
  * reports what it cannot read or write as a {@link StorageError}, which says
- * nothing of the recording either.
+ * nothing of the trajectory either.
  *
  * The models are the schemas of the header and of the metadata the layer holds,
  * constrained to ones plain enough to parse without a service of their own: what
- * parses the line a recording starts with and the metadata it ends with is built
+ * parses the line a trajectory starts with and the metadata it ends with is built
  * from them, and what `load` gives out is typed by them.
  */
 export const service = <
@@ -622,7 +622,7 @@ export const service = <
       (id: string) => {
         const config = configOf(trajectory);
 
-        const recording = Effect.gen(function* () {
+        const encoded = Effect.gen(function* () {
           const line = encodeHeader(config);
 
           const frames = trajectory.pipe(Stream.mapEffect(encodePart(config), { concurrency: 1 }));
@@ -634,7 +634,7 @@ export const service = <
           // FIXME: a digest can be read off fewer parts than the frame carries.
           // `broadcastN` hands the frames over a pubsub, and a subscription ends
           // without draining what the slower reader has not taken yet, so the
-          // digest a recording ends with can be that of a prefix of its parts —
+          // digest a trajectory ends with can be that of a prefix of its parts —
           // the sample the viewer opens loses its last frame here. What writes
           // the frame and what reads a digest off them should read them in one
           // pass instead.
@@ -642,7 +642,7 @@ export const service = <
 
           const digest = yield* Stream.run(hashed, hasher.digest).pipe(Effect.forkScoped);
 
-          // The metadata states what the bytes of the recording were written with
+          // The metadata states what the bytes of the trajectory were written with
           // and what they are named by, so it is emitted once the compression has
           // finished the frame it wrote for them and the digest has been read off
           // the parts it is of.
@@ -664,9 +664,9 @@ export const service = <
           );
         }).pipe(Stream.unwrap, Stream.scoped);
 
-        // What holds the bytes of a recording is held open for as long as they are
+        // What holds the bytes of a trajectory is held open for as long as they are
         // written, so the sink is run in the scope of the save itself.
-        return Stream.run(recording, storage.write(id)).pipe(Effect.scoped);
+        return Stream.run(encoded, storage.write(id)).pipe(Effect.scoped);
       },
   };
 };

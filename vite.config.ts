@@ -68,7 +68,7 @@ export default defineConfig({
   run: {
     // Cache tasks, not `package.json` scripts (the Vite+ default). Script
     // caching would also cover long-running commands like the docs dev server,
-    // whose recorded output would be replayed instead of served.
+    // whose cached output would be replayed instead of served.
     cache: { tasks: true, scripts: false },
     tasks: {
       // `vp run website` starts the docs site's Fumapress dev server; the task

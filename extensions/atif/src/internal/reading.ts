@@ -1,17 +1,17 @@
 /**
- * An ATIF document read as the turns of a recording.
+ * An ATIF document read as the turns of a trajectory.
  *
- * A document states one step per inference, while a recording holds what a model was
+ * A document states one step per inference, while a trajectory holds what a model was
  * given before each of them, so the steps are read as turns: a step that states a
- * message opens a turn with it, an agent step is recorded as the parts of the
+ * message opens a turn with it, an agent step is produced as the parts of the
  * response it answered with, and a step that follows the answer of a turn opens one
  * of its own with no message in it, because the model was called again on the same
- * messages. {@link record} enqueues those turns into the producer of a recording.
+ * messages. {@link produce} enqueues those turns into the producer of a trajectory.
  *
  * The reading is written against the kits a document names, which are none — the
  * empty kits of {@link Trajectory.UnknownConfig} — so a part a step holds beyond its
- * text — an image, a recording of speech, a subagent trajectory — is stated by a
- * location or by another document, and neither is a part a recording holds: what is
+ * text — an image, a trajectory of speech, a subagent trajectory — is stated by a
+ * location or by another document, and neither is a part a trajectory holds: what is
  * not read of a document is left out rather than invented.
  */
 
@@ -23,14 +23,14 @@ import { Effect, Predicate } from "effect";
 import type { Content, Document, StepObject } from "#/Document.ts";
 
 /**
- * The session a document's steps are recorded in, where the document names none.
+ * The session a document's steps are produced in, where the document names none.
  *
  * ATIF states the run a document belongs to for the document as a whole — the
  * steps of a document are the turns of one run — and `session_id` is optional since
- * ATIF v1.7, while a recording names every part by the session that recorded it. A
+ * ATIF v1.7, while a trajectory names every part by the session that produced it. A
  * document that states neither a run nor an identity of its own is therefore
- * recorded in this session: a name of the reading's own rather than one of the
- * document's, and one a caller reading the recording can tell from a run that was
+ * produced in this session: a name of the reading's own rather than one of the
+ * document's, and one a caller reading the trajectory can tell from a run that was
  * named.
  */
 const unnamedSession = "atif";
@@ -67,14 +67,14 @@ const promptOf = (step: StepObject): Prompt.Prompt =>
   ]);
 
 /**
- * The id a result that answers no call is recorded under: the step that was answered
+ * The id a result that answers no call is produced under: the step that was answered
  * and the position of the result in it, which name it without colliding with the id
  * of any call.
  */
 const resultId = (step: StepObject, at: number): string => `${step.step_id}-${at + 1}`;
 
 /**
- * The results a step was answered with, as the tool results of a recording.
+ * The results a step was answered with, as the tool results of a trajectory.
  *
  * A result that names no call answers the first call of its step that no result has
  * answered yet, since the calls of a step are answered in the order they were made; a
@@ -150,7 +150,7 @@ const responsesOf = (step: StepObject): ReadonlyArray<Response.AllPartsView<{}>>
   return parts;
 };
 
-/** One turn as {@link turnsOf} builds it, before it is recorded. */
+/** One turn as {@link turnsOf} builds it, before it is produced. */
 interface Turn {
   prompt: Prompt.Prompt;
   response: Array<Response.AllPartsView<{}>>;
@@ -162,9 +162,9 @@ interface Turn {
  * The turns a document's steps are read as.
  *
  * A step that answers a turn an agent step has answered already opens one of its own,
- * since ATIF states one step per inference while a recording holds what a model was
+ * since ATIF states one step per inference while a trajectory holds what a model was
  * given before each of them: the model was called again on the same messages with the
- * results of the calls in between, which are the parts recorded before it — so the
+ * results of the calls in between, which are the parts produced before it — so the
  * turn opens with no message of its own rather than repeating what the model was given.
  */
 const turnsOf = (document: Document): ReadonlyArray<Turn> => {
@@ -191,13 +191,13 @@ const turnsOf = (document: Document): ReadonlyArray<Turn> => {
 };
 
 /**
- * Records the turns of a document, in the order the document states them.
+ * Produces the turns of a document, in the order the document states them.
  *
- * The session is declared before the parts recorded in it, since every part of a
- * recording names the session that recorded it and a document states one run rather
+ * The session is declared before the parts produced in it, since every part of a
+ * trajectory names the session that produced it and a document states one run rather
  * than a session per step.
  */
-export const record = (
+export const produce = (
   producer: Produce.Producer<
     Trajectory.UnknownConfig["toolkit"]["tools"],
     Trajectory.UnknownConfig["eventkit"]["events"],

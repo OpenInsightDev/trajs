@@ -3,25 +3,24 @@
  *
  * A trajectory is a stream of parts, and what a program keeps it in — a file, a
  * database, a bucket — holds bytes. {@link Exchange} is the seam between the two:
- * {@link Service.save} encodes a trajectory into the bytes a recording is made
- * of, and {@link Service.load} reads back what a recording states of itself, the
+ * {@link Service.save} encodes a trajectory into the bytes it is made of, and {@link Service.load} reads back what a trajectory states of itself, the
  * metadata it ends with, and the trajectory its parts make. Those bytes are read
- * at random — the head of a recording for what it states of itself, its tail for
+ * at random — the head of a trajectory for what it states of itself, its tail for
  * the metadata it ends with — and held under an id by the storage the exchange was
  * provided, so an exchange performs no IO of its own: it asks that storage for the
- * bytes of a recording and for the place to write one, and where those bytes are
+ * bytes of a trajectory and for the place to write one, and where those bytes are
  * kept is the storage's to say.
  *
  * What those bytes are is the layer's to say. {@link Exchange.layer} is the format
  * this package ships — the bytes a `.trajs` file holds, described on the layer
- * itself — and a program that keeps recordings some other way provides a layer of
- * its own, which is the only thing that changes. Of that format, a recording
+ * itself — and a program that keeps trajectories some other way provides a layer of
+ * its own, which is the only thing that changes. Of that format, a trajectory
  * starts with a header line stating what it was made with, the parts follow in one
  * frame, and the metadata stating how that frame was written and what it is named
  * by follows them ({@link Metadata}); reading at random is what lets the head of a
- * recording be read for the header line and its tail for the metadata without
+ * trajectory be read for the header line and its tail for the metadata without
  * reading the frame between them. How such a frame is written, how the parts are
- * hashed and where a recording is kept are not the format's to state: the layer is
+ * hashed and where a trajectory is kept are not the format's to state: the layer is
  * built over a compression of the parts, over a hash of them and over a storage,
  * which are `@trajs/utils`'s services — a program provides the layer a platform
  * package states them with, such as `@trajs/platform-node` for one that runs on
@@ -29,7 +28,7 @@
  * compute, and the files of the machine — or `@trajs/platform-browser` for one that
  * runs where `node:zlib` is not, a page say. Which frame the parts are carried in,
  * and which digest names them, are the layer's to state too
- * ({@link Compression.Options}), and what it was built over is what the recording
+ * ({@link Compression.Options}), and what it was built over is what the trajectory
  * states of itself in the metadata it ends with.
  */
 
@@ -43,23 +42,23 @@ import * as Trajectory from "#/Trajectory.ts";
 import { TrajectoryError } from "#/TrajectoryError.ts";
 
 /**
- * What a recording states about itself, before any of its parts.
+ * What a trajectory states about itself, before any of its parts.
  *
  * **When to use**
  *
- * Use to read what a recording was made with before decoding any of its parts.
+ * Use to read what a trajectory was made with before decoding any of its parts.
  *
  * **Details**
  *
- * The toolkit and the kits a recording was made with are carried as the
+ * The toolkit and the kits a trajectory was made with are carried as the
  * descriptions they state of themselves, which is enough to name the tools, the
- * events, the metrics and the kinds of extra data a recording refers to without
+ * events, the metrics and the kinds of extra data a trajectory refers to without
  * their Effect Schemas: the toolkit as {@link Toolkit.encode} describes it — an
  * arbitrary JSON object, which a reader carries on with whatever the writer put in
  * it — and each kit as the name and the description of each of its contributions,
- * keyed by the tag it is recorded under.
+ * keyed by the tag it is produced under.
  *
- * Where a recording carries it is the layer's to say, and
+ * Where a trajectory carries it is the layer's to say, and
  * {@link Exchange.layer} says it for the one this package ships.
  *
  * @see {@link Loaded.header} for reading it back.
@@ -75,30 +74,30 @@ export const Header = Schema.Struct({
 export type Header = Schema.Schema.Type<typeof Header>;
 
 /**
- * What a recording states at its end about the bytes it is made of: how that frame
- * was written, and what the recording is named by.
+ * What a trajectory states at its end about the bytes it is made of: how that frame
+ * was written, and what the trajectory is named by.
  *
  * **When to use**
  *
- * Use to read what a recording was written with and what names it without reading
- * the parts it carries, or to state the metadata of a recording of your own.
+ * Use to read what a trajectory was written with and what names it without reading
+ * the parts it carries, or to state the metadata of a trajectory of your own.
  *
  * **Details**
  *
  * - `compression` is the algorithm the parts were carried in a frame with
  *   ({@link Compression.Algorithm}), and `hash` the algorithm their digest was read
  *   with ({@link StreamHash.Algorithm}), each stated as the code its algorithm goes
- *   by rather than as the name of it, so a recording states what wrote it rather than
+ *   by rather than as the name of it, so a trajectory states what wrote it rather than
  *   leaving whatever reads it to assume.
- * - `digest` is the digest of those parts, which is what the recording is named by
+ * - `digest` is the digest of those parts, which is what the trajectory is named by
  *   — the lowercase hex a {@link StreamHash} reads one off with.
- * - `version` is the version of this package that wrote the recording, as its
+ * - `version` is the version of this package that wrote the trajectory, as its
  *   `package.json` states it, so a reader can tell which of them wrote what it is
  *   reading.
  *
- * Where a recording carries it is the layer's to say, and {@link Exchange.layer}
+ * Where a trajectory carries it is the layer's to say, and {@link Exchange.layer}
  * says it for the one this package ships: the metadata is the last thing a
- * recording holds, so it is read from the tail of those bytes while the frame the
+ * trajectory holds, so it is read from the tail of those bytes while the frame the
  * parts are carried in is left unread.
  *
  * @see {@link Loaded.metadata} for reading it back.
@@ -124,12 +123,12 @@ export type Metadata = Schema.Schema.Type<typeof Metadata>;
  *
  * **Details**
  *
- * A response part is written through the schemas of the toolkit it was recorded
+ * A response part is written through the schemas of the toolkit it was produced
  * with — the tool results the toolkit's own tools state — so this is what those
  * schemas need, and `never` for a toolkit of plain ones. Nothing else a part
- * holds states a service: the parts of a recording are rebuilt from the plain
+ * holds states a service: the parts of a trajectory are rebuilt from the plain
  * schemas of `effect/ai` and of this package rather than read as the schemas
- * they were recorded with, which is what {@link Part} states. Reading takes
+ * they were produced with, which is what {@link Part} states. Reading takes
  * none, since the frames of a body are parsed synchronously.
  *
  * @see {@link Service.save} for the operation that requires them.
@@ -140,38 +139,38 @@ export type EncodingServices<C extends Trajectory.AnyConfig> = Schema.Union<
 >["EncodingServices"];
 
 /**
- * A recording a storage holds under an id, as the operations that read it: what it
+ * A trajectory a storage holds under an id, as the operations that read it: what it
  * states of itself, the metadata it ends with, and the trajectory its parts make.
  *
  * **When to use**
  *
- * Use to read what a recording is before reading it — what it was made with, and
+ * Use to read what a trajectory is before reading it — what it was made with, and
  * what names it, are both readable without reading its parts — or to read it once
  * as the trajectory it holds.
  *
  * **Details**
  *
- * - `header` is what the header line a recording starts with states, decoded
- *   ({@link Header}), and is read while the recording is loaded: what a recording
+ * - `header` is what the header line a trajectory starts with states, decoded
+ *   ({@link Header}), and is read while the trajectory is loaded: what a trajectory
  *   was made with is known without reading the frame its parts are carried in.
- * - `metadata` reads what a recording states at its end off its tail, without
+ * - `metadata` reads what a trajectory states at its end off its tail, without
  *   reading that frame either ({@link Metadata}).
- * - `read()` reads the whole recording as the trajectory its parts make, read as
- *   the most general one: any recording may be of any kind, so its response parts
+ * - `read()` reads the whole trajectory as the trajectory its parts make, read as
+ *   the most general one: any trajectory may be of any kind, so its response parts
  *   are read as the streams they arrived in, and its parts are read with no kit at
  *   all — see {@link Part} for what that means for the parts of either kind.
  *
- * What a load reads is the head of a recording alone, so a program that asks what
- * a recording states of itself reads neither its parts nor its tail, and what reads
+ * What a load reads is the head of a trajectory alone, so a program that asks what
+ * a trajectory states of itself reads neither its parts nor its tail, and what reads
  * the tail asks for the metadata and reads it alone ({@link Service.load}). `read`
  * is a function rather than a value because a trajectory is a stream of parts and a
  * stream is read once: each call gives the parts as they are read rather than a
  * reading already begun, and each reads the frame the parts are carried in again —
  * and the metadata with it, since where that frame ends is what the metadata says.
  *
- * Either of the three fails with what the recording fails with — a header line
+ * Either of the three fails with what the trajectory fails with — a header line
  * that is not a header, a frame that does not decode, bytes that do not end with
- * the metadata of a recording — as {@link TrajectoryError}, and with what the
+ * the metadata of a trajectory — as {@link TrajectoryError}, and with what the
  * storage fails with as a failure of its own.
  *
  * @see {@link Service.load} for the operation that gives these.
@@ -179,20 +178,20 @@ export type EncodingServices<C extends Trajectory.AnyConfig> = Schema.Union<
  */
 export interface Loaded {
   /**
-   * What the recording states about itself, as the header line the load of it
+   * What the trajectory states about itself, as the header line the load of it
    * read.
    */
   readonly header: Header;
 
   /**
-   * What the recording states at its end about its own bytes — how the frame was
-   * written and what the recording is named by — read from the tail of them
+   * What the trajectory states at its end about its own bytes — how the frame was
+   * written and what the trajectory is named by — read from the tail of them
    * ({@link Metadata}).
    */
   readonly metadata: Effect.Effect<Metadata, TrajectoryError | StorageError>;
 
   /**
-   * The trajectory the recording holds, and the parts it is made of as the bytes
+   * The trajectory the trajectory holds, and the parts it is made of as the bytes
    * they are read from.
    */
   readonly read: () => Trajectory.Trajectory<
@@ -207,28 +206,28 @@ export interface Loaded {
  *
  * **When to use**
  *
- * Use to save a trajectory where a program keeps its recordings, or to load one
- * back, without naming the format those recordings are in or where they are kept.
+ * Use to save a trajectory where a program keeps its trajectories, or to load one
+ * back, without naming the format those trajectories are in or where they are kept.
  *
  * **Details**
  *
  * {@link Service.save} writes a trajectory into the storage under an id, encoding
- * it as it is produced, and {@link Service.load} reads a recording kept under an id
+ * it as it is produced, and {@link Service.load} reads a trajectory kept under an id
  * as the operations it is read by ({@link Loaded}): loading reads the head of a
- * recording and what it takes, and the operations read the parts of it and its
+ * trajectory and what it takes, and the operations read the parts of it and its
  * tail where they are asked for.
  *
  * What those bytes are is the layer's to say, and where they are kept is the
  * storage's. An exchange holds neither: it asks the storage it was provided for the
- * bytes of a recording and for the place to write one, so what a storage fails with
- * is a failure of its own and what a recording fails with is a
+ * bytes of a trajectory and for the place to write one, so what a storage fails with
+ * is a failure of its own and what a trajectory fails with is a
  * {@link TrajectoryError}, and a program can tell the two apart by the error
  * alone.
  *
- * Either direction fails with what the recording fails with — a part that cannot
+ * Either direction fails with what the trajectory fails with — a part that cannot
  * be encoded or decoded, bytes that do not decode — as {@link TrajectoryError}, on
  * top of the failures of what it reads: the trajectory being saved or the
- * recording being loaded as `E`, and the services they need as `R`, which saving
+ * trajectory being loaded as `E`, and the services they need as `R`, which saving
  * adds the services the parts' own schemas state to.
  *
  * @see {@link Exchange.layer} for the format this package ships.
@@ -236,10 +235,10 @@ export interface Loaded {
  */
 export interface Service {
   /**
-   * Reads a recording kept under `id` into the operations it is read by.
+   * Reads a trajectory kept under `id` into the operations it is read by.
    *
-   * What loading reads is the head of a recording — the line it states itself in
-   * — so a recording that is not there, or whose head is not a header, fails here
+   * What loading reads is the head of a trajectory — the line it states itself in
+   * — so a trajectory that is not there, or whose head is not a header, fails here
    * rather than when its trajectory is read. What is left for the operations is the
    * frame its parts are carried in and the metadata it ends with, neither of which
    * a load reads.
@@ -250,13 +249,13 @@ export interface Service {
    * Writes a trajectory into the storage under the id it is given.
    *
    * The trajectory comes first and the id second, as what a save is of is the
-   * trajectory: `save(trajectory)(id)` records one trajectory where recordings are
+   * trajectory: `save(trajectory)(id)` produces one trajectory where trajectories are
    * kept, rather than naming a place and asking what goes in it.
    *
    * The trajectory is encoded as it is produced, so what it holds is never held
    * whole: what it states of itself is what the header line carries, its parts
    * follow in the frame they are compressed into, and the metadata stating how that
-   * frame was written and what the recording is named by, read off the bytes they
+   * frame was written and what the trajectory is named by, read off the bytes they
    * are carried in, follows them.
    */
   readonly save: <C extends Trajectory.AnyConfig, E, R>(
@@ -278,11 +277,11 @@ export interface Service {
  *
  * An effect written against this service takes whatever format the layer it is
  * provided with writes — nothing of a format is part of what an exchange requires
- * — and whatever storage that layer was provided with keeps its recordings, so a
- * program that keeps recordings some other way, or keeps them somewhere else,
+ * — and whatever storage that layer was provided with keeps its trajectories, so a
+ * program that keeps trajectories some other way, or keeps them somewhere else,
  * provides a layer of its own and the code that exchanges them is unchanged.
  *
- * {@link Service.save} writes a trajectory where recordings are kept, and
+ * {@link Service.save} writes a trajectory where trajectories are kept, and
  * {@link Service.load} gives what one of them is read by ({@link Loaded}): what
  * it states of itself, read from its head, what it states at its end about its own
  * bytes, read from its tail, and the trajectory it holds, read out of it as it
@@ -305,19 +304,19 @@ export class Exchange extends Context.Service<Exchange, Service>()("trajs/core/E
    *
    * **When to use**
    *
-   * Use to state the format itself, and provide it with where its recordings are
+   * Use to state the format itself, and provide it with where its trajectories are
    * kept.
    *
    * **Details**
    *
-   * A recording starts with one plain-text line, the encoded {@link Header}, and
+   * A trajectory starts with one plain-text line, the encoded {@link Header}, and
    * nothing before it is compressed, so the head of a file is readable — and its
    * toolkit and kits knowable — without anything else. Everything after that line
    * is one frame carrying the trajectory's parts, each encoded as one
-   * SchemaBinary frame ({@link Part}), so a recording is read as it arrives rather
-   * than once it has ended. The frame is followed by the metadata of the recording
+   * SchemaBinary frame ({@link Part}), so a trajectory is read as it arrives rather
+   * than once it has ended. The frame is followed by the metadata of the trajectory
    * ({@link Metadata}), as one more SchemaBinary frame, and by the length of that
-   * metadata as four bytes, big-endian: what a recording is named by is its tail,
+   * metadata as four bytes, big-endian: what a trajectory is named by is its tail,
    * and the length that ends it says where the metadata it names begins, so the
    * metadata is read without the frame before it being read
    * ({@link Loaded.metadata}).
@@ -328,8 +327,8 @@ export class Exchange extends Context.Service<Exchange, Service>()("trajs/core/E
    *
    * What writes and reads that frame is the compression the layer is provided
    * with, what hashes the parts is the hash it is provided with, and what holds the
-   * bytes of a recording is the storage — so the layer requires all three rather
-   * than holding any, and what a program provides them with is where its recordings
+   * bytes of a trajectory is the storage — so the layer requires all three rather
+   * than holding any, and what a program provides them with is where its trajectories
    * are kept. These are `@trajs/utils`'s services: a program provides the layer a
    * platform package states them with, such as `@trajs/platform-node` — over
    * `node:zlib`, the Rust binding and `node:crypto` — or
@@ -358,8 +357,8 @@ export class Exchange extends Context.Service<Exchange, Service>()("trajs/core/E
  *
  * **When to use**
  *
- * Use to read the parts of a recording this package wrote, or to write the parts
- * of a recording of your own in that format.
+ * Use to read the parts of a trajectory this package wrote, or to write the parts
+ * of a trajectory of your own in that format.
  *
  * **Details**
  *
@@ -371,14 +370,14 @@ export class Exchange extends Context.Service<Exchange, Service>()("trajs/core/E
  *
  * The response parts are stated as {@link Trajectory.ResponsePart} states them
  * for a streaming trajectory, whatever the trajectory being written states: a
- * recording is read as the most general trajectory, whose response parts are
+ * trajectory is read as the most general trajectory, whose response parts are
  * streams, and the response parts of any other kind are the members of that
  * schema too, so one schema carries the response parts of every kind.
  *
- * A part is written through the schemas of the toolkit it was recorded with, so
+ * A part is written through the schemas of the toolkit it was produced with, so
  * encoding one takes what those schemas state ({@link EncodingServices}); what
- * the other parts state is the services of none, since a recording is rebuilt
- * from plain schemas rather than read as the schemas it was recorded with.
+ * the other parts state is the services of none, since a trajectory is rebuilt
+ * from plain schemas rather than read as the schemas it was produced with.
  *
  * @see {@link Exchange.layer} for the format these frames belong to.
  * @category models

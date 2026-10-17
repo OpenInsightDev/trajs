@@ -3,9 +3,9 @@
  * carry, and the stream a response arrives in, rendered by the component each of
  * them is mapped to.
  *
- * The gallery is the mapping's own showcase rather than a viewer of recorded
+ * The gallery is the mapping's own showcase rather than a viewer of produced
  * data: the parts it renders are written here with `effect/ai`'s own
- * constructors, so it needs no recording, no model and no network. Each section
+ * constructors, so it needs no trajectory, no model and no network. Each section
  * names the part it shows and the component that part is mapped to, so the whole
  * mapping can be read off the page.
  */
@@ -47,7 +47,7 @@ import type { ReactNode } from "react";
 const markdown = [
   "A trajectory is a **stream of parts** in one total order: the messages a model was given, the parts it returned, session declarations and extension data.",
   "",
-  "A prompt part opens a turn, and every response part that follows it is recorded on that turn:",
+  "A prompt part opens a turn, and every response part that follows it is part of that turn:",
   "",
   "- the increments of a streamed response are folded into the part they complete",
   "- a response part that no prompt precedes belongs to no turn",
@@ -60,7 +60,7 @@ const markdown = [
 const textPart = Prompt.makePart("text", { text: markdown });
 
 const closingTextPart = Prompt.makePart("text", {
-  text: "Read one turn at a time with `View.promptTurns`, or fold a recording back into the prompt its model was given with `View.prompt`.",
+  text: "Read one turn at a time with `View.promptTurns`, or fold a trajectory back into the prompt its model was given with `View.prompt`.",
 });
 
 const reasoningPart = Prompt.makePart("reasoning", {
@@ -69,7 +69,7 @@ const reasoningPart = Prompt.makePart("reasoning", {
 
 const filePart = Prompt.makePart("file", {
   mediaType: "image/png",
-  fileName: "recorded-turn.png",
+  fileName: "produced-turn.png",
   data: "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
 });
 
@@ -86,7 +86,7 @@ const toolResultPart = Prompt.makePart("tool-result", {
   isFailure: false,
   result: {
     term: "trajectory",
-    summary: "A recording of what a program did with a model.",
+    summary: "A trajectory of what a program did with a model.",
     readWith: ["View.promptTurns", "Step.steps"],
   },
   providerExecuted: false,
@@ -94,7 +94,7 @@ const toolResultPart = Prompt.makePart("tool-result", {
 
 const failedToolResultPart = Prompt.makePart("tool-result", {
   id: "call_1a4c",
-  name: "read_recording",
+  name: "read_trajectory",
   isFailure: true,
   result: { message: "ENOENT: no such file or directory, open 'run.trajs'" },
   providerExecuted: false,
@@ -113,7 +113,7 @@ const approvedPart = Prompt.makePart("tool-approval-response", {
 const deniedPart = Prompt.makePart("tool-approval-response", {
   approvalId: "approval_2c17",
   approved: false,
-  reason: "the recording is out of scope for this turn",
+  reason: "the trajectory is out of scope for this turn",
 });
 
 const systemMessage = Prompt.makeMessage("system", {
@@ -210,7 +210,7 @@ const responseReasoningPart = Response.makePart("reasoning", {
   text: "The answer is in the response half of the turn, so the parts it carries are the ones to read.",
 });
 
-/** The response parts the dispatch section renders, in the order a turn records them. */
+/** The response parts the dispatch section renders, in the order a turn produces them. */
 const responseParts: ReadonlyArray<AnyResponsePart> = [
   responseReasoningPart,
   responseTextPart,
@@ -222,7 +222,7 @@ const responseParts: ReadonlyArray<AnyResponsePart> = [
 
 /** The answer the stream below writes, as the markdown it ends up as. */
 const streamedAnswer = [
-  "A trajectory is a **stream of parts** in one total order, so the exchange it records is read by grouping the parts that follow one another:",
+  "A trajectory is a **stream of parts** in one total order, so the exchange it produces is read by grouping the parts that follow one another:",
   "",
   "- the increments of a streamed response are folded into the part they complete",
   "- a response part that no prompt precedes belongs to no turn",
@@ -272,7 +272,7 @@ const streamParts: ReadonlyArray<AnyStreamPart> = [
   Response.makePart("reasoning-delta", {
     id: "reasoning_5d0c",
     delta:
-      "The question is about how a recording is read, so the answer is the reader that reads it ",
+      "The question is about how a trajectory is read, so the answer is the reader that reads it ",
   }),
   Response.makePart("reasoning-delta", {
     id: "reasoning_5d0c",
@@ -389,7 +389,7 @@ export const Gallery = () => (
       <p className="text-sm text-muted-foreground">
         Every part of an <code>effect/ai</code> prompt or response — and the stream a response
         arrives in — rendered by the shadcn/ui chat component that part is mapped to. The parts
-        below are written in the gallery itself, so nothing here is recorded or requested from a
+        below are written in the gallery itself, so nothing here is produced or requested from a
         model.
       </p>
     </header>
@@ -523,7 +523,7 @@ export const Gallery = () => (
           }}
         />
       </Sample>
-      <Sample label="parameters written, before the call is recorded">
+      <Sample label="parameters written, before the call is produced">
         <ResponseToolParams
           part={{
             id: "call_8f2a",
@@ -536,10 +536,10 @@ export const Gallery = () => (
     </Section>
 
     <Section part="Response.ErrorPart" component="ResponseError">
-      <Sample label="an error a provider recorded as a value">
+      <Sample label="an error a provider produced as a value">
         <ResponseError part={responseErrorPart} />
       </Sample>
-      <Sample label="an error a provider recorded as plain text">
+      <Sample label="an error a provider produced as plain text">
         <ResponseError part={responseTextErrorPart} />
       </Sample>
     </Section>

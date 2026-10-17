@@ -1,10 +1,10 @@
 /**
- * The count one part of a trajectory is recorded as.
+ * The count one part of a trajectory is produced as.
  *
  * Counting a part yields the numbers it is worth, and this is what those numbers
  * become: the datum of one member of `Tokens` — the buckets of a prompt, or the
  * count of the kind of response part it is. The two steps are apart because the
- * first is what a tokenizer answers and the second is what a recording states, so
+ * first is what a tokenizer answers and the second is what a trajectory states, so
  * a change to the shapes does not reach into the counting.
  */
 
@@ -71,12 +71,12 @@ const pairedTokens = (
  * The count of a response part, as the schema of the kind of part it is, or
  * nothing when no count is taken from it.
  *
- * A response part is one message part, so the kind of count it is recorded as is
+ * A response part is one message part, so the kind of count it is produced as is
  * the `type` of that part. Two kinds give back nothing: a kind that carries no
  * content — the source of a response, its metadata, its finish, the approval of a
  * call — because nothing a tokenizer answers for is in it; and a tool result,
  * whose count states what the call it answers is worth beside it, because that is
- * read from the recording the result belongs to rather than from the result alone.
+ * read from the trajectory the result belongs to rather than from the result alone.
  */
 export const responseDatum = (
   part: ResponsePart,
@@ -106,7 +106,7 @@ export const responseDatum = (
 };
 
 /**
- * The count one part of a trajectory is recorded as, or nothing when the part is
+ * The count one part of a trajectory is produced as, or nothing when the part is
  * one no count is taken from.
  *
  * The calls the parts before this one made are given so that a tool result can

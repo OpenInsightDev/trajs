@@ -1,7 +1,7 @@
 /**
  * The reading behind {@link Session.sessions}: one pass over a trajectory routes
- * each of its parts to the session that names it, so the sessions of a recording
- * are read as it is recorded rather than once it has ended.
+ * each of its parts to the session that names it, so the sessions of a trajectory
+ * are read as it is produced rather than once it has ended.
  *
  * Nothing here is published: a program reaches the reading through
  * `Session.sessions` and `Session.of`.
@@ -26,7 +26,7 @@ interface Reading<Config extends Trajectory.AnyConfig, E, R> {
 }
 
 /**
- * A session the trajectory has named, and where what it records arrives: the parts
+ * A session the trajectory has named, and where what it produces arrives: the parts
  * of the session and the sessions forked off it are routed to it as the trajectory
  * is read.
  */
@@ -41,10 +41,10 @@ interface Opened<Config extends Trajectory.AnyConfig, E, R> {
 }
 
 /**
- * The session that recorded a part read so far, and the part itself: what a `fork`
+ * The session that produced a part read so far, and the part itself: what a `fork`
  * naming the part is resolved against.
  */
-interface Recorded<Config extends Trajectory.AnyConfig, E, R> {
+interface Produced<Config extends Trajectory.AnyConfig, E, R> {
   readonly reading: Opened<Config, E, R>;
   readonly part: Trajectory.Part<Config>;
 }
@@ -65,15 +65,15 @@ const fromQueue = <A, E>(queue: Queue.Queue<A, E | Cause.Done>): Stream.Stream<A
   Stream.fromQueue(queue) as Stream.Stream<A, E>;
 
 /**
- * Reads a trajectory as the sessions it records, in one pass: the parts of a session
+ * Reads a trajectory as the sessions it produces, in one pass: the parts of a session
  * are routed to it as they are read, a session is emitted where the trajectory
  * declares it or first names it, and a `fork` is resolved against the `uuid` of every
  * part read.
  *
- * A recording is read against what it is taken to hold — a session is declared before
- * the parts it recorded, and a `fork` names a part the recording holds by the time the
+ * A trajectory is read against what it is taken to hold — a session is declared before
+ * the parts it produced, and a `fork` names a part the trajectory holds by the time the
  * declaration reading it is read — so nothing is waited for and nothing is placed once
- * the trajectory has ended: a recording that holds neither fails.
+ * the trajectory has ended: a trajectory that holds neither fails.
  */
 export const read = <Config extends Trajectory.AnyConfig, E, R>(
   trajectory: Trajectory.TrajectoryStream<Config, E, R>,
@@ -83,8 +83,8 @@ export const read = <Config extends Trajectory.AnyConfig, E, R>(
 
     /** The sessions the trajectory has named so far, by id, in the order it first named them. */
     const opened = new Map<string, Opened<Config, E, R>>();
-    /** The session that recorded each part read so far, by the part's `uuid`: what a `fork` is resolved against. */
-    const recorded = new Map<string, Recorded<Config, E, R>>();
+    /** The session that produced each part read so far, by the part's `uuid`: what a `fork` is resolved against. */
+    const produced = new Map<string, Produced<Config, E, R>>();
 
     /** The reading of the session `id`, opened on the first part that names it. */
     const opening = (id: string): Effect.Effect<Opened<Config, E, R>> =>
@@ -147,9 +147,9 @@ export const read = <Config extends Trajectory.AnyConfig, E, R>(
       emit(reading, roots, Option.none());
 
     /**
-     * Emits a session under the session that recorded the part it continues from. A
-     * `fork` names a part the recording holds by the time it is read, and the session
-     * that recorded a part is declared before it: that session has been read and
+     * Emits a session under the session that produced the part it continues from. A
+     * `fork` names a part the trajectory holds by the time it is read, and the session
+     * that produced a part is declared before it: that session has been read and
      * emitted, so there is nothing to wait for.
      */
     const emitFork = (
@@ -157,10 +157,10 @@ export const read = <Config extends Trajectory.AnyConfig, E, R>(
       uuid: string,
     ): Effect.Effect<void, TrajectoryError> =>
       Effect.gen(function* () {
-        const parent = recorded.get(uuid);
+        const parent = produced.get(uuid);
 
         if (parent === undefined) {
-          return yield* Effect.fail(TrajectoryError.session(reading.session.id, "unrecorded-fork"));
+          return yield* Effect.fail(TrajectoryError.session(reading.session.id, "unproduced-fork"));
         }
 
         yield* emit(
@@ -172,7 +172,7 @@ export const read = <Config extends Trajectory.AnyConfig, E, R>(
 
     /**
      * Reads the declaration of a session: one read after the parts the session
-     * recorded is the failure of a recording that does not declare it first.
+     * produced is the failure of a trajectory that does not declare it first.
      */
     const declare = (
       reading: Opened<Config, E, R>,
@@ -205,7 +205,7 @@ export const read = <Config extends Trajectory.AnyConfig, E, R>(
      * declares with `id`, and every other part that names one refers to it with
      * `sessionId`.
      */
-    const record = (part: Trajectory.Part<Config>): Effect.Effect<void, TrajectoryError> =>
+    const produce = (part: Trajectory.Part<Config>): Effect.Effect<void, TrajectoryError> =>
       Effect.gen(function* () {
         // A metric part names no session, and is on no session's parts: what a kit
         // contributes of its own is read with the parts it is attached to.
@@ -216,8 +216,8 @@ export const read = <Config extends Trajectory.AnyConfig, E, R>(
         const reading = yield* opening(part._tag === "Session" ? part.id : part.sessionId);
 
         // A `fork` names the part it continues from by `uuid` rather than by session,
-        // so the reading remembers the session that recorded every part it reads.
-        recorded.set(part.uuid, { reading, part });
+        // so the reading remembers the session that produced every part it reads.
+        produced.set(part.uuid, { reading, part });
 
         yield* Queue.offer(reading.parts, part);
 
@@ -228,7 +228,7 @@ export const read = <Config extends Trajectory.AnyConfig, E, R>(
         }
 
         // A session whose first part is not a declaration is one nothing declares — a
-        // session is declared before the parts it recorded — so it is a root, emitted
+        // session is declared before the parts it produced — so it is a root, emitted
         // where the trajectory first names it.
         if (!reading.emitted) {
           yield* emitRoot(reading);
@@ -282,11 +282,11 @@ export const read = <Config extends Trajectory.AnyConfig, E, R>(
     // whoever reads one of them, and a trajectory that fails fails the sessions it was
     // read into.
     return Stream.fromQueue(roots).pipe(
-      Stream.drainFork(trajectory.pipe(Stream.tap(record), Stream.onExit(close), Stream.drain)),
+      Stream.drainFork(trajectory.pipe(Stream.tap(produce), Stream.onExit(close), Stream.drain)),
     );
   }).pipe(Stream.unwrap);
 
-/** The session a stream of sessions records under `id`, if it records one. */
+/** The session a stream of sessions carries under `id`, if it names one. */
 export const find =
   (id: string) =>
   <Config extends Trajectory.AnyConfig, E, R>(

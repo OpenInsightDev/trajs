@@ -23,7 +23,7 @@ type Reading<Prev extends Schema.Top, Next extends Schema.Top, RD> = Schema.deco
  * **When to use**
  *
  * Use to type data that is written at a version of its own, such as the data an
- * extension contributes to a recording — see {@link Extension.Extension}.
+ * extension contributes to a trajectory — see {@link Extension.Extension}.
  *
  * **Details**
  *
@@ -31,7 +31,7 @@ type Reading<Prev extends Schema.Top, Next extends Schema.Top, RD> = Schema.deco
  * member for every version the data was written at, so data of any of them reads as
  * the newest one. A shape stated by {@link make} holds one member, its only version;
  * every member {@link upgrade} adds reads the version before it, which is how a
- * recording written at an older version still reads.
+ * trajectory written at an older version still reads.
  *
  * @see {@link make} for the first version of a shape.
  * @see {@link upgrade} for deriving the version next.
@@ -87,7 +87,7 @@ function assemble(self: Schema.Top, readers: ReadonlyArray<Schema.Top>): Schema.
  * **When to use**
  *
  * Use to state the shape of the data an extension contributes: what it attaches to
- * a message part, the events it records, and what a producer yields.
+ * a message part, the events it produces, and what a producer yields.
  *
  * **Details**
  *
@@ -122,14 +122,14 @@ export const make = <Self extends Schema.Struct<{ readonly version: Schema.Liter
  *
  * **When to use**
  *
- * Use when a shape gains, loses or renames a field, so that a recording written at
+ * Use when a shape gains, loses or renames a field, so that a trajectory written at
  * the version before still reads as the version next.
  *
  * **Details**
  *
  * `fields` are the version next's own: the fields of the version before, as the
  * caller changes them. `change.decode` reads a datum of the version before as one of
- * the version next, which is what makes a recording of either version read the same
+ * the version next, which is what makes a trajectory of either version read the same
  * way. Writing goes one way only: every version a shape holds writes as the version
  * next.
  *
@@ -235,9 +235,9 @@ type TaggedTable<Table extends Schemas> = {
  *
  * **When to use**
  *
- * Use to type data of several kinds that is recorded together and read back without
+ * Use to type data of several kinds that is produced together and read back without
  * knowing which kind it is — what an extension yields of a part beside what it fails
- * with, or what each extension of a kit contributes to a recording.
+ * with, or what each extension of a kit contributes to a trajectory.
  *
  * **Details**
  *
@@ -291,8 +291,8 @@ const tagSchema = (tag: string, entry: Any): Any => {
  *
  * **When to use**
  *
- * Use to state the data a recording holds of several kinds as one: the two schemas an
- * extension derives a recording with, or the schema each extension of a kit
+ * Use to state the data a trajectory holds of several kinds as one: the two schemas an
+ * extension derives a trajectory with, or the schema each extension of a kit
  * contributes to one.
  *
  * **Details**

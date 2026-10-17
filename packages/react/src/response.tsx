@@ -5,7 +5,7 @@
  * on a part's `type` to those and to the components `prompt.tsx` renders the
  * shapes a response shares with a prompt by.
  *
- * Nothing is mapped twice: wherever a response part and a prompt part record the
+ * Nothing is mapped twice: wherever a response part and a prompt part produce the
  * same thing, one component reads both, so the text of an answer, its reasoning,
  * its files and its tool calls are rendered as a prompt's are. Only the parts a
  * response is made of are here; `stream.tsx` is where the parts it is written in
@@ -53,13 +53,13 @@ import {
 } from "./prompt.tsx";
 
 /**
- * A response part, as a recording carries it: the toolkit a part was recorded
+ * A response part, as a trajectory carries it: the toolkit a part was produced
  * with is not the toolkit it is read with, so the tool a part names is left
  * unconstrained.
  *
  * **When to use**
  *
- * Use to type a response whose parts were recorded rather than built, such as the
+ * Use to type a response whose parts were produced rather than built, such as the
  * answer a turn holds.
  *
  * @see {@link ResponsePart} for the component that dispatches over it.
@@ -80,7 +80,7 @@ type SourcePart = Response.DocumentSourcePart | Response.UrlSourcePart;
  *
  * A URL is the link it points at: its title opens it in a new tab, and the URL
  * itself is read under the title. A document is named by its title, its media
- * type and the file name it recorded where it recorded one — the response holds
+ * type and the file name it produced where it produced one — the response holds
  * a reference to it, not its bytes, so nothing about the document is opened.
  *
  * @see {@link ResponsePart} for the dispatch that reaches this component.
@@ -109,7 +109,7 @@ export const ResponseSource = ({ part }: { part: SourcePart }) => (
 );
 
 /**
- * The fields a metadata part recorded, as the label and the value each is read
+ * The fields a metadata part produced, as the label and the value each is read
  * by. A request is read as the method and the URL it was sent to rather than as
  * the parameters and headers it carried.
  */
@@ -139,7 +139,7 @@ const Field = ({ label, value }: { label: string; value: string }) => (
 );
 
 /**
- * A response metadata part, as what the response recorded about itself.
+ * A response metadata part, as what the response produced about itself.
  *
  * **When to use**
  *
@@ -148,8 +148,8 @@ const Field = ({ label, value }: { label: string; value: string }) => (
  *
  * **Details**
  *
- * A metadata part carries whichever fields the response recorded and nothing of
- * the rest, so a part that recorded none of them opens onto nothing.
+ * A metadata part carries whichever fields the response produced and nothing of
+ * the rest, so a part that produced none of them opens onto nothing.
  *
  * @see {@link ResponseFinish} for what the response ended with.
  * @category components
@@ -232,12 +232,12 @@ const tokensOf = (usage: Response.Usage): ReadonlyArray<string> => {
  *
  * **Details**
  *
- * The reason is shown as the provider recorded it rather than translated, so a
+ * The reason is shown as the provider produced it rather than translated, so a
  * reason this package has never heard of still reads. A count the provider did
  * not report is not shown, and a part that reported no usage at all is the
  * reason alone.
  *
- * @see {@link ResponseMetadata} for what the response recorded about itself.
+ * @see {@link ResponseMetadata} for what the response produced about itself.
  * @category components
  */
 export const ResponseFinish = ({ part }: { part: Response.FinishPart }) => {
@@ -267,7 +267,7 @@ const unmapped = (part: never): never => part;
  * **When to use**
  *
  * Use to render a response whose parts are known only as the union `effect/ai`
- * gives them, such as the answer a turn recorded.
+ * gives them, such as the answer a turn produced.
  *
  * **Details**
  *

@@ -2,14 +2,14 @@
  * Response parts that tolerate tools the toolkit does not know about.
  *
  * `effect/ai/Response` types tool call and tool result parts by the tool names of
- * toolkit they were built from, so decoding a recorded response that mentions
+ * toolkit they were built from, so decoding a response a trajectory holds that mentions
  * any other tool fails. Each `*View` schema unions the upstream schema with the
  * two unconstrained parts below, {@link AnyToolCallPart} and
  * {@link AnyToolResultPart}, so those tools decode instead of being rejected
  * while tools that are in the toolkit keep their exact names, parameters and
  * results. A part claiming a known tool name whose payload no longer matches that
  * tool's schema also falls back to the unconstrained part, because loading
- * recorded history should not depend on the current tool schemas.
+ * the history a trajectory holds should not depend on the current tool schemas.
  */
 
 import { Effect, identity, Predicate, Schema, SchemaTransformation } from "effect";
@@ -71,7 +71,7 @@ export type AllPartsView<Tools extends Record<string, Tool.Any>> =
  *
  * **When to use**
  *
- * Use when decoding or encoding recorded response parts that may contain tools
+ * Use when decoding or encoding the response parts a trajectory holds that may contain tools
  * the provided toolkit does not define.
  *
  * @see {@link AllParts} for a Schema restricted to the provided toolkit.
@@ -109,7 +109,7 @@ export type PartView<
  *
  * **When to use**
  *
- * Use when decoding or encoding a recorded response part that may contain tools
+ * Use when decoding or encoding a response part a trajectory holds that may contain tools
  * the provided toolkit does not define.
  *
  * @see {@link Part} for a Schema restricted to the provided toolkit.
@@ -147,7 +147,7 @@ export type StreamPartView<
  *
  * **When to use**
  *
- * Use when decoding or encoding a recorded stream part that may contain tools
+ * Use when decoding or encoding a stream part a trajectory holds that may contain tools
  * the provided toolkit does not define.
  *
  * @see {@link StreamPart} for a Schema restricted to the provided toolkit.
@@ -232,7 +232,7 @@ export type ToolPartView<
  *
  * **When to use**
  *
- * Use to type a tool call part recorded for a tool whose schema is no longer
+ * Use to type a tool call part a trajectory holds for a tool whose schema is no longer
  * available.
  *
  * @category models
@@ -261,7 +261,7 @@ export const isAnyToolCallPart = (u: unknown): u is RuntimeAnyToolCallPart =>
  *
  * **When to use**
  *
- * Use when recording a tool call for a tool that is not part of a toolkit.
+ * Use when trajectory a tool call for a tool that is not part of a toolkit.
  *
  * @category constructors
  */
@@ -305,7 +305,7 @@ export const AnyToolCallPart: Schema.Codec<AnyToolCallPart, ToolCallPartEncoded>
  *
  * **When to use**
  *
- * Use to type a tool result part recorded for a tool whose schema is no longer
+ * Use to type a tool result part a trajectory holds for a tool whose schema is no longer
  * available.
  *
  * @category models
@@ -376,13 +376,13 @@ type AnyToolResultParams = Omit<
  *
  * **When to use**
  *
- * Use when recording a tool result for a tool that is not part of a toolkit.
+ * Use when trajectory a tool result for a tool that is not part of a toolkit.
  *
  * **Details**
  *
  * What a result is encoded as is derived from the result, the way decoding a part
  * derives it: the two fields the decoded part holds beyond what a caller states
- * are filled in here, so that the part built is the part a recording reads back —
+ * are filled in here, so that the part built is the part a trajectory reads back —
  * which is what `Trajectory.responsePart` refuses a part built without them to
  * be.
  *

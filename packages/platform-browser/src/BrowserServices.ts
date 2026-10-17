@@ -5,7 +5,7 @@
  * JavaScript hash of `@trajs/utils` read a digest with.
  *
  * {@link layer} is the layer a program that runs where `node:zlib` is not provides
- * `@trajs/core`'s `Exchange.layer` with, beside where it keeps its recordings.
+ * `@trajs/core`'s `Exchange.layer` with, beside where it keeps its trajectories.
  */
 
 import { type Compression, type Options as CompressionOptions } from "@trajs/utils/Compression";
@@ -31,20 +31,20 @@ export type BrowserServices = Compression | StreamHash;
  *
  * **When to use**
  *
- * Use where a program states how its recordings are carried and what names them, or
+ * Use where a program states how its trajectories are carried and what names them, or
  * to type what a layer of these services is built with.
  *
  * **Details**
  *
  * - `compression` is what {@link BrowserCompression.layer} is built with: the
- *   algorithm a recording's parts are carried in ({@link CompressionOptions}), which
+ *   algorithm a trajectory's parts are carried in ({@link CompressionOptions}), which
  *   `@trajs/utils`'s `Compression` states.
  * - `hash` is what {@link BrowserStreamHash.layer} is built with: the algorithm
  *   those parts are named by ({@link StreamHashOptions}), which `@trajs/utils`'s
  *   `StreamHash` states.
  *
  * Either may be left out, and neither is required: a layer built over no options
- * carries and names a recording the way it has always been carried and named — in a
+ * carries and names a trajectory the way it has always been carried and named — in a
  * zstd frame, by a BLAKE3 digest.
  *
  * @see {@link layer} for what it is given to.
@@ -62,13 +62,13 @@ export interface Options {
  * **When to use**
  *
  * Use when a program has no `node:zlib` — a page, a worker — or when every run
- * should write and read a recording with the same codecs.
+ * should write and read a trajectory with the same codecs.
  *
  * **Details**
  *
  * It is {@link BrowserCompression.layer} and {@link BrowserStreamHash.layer} at the
  * algorithms given ({@link Options}), so what a program provides decides both how a
- * recording is carried and what names it. Where a recording is kept is not among
+ * trajectory is carried and what names it. Where a trajectory is kept is not among
  * them: where a page keeps one — the bytes it was handed, a store in it — is the
  * program's to say, so it provides a storage of its own beside this layer.
  *

@@ -2,12 +2,12 @@
  * The parts of a response that arrived in increments as the whole parts they add
  * up to.
  *
- * A response may be recorded as it arrives — the increments of a streamed answer —
+ * A response may be produced as it arrives — the increments of a streamed answer —
  * and read as the parts those increments complete: {@link collapse} is that
  * reading of one part, and {@link foldParts} the reading of a whole trajectory.
  * Either way the folding is the one `View` reads a turn with, so what a reader of
- * a recording sees of a streamed answer is the answer itself, however it was
- * recorded.
+ * a trajectory sees of a streamed answer is the answer itself, however it was
+ * produced.
  */
 
 import { Predicate, Stream } from "effect";
@@ -186,7 +186,7 @@ const foldPart = <Config extends Trajectory.AnyConfig>(
  * **When to use**
  *
  * Use when what reads a part is to read it as it was said rather than as it was
- * recorded, since a trajectory is read as the most general one and the parts of it
+ * produced, since a trajectory is read as the most general one and the parts of it
  * are therefore the increments of a streamed response as well as the whole parts
  * those increments complete — see {@link Trajectory.AnyConfig}. The producers of a
  * metric are the readers this is for: a producer measures the parts a model was
@@ -205,7 +205,7 @@ const foldPart = <Config extends Trajectory.AnyConfig>(
  * `uuid`, `timestamp` and extra data rather than an identity of its own: what
  * `collapse` gathers is the content of the part, and the `*-end` increment is the
  * part at which the whole of it exists. What attaches to a folded part therefore
- * names a part the recording holds, which is the increment the reading of it
+ * names a part the trajectory holds, which is the increment the reading of it
  * arrived at.
  *
  * The state of the folding is one per reading rather than shared between them, so

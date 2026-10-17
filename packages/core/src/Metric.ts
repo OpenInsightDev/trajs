@@ -1,14 +1,14 @@
 /**
- * Metrics a producer reports of a trajectory, and the parts a recording holds
+ * Metrics a producer reports of a trajectory, and the parts a trajectory holds
  * them as.
  *
  * A {@link Metric} is one kind of measurement an extension names, with the
  * schemas of what a producer reports of it and of what producing it fails with.
  * {@link makeKit} collects metrics into a kit, {@link mergeKit} adds the metrics of
  * one kit to another's, and {@link toProducers} provides a kit with the producer of
- * each of them, which {@link produce} runs over a recording. {@link MetricParts} reads
+ * each of them, which {@link produce} runs over a trajectory. {@link MetricParts} reads
  * the parts of the metrics a kit names, and {@link MetricPartsView} reads those parts
- * while tolerating metrics the kit does not name, so a recording another kit wrote still
+ * while tolerating metrics the kit does not name, so a trajectory another kit wrote still
  * reads.
  */
 
@@ -107,7 +107,7 @@ type ProducersMerged<Ks extends ReadonlyArray<WithProducers<AnyKit>>> = Ks exten
  * **When to use**
  *
  * Use to name the kit {@link mergeKit} returns, such as to type a kit built over
- * the ones of two recordings.
+ * the ones of two trajectories.
  *
  * **Details**
  *
@@ -137,14 +137,14 @@ export type MetrickitMerged<Ks extends ReadonlyArray<AnyKit>> =
  * **When to use**
  *
  * Use when the metrics of several extensions are read together, or when a reader
- * that knows some of a recording's metrics should read it under the ones it knows
- * without forgetting the rest — which is what reading two recordings as one does.
+ * that knows some of a trajectory's metrics should read it under the ones it knows
+ * without forgetting the rest — which is what reading two trajectories as one does.
  *
  * **Details**
  *
  * A tag the kits share holds the metric of the kit latest among those given that
  * names it, so a kit of the version an extension states now states over the one a
- * recording was read with. The kit returned is a kit like any other: it names the
+ * trajectory was read with. The kit returned is a kit like any other: it names the
  * metrics of every kit given and no others.
  *
  * The producers the kits were provided with are added to each other the same way,
@@ -285,7 +285,7 @@ export const isAnyMetricPart = (u: unknown): u is RuntimeAnyMetricPart =>
  * **Details**
  *
  * - The marker is stated on a part when it is read and omitted when it is
- *   written, so a recording written again holds what it did.
+ *   written, so a trajectory written again holds what it did.
  * - The tag must be a string and the data must be present: nothing else of a
  *   part of a metric a kit does not name is known.
  *
@@ -342,7 +342,7 @@ const failureSchemaOf = <Ext extends Any>(metric: Ext): FailureSchema<Ext> =>
  * **When to use**
  *
  * Use where the producer of a metric reports a measurement it derived, which is
- * every measurement a producer reports: what is returned is what the kit records
+ * every measurement a producer reports: what is returned is what the kit produces
  * as a metric part of the trajectory, about the parts the measurement was taken
  * for.
  *
@@ -389,7 +389,7 @@ export class ProducerFailure<Ext extends Any> extends Data.TaggedClass("Producer
  * **When to use**
  *
  * Use where the producer of a metric reports a part it could not measure, which a
- * kit records as a metric part of the trajectory rather than failing the run.
+ * kit produces as a metric part of the trajectory rather than failing the run.
  *
  * **Details**
  *
@@ -397,7 +397,7 @@ export class ProducerFailure<Ext extends Any> extends Data.TaggedClass("Producer
  * argument for the same reason, `failure` is the metric's own failure at the newest
  * version of it, and `attach` names the parts the failure is about. What a
  * producer reports on its error channel is told from the failure of the run by
- * this shape's tag, so a failure a producer derived is recorded rather than
+ * this shape's tag, so a failure a producer derived is produced rather than
  * thrown.
  *
  * @see {@link ProducerFailure} for what a report holds.
@@ -431,9 +431,9 @@ export const makeFailure = <Ext extends Any>(
  * a model was given and returned rather than the increments an answer arrived in:
  * the parts of a streamed answer are folded into the whole parts they complete
  * before a producer reads them, which {@link produce} does for the kit it runs. The
- * kits a recording was read with are the reading's rather than the producer's, so a
- * producer measures a recording without knowing the toolkit, the kits or the
- * variant it was recorded with.
+ * kits a trajectory was read with are the reading's rather than the producer's, so a
+ * producer measures a trajectory without knowing the toolkit, the kits or the
+ * variant it was produced with.
  *
  * What a run of a producer requires is what the trajectory it reads requires, so
  * a producer asks for no service of its own: a service it is built with is
@@ -482,7 +482,7 @@ export type Producers<Metrics extends Record<string, Any>> = Readonly<{
  * **Details**
  *
  * It is the kit itself, carrying the producers of its metrics beside them: the
- * metrics it holds are the ones a recording is read with, and the producers are
+ * metrics it holds are the ones a trajectory is read with, and the producers are
  * keyed as those metrics are, so each metric is reported by the producer it
  * names and none is left without one. The producers are held beside the metrics
  * rather than standing for them because a producer does not name its own metric:
@@ -609,7 +609,7 @@ export const MetricParts = <K extends AnyKit>(
  *
  * **When to use**
  *
- * Use to type a metric part read from a recording that may mention metrics the
+ * Use to type a metric part read from a trajectory that may mention metrics the
  * reading kit does not name.
  *
  * **Details**
@@ -641,7 +641,7 @@ type MetricPartsViewSchema<Metrics extends Record<string, Any>> = Schema.Union<
  *
  * **When to use**
  *
- * Use when decoding or encoding recorded metric parts that may mention metrics
+ * Use when decoding or encoding the metric parts a trajectory holds that may mention metrics
  * the reading kit does not name.
  *
  * **Details**
@@ -650,9 +650,9 @@ type MetricPartsViewSchema<Metrics extends Record<string, Any>> = Schema.Union<
  *   reads it, in the order the kit holds the metrics.
  * - A part naming a metric of the kit whose data no longer matches a version of
  *   the schema that metric states falls back to {@link AnyMetricPart}, because
- *   reading a recording does not depend on the schemas it is read with.
+ *   reading a trajectory does not depend on the schemas it is read with.
  * - A part read as {@link AnyMetricPart} is written back as it was read, so
- *   re-writing a recording a kit wrote does not change it.
+ *   re-writing a trajectory a kit wrote does not change it.
  *
  * **Example** (Reading metrics the kit named and one it did not)
  *
@@ -733,47 +733,47 @@ const isProducerFailure = (value: unknown): value is ProducerFailure<Any> =>
   Predicate.isTagged("ProducerFailure")(value) && Predicate.hasProperty(value, "failure");
 
 /**
- * Runs every producer of a kit over a recording, reporting what each of them
+ * Runs every producer of a kit over a trajectory, reporting what each of them
  * derived of it.
  *
  * **When to use**
  *
- * Use to derive the metrics a kit names from a trajectory, such as to record what
- * was derived as the metric parts of the trajectory, so that what a recording is
+ * Use to derive the metrics a kit names from a trajectory, such as to produce what
+ * was derived as the metric parts of the trajectory, so that what a trajectory is
  * worth reads back without the producers that derived it.
  *
  * **Details**
  *
- * A recording is read once however many metrics the kit names: the parts are
- * shared between the producers rather than read by each of them, so the recording
+ * A trajectory is read once however many metrics the kit names: the parts are
+ * shared between the producers rather than read by each of them, so the trajectory
  * is broadcast and every one of them reads the same parts.
  *
- * The parts a producer reads are the recording's own, with the increments a
+ * The parts a producer reads are the trajectory's own, with the increments a
  * streamed response arrived in folded into the whole parts they complete: a
  * producer measures what a model was given and returned, so it reads a part as it
- * was said rather than as it was recorded — see {@link Producer}. The folding is
+ * was said rather than as it was produced — see {@link Producer}. The folding is
  * the one `View` reads a streamed answer with, and a folded part carries the `uuid`
  * of the increment that completed it, so what a report attaches to is a part the
- * recording holds.
+ * trajectory holds.
  *
  * What is emitted is one report of a metric with the tag of the metric it
- * belongs to, which is the part a recording holds a report as, as
+ * belongs to, which is the part a trajectory holds a report as, as
  * {@link MetricParts} reads one: the data of the metric it was derived of, about
- * the parts it is attached to, apart from the metadata a trajectory records
+ * the parts it is attached to, apart from the metadata a trajectory produces
  * every part with. A report of one metric is told from a report of another by
  * that tag alone, since a producer names no metric of its own.
  *
  * The failure a producer reports of a part is not a failure of the run: it is
  * emitted beside what the producers yield, as the metric's own failure, so a
- * part that could not be measured is recorded rather than throwing. The stream
- * fails with the recording's failure, or with the {@link TrajectoryError} a
+ * part that could not be measured is produced rather than throwing. The stream
+ * fails with the trajectory's failure, or with the {@link TrajectoryError} a
  * producer fails with once one has read.
  *
  * What a producer is built with travels with the producer rather than with the
  * kit: a run of it asks for nothing on that account, and the services the
- * recording asks for are provided to the run.
+ * trajectory asks for are provided to the run.
  *
- * **Example** (Running a kit's producers over a recording)
+ * **Example** (Running a kit's producers over a trajectory)
  *
  * ```ts import.meta.vitest
  * import { Effect, Schema, Stream } from "effect"
@@ -793,11 +793,11 @@ const isProducerFailure = (value: unknown): value is ProducerFailure<Any> =>
  *   }).pipe(VersionedSchema.make)
  * })
  *
- * // What the metric is reported by: a count for each part the recording holds. A
+ * // What the metric is reported by: a count for each part the trajectory holds. A
  * // producer is typed where it is written, since what it reports is the data of
  * // the metric it is keyed by.
- * const counting: Metric.Producer<typeof count> = (recording) =>
- *   recording.pipe(
+ * const counting: Metric.Producer<typeof count> = (trajectory) =>
+ *   trajectory.pipe(
  *     Stream.map((): Metric.ProducerOutput<typeof count> =>
  *       Metric.makeOutput<typeof count>({ version: "0.1.0", tokens: 1 }, {
  *         attach: ["01890a5d-ac96-774b-bcce-b302099a8057"]
@@ -809,16 +809,16 @@ const isProducerFailure = (value: unknown): value is ProducerFailure<Any> =>
  *   "tokenize/count": counting
  * })
  *
- * // A recording another kit wrote: the parts are read as they are, whichever
+ * // A trajectory another kit wrote: the parts are read as they are, whichever
  * // metrics they name, so a producer of the kit still reads every one of them.
- * const recorded = Stream.make(
+ * const produced = Stream.make(
  *   Schema.decodeSync(Trajectory.MetricPart(Metric.makeKit()))({
  *     _tag: "Metric",
  *     metric: { _tag: "atif/step", data: { version: "0.1.0", index: 1 } }
  *   })
  * )
  *
- * const parts = await Effect.runPromise(Stream.runCollect(Metric.produce(runnable)(recorded)))
+ * const parts = await Effect.runPromise(Stream.runCollect(Metric.produce(runnable)(produced)))
  *
  * Array.from(parts).map((part) => part._tag) // => ["tokenize/count"]
  * ```
@@ -830,20 +830,20 @@ const isProducerFailure = (value: unknown): value is ProducerFailure<Any> =>
 export const produce =
   <Kit extends AnyKit>({ producers }: WithProducers<Kit>) =>
   <Config extends Trajectory.AnyConfig, E, R>(
-    recorded: Trajectory.TrajectoryStream<Config, E, R>,
+    produced: Trajectory.TrajectoryStream<Config, E, R>,
   ): Stream.Stream<MetricParts<Kit["metrics"]>, E | TrajectoryError, R> => {
     const tags = Object.keys(producers);
 
-    // A kit that names no metric derives nothing of a recording, so it reads none
+    // A kit that names no metric derives nothing of a trajectory, so it reads none
     // of one.
     if (tags.length === 0) {
       return Stream.empty;
     }
 
-    return foldParts(recorded).pipe(
-      // A producer reads the recording for the parts it measures, so the parts are
+    return foldParts(produced).pipe(
+      // A producer reads the trajectory for the parts it measures, so the parts are
       // served to the producers rather than read by each of them: a stream serves
-      // a single reading, and a recording read for what a kit derives of it
+      // a single reading, and a trajectory read for what a kit derives of it
       // arrives in one that is the branch of a broadcast.
       Stream.broadcastN({ n: tags.length, capacity: "unbounded" }),
       Effect.map((readings) =>
@@ -857,7 +857,7 @@ export const produce =
             return report(readings[index]).pipe(
               Stream.map((reported) => ({ _tag: tag, data: reported })),
               // The failure a producer derived is the data of its metric, so it is
-              // recorded as a metric part rather than failing the run.
+              // produced as a metric part rather than failing the run.
               Stream.catchIf(isProducerFailure, (failure) =>
                 Stream.make({ _tag: tag, data: failure }),
               ),

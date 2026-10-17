@@ -1,7 +1,7 @@
 # @trajs/cli
 
-The `trajs` command line: read what a `.trajs` recording states about itself
-without opening it in a viewer.
+The `trajs` command line: read what a trajectory states about itself without
+opening it in a viewer.
 
 ## Commands
 
@@ -12,8 +12,8 @@ written with — as JSON. The header is written on one line until `--indent` say
 otherwise:
 
 ```bash
-trajs inspect recording.trajs
-trajs inspect recording.trajs --indent 2
+trajs inspect trajectory.trajs
+trajs inspect trajectory.trajs --indent 2
 ```
 
 ## Development
@@ -21,7 +21,7 @@ trajs inspect recording.trajs --indent 2
 - Run the command from source, on the Node runtime's own TypeScript support:
 
 ```bash
-pnpm --filter @trajs/cli dev inspect recording.trajs
+pnpm --filter @trajs/cli dev inspect trajectory.trajs
 ```
 
 - Build the executable:

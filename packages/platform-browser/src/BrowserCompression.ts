@@ -89,7 +89,7 @@ const piped = <E, R>(
 
 /**
  * A browser's codec as the pair of streams a frame is carried through: the binary of
- * a recording's parts is what is written into it and what is read back from it.
+ * a trajectory's parts is what is written into it and what is read back from it.
  */
 type Pair = ReadableWritablePair<Uint8Array, Uint8Array>;
 
@@ -98,7 +98,7 @@ type Pair = ReadableWritablePair<Uint8Array, Uint8Array>;
  *
  * The writable of `CompressionStream` and `DecompressionStream` is declared a
  * `WritableStream<BufferSource>` — any binary a caller may hand one — where the
- * chunks a recording's frame arrives in are `Uint8Array` over buffers this side does
+ * chunks a trajectory's frame arrives in are `Uint8Array` over buffers this side does
  * not name; what the pair states is what the codec reads and writes at run time,
  * which its own declaration cannot state.
  */
@@ -154,20 +154,20 @@ const decompressors: Record<CodedAlgorithm, Frame> = {
  * **When to use**
  *
  * Use when a program runs where `node:zlib` is not — a page, a worker, Deno — or
- * when every run should write and read a recording with the same codecs.
+ * when every run should write and read a trajectory with the same codecs.
  *
  * **Details**
  *
  * gzip and deflate are the frames `CompressionStream` and `DecompressionStream`
  * write and read, and zstd is the WebAssembly codec's, whose engine picks the SIMD
  * payload where the host has it and the scalar one where it has not. Each frame is
- * carried through one codec per run, so a recording is written and read as it
+ * carried through one codec per run, so a trajectory is written and read as it
  * arrives — as it is on Node, where `node:zlib` is what the algorithms are stated
  * over.
  *
  * `none` carries the parts as the format encodes them, which is the frame that costs
  * nothing to write and the most to keep. The algorithm is the layer's to state
- * ({@link Options}), and defaults to zstd, the frame a recording has always been
+ * ({@link Options}), and defaults to zstd, the frame a trajectory has always been
  * carried in.
  *
  * @see {@link Compression} for the compression this provides.

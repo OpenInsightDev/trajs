@@ -4,7 +4,7 @@
  * `@napi-rs/blake-hash` and `node:crypto` compute.
  *
  * {@link layer} is what a program that runs on Bun provides `@trajs/core`'s
- * `Exchange.layer` with, beside where it keeps a recording.
+ * `Exchange.layer` with, beside where it keeps a trajectory.
  */
 
 import * as NodeStreamHash from "@trajs/platform-node/NodeStreamHash";
@@ -28,20 +28,20 @@ export type BunServices = Compression | StreamHash;
  *
  * **When to use**
  *
- * Use where a program states how its recordings are carried and what names them, or
+ * Use where a program states how its trajectories are carried and what names them, or
  * to type what a layer of these codecs is built with.
  *
  * **Details**
  *
  * - `compression` is what {@link BunCompression.layer} is built with: the algorithm
- *   a recording's parts are carried in ({@link CompressionOptions}), which
+ *   a trajectory's parts are carried in ({@link CompressionOptions}), which
  *   `@trajs/utils`'s `Compression` states.
  * - `hash` is what `@trajs/platform-node`'s `NodeStreamHash.layer` is built with:
  *   the algorithm those parts are named by ({@link StreamHashOptions}), which
  *   `@trajs/utils`'s `StreamHash` states.
  *
  * Either may be left out, and neither is required: a layer built over no options
- * carries and names a recording the way it has always been carried and named — in a
+ * carries and names a trajectory the way it has always been carried and named — in a
  * zstd frame, by a BLAKE3 digest.
  *
  * @see {@link layer} for what it is given to.
@@ -58,7 +58,7 @@ export interface Options {
  * **When to use**
  *
  * Use when a program runs on Bun: it is the layer `Exchange.layer` is provided with,
- * beside the storage where a recording is kept.
+ * beside the storage where a trajectory is kept.
  *
  * **Details**
  *
@@ -70,7 +70,7 @@ export interface Options {
  * one — so every algorithm is one a codec of Bun computes.
  *
  * Both layers are built at the algorithms given ({@link Options}), so where a
- * recording is kept is not among them: a program that keeps its recordings as files
+ * trajectory is kept is not among them: a program that keeps its trajectories as files
  * provides `@trajs/utils`'s file storage beside this layer.
  *
  * @see {@link BunServices} for the codecs it provides.
