@@ -20,10 +20,10 @@ import {
 
 import { pipeThroughDuplex } from "@effect/platform-node/NodeStream";
 import {
+  Algorithm,
   Compression,
   CompressionError,
   defaultAlgorithm,
-  type Algorithm,
   type Options,
 } from "@trajs/utils/Compression";
 import { Layer, Stream } from "effect";
@@ -32,18 +32,18 @@ import { Layer, Stream } from "effect";
  * The algorithms `node:zlib` writes a frame with: every one the compression states
  * but the bytes carried as they are, which no codec is needed for.
  */
-type ZlibAlgorithm = Exclude<Algorithm, "none">;
+type ZlibAlgorithm = Exclude<Algorithm, typeof Algorithm.None>;
 
 const compressors: Record<ZlibAlgorithm, () => Transform> = {
-  deflate: () => createDeflate(),
-  gzip: () => createGzip(),
-  zstd: () => createZstdCompress(),
+  [Algorithm.Deflate]: () => createDeflate(),
+  [Algorithm.Gzip]: () => createGzip(),
+  [Algorithm.Zstd]: () => createZstdCompress(),
 };
 
 const decompressors: Record<ZlibAlgorithm, () => Transform> = {
-  deflate: () => createInflate(),
-  gzip: () => createGunzip(),
-  zstd: () => createZstdDecompress(),
+  [Algorithm.Deflate]: () => createInflate(),
+  [Algorithm.Gzip]: () => createGunzip(),
+  [Algorithm.Zstd]: () => createZstdDecompress(),
 };
 
 /**
@@ -90,11 +90,12 @@ const through = (open: () => Transform) =>
  * ```ts import.meta.vitest
  * import { gunzipSync } from "node:zlib"
  * import { Effect, Stream } from "effect"
+ * import { Algorithm } from "@trajs/utils/Compression"
  *
  * const source = Stream.make(new TextEncoder().encode("hello ".repeat(1024)))
  *
  * const program = Effect.gen(function*() {
- *   const frame = yield* source.pipe(compress({ algorithm: "gzip" }), Stream.runCollect)
+ *   const frame = yield* source.pipe(compress({ algorithm: Algorithm.Gzip }), Stream.runCollect)
  *
  *   gunzipSync(Buffer.concat(frame)).toString().length // => 6144
  * })
@@ -111,7 +112,7 @@ export const compress =
   ): Stream.Stream<Uint8Array, E | CompressionError, R> => {
     const algorithm = options?.algorithm ?? defaultAlgorithm;
 
-    return algorithm === "none" ? self : self.pipe(through(compressors[algorithm]));
+    return algorithm === Algorithm.None ? self : self.pipe(through(compressors[algorithm]));
   };
 
 /**
@@ -163,7 +164,7 @@ export const decompress =
   ): Stream.Stream<Uint8Array, E | CompressionError, R> => {
     const algorithm = options?.algorithm ?? defaultAlgorithm;
 
-    return algorithm === "none" ? self : self.pipe(through(decompressors[algorithm]));
+    return algorithm === Algorithm.None ? self : self.pipe(through(decompressors[algorithm]));
   };
 
 /**

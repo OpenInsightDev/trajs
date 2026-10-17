@@ -10,10 +10,10 @@
  */
 
 import {
+  Algorithm,
   Compression,
   CompressionError,
   defaultAlgorithm,
-  type Algorithm,
   type Options,
 } from "@trajs/utils/Compression";
 import { deflateSync, gunzipSync, gzipSync, inflateSync, zstdCompress, zstdDecompress } from "bun";
@@ -23,19 +23,19 @@ import { Effect, Layer, Stream } from "effect";
  * The algorithms Bun states a codec for: every one the compression states but the
  * bytes carried as they are, which no codec is needed for.
  */
-type BunAlgorithm = Exclude<Algorithm, "none">;
+type BunAlgorithm = Exclude<Algorithm, typeof Algorithm.None>;
 
 const compressors: Record<BunAlgorithm, (bytes: Uint8Array) => Uint8Array | Promise<Uint8Array>> = {
-  deflate: deflateSync,
-  gzip: gzipSync,
-  zstd: zstdCompress,
+  [Algorithm.Deflate]: deflateSync,
+  [Algorithm.Gzip]: gzipSync,
+  [Algorithm.Zstd]: zstdCompress,
 };
 
 const decompressors: Record<BunAlgorithm, (bytes: Uint8Array) => Uint8Array | Promise<Uint8Array>> =
   {
-    deflate: inflateSync,
-    gzip: gunzipSync,
-    zstd: zstdDecompress,
+    [Algorithm.Deflate]: inflateSync,
+    [Algorithm.Gzip]: gunzipSync,
+    [Algorithm.Zstd]: zstdDecompress,
   };
 
 /** What Bun refuses a frame for, as the compression that failed. */
@@ -109,8 +109,9 @@ export const layer = (options?: Options): Layer.Layer<Compression> => {
 
   return Layer.succeed(Compression, {
     algorithm,
-    compress: (bytes) => (algorithm === "none" ? bytes : carried(compressors[algorithm], bytes)),
+    compress: (bytes) =>
+      algorithm === Algorithm.None ? bytes : carried(compressors[algorithm], bytes),
     decompress: (bytes) =>
-      algorithm === "none" ? bytes : carried(decompressors[algorithm], bytes),
+      algorithm === Algorithm.None ? bytes : carried(decompressors[algorithm], bytes),
   });
 };

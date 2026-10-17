@@ -19,7 +19,7 @@ import { blake2b } from "@noble/hashes/blake2.js";
 import { blake3 } from "@noble/hashes/blake3.js";
 import { sha256 } from "@noble/hashes/sha2.js";
 import { bytesToHex } from "@noble/hashes/utils.js";
-import { Context, Layer, Schema, Sink } from "effect";
+import { Context, Layer, Sink } from "effect";
 
 /**
  * The digest a recording is named by: the algorithm it is read with.
@@ -31,29 +31,36 @@ import { Context, Layer, Schema, Sink } from "effect";
  *
  * **Details**
  *
- * - `blake3` is BLAKE3, which is what {@link defaultAlgorithm} names: it is the
+ * - `Blake3` (0) is BLAKE3, which is what {@link defaultAlgorithm} names: it is the
  *   digest a recording has always been named by, and the one every platform package
  *   states a codec for.
- * - `blake2b` is BLAKE2b with a digest of 32 bytes — the same length as BLAKE3's,
- *   which is not the 64 bytes an unconfigured BLAKE2b computes — so a recording is
- *   named by 64 characters of hex whichever of the two is stated.
- * - `sha256` is SHA-256.
+ * - `Blake2b` (1) is BLAKE2b with a digest of 32 bytes — the same length as
+ *   BLAKE3's, which is not the 64 bytes an unconfigured BLAKE2b computes — so a
+ *   recording is named by 64 characters of hex whichever of the two is stated.
+ * - `Sha256` (2) is SHA-256.
  *
  * A digest is read by feeding one run of a hash the bytes of one stream, so what an
  * algorithm names is what two programs agree on: they name a recording the same way
  * where they state the same one. Which of them named a recording is what the
- * recording states of itself — the metadata it ends with names the algorithm its
- * digest was read with ({@link StreamHash.algorithm}) — so a program handed a
- * recording can tell what named it rather than naming it again by an algorithm of
- * its own.
+ * recording states of itself — the metadata it ends with states the algorithm its
+ * digest was read with as that algorithm's code ({@link StreamHash.algorithm}) — so
+ * a program handed a recording can tell what named it rather than naming it again by
+ * an algorithm of its own. The codes are the format's, as they are for the frame a
+ * recording is carried in: each digest is stated by one of them, and a code is never
+ * restated for another digest, so a recording is named the way it was named however
+ * long after it was written.
  *
  * @see {@link Options} for where an algorithm is stated.
  * @see {@link StreamHash.algorithm} for what a hash states of itself.
  * @category models
  */
-export const Algorithm = Schema.Literals(["blake3", "blake2b", "sha256"]);
+export const Algorithm = {
+  Blake3: 0,
+  Blake2b: 1,
+  Sha256: 2,
+} as const;
 
-export type Algorithm = Schema.Schema.Type<typeof Algorithm>;
+export type Algorithm = (typeof Algorithm)[keyof typeof Algorithm];
 
 /**
  * The digest a hash layer is built over.
@@ -66,7 +73,7 @@ export type Algorithm = Schema.Schema.Type<typeof Algorithm>;
  * **Details**
  *
  * - `algorithm` is the digest a stream is hashed to ({@link Algorithm}), and
- *   defaults to {@link defaultAlgorithm} — `blake3` — so a program that states
+ *   defaults to {@link defaultAlgorithm} — `Blake3` — so a program that states
  *   nothing names its recordings the way they have always been named.
  *
  * The option is stated where the layer is built rather than where a digest is read,
@@ -84,7 +91,7 @@ export interface Options {
 }
 
 /**
- * The algorithm a digest is read with when a program states none: `blake3`.
+ * The algorithm a digest is read with when a program states none: `Blake3`.
  *
  * **When to use**
  *
@@ -101,7 +108,7 @@ export interface Options {
  * @see {@link Algorithm} for what it names.
  * @category constants
  */
-export const defaultAlgorithm: Algorithm = "blake3";
+export const defaultAlgorithm: Algorithm = Algorithm.Blake3;
 
 /**
  * A hash of a stream of bytes: the bytes are given to it as a sink, and the digest
@@ -171,11 +178,11 @@ const hashing = (algorithm: Algorithm): Sink.Sink<string, Uint8Array, never, nev
   Sink.reduce(
     () => {
       switch (algorithm) {
-        case "blake2b":
+        case Algorithm.Blake2b:
           // BLAKE2b of the length the other two digests are of, rather than the 64
           // bytes one computes where its length is not stated.
           return blake2b.create({ dkLen: 32 });
-        case "sha256":
+        case Algorithm.Sha256:
           return sha256.create();
         default:
           return blake3.create();

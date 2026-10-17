@@ -87,8 +87,9 @@ export type Header = Schema.Schema.Type<typeof Header>;
  *
  * - `compression` is the algorithm the parts were carried in a frame with
  *   ({@link Compression.Algorithm}), and `hash` the algorithm their digest was read
- *   with ({@link StreamHash.Algorithm}), so a recording states what wrote it rather
- *   than leaving whatever reads it to assume.
+ *   with ({@link StreamHash.Algorithm}), each stated as the code its algorithm goes
+ *   by rather than as the name of it, so a recording states what wrote it rather than
+ *   leaving whatever reads it to assume.
  * - `digest` is the digest of those parts, which is what the recording is named by
  *   — the lowercase hex a {@link StreamHash} reads one off with.
  * - `version` is the version of this package that wrote the recording, as its
@@ -104,8 +105,8 @@ export type Header = Schema.Schema.Type<typeof Header>;
  * @category models
  */
 export const Metadata = Schema.Struct({
-  compression: CompressionAlgorithm,
-  hash: HashAlgorithm,
+  compression: Schema.Enum(CompressionAlgorithm),
+  hash: Schema.Enum(HashAlgorithm),
   digest: Schema.String,
   version: Schema.String,
 });

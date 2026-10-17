@@ -14,12 +14,7 @@
 import { createHash } from "node:crypto";
 
 import * as blake from "@napi-rs/blake-hash";
-import {
-  StreamHash,
-  defaultAlgorithm,
-  type Algorithm,
-  type Options,
-} from "@trajs/utils/StreamHash";
+import { Algorithm, StreamHash, defaultAlgorithm, type Options } from "@trajs/utils/StreamHash";
 import { Layer, Sink } from "effect";
 
 /**
@@ -48,7 +43,7 @@ interface Hashing {
  * states as `blake2b512`.
  */
 const hashers: Record<Algorithm, () => Hashing> = {
-  blake2b: () => {
+  [Algorithm.Blake2b]: () => {
     const params = new blake.Blake2BParam();
     params.hashLength(32);
 
@@ -64,8 +59,8 @@ const hashers: Record<Algorithm, () => Hashing> = {
       },
     };
   },
-  blake3: () => new blake.Blake3Hasher(),
-  sha256: () => createHash("sha256"),
+  [Algorithm.Blake3]: () => new blake.Blake3Hasher(),
+  [Algorithm.Sha256]: () => createHash("sha256"),
 };
 
 /** One run of a hash of the algorithm given: the bytes of a stream fed to it as they arrive, the digest read off them at the end. */

@@ -17,7 +17,7 @@
  * recording rather than assumed by whatever reads it.
  */
 
-import { Context, Data, Schema, Stream } from "effect";
+import { Context, Data, Stream } from "effect";
 
 /**
  * What writing or reading the frame a recording's parts are carried in failed
@@ -52,36 +52,44 @@ export class CompressionError extends Data.TaggedError("CompressionError")<{
  *
  * **Details**
  *
- * - `none` carries the bytes of a stream themselves: nothing is written around
+ * - `None` (0) carries the bytes of a stream themselves: nothing is written around
  *   them and nothing is read off them, so what a recording holds between its header
  *   line and its metadata is the parts as the format encodes them.
- * - `zstd` is a zstd frame, which is what {@link defaultAlgorithm} names: it is
+ * - `Zstd` (1) is a zstd frame, which is what {@link defaultAlgorithm} names: it is
  *   the frame a recording has always been carried in, so a recording written
  *   before an algorithm could be stated is one a layer defaults to reading.
- * - `gzip` and `deflate` are the frames a browser states itself — a gzip frame
- *   (RFC 1952) and a deflate frame as zlib wraps one (RFC 1950) — which `node:zlib`
- *   and Bun state as well.
+ * - `Gzip` (2) and `Deflate` (3) are the frames a browser states itself — a gzip
+ *   frame (RFC 1952) and a deflate frame as zlib wraps one (RFC 1950) — which
+ *   `node:zlib` and Bun state as well.
  *
- * A frame is written and read with one algorithm, and what a recording was
- * carried in is what the recording states of itself: the metadata it ends with
- * names the algorithm its parts were written with
- * ({@link Compression.algorithm}), so a program handed a recording it did not
- * write can tell what to read it with rather than guessing among the algorithms
- * it has.
+ * A frame is written and read with one algorithm, and what a recording was carried
+ * in is what the recording states of itself: the metadata it ends with states the
+ * algorithm its parts were written with as that algorithm's code
+ * ({@link Compression.algorithm}), so a program handed a recording it did not write
+ * can tell what to read it with rather than guessing among the algorithms it has.
+ * The codes are the format's: each frame is stated by one of them, and a code is
+ * never restated for another frame, so a recording is read with the algorithm the
+ * code it carries names however long after it was written — which is what makes the
+ * number worth carrying in place of the name.
  *
  * Each algorithm is a frame the platform packages write and read with a codec
  * their platform states rather than with code this package computes, and the
  * codecs of one algorithm agree: a recording carried by one platform is read back
- * by another, and `none` — no codec at all — is the same bytes wherever it is
+ * by another, and `None` — no codec at all — is the same bytes wherever it is
  * read.
  *
  * @see {@link Options} for where an algorithm is stated.
  * @see {@link Compression.algorithm} for what a compression states of itself.
  * @category models
  */
-export const Algorithm = Schema.Literals(["none", "zstd", "gzip", "deflate"]);
+export const Algorithm = {
+  None: 0,
+  Zstd: 1,
+  Gzip: 2,
+  Deflate: 3,
+} as const;
 
-export type Algorithm = Schema.Schema.Type<typeof Algorithm>;
+export type Algorithm = (typeof Algorithm)[keyof typeof Algorithm];
 
 /**
  * The frame a compression layer is built over.
@@ -94,7 +102,7 @@ export type Algorithm = Schema.Schema.Type<typeof Algorithm>;
  * **Details**
  *
  * - `algorithm` is the algorithm a frame is written and read with
- *   ({@link Algorithm}), and defaults to {@link defaultAlgorithm} — `zstd` — so a
+ *   ({@link Algorithm}), and defaults to {@link defaultAlgorithm} — `Zstd` — so a
  *   program that states nothing carries its recordings the way they have always
  *   been carried.
  *
@@ -113,7 +121,7 @@ export interface Options {
 }
 
 /**
- * The algorithm a frame is carried in when a program states none: `zstd`.
+ * The algorithm a frame is carried in when a program states none: `Zstd`.
  *
  * **When to use**
  *
@@ -131,7 +139,7 @@ export interface Options {
  * @see {@link Algorithm} for what it names.
  * @category constants
  */
-export const defaultAlgorithm: Algorithm = "zstd";
+export const defaultAlgorithm: Algorithm = Algorithm.Zstd;
 
 /**
  * A compression of a recording's parts: the chunks of a stream in, the chunks of

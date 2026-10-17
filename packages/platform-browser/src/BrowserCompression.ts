@@ -16,10 +16,10 @@ import {
   type CompressStream,
 } from "@structured-world/structured-zstd";
 import {
+  Algorithm,
   Compression,
   CompressionError,
   defaultAlgorithm,
-  type Algorithm,
   type Options,
 } from "@trajs/utils/Compression";
 import { Effect, Layer, Stream } from "effect";
@@ -133,18 +133,18 @@ const web =
  * The algorithms a codec is needed for: every one the compression states but the
  * bytes carried as they are.
  */
-type CodedAlgorithm = Exclude<Algorithm, "none">;
+type CodedAlgorithm = Exclude<Algorithm, typeof Algorithm.None>;
 
 const compressors: Record<CodedAlgorithm, Frame> = {
-  deflate: web("deflate", "compress"),
-  gzip: web("gzip", "compress"),
-  zstd: (bytes) => carried(() => createCompressStream(), bytes),
+  [Algorithm.Deflate]: web("deflate", "compress"),
+  [Algorithm.Gzip]: web("gzip", "compress"),
+  [Algorithm.Zstd]: (bytes) => carried(() => createCompressStream(), bytes),
 };
 
 const decompressors: Record<CodedAlgorithm, Frame> = {
-  deflate: web("deflate", "decompress"),
-  gzip: web("gzip", "decompress"),
-  zstd: (bytes) => carried(() => createDecompressStream(), bytes),
+  [Algorithm.Deflate]: web("deflate", "decompress"),
+  [Algorithm.Gzip]: web("gzip", "decompress"),
+  [Algorithm.Zstd]: (bytes) => carried(() => createDecompressStream(), bytes),
 };
 
 /**
@@ -178,7 +178,7 @@ export const layer = (options?: Options): Layer.Layer<Compression> => {
 
   return Layer.succeed(Compression, {
     algorithm,
-    compress: (bytes) => (algorithm === "none" ? bytes : compressors[algorithm](bytes)),
-    decompress: (bytes) => (algorithm === "none" ? bytes : decompressors[algorithm](bytes)),
+    compress: (bytes) => (algorithm === Algorithm.None ? bytes : compressors[algorithm](bytes)),
+    decompress: (bytes) => (algorithm === Algorithm.None ? bytes : decompressors[algorithm](bytes)),
   });
 };

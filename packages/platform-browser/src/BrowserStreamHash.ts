@@ -11,10 +11,10 @@
  */
 
 import {
+  Algorithm,
   StreamHash,
   defaultAlgorithm,
   make as hashInJavaScript,
-  type Algorithm,
   type Options,
 } from "@trajs/utils/StreamHash";
 import * as blake3 from "blake3-wasm";
@@ -100,9 +100,9 @@ const webAssembly: Hashing = Sink.reduce(
 /** The digest of one algorithm, as the sink a stream is hashed through. */
 const digest = (algorithm: Algorithm): Hashing => {
   switch (algorithm) {
-    case "blake2b":
+    case Algorithm.Blake2b:
       return hashInJavaScript({ algorithm }).digest;
-    case "sha256":
+    case Algorithm.Sha256:
       return webCrypto;
     default:
       return webAssembly;
