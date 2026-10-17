@@ -1,0 +1,44 @@
+---
+title: Accordion
+description: Stacked sections, each folding its content open.
+---
+
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@trajs/shadcn/accordion";
+
+An `AccordionItem` is a `AccordionTrigger` and the `AccordionContent` it opens.
+The trigger's own chevron turns over with the item, so a section says which way
+it moves without the page saying it, and `defaultValue` is what decides which
+items a reader meets open.
+
+<Preview>
+  <Accordion defaultValue={["parameters"]}>
+    <AccordionItem value="parameters">
+      <AccordionTrigger>Parameters</AccordionTrigger>
+      <AccordionContent>
+        The call was produced with a single term, and the model had already written it before the
+        call arrived.
+      </AccordionContent>
+    </AccordionItem>
+    <AccordionItem value="result">
+      <AccordionTrigger>Result</AccordionTrigger>
+      <AccordionContent>
+        The tool answered with one match, which is what the model was shown next.
+      </AccordionContent>
+    </AccordionItem>
+    <AccordionItem value="usage">
+      <AccordionTrigger>Usage</AccordionTrigger>
+      <AccordionContent>
+        The call and its result are two parts of one message, and both were counted once.
+      </AccordionContent>
+    </AccordionItem>
+  </Accordion>
+</Preview>
+
+`multiple` lets more than one item stay open at once; without it an accordion
+holds the one section a reader is looking at, which is what a long side panel
+wants.

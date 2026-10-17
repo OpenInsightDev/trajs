@@ -1,0 +1,73 @@
+---
+title: Attachment
+description: A file a message carries, and what is happening to it.
+---
+
+import {
+  Attachment,
+  AttachmentAction,
+  AttachmentActions,
+  AttachmentContent,
+  AttachmentDescription,
+  AttachmentGroup,
+  AttachmentMedia,
+  AttachmentTitle,
+} from "@trajs/shadcn/attachment";
+import { FileTextIcon, XIcon } from "lucide-react";
+
+An attachment is one file: the media it is previewed by, the title and the
+description it is named and sized by, and the actions beside it. Its `state` is
+what it is doing — `idle` for one not uploaded, `uploading` and `processing`
+while a name shimmers, `error` for one that did not arrive — and the border says
+that state before any text does.
+
+<Preview>
+  <div className="flex flex-col gap-4">
+    <AttachmentGroup>
+      <Attachment>
+        <AttachmentMedia>
+          <FileTextIcon />
+        </AttachmentMedia>
+        <AttachmentContent>
+          <AttachmentTitle>recording.json</AttachmentTitle>
+          <AttachmentDescription>18 kB · JSON</AttachmentDescription>
+        </AttachmentContent>
+        <AttachmentActions>
+          <AttachmentAction aria-label="Remove">
+            <XIcon />
+          </AttachmentAction>
+        </AttachmentActions>
+      </Attachment>
+      <Attachment state="uploading">
+        <AttachmentMedia>
+          <FileTextIcon />
+        </AttachmentMedia>
+        <AttachmentContent>
+          <AttachmentTitle>long-session.jsonl</AttachmentTitle>
+          <AttachmentDescription>uploading…</AttachmentDescription>
+        </AttachmentContent>
+      </Attachment>
+      <Attachment state="error">
+        <AttachmentMedia>
+          <FileTextIcon />
+        </AttachmentMedia>
+        <AttachmentContent>
+          <AttachmentTitle>broken.json</AttachmentTitle>
+          <AttachmentDescription>not a trajectory</AttachmentDescription>
+        </AttachmentContent>
+      </Attachment>
+    </AttachmentGroup>
+    <Attachment orientation="vertical" size="sm">
+      <AttachmentMedia variant="image">
+        <img src="https://github.com/OpenInsightDev.png" alt="trajs" />
+      </AttachmentMedia>
+      <AttachmentContent>
+        <AttachmentTitle>trajs.png</AttachmentTitle>
+        <AttachmentDescription>1:1</AttachmentDescription>
+      </AttachmentContent>
+    </Attachment>
+  </div>
+</Preview>
+
+`AttachmentTrigger` covers an attachment whole, which is what a file that opens
+somewhere is: the content stays selectable and the click belongs to the trigger.

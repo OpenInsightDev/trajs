@@ -1,0 +1,37 @@
+---
+title: NativeSelect
+description: The browser's own select, styled with the tokens.
+---
+
+import {
+  NativeSelect,
+  NativeSelectOptGroup,
+  NativeSelectOption,
+} from "@trajs/shadcn/native-select";
+
+A native select is the browser's, not a rendered list: its options are the
+platform's, and it is the one that behaves as the operating system says on a
+phone. The chevron is drawn beside it, since the appearance is turned off to let
+the tokens paint it.
+
+<Preview>
+  <div className="flex flex-wrap items-center gap-3">
+    <NativeSelect defaultValue="grid">
+      <NativeSelectOption value="grid">Grid</NativeSelectOption>
+      <NativeSelectOption value="list">List</NativeSelectOption>
+      <NativeSelectOption value="timeline">Timeline</NativeSelectOption>
+    </NativeSelect>
+    <NativeSelect size="sm" defaultValue="comfortable">
+      <NativeSelectOptGroup label="Density">
+        <NativeSelectOption value="compact">Compact</NativeSelectOption>
+        <NativeSelectOption value="comfortable">Comfortable</NativeSelectOption>
+      </NativeSelectOptGroup>
+    </NativeSelect>
+    <NativeSelect disabled defaultValue="grid">
+      <NativeSelectOption value="grid">Disabled</NativeSelectOption>
+    </NativeSelect>
+  </div>
+</Preview>
+
+The rendered list — with the group labels, separators and scroll arrows a native
+select cannot have — is [Select](/components/select).

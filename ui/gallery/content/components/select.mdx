@@ -1,0 +1,49 @@
+---
+title: Select
+description: One value chosen from a list that opens.
+---
+
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectLabel,
+  SelectSeparator,
+  SelectTrigger,
+  SelectValue,
+} from "@trajs/shadcn/select";
+
+A select is a button and the list it opens: the trigger holds the value it is
+showing, the content is placed against that trigger, and everything inside it is
+an item or the group that labels one. The check beside an item is the
+component's, so the chosen value is read from the list rather than from the
+trigger alone.
+
+<Preview>
+  <Select defaultValue="grid">
+    <SelectTrigger className="w-48">
+      <SelectValue placeholder="Choose a layout" />
+    </SelectTrigger>
+    <SelectContent>
+      <SelectGroup>
+        <SelectLabel>Layout</SelectLabel>
+        <SelectItem value="grid">Grid</SelectItem>
+        <SelectItem value="list">List</SelectItem>
+        <SelectItem value="timeline">Timeline</SelectItem>
+      </SelectGroup>
+      <SelectSeparator />
+      <SelectGroup>
+        <SelectLabel>Density</SelectLabel>
+        <SelectItem value="compact">Compact</SelectItem>
+        <SelectItem value="comfortable">Comfortable</SelectItem>
+        <SelectItem value="spacious" disabled>
+          Spacious
+        </SelectItem>
+      </SelectGroup>
+    </SelectContent>
+  </Select>
+</Preview>
+
+`alignItemWithTrigger` is what makes the selected item open over the trigger
+instead of below it, which is what a select of a few values does on a phone.

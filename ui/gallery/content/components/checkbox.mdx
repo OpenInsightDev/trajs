@@ -1,0 +1,30 @@
+---
+title: Checkbox
+description: One thing that is either chosen or not.
+---
+
+import { Checkbox } from "@trajs/shadcn/checkbox";
+
+A checkbox is a single choice, and its own check is what says the choice was
+made: the indicator is the component's, so nothing has to be placed to show a
+tick. It is uncontrolled unless the page gives it `checked`.
+
+<Preview>
+  <div className="flex flex-col gap-3">
+    <label className="flex items-center gap-2 text-sm">
+      <Checkbox defaultChecked />
+      Import inherited sessions
+    </label>
+    <label className="flex items-center gap-2 text-sm">
+      <Checkbox />
+      Keep the tool payloads
+    </label>
+    <label className="flex items-center gap-2 text-sm opacity-50">
+      <Checkbox disabled />
+      Re-run the model
+    </label>
+  </div>
+</Preview>
+
+Inside a `Field` the checkbox is what makes the whole row the target, which is
+the shape the [Field](/components/field) page reads.

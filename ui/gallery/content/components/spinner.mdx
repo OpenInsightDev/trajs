@@ -1,0 +1,31 @@
+---
+title: Spinner
+description: Something is happening, for as long as it takes.
+---
+
+import { Spinner } from "@trajs/shadcn/spinner";
+import { Button } from "@trajs/shadcn/button";
+
+A spinner says work is in progress without saying how far along it is, which is
+the honest answer when the length is not known. It is one `Loader2Icon` with
+`role="status"`, so it is announced rather than being decoration, and it takes
+the current colour — which is what lets one sit inside a button or a destructive
+alert and read right.
+
+<Preview>
+  <div className="flex flex-wrap items-center gap-4">
+    <Spinner />
+    <Spinner className="size-6" />
+    <Button variant="outline" disabled>
+      <Spinner />
+      Importing
+    </Button>
+    <span className="flex items-center gap-2 text-sm text-muted-foreground">
+      <Spinner className="size-3.5" />
+      reading 4 of 18 turns
+    </span>
+  </div>
+</Preview>
+
+Work whose size is known is a [Progress](/components/progress) bar instead, since
+a bar can say more.

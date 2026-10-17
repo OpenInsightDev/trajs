@@ -1,0 +1,21 @@
+---
+title: Textarea
+description: Several lines a reader types into.
+---
+
+import { Textarea } from "@trajs/shadcn/textarea";
+
+A textarea is the input that takes more than one line. It is `field-sizing-content`,
+so it grows with what is typed instead of scrolling inside a fixed height, and
+it stops at the height the page gives it.
+
+<Preview>
+  <div className="flex w-full max-w-sm flex-col gap-3">
+    <Textarea placeholder="What should the model do next?" />
+    <Textarea defaultValue="Read the trajectory, then answer with the tool call it produced." />
+    <Textarea defaultValue="This one is disabled." disabled />
+  </div>
+</Preview>
+
+`min-h-16` is what it starts at, so an empty one still reads as somewhere to
+write rather than as a line.

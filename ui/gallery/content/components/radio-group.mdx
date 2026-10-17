@@ -1,0 +1,33 @@
+---
+title: RadioGroup
+description: One choice out of several, all of them visible.
+---
+
+import { RadioGroup, RadioGroupItem } from "@trajs/shadcn/radio-group";
+import { Label } from "@trajs/shadcn/label";
+
+A radio group shows every choice at once, which is what it is for: a reader
+compares them before deciding, rather than opening a list to find one. The group
+owns the value, so the items know about each other, and the dot is the item's
+own rather than placed beside it.
+
+<Preview>
+  <RadioGroup defaultValue="comfortable" className="w-fit">
+    <div className="flex items-center gap-2">
+      <RadioGroupItem value="compact" id="density-compact" />
+      <Label htmlFor="density-compact">Compact</Label>
+    </div>
+    <div className="flex items-center gap-2">
+      <RadioGroupItem value="comfortable" id="density-comfortable" />
+      <Label htmlFor="density-comfortable">Comfortable</Label>
+    </div>
+    <div className="flex items-center gap-2">
+      <RadioGroupItem value="spacious" id="density-spacious" disabled />
+      <Label htmlFor="density-spacious">Spacious (unavailable)</Label>
+    </div>
+  </RadioGroup>
+</Preview>
+
+A choice that needs no comparison is a [Select](/components/select), and one
+that needs noting rather than choosing is a
+[Checkbox](/components/checkbox).

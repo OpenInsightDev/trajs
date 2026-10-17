@@ -1,0 +1,31 @@
+---
+title: Switch
+description: A setting that is on or off, applied at once.
+---
+
+import { Switch } from "@trajs/shadcn/switch";
+import { Label } from "@trajs/shadcn/label";
+
+A switch takes effect when it is thrown, which is what tells it apart from a
+checkbox: nothing is submitted for it. Its two states are the two the tokens
+paint, and the thumb slides between them.
+
+<Preview>
+  <div className="flex flex-col gap-3">
+    <div className="flex items-center gap-2">
+      <Switch id="switch-reasoning" defaultChecked />
+      <Label htmlFor="switch-reasoning">Show reasoning</Label>
+    </div>
+    <div className="flex items-center gap-2">
+      <Switch id="switch-payload" size="sm" />
+      <Label htmlFor="switch-payload">Keep tool payloads</Label>
+    </div>
+    <div className="flex items-center gap-2 opacity-50">
+      <Switch id="switch-model" disabled />
+      <Label htmlFor="switch-model">Re-run the model</Label>
+    </div>
+  </div>
+</Preview>
+
+A choice that is only recorded when a form is submitted is a
+[Checkbox](/components/checkbox) instead.

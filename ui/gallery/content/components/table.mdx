@@ -1,0 +1,59 @@
+---
+title: Table
+description: Rows of the same columns, compared down a column.
+---
+
+import {
+  Table,
+  TableBody,
+  TableCaption,
+  TableCell,
+  TableFooter,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@trajs/shadcn/table";
+
+A table is the columns the rows are read in: the header names them, the body
+holds them, and the footer is the row a table totals itself in. Rows hover and
+say when they are selected from their own state, which is what makes a long one
+trackable across the width of it.
+
+<Preview>
+  <Table>
+    <TableCaption>Sessions in this trajectory.</TableCaption>
+    <TableHeader>
+      <TableRow>
+        <TableHead>Session</TableHead>
+        <TableHead>Turns</TableHead>
+        <TableHead>Tool calls</TableHead>
+        <TableHead className="text-right">Duration</TableHead>
+      </TableRow>
+    </TableHeader>
+    <TableBody>
+      <TableRow>
+        <TableCell className="font-mono">session_8f2a</TableCell>
+        <TableCell>18</TableCell>
+        <TableCell>4</TableCell>
+        <TableCell className="text-right">2m 41s</TableCell>
+      </TableRow>
+      <TableRow>
+        <TableCell className="font-mono">session_31c7</TableCell>
+        <TableCell>4</TableCell>
+        <TableCell>0</TableCell>
+        <TableCell className="text-right">22s</TableCell>
+      </TableRow>
+    </TableBody>
+    <TableFooter>
+      <TableRow>
+        <TableCell>Total</TableCell>
+        <TableCell>22</TableCell>
+        <TableCell>4</TableCell>
+        <TableCell className="text-right">3m 3s</TableCell>
+      </TableRow>
+    </TableFooter>
+  </Table>
+</Preview>
+
+A narrow surface gets the table scrolled sideways rather than wrapped, since a
+column that folds into two lines stops being comparable with the one above it.

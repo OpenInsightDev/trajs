@@ -11,6 +11,18 @@ in `@trajs/shadcn` because two things need the same components — the viewer, a
 (see [Prompt](/prompt) and [Response](/response)) — and a component copied twice
 is a component that drifts.
 
-Every demo on these pages mounts the real component from the package, at the
-version the apps use. Nothing here is a screenshot, and nothing is a
-reproduction.
+Every component the package publishes has a page here, in the group it is read
+in: the layout a page is arranged with, the controls that take a value, the
+surfaces that display one, what is said back, the menus and links a reader
+navigates by, and the overlays that open over a page. Each page mounts the real
+component from the package, at the version the apps use. Nothing here is a
+screenshot, and nothing is a reproduction.
+
+Most pages render the component in the page itself, so what a page shows is the
+component it runs. The exceptions are the demos that have to be client
+components: the components that hold state, read the viewport or reach a class
+defined over a client dependency — a dialog, a hover card, a sheet, a drawer, a
+sidebar, a message scroller, a questionnaire — and the toaster, which is raised
+by a click. Those demos are `"use client"` modules the page names, which
+Fumapress still renders on the server, so the demo stays in the HTML and the
+search index.

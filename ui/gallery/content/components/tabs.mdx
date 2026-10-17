@@ -1,0 +1,40 @@
+---
+title: Tabs
+description: One set of content at a time, under the names that reach it.
+---
+
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@trajs/shadcn/tabs";
+
+Tabs are a set of panels of which one is shown, and the list is what names them.
+The `variant` decides how the list reads: `default` is the pill on the selected
+tab, `line` is a rule under it, and `orientation="vertical"` puts the list beside
+the panels rather than above them.
+
+<Preview>
+  <div className="flex flex-col gap-6">
+    <Tabs defaultValue="prompt">
+      <TabsList>
+        <TabsTrigger value="prompt">Prompt</TabsTrigger>
+        <TabsTrigger value="response">Response</TabsTrigger>
+        <TabsTrigger value="usage" disabled>
+          Usage
+        </TabsTrigger>
+      </TabsList>
+      <TabsContent value="prompt">What the model was given, one part at a time.</TabsContent>
+      <TabsContent value="response">
+        What it answered with, and the tool call it produced.
+      </TabsContent>
+    </Tabs>
+    <Tabs defaultValue="json" orientation="vertical">
+      <TabsList variant="line">
+        <TabsTrigger value="json">JSON</TabsTrigger>
+        <TabsTrigger value="markdown">Markdown</TabsTrigger>
+      </TabsList>
+      <TabsContent value="json">The parts, as they were recorded.</TabsContent>
+      <TabsContent value="markdown">The conversation, as it is read.</TabsContent>
+    </Tabs>
+  </div>
+</Preview>
+
+A tab that cannot be reached is `disabled`, and the reason belongs in the panel
+rather than on the tab, which has no room for one.

@@ -1,0 +1,32 @@
+---
+title: Bubble
+description: One message, in the bubble its role calls for.
+---
+
+import { Bubble, BubbleContent, BubbleGroup, BubbleReactions } from "@trajs/shadcn/bubble";
+
+A bubble is a message and the bubble it is read in: the `variant` is what the
+message is — a `secondary` answer, a `ghost` one that is only text — and the
+`align` is whose side of the conversation it sits on. Its content is one
+`BubbleContent`, so a message with more than one paragraph is one bubble rather
+than a stack of them.
+
+<Preview>
+  <BubbleGroup>
+    <Bubble align="end">
+      <BubbleContent>Which term did you look up?</BubbleContent>
+    </Bubble>
+    <Bubble variant="secondary">
+      <BubbleContent>`trajectory` — the recording of one exchange, parts and all.</BubbleContent>
+    </Bubble>
+    <Bubble variant="ghost" align="end">
+      <BubbleContent>Thanks. Keep the tool call open.</BubbleContent>
+      <BubbleReactions>👍 1</BubbleReactions>
+    </Bubble>
+  </BubbleGroup>
+</Preview>
+
+`BubbleReactions` hangs off the bubble's edge — the reactions a message collects
+are about it, so they are placed on it rather than under it. A `BubbleContent`
+given `render` becomes the button or link it is read as, which is how a bubble
+suggests an answer.

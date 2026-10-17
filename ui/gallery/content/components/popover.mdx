@@ -1,0 +1,43 @@
+---
+title: Popover
+description: A surface anchored to what opened it.
+---
+
+import {
+  Popover,
+  PopoverContent,
+  PopoverDescription,
+  PopoverHeader,
+  PopoverTitle,
+  PopoverTrigger,
+} from "@trajs/shadcn/popover";
+import { Button } from "@trajs/shadcn/button";
+import { Input } from "@trajs/shadcn/input";
+import { Label } from "@trajs/shadcn/label";
+
+A popover stays after the click that opened it, which is what an input, a menu
+or a form needs. Its content is placed against the trigger, and the header is
+what names it: the title and the description are what the popover is announced
+by, the same way a dialog's are.
+
+<Preview>
+  <Popover>
+    <PopoverTrigger render={<Button variant="outline" />}>Rename session</PopoverTrigger>
+    <PopoverContent>
+      <PopoverHeader>
+        <PopoverTitle>Rename session</PopoverTitle>
+        <PopoverDescription>
+          The id in the recording is not changed; this is what it is read as.
+        </PopoverDescription>
+      </PopoverHeader>
+      <div className="flex flex-col gap-2">
+        <Label htmlFor="popover-name">Name</Label>
+        <Input id="popover-name" defaultValue="session_8f2a" />
+      </div>
+    </PopoverContent>
+  </Popover>
+</Preview>
+
+What is read by resting on something rather than by clicking it is a
+[HoverCard](/components/hover-card), since a popover waits for a decision and a
+card does not.

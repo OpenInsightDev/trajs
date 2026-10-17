@@ -1,0 +1,18 @@
+---
+title: Dialog
+description: A surface that takes over what the page was showing.
+---
+
+<Preview>
+  <DialogDemo />
+</Preview>
+
+The trigger opens it, the content is placed by the portal it belongs to, and the
+close button the content carries is what a reader leaves by. The title and the
+description are not decoration: they are what the dialog is announced with, so a
+dialog without a title is a dialog screen readers cannot name.
+
+`showCloseButton` is on the content by default, and turning it off is what a
+dialog says when the footer already offers the way out. The [Command
+palette](/components/command) is a dialog too: `CommandDialog` is this one with
+a command list inside it.

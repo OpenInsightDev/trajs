@@ -16,7 +16,7 @@ Landing means the thread's work is committed and pushed to `origin`
 (`https://github.com/OpenInsightDev/trajs.git`). An explicit landing request —
 the Land Changes action or equivalent user language — is the trigger: proceed
 with this workflow instead of asking whether to merge. Stop only for the genuine
-blockers listed under Gates and Conflicts.
+blockers listed under Gates and Divergence.
 
 ## 1. Preflight (read-only)
 
@@ -69,6 +69,8 @@ tests, a step that did not run — stops the landing as before.
 
 - `origin/main` absent: `git push -u origin main`.
 - `origin/main` present and fast-forwardable: `git push origin main`.
+- If the push is rejected only because `main` has moved on the remote, merge it
+  in and push again; a stale branch is not a reason to stop.
 - If `main` is protected against direct pushes, push a branch and open a pull
   request with `gh pr create` instead. Check first with
   `gh api repos/OpenInsightDev/trajs/branches/main/protection`.
@@ -80,14 +82,17 @@ tests, a step that did not run — stops the landing as before.
   commit.
 - Report the target branch and commit; state plainly if the change did not land.
 
-## Conflicts
+## Divergence
 
-Preference: pause and report. On divergence or conflict, do not auto-resolve and
-do not force-push. Report the conflicting refs and wait for the user's decision.
+A remote that has advanced is not a conflict: merge it in (`git merge
+origin/main`), re-run `vp run ready`, and land. Stop only when git reports a
+conflict it cannot merge, or when the checks fail for the merged tree. Never
+force-push.
 
 ## Gates
 
 Stop and report without bypassing when: `origin` is not the expected repository;
 `vp run ready` fails for a reason other than the missing-test packages described
-under Verify; the remote rejects the push; `main` is protected and pull request
-creation is unavailable; or the scope of the change is ambiguous.
+under Verify; a merge needs a conflict resolved by hand; the push is rejected for
+a reason other than the remote having advanced; or the scope of the change is
+ambiguous.

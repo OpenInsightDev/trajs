@@ -1,0 +1,24 @@
+---
+title: Badge
+description: A short label attached to the thing it names.
+---
+
+import { Badge } from "@trajs/shadcn/badge";
+
+A badge is a label, not a control: it takes no space of its own and reads beside
+what it is attached to. The variants are the amounts of attention it may ask
+for, from `default` through `outline` to the `destructive` a failed part carries.
+
+<Preview>
+  <div className="flex flex-wrap items-center gap-2">
+    <Badge>default</Badge>
+    <Badge variant="secondary">secondary</Badge>
+    <Badge variant="destructive">destructive</Badge>
+    <Badge variant="outline">outline</Badge>
+    <Badge variant="ghost">ghost</Badge>
+    <Badge variant="link">link</Badge>
+  </div>
+</Preview>
+
+`render` is what makes a badge somewhere to go: given an anchor it stays a label
+but is read as the link it is, and the hover the variant states applies.

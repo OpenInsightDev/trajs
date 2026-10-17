@@ -1,0 +1,27 @@
+---
+title: Progress
+description: How far along a known amount of work is.
+---
+
+import { Progress, ProgressLabel, ProgressValue } from "@trajs/shadcn/progress";
+
+A progress bar is for work whose size is known, and the value is that size, not
+a decoration: the track and the indicator are drawn from it, and `ProgressValue`
+states it in figures for the reader who wants the number. `value={null}` is the
+one that has no end yet.
+
+<Preview>
+  <div className="flex w-full max-w-sm flex-col gap-5">
+    <Progress value={62}>
+      <ProgressLabel>Importing</ProgressLabel>
+      <ProgressValue />
+    </Progress>
+    <Progress value={100}>
+      <ProgressLabel>Read</ProgressLabel>
+      <ProgressValue />
+    </Progress>
+  </div>
+</Preview>
+
+Work of unknown length is a [Spinner](/components/spinner): a bar that cannot
+say how far along it is says less than a spinner that admits it does not know.

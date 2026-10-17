@@ -1,0 +1,40 @@
+---
+title: Empty
+description: What a list says when it has nothing in it.
+---
+
+import {
+  Empty,
+  EmptyContent,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from "@trajs/shadcn/empty";
+import { Button } from "@trajs/shadcn/button";
+import { FileQuestionIcon } from "lucide-react";
+
+An empty state is a message, not an absence: the header says what is not there,
+the content says what to do about it, and both are centred because there is
+nothing beside them. `EmptyMedia` is the icon that makes the message findable at
+a glance.
+
+<Preview>
+  <Empty>
+    <EmptyHeader>
+      <EmptyMedia variant="icon">
+        <FileQuestionIcon />
+      </EmptyMedia>
+      <EmptyTitle>No trajectory is open</EmptyTitle>
+      <EmptyDescription>
+        Import a recording to read its turns, or start one from the viewer.
+      </EmptyDescription>
+    </EmptyHeader>
+    <EmptyContent>
+      <Button size="sm">Import trajectory</Button>
+    </EmptyContent>
+  </Empty>
+</Preview>
+
+The dashed border and the generous padding are what make it read as a place
+something will go rather than as a card that happens to be blank.

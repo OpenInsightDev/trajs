@@ -1,0 +1,40 @@
+---
+title: Resizable
+description: Panels whose sizes the reader sets.
+---
+
+import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@trajs/shadcn/resizable";
+
+A resizable group splits the space it is given, and each panel says how much of
+it it takes: `defaultSize` is where it starts and `minSize` is where the handle
+stops. `orientation` is the direction the split runs in, so a vertical group is
+a column of panels rather than a row of them.
+
+<Preview>
+  <ResizablePanelGroup orientation="horizontal" className="h-48 overflow-hidden rounded-lg border">
+    <ResizablePanel defaultSize="35%" minSize="20%">
+      <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
+        sessions
+      </div>
+    </ResizablePanel>
+    <ResizableHandle withHandle />
+    <ResizablePanel defaultSize="65%">
+      <ResizablePanelGroup orientation="vertical">
+        <ResizablePanel defaultSize="60%">
+          <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
+            conversation
+          </div>
+        </ResizablePanel>
+        <ResizableHandle />
+        <ResizablePanel defaultSize="40%">
+          <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
+            tool payload
+          </div>
+        </ResizablePanel>
+      </ResizablePanelGroup>
+    </ResizablePanel>
+  </ResizablePanelGroup>
+</Preview>
+
+`withHandle` draws the grip on the separator, which is what a reader has to see
+before they try to drag it.

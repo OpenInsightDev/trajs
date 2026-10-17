@@ -1,0 +1,36 @@
+---
+title: Marker
+description: A line that says what happened between one part and the next.
+---
+
+import { Marker, MarkerContent, MarkerIcon } from "@trajs/shadcn/marker";
+import { CircleSlashIcon } from "lucide-react";
+
+A marker is read at the size of a part and says what is around it rather than
+being a part itself: which session a stretch of the conversation came from,
+which turn was cut short. `separator` draws the rule through the middle of the
+line, `border` closes the stretch above it.
+
+<Preview>
+  <div className="flex flex-col gap-4">
+    <Marker>
+      <MarkerIcon>
+        <CircleSlashIcon />
+      </MarkerIcon>
+      <MarkerContent>the response stopped before its end</MarkerContent>
+    </Marker>
+    <Marker variant="separator">
+      <MarkerContent>no answer was produced</MarkerContent>
+    </Marker>
+    <Marker variant="border">
+      <MarkerContent>
+        <span className="font-mono">session_8f2a</span>
+        <span> · continues session_31c7</span>
+      </MarkerContent>
+    </Marker>
+  </div>
+</Preview>
+
+It is the muted face, not the foreground one, because it is a note on the
+conversation rather than something the conversation said. This is what the
+viewer marks an inherited stretch with, and what it marks a cut-short turn with.
