@@ -36,6 +36,40 @@ const versions = [
 
 const sources = ["system", "user", "agent"] as const;
 
+/**
+ * The version of ATIF a document conforms to, as the format states it.
+ *
+ * ATIF RFC 0001 v1.8, Section II "Root-Level Metadata", the `schema_version` of a
+ * document.
+ *
+ * **When to use**
+ *
+ * Use when reading what a document states of the format it is written in, or when
+ * stating the version of a document of your own.
+ *
+ * **Details**
+ *
+ * The versions are the ones ATIF names, from `ATIF-v1.0` to `ATIF-v1.8`: a document
+ * states the version it conforms to, and a reader that knows the format reads the
+ * fields that version added. The set is what the RFC states, so a version beyond it
+ * is rejected rather than read with the fields this package knows.
+ *
+ * @see {@link Document} for the document a version is stated by.
+ * @category schemas
+ */
+export const SchemaVersion = Schema.Literals(versions);
+
+/**
+ * A {@link SchemaVersion} as it is read.
+ *
+ * ATIF RFC 0001 v1.8, Section II "Root-Level Metadata", the `schema_version` of a
+ * document.
+ *
+ * @see {@link SchemaVersion} for the schema it is read by.
+ * @category models
+ */
+export type SchemaVersion = Schema.Schema.Type<typeof SchemaVersion>;
+
 /** The types ATIF states for an image. */
 const imageMediaTypes = ["image/jpeg", "image/png", "image/gif", "image/webp"] as const;
 
@@ -76,6 +110,38 @@ const audioMediaTypeSpellings = [
  * says rather than read with the field dropped out of what it states.
  */
 const omitted = Schema.optional(Schema.Never);
+
+/**
+ * What a producer states of a step, a result, a tool call, a metric or a document
+ * beyond what the format states of it: the JSON a producer writes, which this
+ * package carries as it was written rather than reading it.
+ *
+ * ATIF RFC 0001 v1.8, Section II: the `arguments` of "ToolCallSchema" and the
+ * `extra` field of every other type it states.
+ *
+ * **When to use**
+ *
+ * Use to read the JSON a document states where the format leaves the field to the
+ * producer, or to state JSON of your own.
+ *
+ * **Details**
+ *
+ * The fields are the producer's own: the format states that they are a JSON object
+ * and leaves what it holds to whoever wrote it, so this package carries one as it
+ * was written rather than reading it into terms of its own.
+ *
+ * @see {@link Document} for the document the fields of a producer belong to.
+ * @category schemas
+ */
+export const ProducerFields = Schema.Record(Schema.String, Schema.Unknown);
+
+/**
+ * The JSON a producer states beyond what a format states, as it is read.
+ *
+ * @see {@link ProducerFields} for the schema it is read by.
+ * @category models
+ */
+export type ProducerFields = Schema.Schema.Type<typeof ProducerFields>;
 
 /**
  * Where the bytes of an image a part states are: the type of the image, and the
@@ -394,9 +460,9 @@ export const ToolCall = Schema.Struct({
   /** The name of the tool the step called. */
   function_name: Schema.String,
   /** The arguments the call was made with, as the JSON object the model produced. */
-  arguments: Schema.Record(Schema.String, Schema.Unknown),
+  arguments: ProducerFields,
   /** What a producer states of the call beyond the format. */
-  extra: Schema.optional(Schema.Record(Schema.String, Schema.Unknown)),
+  extra: Schema.optional(ProducerFields),
 });
 
 /**
@@ -408,6 +474,52 @@ export const ToolCall = Schema.Struct({
  * @category models
  */
 export type ToolCall = Schema.Schema.Type<typeof ToolCall>;
+
+/**
+ * A reference to a trajectory of delegated work: where the run a subagent left is
+ * written, and what it is named by (v1.7+).
+ *
+ * ATIF RFC 0001 v1.8, Section II "SubagentTrajectoryRefSchema".
+ *
+ * **When to use**
+ *
+ * Use when reading what an observation says of the work it delegated, or when
+ * stating that a call was answered by a run of another agent.
+ *
+ * **Details**
+ *
+ * A reference resolves one of two ways: `trajectory_id` names a document embedded
+ * in the `subagent_trajectories` of the document that holds the reference, or
+ * `trajectory_path` locates the trajectory of the subagent as a file beside the
+ * document. ATIF requires at least one of the two, so a reference that names
+ * neither resolves nothing. `session_id` is the run the subagent belonged to, which
+ * ATIF keeps for correlation alone — several subagents of one run may share it, so
+ * it is no key — and `extra` is what a producer states of the subagent beyond the
+ * format.
+ *
+ * @see {@link ObservationResult} for the result a reference answers a step by.
+ * @category models
+ */
+export const SubagentTrajectoryRef = Schema.Struct({
+  /** The `trajectory_id` of an embedded document this reference resolves to. */
+  trajectory_id: Schema.optional(Schema.NullOr(Schema.String)),
+  /** The path of the file holding the subagent's trajectory, where it is not embedded. */
+  trajectory_path: Schema.optional(Schema.NullOr(Schema.String)),
+  /** The run the subagent belonged to: informational alone, and shared among siblings. */
+  session_id: Schema.optional(Schema.NullOr(Schema.String)),
+  /** What a producer states of the subagent beyond the format. */
+  extra: Schema.optional(ProducerFields),
+});
+
+/**
+ * A {@link SubagentTrajectoryRef} as it is read.
+ *
+ * ATIF RFC 0001 v1.8, Section II "SubagentTrajectoryRefSchema".
+ *
+ * @see {@link SubagentTrajectoryRef} for the schema it is read by.
+ * @category models
+ */
+export type SubagentTrajectoryRef = Schema.Schema.Type<typeof SubagentTrajectoryRef>;
 
 /**
  * One result a step was answered with: what a tool call returned, or what an action
@@ -443,9 +555,9 @@ export const ObservationResult = Schema.Struct({
    * The trajectories a delegated call left, each of them referenced by an embedded
    * document's id or by the path of a file beside the document.
    */
-  subagent_trajectory_ref: Schema.optional(Schema.Unknown),
+  subagent_trajectory_ref: Schema.optional(Schema.NullOr(Schema.Array(SubagentTrajectoryRef))),
   /** What a producer states of the result beyond the format. */
-  extra: Schema.optional(Schema.Record(Schema.String, Schema.Unknown)),
+  extra: Schema.optional(ProducerFields),
 });
 
 /**
@@ -495,6 +607,156 @@ export const Observation = Schema.Struct({
 export type Observation = Schema.Schema.Type<typeof Observation>;
 
 /**
+ * The tokens, the cost and the confidence data of one agent step.
+ *
+ * ATIF RFC 0001 v1.8, Section II "MetricsSchema".
+ *
+ * **When to use**
+ *
+ * Use when reading what a document states of what one inference cost, or when
+ * stating one.
+ *
+ * **Details**
+ *
+ * `prompt_tokens` counts every input token the model processed, cached and not,
+ * and `cached_tokens` the subset of them that were read from a prompt cache rather
+ * than processed again. `cost_usd` is the money the call cost, as the producer read
+ * it at the time, which the format leaves to the producer rather than deriving from
+ * a price list. The token-id arrays and `logprobs` carry what a training pipeline
+ * reads off an inference, and `extra` what a provider states beyond the format —
+ * reasoning tokens, cache-creation tokens, and the like.
+ *
+ * @see {@link FinalMetrics} for the same figures summed over a run.
+ * @category models
+ */
+export const Metrics = Schema.Struct({
+  /** Every input token the model processed, cached and not. */
+  prompt_tokens: Schema.optional(Schema.NullOr(Schema.Int)),
+  /** Every token the model generated, reasoning and tool calls among them. */
+  completion_tokens: Schema.optional(Schema.NullOr(Schema.Int)),
+  /** The input tokens read from a prompt cache, which `prompt_tokens` counts too. */
+  cached_tokens: Schema.optional(Schema.NullOr(Schema.Int)),
+  /** What the call cost, as the producer read it when the call was made. */
+  cost_usd: Schema.optional(Schema.NullOr(Schema.Number)),
+  /** The ids of the `prompt_tokens`, for a pipeline that must not retokenize them. */
+  prompt_token_ids: Schema.optional(Schema.NullOr(Schema.Array(Schema.Int))),
+  /** The ids of the `completion_tokens`, which `logprobs` align with. */
+  completion_token_ids: Schema.optional(Schema.NullOr(Schema.Array(Schema.Int))),
+  /** The log probability of each completion token. */
+  logprobs: Schema.optional(Schema.NullOr(Schema.Array(Schema.Number))),
+  /** What a provider states of the inference beyond the format. */
+  extra: Schema.optional(ProducerFields),
+});
+
+/**
+ * A {@link Metrics} as it is read.
+ *
+ * ATIF RFC 0001 v1.8, Section II "MetricsSchema".
+ *
+ * @see {@link Metrics} for the schema it is read by.
+ * @category models
+ */
+export type Metrics = Schema.Schema.Type<typeof Metrics>;
+
+/**
+ * The tokens and the cost of a run as a whole.
+ *
+ * ATIF RFC 0001 v1.8, Section II "FinalMetricsSchema".
+ *
+ * **When to use**
+ *
+ * Use when reading what a document states of what its run cost, or when stating
+ * one.
+ *
+ * **Details**
+ *
+ * Each total is the sum of the same figure over the steps of the document,
+ * `total_prompt_tokens` counting cached and uncached input tokens alike. `total_steps`
+ * is the producer's own count of the run, which the format leaves it to state rather
+ * than reading off the length of `steps`. `extra` is what a producer states of the
+ * run beyond the format.
+ *
+ * @see {@link Metrics} for the same figures of one step.
+ * @category models
+ */
+export const FinalMetrics = Schema.Struct({
+  /** Every input token of the run, cached and not. */
+  total_prompt_tokens: Schema.optional(Schema.NullOr(Schema.Int)),
+  /** Every token the run generated. */
+  total_completion_tokens: Schema.optional(Schema.NullOr(Schema.Int)),
+  /** The input tokens of the run read from a prompt cache. */
+  total_cached_tokens: Schema.optional(Schema.NullOr(Schema.Int)),
+  /** What the whole run cost, as the producer read it while it ran. */
+  total_cost_usd: Schema.optional(Schema.NullOr(Schema.Number)),
+  /** The producer's own count of the steps of the run. */
+  total_steps: Schema.optional(Schema.NullOr(Schema.Int)),
+  /** What a producer states of the run beyond the format. */
+  extra: Schema.optional(ProducerFields),
+});
+
+/**
+ * A {@link FinalMetrics} as it is read.
+ *
+ * ATIF RFC 0001 v1.8, Section II "FinalMetricsSchema".
+ *
+ * @see {@link FinalMetrics} for the schema it is read by.
+ * @category models
+ */
+export type FinalMetrics = Schema.Schema.Type<typeof FinalMetrics>;
+
+/**
+ * One tool an agent was given, in the shape OpenAI states a function in.
+ *
+ * ATIF RFC 0001 v1.8, Section II "AgentSchema", the `tool_definitions` an agent
+ * was given.
+ *
+ * **When to use**
+ *
+ * Use when reading the tools a document says its agent was given (v1.5+).
+ *
+ * **Details**
+ *
+ * `type` names the kind of tool, which is `"function"` for the tools ATIF states,
+ * and `function` states the tool itself: the `name` it is called by, what it is
+ * `description` as, and the `parameters` it accepts, as the JSON schema the model
+ * was given rather than as any schema of a program. A reader that knows the tools
+ * of its own toolkit reads a call of a step as the call it was and leaves the
+ * definitions here; `strict` is OpenAI's, and states whether the arguments must
+ * follow the schema exactly.
+ *
+ * @see {@link Agent} for the agent the definitions were given to.
+ * @category models
+ */
+export const ToolDefinition = Schema.Struct({
+  /** The kind of tool: `"function"` for the tools ATIF states. */
+  type: Schema.String,
+  /** The function the tool names. */
+  function: Schema.Struct({
+    /** The name the tool is called by. */
+    name: Schema.String,
+    /** What the tool does, as the model was told. */
+    description: Schema.optional(Schema.NullOr(Schema.String)),
+    /** The arguments the tool accepts, as the JSON schema the model was given. */
+    parameters: Schema.optional(Schema.Unknown),
+    /** Whether the arguments must follow the schema exactly, in OpenAI's sense. */
+    strict: Schema.optional(Schema.NullOr(Schema.Boolean)),
+  }),
+  /** What a producer states of the tool beyond the format. */
+  extra: Schema.optional(ProducerFields),
+});
+
+/**
+ * A {@link ToolDefinition} as it is read.
+ *
+ * ATIF RFC 0001 v1.8, Section II "AgentSchema", the `tool_definitions` an agent
+ * was given.
+ *
+ * @see {@link ToolDefinition} for the schema it is read by.
+ * @category models
+ */
+export type ToolDefinition = Schema.Schema.Type<typeof ToolDefinition>;
+
+/**
  * The agent that ran, as the document states it.
  *
  * ATIF RFC 0001 v1.8, Section II "AgentSchema".
@@ -522,9 +784,9 @@ export const Agent = Schema.Struct({
   /** The model the agent ran on by default, which a step's own `model_name` overrides. */
   model_name: Schema.optional(Schema.NullOr(Schema.String)),
   /** The tools the agent was given (v1.5+), each of them an OpenAI function definition. */
-  tool_definitions: Schema.optional(Schema.Unknown),
+  tool_definitions: Schema.optional(Schema.NullOr(Schema.Array(ToolDefinition))),
   /** What a producer states of the agent beyond the format. */
-  extra: Schema.optional(Schema.Record(Schema.String, Schema.Unknown)),
+  extra: Schema.optional(ProducerFields),
 });
 
 /**
@@ -589,13 +851,13 @@ export const StepObject = Schema.Struct({
   /** What the step was answered with, where it was answered by anything. */
   observation: Schema.optional(Schema.NullOr(Observation)),
   /** The tokens, the cost and the confidence data of the step, where the document states them. */
-  metrics: Schema.optional(Schema.Unknown),
+  metrics: Schema.optional(Schema.NullOr(Metrics)),
   /** Whether the step was copied from a prior trajectory into this one for context. */
   is_copied_context: Schema.optional(Schema.NullOr(Schema.Boolean)),
   /** How many LLM inferences the step represents, where the producer tracked it. */
   llm_call_count: Schema.optional(Schema.NullOr(Schema.Int)),
   /** What a producer states of the step beyond the format. */
-  extra: Schema.optional(Schema.Record(Schema.String, Schema.Unknown)),
+  extra: Schema.optional(ProducerFields),
 });
 
 /**
@@ -647,9 +909,9 @@ export type StepObject = Schema.Schema.Type<typeof StepObject>;
  * @see {@link StepObject} for the steps a document holds.
  * @category schemas
  */
-export const Document = Schema.Struct({
+export const Document: Schema.Codec<Document> = Schema.Struct({
   /** The version of ATIF the document conforms to. */
-  schema_version: Schema.Literals(versions),
+  schema_version: SchemaVersion,
   /** The agent run the document belongs to, where it states one; run-scoped, and optional since v1.7. */
   session_id: Schema.optional(Schema.NullOr(Schema.String)),
   /** The identity of the document among the ones of a run, where it states one (v1.7+). */
@@ -661,13 +923,13 @@ export const Document = Schema.Struct({
   /** What a producer wrote of the run itself: its design notes, or what the format does not state. */
   notes: Schema.optional(Schema.NullOr(Schema.String)),
   /** The tokens and the cost of the run as a whole, where the document states them. */
-  final_metrics: Schema.optional(Schema.Unknown),
+  final_metrics: Schema.optional(Schema.NullOr(FinalMetrics)),
   /** The document this one is continued in, where it is continued in another. */
   continued_trajectory_ref: Schema.optional(Schema.NullOr(Schema.String)),
   /** What a producer states of the document beyond the format. */
-  extra: Schema.optional(Schema.Record(Schema.String, Schema.Unknown)),
+  extra: Schema.optional(ProducerFields),
   /** The trajectories of the subagents a step delegated work to (v1.7+). */
-  subagent_trajectories: Schema.optional(Schema.Array(Schema.Unknown)),
+  subagent_trajectories: Schema.optional(Schema.Array(Schema.suspend(() => Document))),
 });
 
 /**
@@ -678,7 +940,28 @@ export const Document = Schema.Struct({
  * @see {@link Document} for the schema it is read by.
  * @category models
  */
-export type Document = Schema.Schema.Type<typeof Document>;
+export interface Document {
+  /** The version of ATIF the document conforms to. */
+  readonly schema_version: (typeof versions)[number];
+  /** The agent run the document belongs to, where it states one; run-scoped, and optional since v1.7. */
+  readonly session_id?: string | null | undefined;
+  /** The identity of the document among the ones of a run, where it states one (v1.7+). */
+  readonly trajectory_id?: string | null | undefined;
+  /** The agent that ran. */
+  readonly agent: Agent;
+  /** The steps of the run, in the order they happened, numbered from `1`. */
+  readonly steps: readonly [StepObject, ...Array<StepObject>];
+  /** What a producer wrote of the run itself: its design notes, or what the format does not state. */
+  readonly notes?: string | null | undefined;
+  /** The tokens and the cost of the run as a whole, where the document states them. */
+  readonly final_metrics?: FinalMetrics | null | undefined;
+  /** The document this one is continued in, where it is continued in another. */
+  readonly continued_trajectory_ref?: string | null | undefined;
+  /** What a producer states of the document beyond the format. */
+  readonly extra?: ProducerFields | undefined;
+  /** The trajectories of the subagents a step delegated work to (v1.7+). */
+  readonly subagent_trajectories?: ReadonlyArray<Document> | undefined;
+}
 
 /**
  * The document as the JSON a `trajectory.json` holds.

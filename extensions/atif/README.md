@@ -75,6 +75,12 @@ producer's account of a run:
   it cost, and how many inferences it stands for. A trajectory times no part of a
   conversation, names no model per turn, and counts no tokens or cost, so there is
   nothing to read them from.
+- what the document states of the run and of the agent that ran it rather than of
+  the conversation: its `notes`, the `final_metrics` of the run, the `name`, the
+  `version` and the default `model_name` of the agent, and the `extra` a producer
+  writes at any level. A trajectory holds the parts a session ran on and what a kit
+  derived of them, so a producer's own account of a run has nothing there to be read
+  from.
 - the tools the agent was given, which the document states in the format's own
   terms rather than as the tools of a toolkit. The calls of a step are produced as
   the calls they were, and are read as the tool parts the reading toolkit does not

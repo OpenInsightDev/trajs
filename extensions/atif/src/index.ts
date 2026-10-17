@@ -15,6 +15,8 @@
  */
 export * as Document from "./Document.ts";
 
+export * from "./Extras.ts";
+
 export * from "./Events.ts";
 
 export * as Encode from "./Encode.ts";

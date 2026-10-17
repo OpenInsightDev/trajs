@@ -17,7 +17,7 @@
  * ({@link promptPart}, {@link sessionPart}, {@link responsePart}).
  */
 
-import { Effect, Schema, Stream } from "effect";
+import { DateTime, Effect, Schema, Stream } from "effect";
 
 import * as Event from "#/Event.ts";
 import * as Extra from "#/Extra.ts";
@@ -51,6 +51,12 @@ const extraField = <K extends Extra.AnyKit, P extends Extra.Part>(extrakit: K, p
  *   `sessionId` the session the part was produced in.
  * - `uuid` identifies the part itself, and is what the `fork` of a
  *   {@link SessionPart} names; `.make` gives a part a fresh one.
+ * - `timestamp` is when the part was produced, where what wrote the part states
+ *   it: a part produced as it happens is timed with the moment it was built, while
+ *   one read from a record that times it — a document of an interchange format,
+ *   say — states the moment that record gives. A part that states none is one whose
+ *   writing had no moment to state, which a trajectory reads as a part of its own
+ *   kind rather than as one outside time.
  * - `extra` is the extra data the kit declares of a prompt part, keyed by the tag
  *   of each kind: {@link Extra.ExtraRecord}. A part produced stating none holds
  *   none, so a trajectory written before an extension declared its data still reads.
@@ -69,6 +75,7 @@ export const PromptPart = <K extends Extra.AnyKit>(extrakit: K) =>
     extra: extraField(extrakit, "prompt"),
     sessionId: Schema.String,
     uuid: Uuid,
+    timestamp: Schema.optional(Schema.DateTimeUtcFromString),
   });
 
 /**
@@ -106,6 +113,11 @@ export type PromptPartEncoded = Schema.Codec.Encoded<ReturnType<typeof PromptPar
  *   stating the extra data of that kit rather than of none.
  * - `messages` are the content of the prompt given, and `sessionId` the session the
  *   part is produced in.
+ * - `timestamp` is when the part was produced, where what produces it states a
+ *   moment rather than leaving it to the part to be timed as it is built: a prompt
+ *   produced as it happens is timed by `.make`, and one read from a record that times
+ *   it states the moment that record gives. A part that states no moment is one
+ *   whose reading had none to give — see {@link PromptPart}.
  * - `extra` may be left out, and the part then states none of it. A datum the kit
  *   does not declare of a prompt part is refused where the part is built, since a
  *   kit reads back what it states and nothing else.
@@ -145,12 +157,14 @@ export const promptPart =
     prompt,
     sessionId,
     extra = {},
+    timestamp,
   }: {
     prompt: Prompt.Prompt;
     sessionId: string;
     extra?: Extra.ExtraRecord<K["extra"], "prompt">;
+    timestamp?: DateTime.Utc;
   }) =>
-    PromptPart(extrakit).make({ messages: prompt.content, sessionId, extra });
+    PromptPart(extrakit).make({ messages: prompt.content, sessionId, extra, timestamp });
 
 /**
  * Creates the schema of a session part, as the extra kit given reads its extra
@@ -423,7 +437,8 @@ export type ResponsePartEncoded = Schema.Codec.Encoded<
  *   part the response is whole in where it does not.
  * - `sessionId` names the session the part is produced in; the `timestamp` and the
  *   `uuid` of the part are supplied where it is built, as they are for every other
- *   part.
+ *   part, and a caller that knows the moment the response happened states it rather
+ *   than leaving the part to be timed as it is built.
  * - `extra` may be left out, and the part then states none of it, as a prompt part
  *   that states none does.
  *
@@ -474,10 +489,12 @@ export const responsePart =
     response,
     sessionId,
     extra = {},
+    timestamp,
   }: {
     response: ResponsePart<Toolkit, Extrakit, Stream>["response"];
     sessionId: string;
     extra?: Extra.ExtraRecord<Extrakit["extra"], "response">;
+    timestamp?: DateTime.Utc;
   }): ResponsePart<Toolkit, Extrakit, Stream> =>
     // SAFETY: `ResponsePart` selects its variant by `stream`, which the fields were
     // read under, so what it makes is the part they state; TypeScript leaves that
@@ -487,6 +504,7 @@ export const responsePart =
       response,
       sessionId,
       extra,
+      timestamp,
     }) as ResponsePart<Toolkit, Extrakit, Stream>;
 
 /**

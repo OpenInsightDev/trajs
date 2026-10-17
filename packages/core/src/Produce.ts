@@ -8,7 +8,7 @@
  * among the parts it is about.
  */
 
-import { Cause, Effect, Exit, Queue, Stream } from "effect";
+import { Cause, DateTime, Effect, Exit, Queue, Stream } from "effect";
 
 import * as Event from "#/Event.ts";
 import * as Extra from "#/Extra.ts";
@@ -371,6 +371,10 @@ export const fromSessions =
  *   of what it returned, each with the extra data the kit declares of the part it
  *   is — {@link Extra.ExtraRecord} — and `enqueueEvent` produces an event of the
  *   event kit.
+ * - A prompt or response part is timed where it is produced, and a caller that
+ *   knows the moment it happened states it as the last argument of the enqueue
+ *   rather than leaving the part to be timed as it is built — which is how a part
+ *   read from a record that times it keeps the moment that record gives.
  * - Every part is produced in this session: the `sessionId` of a part is the `id`
  *   of the session that wrote it, so the parts of the sessions a run opens are
  *   read apart.
@@ -388,10 +392,12 @@ export type ProduceSession<
   enqueuePrompt: (
     message: Prompt.Prompt,
     options?: Extra.ExtraRecord<Extras, "prompt">,
+    timestamp?: DateTime.Utc,
   ) => Effect.Effect<Trajectory.PromptPart<Extra.Extrakit<Extras>>>;
   enqueueResponse: (
     response: Response.AllPartsView<Tools>,
     options?: Extra.ExtraRecord<Extras, "response">,
+    timestamp?: DateTime.Utc,
   ) => Effect.Effect<Trajectory.ResponsePart<Toolkit.Toolkit<Tools>, Extra.Extrakit<Extras>, true>>;
   enqueueEvent: (
     event: Event.EventPartsView<Events>,
@@ -552,10 +558,10 @@ export const produce =
         id: string,
       ): ProduceSession<Toolkit["tools"], Eventkit["events"], Extrakit["extra"]> => ({
         id,
-        enqueuePrompt: (prompt, extra = {}) =>
-          enqueue(promptPart({ prompt, sessionId: id, extra })),
-        enqueueResponse: (response, extra = {}) =>
-          enqueue(responsePart({ response, sessionId: id, extra })),
+        enqueuePrompt: (prompt, extra = {}, timestamp) =>
+          enqueue(promptPart({ prompt, sessionId: id, extra, timestamp })),
+        enqueueResponse: (response, extra = {}, timestamp) =>
+          enqueue(responsePart({ response, sessionId: id, extra, timestamp })),
         enqueueEvent: (event) => enqueue(eventPart.make({ event, sessionId: id })),
       });
 
