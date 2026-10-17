@@ -1,0 +1,20 @@
+---
+title: Toaster
+description: What is said after an action, and taken away by itself.
+---
+
+<Preview>
+  <ToasterDemo />
+</Preview>
+
+A toast is raised by an event rather than by a page being read, which is why
+this one is raised by pressing the buttons above. It is the answer an action
+gets when it should not interrupt: importing a file, copying a part, a failure
+that needs no decision. `Toaster` is the single surface the toasts are collected
+on — a page mounts one — and each toast settles in a corner and leaves by
+itself.
+
+Success, error, warning, info and loading are stated on the call that raises the
+toast, and each arrives with the icon the design language gives it. A drawer
+that needs an answer is an [AlertDialog](/components/alert-dialog) instead: a
+toast cannot be answered.

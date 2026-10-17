@@ -1,0 +1,31 @@
+---
+title: Kbd
+description: A key, written as the key it is.
+---
+
+import { Kbd, KbdGroup } from "@trajs/shadcn/kbd";
+
+A `Kbd` is a key rather than a code sample, so it is read in the face the rest
+of the page is and sized to one character. `KbdGroup` is the set of them a
+chord is, and a key inside a [Tooltip](/components/tooltip) inverts to stay
+readable on the tooltip's surface.
+
+<Preview>
+  <div className="flex flex-wrap items-center gap-4 text-sm">
+    <KbdGroup>
+      <Kbd>⌘</Kbd>
+      <Kbd>K</Kbd>
+    </KbdGroup>
+    <KbdGroup>
+      <Kbd>⌘</Kbd>
+      <Kbd>⇧</Kbd>
+      <Kbd>P</Kbd>
+    </KbdGroup>
+    <Kbd>Esc</Kbd>
+    <Kbd>↵</Kbd>
+  </div>
+</Preview>
+
+It is a label for a key, not for what the key does: the shortcut beside a menu
+item is that item's, and this is what the page writes when it is showing the key
+itself.

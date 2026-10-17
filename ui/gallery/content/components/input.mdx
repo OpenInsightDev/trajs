@@ -1,0 +1,23 @@
+---
+title: Input
+description: One line a reader types into.
+---
+
+import { Input } from "@trajs/shadcn/input";
+
+`Input` is the browser's input, styled with the tokens and nothing else: `type`,
+`placeholder`, `disabled` and the validity state are all still its own. It is
+usually read inside a [Field](/components/field), which is what puts a label and
+a description against it.
+
+<Preview>
+  <div className="flex flex-col gap-3">
+    <Input placeholder="Search sessions…" />
+    <Input defaultValue="trajs" aria-invalid />
+    <Input defaultValue="read-only" disabled />
+    <Input type="file" />
+  </div>
+</Preview>
+
+The invalid, disabled and file states are read from the input's own attributes,
+so a control that says what it is does not also need classes to look like it.

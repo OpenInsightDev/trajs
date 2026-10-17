@@ -1,0 +1,52 @@
+---
+title: Avatar
+description: Who a message is from, as a picture or the initials that stand for one.
+---
+
+import {
+  Avatar,
+  AvatarBadge,
+  AvatarFallback,
+  AvatarGroup,
+  AvatarGroupCount,
+  AvatarImage,
+} from "@trajs/shadcn/avatar";
+
+An avatar holds a picture over the initials that stand in for one, so it is
+never empty while the image loads and never empty when there is none. The sizes
+are the ones messages and lists place it at.
+
+<Preview>
+  <div className="flex flex-col gap-6">
+    <div className="flex items-center gap-3">
+      <Avatar size="sm">
+        <AvatarFallback>B</AvatarFallback>
+        <AvatarBadge />
+      </Avatar>
+      <Avatar>
+        <AvatarFallback>BW</AvatarFallback>
+      </Avatar>
+      <Avatar size="lg">
+        <AvatarFallback>TW</AvatarFallback>
+      </Avatar>
+      <Avatar size="lg">
+        <AvatarImage src="https://github.com/OpenInsightDev.png" alt="trajs" />
+        <AvatarFallback>tr</AvatarFallback>
+        <AvatarBadge />
+      </Avatar>
+    </div>
+    <AvatarGroup>
+      <Avatar>
+        <AvatarFallback>A</AvatarFallback>
+      </Avatar>
+      <Avatar>
+        <AvatarFallback>M</AvatarFallback>
+      </Avatar>
+      <AvatarGroupCount>+3</AvatarGroupCount>
+    </AvatarGroup>
+  </div>
+</Preview>
+
+`AvatarGroup` overlaps the avatars it holds and `AvatarGroupCount` stands for the
+ones it does not show, which is how a long list of participants is read without
+being written out.

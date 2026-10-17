@@ -1,0 +1,19 @@
+---
+title: Drawer
+description: A surface that slides in from an edge and can be swiped back.
+---
+
+<Preview>
+  <DrawerDemo />
+</Preview>
+
+A drawer is a dialog a thumb can throw away: it comes from the edge
+`swipeDirection` names, follows the gesture while it is being made, and settles
+back if it is not carried far enough. Everything above the content — the handle,
+the header, the footer — is a slot, so a drawer with a form is written the same
+way as one without.
+
+`modal={false}` leaves the page behind the drawer usable, and `snapPoints` lets
+a drawer rest partway up instead of only opening fully. On a narrow viewport it
+is also what the sidebar collapses into, which is the one place the two
+components are the same surface.

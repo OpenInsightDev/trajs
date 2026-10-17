@@ -1,0 +1,43 @@
+---
+title: AlertDialog
+description: A dialog that asks before something cannot be undone.
+---
+
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@trajs/shadcn/alert-dialog";
+import { Button } from "@trajs/shadcn/button";
+
+An alert dialog interrupts, so it is for what will not be read any other way:
+the dialog a destructive action is confirmed in. It is a `Dialog` that cannot be
+dismissed by clicking away, and `AlertDialogAction` and `AlertDialogCancel` are
+the two answers it takes.
+
+<Preview>
+  <AlertDialog>
+    <AlertDialogTrigger render={<Button variant="outline" />}>Delete session</AlertDialogTrigger>
+    <AlertDialogContent>
+      <AlertDialogHeader>
+        <AlertDialogTitle>Delete this session?</AlertDialogTitle>
+        <AlertDialogDescription>
+          The session and every fork of it are removed from the recording. This cannot be undone.
+        </AlertDialogDescription>
+      </AlertDialogHeader>
+      <AlertDialogFooter>
+        <AlertDialogCancel>Cancel</AlertDialogCancel>
+        <AlertDialogAction>Delete</AlertDialogAction>
+      </AlertDialogFooter>
+    </AlertDialogContent>
+  </AlertDialog>
+</Preview>
+
+`size="sm"` narrows the dialog and puts its two answers in one row, which is what
+a question with a short answer takes.

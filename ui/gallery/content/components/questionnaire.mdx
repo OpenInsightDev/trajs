@@ -1,0 +1,24 @@
+---
+title: Questionnaire
+description: A flow of questions a model asks before it answers.
+---
+
+<Preview>
+  <QuestionnaireDemo />
+</Preview>
+
+A questionnaire is not a form: it is the same form restricted to one item at a
+time, with the rest of the flow around it. The root declares every item and its
+choices — which is what the keyboard shortcuts, the progress and the required
+state are read from — and each item is written out again as the content it is
+shown as.
+
+`QuestionnaireProgress` states the position within the flow, `QuestionnaireItem`
+is current only while it is the one being asked, and the actions move between
+the items: `Previous`, `Skip` and `Next`, with `Submit` in the last one's place
+when the item is the last. An answer that does not validate stops `Next` and is
+read by `QuestionnaireError`.
+
+The shortcuts are letters or numbers, stated once on the root, and are what the
+small keys beside each choice are; an item with a single choice and an `Input`
+is the one that is answered by typing.

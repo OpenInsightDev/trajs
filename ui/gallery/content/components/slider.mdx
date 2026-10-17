@@ -1,0 +1,21 @@
+---
+title: Slider
+description: A value chosen by dragging it.
+---
+
+import { Slider } from "@trajs/shadcn/slider";
+
+A slider is for a value whose neighbours are known — a temperature, a density, a
+playback position — so a reader can pick one by feel rather than by typing it.
+The value is a number or a tuple, and a tuple is the range between two thumbs.
+
+<Preview>
+  <div className="flex w-full max-w-sm flex-col gap-6">
+    <Slider defaultValue={[62]} max={100} step={1} />
+    <Slider defaultValue={[25, 75]} max={100} step={5} />
+    <Slider defaultValue={[40]} max={100} step={10} disabled />
+  </div>
+</Preview>
+
+A number that has to be typed exactly is an [Input](/components/input); a slider
+is what a reader sets while watching what it affects.

@@ -1,0 +1,48 @@
+---
+title: Command
+description: A list that narrows as it is searched.
+---
+
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+  CommandSeparator,
+  CommandShortcut,
+} from "@trajs/shadcn/command";
+
+A command palette is a search input over the commands themselves, so the list is
+the same one whatever is typed: `CommandList` and `CommandGroup` hold the items,
+`CommandEmpty` is what is shown when none of them matches, and the input filters
+what is above it.
+
+<Preview>
+  <Command className="ring-1 ring-border">
+    <CommandInput placeholder="Search sessions…" />
+    <CommandList>
+      <CommandEmpty>No session matches.</CommandEmpty>
+      <CommandGroup heading="Recent">
+        <CommandItem>
+          session_8f2a
+          <CommandShortcut>⌘1</CommandShortcut>
+        </CommandItem>
+        <CommandItem>
+          session_31c7
+          <CommandShortcut>⌘2</CommandShortcut>
+        </CommandItem>
+      </CommandGroup>
+      <CommandSeparator />
+      <CommandGroup heading="Actions">
+        <CommandItem>Import a trajectory</CommandItem>
+        <CommandItem>Compare two sessions</CommandItem>
+      </CommandGroup>
+    </CommandList>
+  </Command>
+</Preview>
+
+A dark surface is not one of these: `Command` reads the popover it is put on, so
+a palette in a dialog is a `CommandDialog`, which puts the dialog and the
+portal around it.

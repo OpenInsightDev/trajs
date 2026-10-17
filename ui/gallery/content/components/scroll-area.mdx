@@ -1,0 +1,24 @@
+---
+title: ScrollArea
+description: A region that scrolls without the browser's scrollbar.
+---
+
+import { ScrollArea } from "@trajs/shadcn/scroll-area";
+
+A scroll area is a viewport and the scrollbar the components draw, rather than
+the platform's own. That is what lets the bar be styled with the tokens, be
+placed inside a rounded surface, and stay out of the way until the region is
+scrolled.
+
+<Preview>
+  <ScrollArea className="h-40 w-full max-w-sm rounded-lg border">
+    <div className="flex flex-col gap-2 p-3 text-sm">
+      {Array.from({ length: 12 }, (_, index) => (
+        <div key={index}>{`turn ${index + 1} — answered in one part`}</div>
+      ))}
+    </div>
+  </ScrollArea>
+</Preview>
+
+The horizontal bar is a `ScrollBar` with `orientation="horizontal"`, which is
+what a wide table inside a narrow surface is scrolled with.

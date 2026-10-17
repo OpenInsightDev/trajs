@@ -1,0 +1,56 @@
+---
+title: Card
+description: A surface one thing is read on.
+---
+
+import {
+  Card,
+  CardAction,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@trajs/shadcn/card";
+import { Button } from "@trajs/shadcn/button";
+
+A card is a ring and one spacing value, which is what makes its parts line up
+without any of them naming a padding. `CardHeader` holds the title, the
+description and the one `CardAction` in its corner, `CardContent` is the body,
+and a `CardFooter` is the row a card is answered in.
+
+<Preview>
+  <div className="grid gap-4 sm:grid-cols-2">
+    <Card>
+      <CardHeader>
+        <CardTitle>session_8f2a</CardTitle>
+        <CardDescription>18 turns · imported 10 minutes ago</CardDescription>
+        <CardAction>
+          <Button size="xs" variant="ghost">
+            Open
+          </Button>
+        </CardAction>
+      </CardHeader>
+      <CardContent>
+        One tool call answered, and the answer was written into the second turn.
+      </CardContent>
+    </Card>
+    <Card size="sm">
+      <CardHeader>
+        <CardTitle>session_31c7</CardTitle>
+        <CardDescription>4 turns · cut short</CardDescription>
+      </CardHeader>
+      <CardContent>The response stopped before its end.</CardContent>
+      <CardFooter>
+        <Button size="sm" variant="outline">
+          Resume
+        </Button>
+      </CardFooter>
+    </Card>
+  </div>
+</Preview>
+
+`size="sm"` tightens the spacing and the title with it, for the cards that sit in
+a list rather than standing alone. An image as the first or last child is
+rounded to the card's own corners, so a card that leads with one needs no
+classes to keep it inside.

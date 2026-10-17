@@ -1,0 +1,53 @@
+---
+title: ContextMenu
+description: The menu a right click opens, where the click happened.
+---
+
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuLabel,
+  ContextMenuSeparator,
+  ContextMenuShortcut,
+  ContextMenuSub,
+  ContextMenuSubContent,
+  ContextMenuSubTrigger,
+  ContextMenuTrigger,
+} from "@trajs/shadcn/context-menu";
+
+The context menu is the dropdown one with a different opener: the trigger is the
+region the click lands in, and the content is placed at the pointer. Everything
+it holds is a menu item — a label, a submenu, the shortcut that says what an
+item is also reachable by.
+
+<Preview>
+  <ContextMenu>
+    <ContextMenuTrigger className="flex h-32 items-center justify-center rounded-lg border border-dashed text-sm text-muted-foreground">
+      Right click a turn
+    </ContextMenuTrigger>
+    <ContextMenuContent>
+      <ContextMenuLabel>Turn</ContextMenuLabel>
+      <ContextMenuItem>
+        Copy as JSON
+        <ContextMenuShortcut>⌘C</ContextMenuShortcut>
+      </ContextMenuItem>
+      <ContextMenuItem>
+        Fork from here
+        <ContextMenuShortcut>⌘F</ContextMenuShortcut>
+      </ContextMenuItem>
+      <ContextMenuSub>
+        <ContextMenuSubTrigger>Open in</ContextMenuSubTrigger>
+        <ContextMenuSubContent>
+          <ContextMenuItem>the viewer</ContextMenuItem>
+          <ContextMenuItem>a new tab</ContextMenuItem>
+        </ContextMenuSubContent>
+      </ContextMenuSub>
+      <ContextMenuSeparator />
+      <ContextMenuItem variant="destructive">Delete turn</ContextMenuItem>
+    </ContextMenuContent>
+  </ContextMenu>
+</Preview>
+
+`variant="destructive"` is the item's own colour rather than a second component,
+so an action that destroys reads as itself wherever menus are written.

@@ -1,0 +1,67 @@
+---
+title: DropdownMenu
+description: The menu a button opens, placed against it.
+---
+
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuSeparator,
+  DropdownMenuShortcut,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
+  DropdownMenuTrigger,
+} from "@trajs/shadcn/dropdown-menu";
+import { Button } from "@trajs/shadcn/button";
+
+A dropdown is the menu a trigger opens: the content is positioned against that
+trigger, and everything inside it is one of the menu's item types — a command, a
+checkbox, a radio, a submenu — so it is keyboard navigation the platform already
+knows. The shortcut is written beside an item rather than bound by it.
+
+<Preview>
+  <DropdownMenu>
+    <DropdownMenuTrigger render={<Button variant="outline" />}>View</DropdownMenuTrigger>
+    <DropdownMenuContent>
+      <DropdownMenuLabel>Session</DropdownMenuLabel>
+      <DropdownMenuGroup>
+        <DropdownMenuItem>
+          Rename
+          <DropdownMenuShortcut>⌘R</DropdownMenuShortcut>
+        </DropdownMenuItem>
+        <DropdownMenuItem>
+          Duplicate
+          <DropdownMenuShortcut>⌘D</DropdownMenuShortcut>
+        </DropdownMenuItem>
+      </DropdownMenuGroup>
+      <DropdownMenuSeparator />
+      <DropdownMenuCheckboxItem defaultChecked>Show reasoning</DropdownMenuCheckboxItem>
+      <DropdownMenuSeparator />
+      <DropdownMenuRadioGroup defaultValue="comfortable">
+        <DropdownMenuRadioItem value="compact">Compact</DropdownMenuRadioItem>
+        <DropdownMenuRadioItem value="comfortable">Comfortable</DropdownMenuRadioItem>
+      </DropdownMenuRadioGroup>
+      <DropdownMenuSeparator />
+      <DropdownMenuSub>
+        <DropdownMenuSubTrigger>Export as</DropdownMenuSubTrigger>
+        <DropdownMenuSubContent>
+          <DropdownMenuItem>JSON</DropdownMenuItem>
+          <DropdownMenuItem>Markdown</DropdownMenuItem>
+        </DropdownMenuSubContent>
+      </DropdownMenuSub>
+      <DropdownMenuSeparator />
+      <DropdownMenuItem variant="destructive">Delete</DropdownMenuItem>
+    </DropdownMenuContent>
+  </DropdownMenu>
+</Preview>
+
+A menu the reader opens where they are, rather than against a button, is
+[ContextMenu](/components/context-menu): the same items under a different
+opener.

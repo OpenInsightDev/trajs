@@ -1,0 +1,30 @@
+---
+title: Label
+description: The name of the control it is for.
+---
+
+import { Label } from "@trajs/shadcn/label";
+import { Input } from "@trajs/shadcn/input";
+import { Switch } from "@trajs/shadcn/switch";
+
+`Label` is the browser's label with the type the tokens state, and `htmlFor` is
+still what ties it to a control — which is what makes clicking the name focus
+the input, and what names the control to a screen reader. A disabled control's
+label dims with it through the `group-data-[disabled=true]` the enclosing
+[Field](/components/field) sets.
+
+<Preview>
+  <div className="flex flex-col gap-3">
+    <div className="flex flex-col gap-1.5">
+      <Label htmlFor="label-project">Project</Label>
+      <Input id="label-project" defaultValue="trajs" />
+    </div>
+    <div className="flex items-center gap-2">
+      <Switch id="label-payload" defaultChecked />
+      <Label htmlFor="label-payload">Keep tool payloads</Label>
+    </div>
+  </div>
+</Preview>
+
+A label beside a checkbox or a switch is the row itself, which is what makes the
+whole row the target a reader can hit.

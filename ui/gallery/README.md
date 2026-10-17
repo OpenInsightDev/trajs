@@ -106,6 +106,16 @@ other packages, and the markdown a message is read as is written by Streamdown, 
 being reached by an import. Dropping the Streamdown lines leaves the build green
 while a message quietly loses its list markers and its syntax highlighting.
 
+**A few components cannot be rendered by the page that shows them.** The
+overlays and gestures — a dialog, a hover card, a sheet, a drawer, a sidebar, a
+message scroller and a questionnaire — and the toaster, which is raised by a
+click, are shown from a `"use client"` demo under `src/components/demos/` rather
+than written into the MDX: the dev server renders a page in the server graph, and
+these hold state, read the viewport, or reach a class defined over a client
+dependency there. The demo module is still rendered on the server, so the demo
+stays in the prerendered HTML and the search index. Every other page renders the
+component in the page itself.
+
 ## Not done yet
 
 There is no deploy configuration: unlike `ui/website`, this package names no
@@ -113,6 +123,6 @@ Cloudflare adapter and has no `wrangler.jsonc`, so `pnpm run build` produces a
 Node-served build. Deploying it needs that decision — its own Worker, or serving
 it out of the documentation site.
 
-The shadcn/ui pages cover one component so far — the rest of `@trajs/shadcn` is
-still to come. The mapping pages under `content/prompt/` and `content/response/`
-are complete for the components `@trajs/component` publishes today.
+The shadcn/ui pages cover every component `@trajs/shadcn` publishes. The mapping
+pages under `content/prompt/` and `content/response/` are complete for the
+components `@trajs/component` publishes today.

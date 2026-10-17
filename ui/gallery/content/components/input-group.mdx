@@ -1,0 +1,51 @@
+---
+title: InputGroup
+description: An input with the controls, affixes and text that belong to it.
+---
+
+import {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupButton,
+  InputGroupInput,
+  InputGroupText,
+} from "@trajs/shadcn/input-group";
+import { Kbd } from "@trajs/shadcn/kbd";
+import { SearchIcon, XIcon } from "lucide-react";
+
+An input group is one bordered control: the addons sit inside the border rather
+than beside it, and the input inside them is the borderless one. The `align` of
+an addon says where it goes — `inline-start`, `inline-end`, or a `block-start` /
+`block-end` row above or below — and a textarea in one grows with what is typed.
+
+<Preview>
+  <div className="flex w-full max-w-sm flex-col gap-3">
+    <InputGroup>
+      <InputGroupAddon>
+        <SearchIcon />
+      </InputGroupAddon>
+      <InputGroupInput placeholder="Search sessions…" />
+      <InputGroupAddon align="inline-end">
+        <Kbd>⌘K</Kbd>
+      </InputGroupAddon>
+    </InputGroup>
+    <InputGroup>
+      <InputGroupAddon>https://</InputGroupAddon>
+      <InputGroupInput placeholder="tra.js.org" />
+      <InputGroupAddon align="inline-end">
+        <InputGroupButton aria-label="Clear">
+          <XIcon />
+        </InputGroupButton>
+      </InputGroupAddon>
+    </InputGroup>
+    <InputGroup>
+      <InputGroupAddon align="block-start">
+        <InputGroupText>Tool payload</InputGroupText>
+      </InputGroupAddon>
+      <InputGroupInput placeholder='{ "term": "trajectory" }' />
+    </InputGroup>
+  </div>
+</Preview>
+
+An addon that is a button is `InputGroupButton`, so the padding a control lands
+on is the group's rather than the button's.

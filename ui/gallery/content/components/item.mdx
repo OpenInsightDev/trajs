@@ -1,0 +1,62 @@
+---
+title: Item
+description: One row of a list, and the parts a row is read in.
+---
+
+import {
+  Item,
+  ItemActions,
+  ItemContent,
+  ItemDescription,
+  ItemFooter,
+  ItemGroup,
+  ItemMedia,
+  ItemSeparator,
+  ItemTitle,
+} from "@trajs/shadcn/item";
+import { Badge } from "@trajs/shadcn/badge";
+import { Button } from "@trajs/shadcn/button";
+import { FileTextIcon } from "lucide-react";
+
+An item is the row a list is made of: `ItemMedia` on one side, the content — a
+title, a description, whatever else the row says — in the middle, and the
+`ItemActions` on the other. `ItemHeader` and `ItemFooter` take the full width,
+which is where a row puts what is about the whole row rather than about its
+content.
+
+<Preview>
+  <ItemGroup>
+    <Item variant="outline">
+      <ItemMedia variant="icon">
+        <FileTextIcon />
+      </ItemMedia>
+      <ItemContent>
+        <ItemTitle>session_8f2a</ItemTitle>
+        <ItemDescription>
+          18 turns, one tool call answered, produced 10 minutes ago.
+        </ItemDescription>
+      </ItemContent>
+      <ItemActions>
+        <Badge variant="secondary">imported</Badge>
+        <Button size="sm" variant="outline">
+          Open
+        </Button>
+      </ItemActions>
+    </Item>
+    <ItemSeparator />
+    <Item variant="muted" size="sm">
+      <ItemContent>
+        <ItemTitle>session_31c7</ItemTitle>
+        <ItemDescription>4 turns, cut short.</ItemDescription>
+      </ItemContent>
+      <ItemActions>
+        <Button size="xs" variant="ghost">
+          Open
+        </Button>
+      </ItemActions>
+    </Item>
+  </ItemGroup>
+</Preview>
+
+`Item` given `render` is the anchor or button the row is, so a list of links is
+a list of items rather than a list of rows holding links.

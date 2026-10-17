@@ -1,0 +1,24 @@
+---
+title: Skeleton
+description: The shape of what is still arriving.
+---
+
+import { Skeleton } from "@trajs/shadcn/skeleton";
+
+A skeleton stands where content will be, at the size that content will be. It is
+one pulsing block, so a page of them is read as a page loading rather than as
+several animations; what makes it read is the sizes it is given rather than the
+component itself.
+
+<Preview>
+  <div className="flex items-center gap-3">
+    <Skeleton className="size-8 rounded-full" />
+    <div className="flex flex-col gap-2">
+      <Skeleton className="h-4 w-48" />
+      <Skeleton className="h-4 w-64" />
+    </div>
+  </div>
+</Preview>
+
+A list of rows is a list of skeletons with the row's own spacing, which is what
+keeps the layout from moving when the content lands.

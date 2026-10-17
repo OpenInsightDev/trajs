@@ -1,0 +1,35 @@
+---
+title: Alert
+description: A message about what just happened, left where it happened.
+---
+
+import { Alert, AlertAction, AlertDescription, AlertTitle } from "@trajs/shadcn/alert";
+import { CircleAlertIcon, CircleCheckIcon } from "lucide-react";
+import { Button } from "@trajs/shadcn/button";
+
+An alert is read in place, so it carries its own `role="alert"` and the title,
+description and action that say what it is about. The default variant is the
+quiet one; `destructive` is for what a reader has to act on.
+
+<Preview>
+  <div className="flex flex-col gap-3">
+    <Alert>
+      <CircleCheckIcon />
+      <AlertTitle>Session imported</AlertTitle>
+      <AlertDescription>18 turns were read from the file and are ready to open.</AlertDescription>
+    </Alert>
+    <Alert variant="destructive">
+      <CircleAlertIcon />
+      <AlertTitle>Import failed</AlertTitle>
+      <AlertDescription>The file is not a trajectory this version reads.</AlertDescription>
+      <AlertAction>
+        <Button size="xs" variant="outline">
+          Retry
+        </Button>
+      </AlertAction>
+    </Alert>
+  </div>
+</Preview>
+
+An `AlertAction` sits in the top corner and holds one button, which is what a
+message that can be answered offers.

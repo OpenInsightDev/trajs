@@ -1,0 +1,42 @@
+---
+title: Field
+description: A labeled control, with the description and the error that belong to it.
+---
+
+import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@trajs/shadcn/field";
+import { Input } from "@trajs/shadcn/input";
+import { Checkbox } from "@trajs/shadcn/checkbox";
+import { Switch } from "@trajs/shadcn/switch";
+
+A field is the label, the control and the text under it that a form is made of.
+`FieldLabel` is the label associated with the control, so clicking it focuses
+it; `FieldDescription` is what is true about the value before it is typed, and
+`FieldError` is what is wrong with it after. An `invalid` field marks all three
+at once.
+
+<Preview>
+  <FieldGroup>
+    <Field>
+      <FieldLabel htmlFor="project">Project</FieldLabel>
+      <Input id="project" placeholder="trajs" defaultValue="trajs" />
+      <FieldDescription>The name a trajectory is grouped under in the viewer.</FieldDescription>
+    </Field>
+    <Field data-invalid="true">
+      <FieldLabel htmlFor="path">Trajectory file</FieldLabel>
+      <Input id="path" aria-invalid defaultValue="/tmp/recordings" />
+      <FieldError errors={[{ message: "This path is a directory." }]} />
+    </Field>
+    <Field orientation="horizontal">
+      <Checkbox id="inherited" defaultChecked />
+      <FieldLabel htmlFor="inherited">Import inherited sessions</FieldLabel>
+    </Field>
+    <Field orientation="horizontal">
+      <Switch id="payload" defaultChecked />
+      <FieldLabel htmlFor="payload">Keep tool payloads</FieldLabel>
+    </Field>
+  </FieldGroup>
+</Preview>
+
+`orientation="horizontal"` puts the control beside the label, which is the shape
+a checkbox or a switch takes. The `FieldSet`, `FieldLegend` and `FieldSeparator`
+around those are what a form is read in.

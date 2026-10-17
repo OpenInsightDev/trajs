@@ -1,0 +1,25 @@
+---
+title: Sidebar
+description: The navigation a page keeps beside its content.
+---
+
+<Preview>
+  <SidebarDemo />
+</Preview>
+
+A sidebar is a whole arrangement, not one component: `SidebarProvider` holds
+whether it is open and the width the sidebar takes, `Sidebar` is the surface
+itself, and `SidebarInset` is the content beside it. On a wide viewport the
+sidebar is fixed to its edge and the inset takes the rest; on a narrow one it
+collapses into a [Sheet](/components/sheet) that `SidebarTrigger` opens, and
+`SidebarRail` drags.
+
+The menu is built from `SidebarGroup`, `SidebarMenu`, `SidebarMenuItem` and
+`SidebarMenuButton`: a button says whether it is the current one with `isActive`,
+an action or a badge sits in its corner, and `SidebarMenuSub` is what its
+children are listed in. `collapsible="icon"` keeps the icons while the labels go,
+which is where the tooltips a button is given start being shown.
+
+`variant="floating"` lifts the whole sidebar off the page and `variant="inset"`
+puts the inset on the sidebar's own surface, which is the one that reads as a
+single rounded frame around the content.

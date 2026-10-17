@@ -1,0 +1,52 @@
+---
+title: Message
+description: One message, with who it is from beside it.
+---
+
+import {
+  Message,
+  MessageAvatar,
+  MessageContent,
+  MessageFooter,
+  MessageGroup,
+  MessageHeader,
+} from "@trajs/shadcn/message";
+import { Avatar, AvatarFallback } from "@trajs/shadcn/avatar";
+
+A message is wider than a [Bubble](/components/bubble): it has an avatar column
+and a content column, and `align` is which side of the conversation it sits on.
+The header and footer are the small print — who it is from, when it arrived —
+and they dim on the side the reader is not on, which is what tells a
+conversation's two voices apart without a colour for each.
+
+<Preview>
+  <MessageGroup>
+    <Message align="end">
+      <MessageAvatar>
+        <Avatar size="sm">
+          <AvatarFallback>BW</AvatarFallback>
+        </Avatar>
+      </MessageAvatar>
+      <MessageContent>
+        <MessageHeader>You</MessageHeader>
+        Which term did you look up?
+      </MessageContent>
+    </Message>
+    <Message>
+      <MessageAvatar>
+        <Avatar size="sm">
+          <AvatarFallback>A</AvatarFallback>
+        </Avatar>
+      </MessageAvatar>
+      <MessageContent>
+        <MessageHeader>Assistant</MessageHeader>
+        trajectory — the recording of one exchange.
+        <MessageFooter>1.2s</MessageFooter>
+      </MessageContent>
+    </Message>
+  </MessageGroup>
+</Preview>
+
+The message holds what a prompt part renders; the parts themselves are
+[`@trajs/component`](/prompt)'s, which is what the viewer reads a trajectory
+with.

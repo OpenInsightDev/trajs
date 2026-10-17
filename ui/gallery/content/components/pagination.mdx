@@ -1,0 +1,49 @@
+---
+title: Pagination
+description: The pages around this one, as links to them.
+---
+
+import {
+  Pagination,
+  PaginationContent,
+  PaginationEllipsis,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from "@trajs/shadcn/pagination";
+
+Pagination is links, not buttons: a page is somewhere a reader can go, and the
+item that is current says so with `aria-current="page"` rather than by being
+unlinked. The links are buttons at the sizes the design language states, so a
+row of them is the same height as the controls beside it.
+
+<Preview>
+  <Pagination>
+    <PaginationContent>
+      <PaginationItem>
+        <PaginationPrevious href="#" />
+      </PaginationItem>
+      <PaginationItem>
+        <PaginationLink href="#">1</PaginationLink>
+      </PaginationItem>
+      <PaginationItem>
+        <PaginationLink href="#" isActive>
+          2
+        </PaginationLink>
+      </PaginationItem>
+      <PaginationItem>
+        <PaginationLink href="#">3</PaginationLink>
+      </PaginationItem>
+      <PaginationItem>
+        <PaginationEllipsis />
+      </PaginationItem>
+      <PaginationItem>
+        <PaginationNext href="#" />
+      </PaginationItem>
+    </PaginationContent>
+  </Pagination>
+</Preview>
+
+The word on the previous and next links is hidden on a narrow viewport, where
+the chevron alone is what fits.

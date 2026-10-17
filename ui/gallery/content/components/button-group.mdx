@@ -1,0 +1,39 @@
+---
+title: ButtonGroup
+description: Related controls, joined into one.
+---
+
+import { ButtonGroup, ButtonGroupSeparator, ButtonGroupText } from "@trajs/shadcn/button-group";
+import { Button } from "@trajs/shadcn/button";
+import { Input } from "@trajs/shadcn/input";
+import { ChevronDownIcon } from "lucide-react";
+
+A button group joins the controls that belong together: their corners where they
+meet are squared off and the border between them is dropped, so a row of buttons
+reads as one control rather than as several. The separator between them is what
+a group draws when the parts are not obviously apart.
+
+<Preview>
+  <div className="flex flex-col gap-3">
+    <ButtonGroup>
+      <ButtonGroupText>session</ButtonGroupText>
+      <Button variant="outline">Open</Button>
+      <ButtonGroupSeparator />
+      <Button variant="outline" size="icon">
+        <ChevronDownIcon />
+      </Button>
+    </ButtonGroup>
+    <ButtonGroup>
+      <Input placeholder="Rename session…" />
+      <Button variant="outline">Save</Button>
+    </ButtonGroup>
+    <ButtonGroup orientation="vertical">
+      <Button variant="outline">Grid</Button>
+      <Button variant="outline">List</Button>
+      <Button variant="outline">Timeline</Button>
+    </ButtonGroup>
+  </div>
+</Preview>
+
+The corners are decided by the group rather than by each part, so a control that
+is added to it later is joined correctly without anything being written twice.

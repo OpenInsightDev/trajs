@@ -1,0 +1,28 @@
+---
+title: Collapsible
+description: One section that folds, with the trigger wherever the page puts it.
+---
+
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@trajs/shadcn/collapsible";
+import { Button } from "@trajs/shadcn/button";
+
+`Collapsible` is the mechanism an accordion item is built from: a trigger, the
+content it opens, and none of the styling either would have on its own. It takes
+nothing but the two, which is what lets the trigger be a button, a row or a
+whole heading.
+
+<Preview>
+  <Collapsible className="rounded-lg border p-3">
+    <CollapsibleTrigger render={<Button size="sm" variant="outline" />}>
+      Tool parameters
+    </CollapsibleTrigger>
+    <CollapsibleContent>
+      <pre className="mt-3 overflow-x-auto font-mono text-xs text-muted-foreground">
+        {'{ "term": "trajectory" }'}
+      </pre>
+    </CollapsibleContent>
+  </Collapsible>
+</Preview>
+
+The trigger and the content are one value, so a section that folds writes them
+once and places them where it wants.

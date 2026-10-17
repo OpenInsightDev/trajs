@@ -1,0 +1,28 @@
+---
+title: Separator
+description: A rule between two things.
+---
+
+import { Separator } from "@trajs/shadcn/separator";
+
+A separator is the line itself and nothing around it — no margin, no colour
+beyond the border token — so the page that places it owns the space. The
+orientation is the direction of the line, not of the things it separates.
+
+<Preview>
+  <div className="flex flex-col gap-3 text-sm">
+    <span>session_8f2a</span>
+    <Separator />
+    <span>session_31c7</span>
+    <div className="flex h-6 items-center gap-3">
+      <span>18 turns</span>
+      <Separator orientation="vertical" />
+      <span>4 turns</span>
+      <Separator orientation="vertical" />
+      <span>1 tool call</span>
+    </div>
+  </div>
+</Preview>
+
+A vertical separator stretches to the height of what it is in, which is what
+makes it read as a divider between columns rather than a mark on one.

@@ -1,0 +1,38 @@
+---
+title: Tooltip
+description: The name of a control, for a reader who has not found it yet.
+---
+
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@trajs/shadcn/tooltip";
+import { Button } from "@trajs/shadcn/button";
+import { Kbd } from "@trajs/shadcn/kbd";
+import { SearchIcon } from "lucide-react";
+
+A tooltip names what it is attached to and is gone as soon as the pointer leaves,
+so it carries no more than a name and the shortcut that reaches the same thing.
+`TooltipProvider` sets the delay from resting to showing, which is what a page
+of them shares.
+
+<Preview>
+  <TooltipProvider delay={100}>
+    <div className="flex items-center gap-3">
+      <Tooltip>
+        <TooltipTrigger render={<Button variant="outline" size="icon" />}>
+          <SearchIcon />
+        </TooltipTrigger>
+        <TooltipContent>
+          Search sessions
+          <Kbd>⌘K</Kbd>
+        </TooltipContent>
+      </Tooltip>
+      <Tooltip>
+        <TooltipTrigger render={<Button variant="outline" />}>Import</TooltipTrigger>
+        <TooltipContent side="bottom">Read a trajectory from a file</TooltipContent>
+      </Tooltip>
+    </div>
+  </TooltipProvider>
+</Preview>
+
+Anything a reader has to read at length, or click, is a
+[Popover](/components/popover) or a [HoverCard](/components/hover-card): a
+tooltip is exactly the length of a name.
