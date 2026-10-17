@@ -2,12 +2,12 @@ import { defineConfig } from "vite-plus";
 
 // Agent tooling assets and the vendored anti-slop plugin are copied sources, not
 // project code, so neither linting nor formatting may rewrite them. The shadcn/ui
-// components in `ui/components/src` are copied sources for the same reason: they
+// components in `ui/shadcn/src` are copied sources for the same reason: they
 // are re-added with `shadcn add`, so leaving them as written keeps that a no-op.
 const generatedAndVendored = [
   ".agents/**",
   "tools/oxlint/anti-slop/**",
-  "ui/components/src/**",
+  "ui/shadcn/src/**",
   // Written by the Fumapress build and the Fumadocs MDX collection it loads.
   "ui/website/.source/**",
   "ui/website/src/pages.gen.ts",

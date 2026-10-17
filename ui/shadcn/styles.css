@@ -1,6 +1,6 @@
 /* The trajs design language: the semantic tokens every component here renders
    with, the `@theme inline` mapping that turns them into Tailwind utilities, and
-   the base layer that applies them. Exported as `@trajs/ui-component/styles.css`;
+   the base layer that applies them. Exported as `@trajs/shadcn/styles.css`;
    a front end imports it once, after Tailwind. */
 
 @custom-variant dark (&:is(.dark *));

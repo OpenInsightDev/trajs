@@ -28,16 +28,10 @@ import {
   ResponseSource,
   ResponseStream,
   ResponseToolParams,
-} from "@trajs/react";
-import type { AnyResponsePart, AnyStreamPart } from "@trajs/react";
-import { Button } from "@trajs/ui-component/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@trajs/ui-component/card";
+} from "@trajs/component";
+import type { AnyResponsePart, AnyStreamPart } from "@trajs/component";
+import { Button } from "@trajs/shadcn/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@trajs/shadcn/card";
 import { DateTime, Schema } from "effect";
 import { Prompt, Response } from "effect/ai";
 import { useEffect, useState } from "react";

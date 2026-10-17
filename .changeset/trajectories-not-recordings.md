@@ -3,7 +3,6 @@
 "@trajs/platform-browser": minor
 "@trajs/platform-bun": minor
 "@trajs/platform-node": minor
-"@trajs/react": minor
 "@trajs/utils": minor
 "@trajs/cli": minor
 ---

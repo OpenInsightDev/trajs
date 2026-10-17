@@ -1,8 +1,9 @@
-# @trajs/react
+# @trajs/component
 
-React components that render an [`effect/ai`](https://effect.website) prompt and
-response as the conversation they are, with the
-[shadcn/ui](https://ui.shadcn.com) chat components.
+The trajs component library: React components that render an
+[`effect/ai`](https://effect.website) prompt and response as the conversation
+they are, with the [shadcn/ui](https://ui.shadcn.com) chat components of
+[`@trajs/shadcn`](../shadcn).
 
 An `effect/ai` prompt is a value — messages, and the parts each message carries —
 and every part has a shape only the union knows. This package is the mapping from
@@ -12,7 +13,7 @@ has a case per part and no default, so a part `effect/ai` adds later stops
 compiling rather than rendering nothing.
 
 ```tsx
-import { PromptView } from "@trajs/react";
+import { PromptView } from "@trajs/component";
 
 <PromptView prompt={prompt} />;
 ```
@@ -45,7 +46,7 @@ dispatches over the response union the way `PromptPart` does, so a part only a
 response carries is the only thing left to render.
 
 ```tsx
-import { ResponsePart } from "@trajs/react";
+import { ResponsePart } from "@trajs/component";
 
 <ResponsePart part={part} />;
 ```
@@ -74,8 +75,8 @@ parameters arrive as, and the `error` part a response can end in. `ResponseStrea
 reads the parts received so far as the answer they have written:
 
 ```tsx
-import { ResponseStream } from "@trajs/react";
-import type { AnyStreamPart } from "@trajs/react";
+import { ResponseStream } from "@trajs/component";
+import type { AnyStreamPart } from "@trajs/component";
 
 // every part the stream has delivered so far, in the order it delivered them
 const [parts, setParts] = useState<ReadonlyArray<AnyStreamPart>>([]);
@@ -99,22 +100,22 @@ still open. Here it is what is open that is worth showing.
 
 ## Installing
 
-The package renders with the components in [`@trajs/ui-component`](../components), which is a
+The package renders with the components in [`@trajs/shadcn`](../shadcn), which is a
 dependency of it, and with shadcn's semantic tokens, which the app owns. An app
 that already has shadcn/ui set up needs only this:
 
 ```tsx
-import { PromptView } from "@trajs/react";
+import { PromptView } from "@trajs/component";
 ```
 
 ```css
 @import "tailwindcss";
-@import "@trajs/react/styles.css";
+@import "@trajs/component/styles.css";
 
 /* Tailwind reads the classes the components are styled with from the built
    packages and from Streamdown, which live outside the app's own sources. */
-@source "../node_modules/@trajs/react/dist";
-@source "../node_modules/@trajs/ui-component/dist";
+@source "../node_modules/@trajs/component/dist";
+@source "../node_modules/@trajs/shadcn/dist";
 @source "../node_modules/streamdown/dist/*.js";
 @source "../node_modules/@streamdown/code/dist/*.js";
 ```

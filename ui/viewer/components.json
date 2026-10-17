@@ -15,9 +15,9 @@
   "aliases": {
     "components": "@/components",
     "utils": "cn",
-    "ui": "@trajs/ui-component/components",
+    "ui": "@trajs/shadcn/components",
     "lib": "@/lib",
-    "hooks": "@trajs/ui-component/hooks"
+    "hooks": "@trajs/shadcn/hooks"
   },
   "menuColor": "default",
   "menuAccent": "subtle",

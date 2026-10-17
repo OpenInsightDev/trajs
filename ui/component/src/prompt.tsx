@@ -13,32 +13,28 @@
  */
 
 import { code } from "@streamdown/code";
-import { Alert, AlertDescription, AlertTitle } from "@trajs/ui-component/alert";
+import { Alert, AlertDescription, AlertTitle } from "@trajs/shadcn/alert";
 import {
   Attachment,
   AttachmentContent,
   AttachmentDescription,
   AttachmentMedia,
   AttachmentTitle,
-} from "@trajs/ui-component/attachment";
-import { Avatar, AvatarFallback } from "@trajs/ui-component/avatar";
-import { Badge } from "@trajs/ui-component/badge";
-import { Bubble, BubbleContent } from "@trajs/ui-component/bubble";
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@trajs/ui-component/collapsible";
-import { Item, ItemContent, ItemDescription, ItemMedia, ItemTitle } from "@trajs/ui-component/item";
-import { Marker, MarkerContent, MarkerIcon } from "@trajs/ui-component/marker";
+} from "@trajs/shadcn/attachment";
+import { Avatar, AvatarFallback } from "@trajs/shadcn/avatar";
+import { Badge } from "@trajs/shadcn/badge";
+import { Bubble, BubbleContent } from "@trajs/shadcn/bubble";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@trajs/shadcn/collapsible";
+import { Item, ItemContent, ItemDescription, ItemMedia, ItemTitle } from "@trajs/shadcn/item";
+import { Marker, MarkerContent, MarkerIcon } from "@trajs/shadcn/marker";
 import {
   Message,
   MessageAvatar,
   MessageContent,
   MessageGroup,
   MessageHeader,
-} from "@trajs/ui-component/message";
-import { Spinner } from "@trajs/ui-component/spinner";
+} from "@trajs/shadcn/message";
+import { Spinner } from "@trajs/shadcn/spinner";
 import { cn } from "cn";
 import type { Prompt } from "effect/ai";
 import {

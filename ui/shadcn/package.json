@@ -1,8 +1,8 @@
 {
-  "name": "@trajs/ui-component",
+  "name": "@trajs/shadcn",
   "version": "0.0.0-alpha.0",
   "private": true,
-  "description": "The shadcn/ui components the trajs prompt components render with.",
+  "description": "The shadcn/ui components, copied in from upstream, and the trajs design language they are styled with.",
   "homepage": "https://github.com/OpenInsightDev/trajs",
   "license": "MIT",
   "author": "Bowei Wang <wozluohd@gmail.com>",

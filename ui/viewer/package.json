@@ -13,10 +13,10 @@
   },
   "dependencies": {
     "@fontsource-variable/geist": "catalog:",
+    "@trajs/component": "workspace:*",
     "@trajs/core": "workspace:*",
     "@trajs/platform-browser": "workspace:*",
-    "@trajs/react": "workspace:*",
-    "@trajs/ui-component": "workspace:*",
+    "@trajs/shadcn": "workspace:*",
     "@trajs/utils": "workspace:*",
     "cn": "catalog:",
     "effect": "catalog:",

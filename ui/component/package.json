@@ -1,8 +1,8 @@
 {
-  "name": "@trajs/react",
+  "name": "@trajs/component",
   "version": "0.0.0-alpha.0",
   "private": true,
-  "description": "React components that render effect/ai prompts with shadcn/ui.",
+  "description": "The trajs component library: React components that render effect/ai prompts and responses with shadcn/ui.",
   "homepage": "https://github.com/OpenInsightDev/trajs",
   "license": "MIT",
   "author": "Bowei Wang <wozluohd@gmail.com>",
@@ -23,7 +23,7 @@
   },
   "dependencies": {
     "@streamdown/code": "catalog:",
-    "@trajs/ui-component": "workspace:*",
+    "@trajs/shadcn": "workspace:*",
     "cn": "catalog:",
     "effect": "catalog:",
     "lucide-react": "catalog:",
