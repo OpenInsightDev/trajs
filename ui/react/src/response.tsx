@@ -16,15 +16,9 @@ import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
-} from "@trajs/ui/components/collapsible";
-import {
-  Item,
-  ItemContent,
-  ItemDescription,
-  ItemMedia,
-  ItemTitle,
-} from "@trajs/ui/components/item";
-import { Marker, MarkerContent, MarkerIcon } from "@trajs/ui/components/marker";
+} from "@trajs/ui-component/collapsible";
+import { Item, ItemContent, ItemDescription, ItemMedia, ItemTitle } from "@trajs/ui-component/item";
+import { Marker, MarkerContent, MarkerIcon } from "@trajs/ui-component/marker";
 import { DateTime } from "effect";
 import type { Response, Tool } from "effect/ai";
 import {

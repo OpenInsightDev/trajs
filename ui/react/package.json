@@ -1,6 +1,7 @@
 {
   "name": "@trajs/react",
   "version": "0.0.0-alpha.0",
+  "private": true,
   "description": "React components that render effect/ai prompts with shadcn/ui.",
   "homepage": "https://github.com/OpenInsightDev/trajs",
   "license": "MIT",
@@ -9,33 +10,20 @@
     "type": "git",
     "url": "git+https://github.com/OpenInsightDev/trajs.git"
   },
-  "files": [
-    "dist",
-    "src/styles.css"
-  ],
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
     "./package.json": "./package.json",
     "./styles.css": "./src/styles.css"
   },
-  "publishConfig": {
-    "exports": {
-      ".": "./dist/index.mjs",
-      "./package.json": "./package.json",
-      "./styles.css": "./src/styles.css"
-    },
-    "access": "public"
-  },
   "scripts": {
     "build": "vp pack",
     "dev": "vp pack --watch",
-    "check": "vp check",
-    "prepublishOnly": "vp run build"
+    "check": "vp check"
   },
   "dependencies": {
     "@streamdown/code": "catalog:",
-    "@trajs/ui": "workspace:*",
+    "@trajs/ui-component": "workspace:*",
     "cn": "catalog:",
     "effect": "catalog:",
     "lucide-react": "catalog:",

@@ -93,13 +93,13 @@ the writing has reached — and keeps the thinking open until it has been though
 fragments they are arriving as, and `ResponseError` is what a stream reports
 instead of an answer.
 
-[`@trajs/core`](../core) folds the same increments into the parts they complete
+[`@trajs/core`](../../packages/core) folds the same increments into the parts they complete
 when it reads a trajectory, because a trajectory has ended and nothing of it is
 still open. Here it is what is open that is worth showing.
 
 ## Installing
 
-The package renders with the components in [`@trajs/ui`](../ui), which is a
+The package renders with the components in [`@trajs/ui-component`](../components), which is a
 dependency of it, and with shadcn's semantic tokens, which the app owns. An app
 that already has shadcn/ui set up needs only this:
 
@@ -114,7 +114,7 @@ import { PromptView } from "@trajs/react";
 /* Tailwind reads the classes the components are styled with from the built
    packages and from Streamdown, which live outside the app's own sources. */
 @source "../node_modules/@trajs/react/dist";
-@source "../node_modules/@trajs/ui/dist";
+@source "../node_modules/@trajs/ui-component/dist";
 @source "../node_modules/streamdown/dist/*.js";
 @source "../node_modules/@streamdown/code/dist/*.js";
 ```

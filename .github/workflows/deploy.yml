@@ -4,8 +4,9 @@ on:
   push:
     branches: [main]
     paths:
-      - "apps/website/**"
+      - "ui/website/**"
       - "packages/**"
+      - "ui/**"
       - "pnpm-lock.yaml"
       - "pnpm-workspace.yaml"
       - ".github/workflows/deploy.yml"

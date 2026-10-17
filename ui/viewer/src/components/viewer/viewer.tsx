@@ -15,21 +15,21 @@
  * viewer goes anywhere.
  */
 
-import { Alert, AlertDescription, AlertTitle } from "@trajs/ui/components/alert";
-import { Button } from "@trajs/ui/components/button";
+import { Alert, AlertDescription, AlertTitle } from "@trajs/ui-component/alert";
+import { Button } from "@trajs/ui-component/button";
 import {
   Empty,
   EmptyContent,
   EmptyHeader,
   EmptyMedia,
   EmptyTitle,
-} from "@trajs/ui/components/empty";
+} from "@trajs/ui-component/empty";
 import {
   ResizableHandle,
   ResizablePanel,
   ResizablePanelGroup,
-} from "@trajs/ui/components/resizable";
-import { Spinner } from "@trajs/ui/components/spinner";
+} from "@trajs/ui-component/resizable";
+import { Spinner } from "@trajs/ui-component/spinner";
 import { cn } from "cn";
 import { Data, Effect } from "effect";
 import { Files, LayoutGrid, TriangleAlert } from "lucide-react";

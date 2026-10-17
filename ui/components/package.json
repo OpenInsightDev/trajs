@@ -1,6 +1,7 @@
 {
-  "name": "@trajs/ui",
+  "name": "@trajs/ui-component",
   "version": "0.0.0-alpha.0",
+  "private": true,
   "description": "The shadcn/ui components the trajs prompt components render with.",
   "homepage": "https://github.com/OpenInsightDev/trajs",
   "license": "MIT",
@@ -9,32 +10,22 @@
     "type": "git",
     "url": "git+https://github.com/OpenInsightDev/trajs.git"
   },
-  "files": [
-    "dist"
-  ],
   "type": "module",
   "imports": {
     "#components/*": "./src/components/*.tsx",
     "#hooks/*": "./src/hooks/*.ts"
   },
   "exports": {
+    "./*": "./src/components/*.tsx",
     "./components/*": "./src/components/*.tsx",
     "./hooks/*": "./src/hooks/*.ts",
+    "./styles.css": "./styles.css",
     "./package.json": "./package.json"
-  },
-  "publishConfig": {
-    "exports": {
-      "./components/*": "./dist/components/*.mjs",
-      "./hooks/*": "./dist/hooks/*.mjs",
-      "./package.json": "./package.json"
-    },
-    "access": "public"
   },
   "scripts": {
     "build": "vp pack",
     "dev": "vp pack --watch",
-    "check": "vp check",
-    "prepublishOnly": "vp run build"
+    "check": "vp check"
   },
   "dependencies": {
     "@base-ui/react": "catalog:",

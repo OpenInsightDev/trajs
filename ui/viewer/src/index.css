@@ -1,0 +1,18 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+@import "@fontsource-variable/geist";
+@import "@trajs/ui-component/styles.css";
+@import "@trajs/react/styles.css";
+
+/* The components are styled with utility classes that live in the two workspace
+   packages and in Streamdown's own bundle, none of which Tailwind scans on its
+   own: each is resolved to its sources here, so classes are read as they are
+   written rather than as they were last built. The paths are written against
+   this stylesheet — registering Streamdown from a package's own stylesheet does
+   not reach it — which is why the app depends on Streamdown: Streamdown is read
+   here, not imported. */
+@source "../../components/src";
+@source "../../react/src";
+@source "../node_modules/streamdown/dist/*.js";
+@source "../node_modules/@streamdown/code/dist/*.js";

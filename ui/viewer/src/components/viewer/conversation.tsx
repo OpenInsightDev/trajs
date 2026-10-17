@@ -15,15 +15,15 @@
 
 import { PromptMessage, ResponsePart } from "@trajs/react";
 import type { AnyResponsePart } from "@trajs/react";
-import { Avatar, AvatarFallback } from "@trajs/ui/components/avatar";
-import { Marker, MarkerContent } from "@trajs/ui/components/marker";
+import { Avatar, AvatarFallback } from "@trajs/ui-component/avatar";
+import { Marker, MarkerContent } from "@trajs/ui-component/marker";
 import {
   Message,
   MessageAvatar,
   MessageContent,
   MessageGroup,
   MessageHeader,
-} from "@trajs/ui/components/message";
+} from "@trajs/ui-component/message";
 import {
   MessageScroller,
   MessageScrollerButton,
@@ -31,7 +31,7 @@ import {
   MessageScrollerItem,
   MessageScrollerProvider,
   MessageScrollerViewport,
-} from "@trajs/ui/components/message-scroller";
+} from "@trajs/ui-component/message-scroller";
 import { Option } from "effect";
 import { Fragment } from "react";
 

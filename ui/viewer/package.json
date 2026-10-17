@@ -16,7 +16,7 @@
     "@trajs/core": "workspace:*",
     "@trajs/platform-browser": "workspace:*",
     "@trajs/react": "workspace:*",
-    "@trajs/ui": "workspace:*",
+    "@trajs/ui-component": "workspace:*",
     "@trajs/utils": "workspace:*",
     "cn": "catalog:",
     "effect": "catalog:",

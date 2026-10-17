@@ -6,5 +6,5 @@
   "baseBranch": "main",
   "updateInternalDependencies": "patch",
   "privatePackages": false,
-  "fixed": [["@trajs/*", "!@trajs/extension-*"]]
+  "fixed": [["@trajs/*", "!@trajs/extension-*", "!@trajs/react", "!@trajs/components"]]
 }

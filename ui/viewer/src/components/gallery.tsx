@@ -30,14 +30,14 @@ import {
   ResponseToolParams,
 } from "@trajs/react";
 import type { AnyResponsePart, AnyStreamPart } from "@trajs/react";
-import { Button } from "@trajs/ui/components/button";
+import { Button } from "@trajs/ui-component/button";
 import {
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
-} from "@trajs/ui/components/card";
+} from "@trajs/ui-component/card";
 import { DateTime, Schema } from "effect";
 import { Prompt, Response } from "effect/ai";
 import { useEffect, useState } from "react";

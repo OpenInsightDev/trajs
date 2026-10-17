@@ -9,7 +9,7 @@
  * what opening it shows.
  */
 
-import { ScrollArea } from "@trajs/ui/components/scroll-area";
+import { ScrollArea } from "@trajs/ui-component/scroll-area";
 import { cn } from "cn";
 import { Option } from "effect";
 import { Fragment } from "react";

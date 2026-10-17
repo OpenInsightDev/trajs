@@ -64,8 +64,9 @@ holds is what opening it shows.
 ## What the gallery renders
 
 The mapping from `effect/ai`'s prompt model to shadcn/ui lives in
-[`@trajs/react`](../../packages/react), and the shadcn/ui components it renders
-with live in [`@trajs/ui`](../../packages/ui). Both are workspace packages, and
+[`@trajs/react`](../react), and the shadcn/ui components it renders
+with live in [`@trajs/ui-component`](../components). Both are workspace packages,
+and
 the app depends on them rather than owning either: a component that is copied
 into an app is a component the next app copies again.
 
@@ -77,14 +78,17 @@ mapped to.
 
 ## The theme
 
-`src/index.css` is where this app's design decisions are, and it is the only
-place they are:
+The design language is `@trajs/ui-component/styles.css`, the stylesheet the
+component package ships: the semantic tokens — `--background`, `--foreground`,
+`--muted`, `--radius` and the rest — the `@theme inline` mapping that turns them
+into Tailwind utilities, and the base layer that applies them. Both packages are
+styled with those tokens and define none of them, the way shadcn/ui does not: the
+theme owns the values, the components read them.
 
-- it imports Tailwind, shadcn's own Tailwind layer, the Geist webfont, and
-  `@trajs/react/styles.css`, and defines the semantic tokens — `--background`,
-  `--foreground`, `--muted`, `--radius` and the rest — that both packages are
-  styled with. Neither package carries a theme, the way shadcn/ui does not: the
-  app owns it and the components read it.
+`src/index.css` is only this app's wiring — what differs per app:
+
+- it imports Tailwind, shadcn's own Tailwind layer, the Geist webfont, the
+  component package's stylesheet, and `@trajs/react/styles.css`.
 - it carries the `@source` lines Tailwind needs to see the utility classes in the
   two packages and in Streamdown, none of which it scans on its own. They point
   at the packages' sources, which is what they resolve to here; an app
@@ -93,13 +97,15 @@ place they are:
   its code plugin: drop either and the build stays green while the markdown
   quietly loses its list markers and its syntax highlighting.
 
-The tokens themselves are shadcn's `base-nova` preset, which is what
-`components.json` and the components under `packages/ui` are written against.
+The token values are still shadcn's `base-nova` preset, which is what
+`components.json` and the components under `ui/components` are written against —
+but they are now the project's own, the starting point rather than a live
+dependency on an upstream preset.
 
 ## Adding components
 
 Add more shadcn/ui components from this directory; the CLI routes them into
-`@trajs/ui` and writes their imports across the workspace boundary:
+`@trajs/ui-component` and writes their imports across the workspace boundary:
 
 ```bash
 pnpm dlx shadcn@latest add <component>
