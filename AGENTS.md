@@ -45,5 +45,5 @@ Public API comments strictly follow the [Effect](https://github.com/Effect-TS/ef
 
 ## Versioning
 
-- Keep every library under `packages/` on the same version via the `fixed` group in `.changeset/config.json` (`@trajs/*` excluding `@trajs/extension-*`), while packages under `extensions/` version independently.
+- Keep the `@trajs/*` packages on the same version via the `fixed` group in `.changeset/config.json` (`@trajs/*` excluding `@trajs/extension-*`, `@trajs/component` and `@trajs/shadcn`) — the libraries under `packages/` and the `@trajs/cli` command under `apps/` alike, since the command reads the format the libraries write. Packages under `extensions/` version independently.
 - Publish every package as an `alpha` prerelease: `.changeset/pre.json` holds Changesets in pre mode, so `changeset version` keeps the `X.Y.Z-alpha.N` line (`changeset pre exit` leaves pre mode).

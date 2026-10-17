@@ -6,6 +6,7 @@ on:
     paths:
       - "ui/website/**"
       - "packages/**"
+      - "apps/**"
       - "ui/**"
       - "pnpm-lock.yaml"
       - "pnpm-workspace.yaml"

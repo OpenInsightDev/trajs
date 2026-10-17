@@ -2,6 +2,7 @@ packages:
   - ui/*
   - extensions/*
   - packages/*
+  - apps/*
   - tools/*
 
 catalogMode: prefer
