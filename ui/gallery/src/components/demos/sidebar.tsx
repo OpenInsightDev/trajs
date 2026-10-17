@@ -26,12 +26,11 @@ import {
 import { SearchIcon } from "lucide-react";
 
 /**
- * The sidebar, collapsed to the parts a page composes it from. The sidebar is a
- * client component — it reads the viewport width and holds its own open state —
- * so it is shown from a client demo rather than written into the page. The
- * `collapsible="none"` variant is the sidebar that is always open, which is
- * what a demo box can hold: the offcanvas one is fixed to the viewport, and
- * would leave the page it is shown on.
+ * Shown from a demo rather than written into the page: the sidebar reads the
+ * viewport width and holds its own open state, which the server graph a page is
+ * rendered in cannot. `collapsible="none"` is the variant a bounded box can
+ * hold — the offcanvas one is fixed to the viewport and would leave the page it
+ * is shown on.
  */
 export function SidebarDemo() {
   return (

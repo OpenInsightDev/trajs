@@ -3,9 +3,8 @@
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@trajs/shadcn/hover-card";
 
 /**
- * The hover card, opened by resting on what it previews. Like a dialog, its
- * module cannot be rendered in the server graph, so the page shows this demo
- * rather than the card itself.
+ * A hover card cannot be rendered in the server graph a page is rendered in, so
+ * it is shown from a client demo.
  */
 export function HoverCardDemo() {
   return (

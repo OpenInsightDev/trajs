@@ -13,9 +13,8 @@ import {
 } from "@trajs/shadcn/drawer";
 
 /**
- * The drawer, opened from a button. A drawer is a client component — it holds
- * the gesture it is being swiped with — so it is shown from a client demo
- * rather than written into the page.
+ * A drawer holds the gesture it is being swiped with, so it cannot be rendered
+ * in the server graph a page is rendered in and is shown from a client demo.
  */
 export function DrawerDemo() {
   return (

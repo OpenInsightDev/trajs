@@ -18,10 +18,9 @@ import {
 } from "@trajs/shadcn/questionnaire";
 
 /**
- * The questionnaire, as a flow of items. The root owns which item is current
- * and what is answered, so the items are declared once in `items` and written
- * out again as the content of each one — the declaration is what the shortcuts
- * and the progress are read from.
+ * The root owns the flow, so the items are declared once in `items` — what the
+ * shortcuts and the progress are read from — and each is written out again as
+ * the content it is shown as.
  */
 const items = [
   {

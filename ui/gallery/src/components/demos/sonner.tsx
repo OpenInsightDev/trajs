@@ -5,9 +5,8 @@ import { Toaster } from "@trajs/shadcn/sonner";
 import { toast } from "sonner";
 
 /**
- * The toaster and the calls that fill it. A toast is raised by an event rather
- * than by the page being read, so what a page can show is the button that
- * raises one — which is what this demo is.
+ * A toast is raised by an event rather than by the page being read, so the demo
+ * is the buttons that raise one and the toaster they arrive on.
  */
 export function ToasterDemo() {
   return (

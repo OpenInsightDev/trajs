@@ -9,6 +9,10 @@ import {
   MessageScrollerViewport,
 } from "@trajs/shadcn/message-scroller";
 
+/**
+ * A message scroller reads the viewport and holds its scroll position, so it is
+ * shown from a client demo rather than written into the page.
+ */
 export function MessageScrollerDemo() {
   const turns = Array.from({ length: 12 }, (_, index) => index + 1);
 

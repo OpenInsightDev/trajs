@@ -13,9 +13,8 @@ import {
 } from "@trajs/shadcn/sheet";
 
 /**
- * The sheet, opened from a button. A sheet is a dialog anchored to an edge, and
- * so is one of the components the server graph cannot render; it is shown from
- * a client demo for the same reason a dialog is.
+ * A sheet is a dialog anchored to an edge, and cannot be rendered in the server
+ * graph a page is rendered in, so it is shown from a client demo.
  */
 export function SheetDemo() {
   return (
