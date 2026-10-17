@@ -10,10 +10,13 @@
  * step holds and {@link StepSource} who contributed one.
  *
  * A step holds what a trajectory holds of the turn it is read from, which is less
- * than ATIF's `StepObject` states: a trajectory names no model per turn, counts no
- * tokens or cost, numbers no step and marks none as copied or as deterministic.
- * {@link Step} says of each field what ATIF states and what a trajectory does, so
- * that what is left to whoever writes the document is read off it.
+ * than ATIF's `StepObject` states: what the step says, and the parts it answered
+ * with. What ATIF states of a step beyond that — the model that answered it, the
+ * tokens and the cost of the turn, the ordinal of the step and the markers that tell
+ * copied or deterministic steps apart — is extra data this package carries on the
+ * part of the step — see `Extras` — which this reading does not fold back into a
+ * step yet. {@link Step} says of each field what ATIF states and what a step holds,
+ * so that what is left to whoever writes the document is read off it.
  */
 
 import { View } from "@trajs/core";
@@ -74,10 +77,11 @@ export type StepSource = "system" | "user" | "agent";
  * reads the conversation rather than the increments a streamed response arrived
  * in.
  *
- * A step carries what a trajectory holds of the turn it is read from. What a
- * trajectory does not hold is left to a reader to supply: a model's name, the
- * tokens or the cost of a turn, a step's ordinal position and the markers that
- * tell copied or deterministic steps apart are not part of a trajectory.
+ * A step carries what a trajectory holds of the turn it is read from. What ATIF
+ * states of a step beyond that — a model's name, the tokens or the cost of a turn,
+ * a step's ordinal position and the markers that tell copied or deterministic steps
+ * apart — is carried as extra data on the part of the step, which this reading does
+ * not fold back into a step yet.
  *
  * @see {@link steps} for the steps a trajectory is read as.
  * @see {@link StepSource} for who contributed one.

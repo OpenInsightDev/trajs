@@ -24,7 +24,7 @@
 import { Event, VersionedSchema } from "@trajs/core";
 import { Schema } from "effect";
 
-import pkg from "../package.json" with { type: "json" };
+import { packageName } from "#/internal/package.ts";
 
 /** The kinds of context transformation ATIF names for a `type`. */
 const types = ["compaction", "pruning", "injection"] as const;
@@ -100,12 +100,12 @@ export type ContextManagementBoundary = (typeof boundaries)[number];
  *
  * **Details**
  *
- * `package` is the `name` of this package as `package.json` states it, and `id`
- * names the event within the package, so the tag the event is produced under is
- * the package's own name followed by `ContextManagement`: what a trajectory states
- * of an event is the package that wrote it rather than a name the package made
- * up. `metadata` describes the event itself, and `schema` is the data of one
- * event at every version it was written at, which here is the single version
+ * `package` is the `name` of this package as `package.json` states it —
+ * {@link packageName} — and `id` names the event within the package, so the tag the
+ * event is produced under is the package's own name followed by `ContextManagement`:
+ * what a trajectory states of an event is the package that wrote it rather than a name
+ * the package made up. `metadata` describes the event itself, and `schema` is the data
+ * of one event at every version it was written at, which here is the single version
  * `1.8`.
  *
  * @see {@link eventkit} for the kit the event is an entry of.
@@ -113,7 +113,7 @@ export type ContextManagementBoundary = (typeof boundaries)[number];
  * @category constants
  */
 export const contextManagementEvent = new Event.Event({
-  package: pkg.name,
+  package: packageName,
   id: "ContextManagement",
   metadata: new Event.Metadata({
     name: "Context management",

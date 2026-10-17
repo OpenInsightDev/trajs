@@ -21,7 +21,8 @@
 import { Extra, VersionedSchema } from "@trajs/core";
 import { Schema } from "effect";
 
-import pkg from "../package.json" with { type: "json" };
+import { packageName } from "#/internal/package.ts";
+
 import { FinalMetrics, Metrics, ProducerFields, SchemaVersion } from "./Document.ts";
 
 /**
@@ -113,18 +114,18 @@ const document180 = Schema.Struct({
  *
  * **Details**
  *
- * `package` is the `name` of this package as `package.json` states it, and `id` names
- * the extra data within the package, so the tag a document's fields are held under is
- * the package's own name followed by `Document`. The schema is stated for a session
- * part, since a document states one run and a trajectory holds it in the session its
- * parts were produced in.
+ * `package` is the `name` of this package as `package.json` states it —
+ * {@link packageName} — and `id` names the extra data within the package, so the tag a
+ * document's fields are held under is the package's own name followed by `Document`.
+ * The schema is stated for a session part, since a document states one run and a
+ * trajectory holds it in the session its parts were produced in.
  *
  * @see {@link extrakit} for the kit the extra data is an entry of.
  * @see {@link DocumentFields} for the shape of one document's fields.
  * @category constants
  */
 export const documentExtra = new Extra.Extra({
-  package: pkg.name,
+  package: packageName,
   id: "Document",
   name: "Document fields",
   description: "The fields ATIF states of a document beyond its steps.",
@@ -152,7 +153,7 @@ export const documentExtra = new Extra.Extra({
  * @category constants
  */
 export const stepExtra = new Extra.Extra({
-  package: pkg.name,
+  package: packageName,
   id: "Step",
   name: "Step fields",
   description: "The fields ATIF states of a step beyond what it says.",

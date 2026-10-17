@@ -37,21 +37,47 @@ session at a time.
 
 ## Reading a document
 
-`Encode.encode` reads an ATIF document as the trajectory it states: the steps of the
-document are produced as the turns of a trajectory with `Produce.produce`, so a
-`trajectory.json` a program that ran elsewhere wrote is a trajectory like any other
-— `View`, `Session`, the codec extensions and the metric kits read it as one, and
-`Step.steps` reads back the steps it was read from. The document is stated as the
-schemas ATIF states it in, so what a file holds is decoded before it is read.
+`Encode.fromFile` reads the `trajectory.json` a path names as the trajectory it
+states, and `Encode.encode` reads a document that is decoded already — the same
+reading either way: the steps of the document are produced as the turns of a
+trajectory with `Produce.produce`, so a `trajectory.json` a program that ran
+elsewhere wrote is a trajectory like any other — `View`, `Session`, the codec
+extensions and the metric kits read it as one, and `Step.steps` reads back the steps
+it was read from. The document is stated as the schemas ATIF states it in, so what a
+file holds is decoded before it is read.
 
 ```ts
-import { Schema } from "effect";
+import { NodeServices } from "@effect/platform-node";
+import { Effect, Stream } from "effect";
+import { Encode, Step } from "@trajs/extension-atif";
+
+const steps = await Effect.runPromise(
+  Effect.gen(function* () {
+    const trajectory = yield* Encode.fromFile("runs/one/trajectory.json");
+
+    return yield* Stream.runCollect(Step.steps(trajectory));
+  }).pipe(Effect.provide(NodeServices.layer)),
+);
+```
+
+`fromFile` reads and decodes the file when the effect it returns is run — the tools a
+document says its agent was given are the toolkit the trajectory is read with, so
+the trajectory is made once the document is read — and the trajectory it produces is
+as lazy as any other.
+
+A program that holds the document already — one that decoded it or built it — reads
+it with `Encode.encode`, and names the directory its paths are read from:
+
+```ts
 import { readFile } from "node:fs/promises";
+import { dirname } from "node:path";
+import { Schema } from "effect";
 import { Document, Encode } from "@trajs/extension-atif";
 
-const json = await readFile("trajectory.json", "utf8");
+const path = "runs/one/trajectory.json";
+const json = await readFile(path, "utf8");
 const document = Schema.decodeUnknownSync(Document.FromJson)(json);
-const trajectory = Encode.encode(document);
+const trajectory = Encode.encode(document, { cwd: dirname(path) });
 ```
 
 One step of the document is one turn of the trajectory: a step that states a
@@ -67,27 +93,56 @@ made — a document that leaves the id of a result out still says which call was
 answered when a step made one call. The session of the trajectory is the run the
 document states, or the document's own id where it states no run.
 
-What a document states beyond the conversation is not read, because a trajectory
-holds the parts a session ran on and what a kit derived of them rather than a
-producer's account of a run:
+An image or a recording a step states is read from the path the document states it
+at and produced as the `file` part of the step it is stated on: a part of the
+message a model was given, of what the agent answered with, or of what a result was
+answered with. ATIF states such a path beside the document, so a document read from
+a file has its media read beside it, and one read from a document of your own is
+read with the directory its options name. A `system` message states text alone, so
+the media of one is not read.
 
-- the ordinal of a step, the moment it happened, the model that answered it, what
-  it cost, and how many inferences it stands for. A trajectory times no part of a
-  conversation, names no model per turn, and counts no tokens or cost, so there is
-  nothing to read them from.
-- what the document states of the run and of the agent that ran it rather than of
-  the conversation: its `notes`, the `final_metrics` of the run, the `name`, the
-  `version` and the default `model_name` of the agent, and the `extra` a producer
-  writes at any level. A trajectory holds the parts a session ran on and what a kit
-  derived of them, so a producer's own account of a run has nothing there to be read
-  from.
-- the tools the agent was given, which the document states in the format's own
-  terms rather than as the tools of a toolkit. The calls of a step are produced as
-  the calls they were, and are read as the tool parts the reading toolkit does not
-  describe, since it names no tools.
-- what a step holds beyond its text — an image, a recording of speech, the
-  trajectory of a delegated subagent — which a document states by a location beside
-  it or by another document, and a trajectory holds as neither.
+The tools the document says its agent was given are read, as the toolkit the
+trajectory names: each tool definition becomes a dynamic tool — the name it is
+called by, what it does, and the JSON schema of the arguments it accepts — so a
+trajectory read from a document says what its agent was run with, and whoever writes
+the trajectory states the same tools in the header it starts with.
+
+What a document states of a step beyond what it says, and of the run itself, is
+carried as extra data on the part it belongs to:
+
+- the ordinal of a step, the model that answered it, the effort it took, how many
+  inferences it stands for, what it cost, and the `extra` a producer wrote of
+  anything are the `StepFields` of the part of that step — the prompt part of a step
+  that states a message, the first response part of a step that answered with parts.
+  The moment a step happened times the part of that step.
+- the version of the format, the agent that ran, the `notes` of the run, its
+  `final_metrics` and its own `extra` are the `DocumentFields` of the session part.
+
+A reader installs the kit a trajectory declares those fields with — `extrakit` —
+and reads them off the part with their types:
+
+```ts
+import { Effect, Stream } from "effect";
+import { documentExtra, stepExtra } from "@trajs/extension-atif";
+
+const parts = Array.from(await Effect.runPromise(Stream.runCollect(trajectory)));
+const session = parts.find((part) => part._tag === "Session");
+const answered = parts.find((part) => part._tag === "Response");
+
+session?.extra[documentExtra.tag]?.agent.name; // => "claude-code"
+answered?.extra[stepExtra.tag]?.model_name; // => "claude-sonnet-4"
+```
+
+What a document states in the terms of a kit the reading does not name is left out,
+because a trajectory holds the parts a session ran on and what a kit derived of them
+rather than a producer's account of a run:
+
+- the trajectory of a delegated or continued run, which a document states by another
+  document rather than by a part of its own.
+- whether a step repeats an earlier trajectory, which the format states of a step a
+  producer copied into the one it continues: the reading does not rebuild the
+  sessions a document continues or delegates to yet, so a copied step is read as a
+  step of the document that states it and the marker is not carried.
 - what a system step is answered with, which is an operation of the run rather than
   of the conversation.
 - the context management a system step declares, which this package produces as an
@@ -128,16 +183,22 @@ boundary rule is what says so.
 
 ## What a step holds
 
-A step holds what a trajectory holds of the turn it is read from. ATIF states more
-than a trajectory does, and what it states is left to whoever writes the document:
+A step holds what a trajectory holds of the turn it is read from, which is the
+conversation of that turn: `Step.steps` folds a trajectory into steps without reading
+the extra data of the parts. What a document states of a step beyond what it says is
+carried on the part of the step rather than on the step — see _Reading a document_
+above for how a reader gets it back:
 
-- `step_id`, the ordinal ATIF numbers steps from `1` with. The steps of a
-  trajectory are emitted in order and unnumbered, because a trajectory holds no
-  such number; a writer numbers them by their position.
-- `timestamp`, `model_name`, `reasoning_effort`, `llm_call_count`,
-  `is_copied_context`, `metrics` and `extra`. A trajectory times no part of a
-  conversation, names no model per turn, and counts no tokens or cost, so there
-  is nothing to read them from.
+- `step_id`, `model_name`, `reasoning_effort`, `llm_call_count`, `metrics` and a
+  step's `extra` are the extra data of the part of the step, and `timestamp` its
+  moment, which `Step.steps` does not read back into a step yet. A step of a
+  trajectory a run produced holds none of them unless the run declared them, so a
+  writer that numbers its steps and times them does so from what it knows rather
+  than from the step.
+- `is_copied_context`, which a document states of a step a producer copied into the
+  one it continues. This reading does not rebuild the sessions a document continues
+  or delegates to yet, so a copied step is read as a step of the document that states
+  it and the marker is not carried.
 - Multimodal `message` and `content` parts, which ATIF added in v1.6. An image or
   a file is referenced by a path that sits beside the trajectory file, while a
   trajectory holds the bytes themselves and no path, so the parts a step cannot
@@ -152,8 +213,9 @@ object ATIF wraps them in, and a step's own tool calls and results are the
 response parts of the trajectory rather than the `tool_calls` and
 `observation.results` those parts encode to.
 
-`Encode.encode` reads the other way, and leaves the same fields out of the trajectory
-it makes: _Reading a document_ above says of each of them what becomes of it.
+`Encode.encode` reads the other way, and states the same fields as the extra data of
+the parts it makes: _Reading a document_ above says of each of them what becomes of
+it.
 
 ## Development
 

@@ -719,10 +719,11 @@ export type FinalMetrics = Schema.Schema.Type<typeof FinalMetrics>;
  * `type` names the kind of tool, which is `"function"` for the tools ATIF states,
  * and `function` states the tool itself: the `name` it is called by, what it is
  * `description` as, and the `parameters` it accepts, as the JSON schema the model
- * was given rather than as any schema of a program. A reader that knows the tools
- * of its own toolkit reads a call of a step as the call it was and leaves the
- * definitions here; `strict` is OpenAI's, and states whether the arguments must
- * follow the schema exactly.
+ * was given rather than as any schema of a program, which the format carries as the
+ * JSON object a schema is. {@link Encode.encode} reads the definitions as the toolkit
+ * of the trajectory, so a call of a step is read as the call of the tool it names;
+ * `strict` is OpenAI's, and states whether the arguments must follow the schema
+ * exactly.
  *
  * @see {@link Agent} for the agent the definitions were given to.
  * @category models
@@ -737,7 +738,7 @@ export const ToolDefinition = Schema.Struct({
     /** What the tool does, as the model was told. */
     description: Schema.optional(Schema.NullOr(Schema.String)),
     /** The arguments the tool accepts, as the JSON schema the model was given. */
-    parameters: Schema.optional(Schema.Unknown),
+    parameters: Schema.optional(Schema.JsonObject),
     /** Whether the arguments must follow the schema exactly, in OpenAI's sense. */
     strict: Schema.optional(Schema.NullOr(Schema.Boolean)),
   }),
