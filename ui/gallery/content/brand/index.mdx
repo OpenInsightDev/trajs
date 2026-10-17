@@ -1,0 +1,56 @@
+---
+title: The logo
+description: The trajs logo, in the forms the packages draw it in, and in the brand's colourways.
+---
+
+The logo is trajs' own drawing — the one thing in `@trajs/component` that is not a
+mapping of `effect/ai`'s model onto shadcn/ui. It is one path held once: `Icon`
+draws the mark alone, and `Logo` draws the mark with the wordmark beside it, so a
+lockup cannot drift from the icon it is built on.
+
+<Preview>
+  <BrandDemo />
+</Preview>
+
+## The colourways
+
+The mark has no colour of its own. Every path is `currentColor`, so a logo is
+drawn in the colour of the text it sits in — which is what makes a colourway a
+ground and a colour and nothing else. There are two it is built from: brand white
+`#F6F6F6` and brand black `#171717`, each the other's inverse. The gold the
+lockup is also used in, `#D4AF37`, is an accent: the same drawing, on either
+ground, and never a third colour inside one lockup.
+
+## What a class decides
+
+How big the logo is drawn, how heavy the mark's lines are and what colour each half
+of the lockup is are classes rather than props of the package's own: `h-*`/`w-*`
+is the size, `stroke-*` the weight and the colour of the mark's lines, `fill-*` the
+colour of the letters — `text-*` both — each of them a default in the markup that
+the class takes over. The site's navbar is why the weight matters: at the ~24px a
+navbar gives it, the weight the mark is drawn at is half a pixel, and the mark's
+frame takes about 4.6 before the stroke runs out of it.
+
+What a class cannot decide is the drawing: the paths, the weight they default to,
+the gap between the mark and the letters, and the boxes they sit in — 92 × 146 for
+the mark, 250 × 146 for the lockup, which is the mark's box extended to the right.
+
+## The wordmark is set in IBM Plex Sans
+
+The letters are IBM Plex Sans, set with the variable font at `wght 250` — an em of
+45.93 units in the lockup's box, on a baseline at y 104.93, with +0.0802 em of
+tracking — and held as paths rather than as live text because a logo is drawn
+rather than typed: it is never rendered in a fallback face, it survives an exported
+`.svg` and an Open Graph image, and no app has to load a font for it. Another
+weight is set again in that font rather than redrawn, which makes it a generation
+step and not a redesign.
+
+The paths are the export rounded to two decimals with a command to a line, so a
+stroke of the mark or a letter of the name can be found and moved without a vector
+tool.
+
+## The one surface that cannot be a component
+
+A browser tab reads a file rather than a component, so the apps keep their own
+`favicon.svg` in `public/`. Everywhere a page draws the logo, it draws these
+components.

@@ -1,3 +1,4 @@
+import { BrandDemo } from "./demos/brand";
 import { ButtonVariants } from "./demos/button-variants";
 import {
   PromptFileDemo,
@@ -35,6 +36,7 @@ import { Preview } from "./preview";
  * component in.
  */
 export const mdxComponents = {
+  BrandDemo,
   ButtonVariants,
   Palette,
   Preview,

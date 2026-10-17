@@ -13,6 +13,9 @@
  * stylesheet they are read with are this package's own. Import
  * `@trajs/component/styles.css` once, in the stylesheet that imports Tailwind, and
  * see the README for the `@source` lines Tailwind needs to see the classes.
+ *
+ * The mark trajs is drawn with is drawn here as well: {@link Logo} and
+ * {@link Icon}, which take the colour and the size of wherever they are read.
  */
 
 export {
@@ -39,3 +42,5 @@ export { ResponseError, ResponseStream, ResponseToolParams } from "./stream.tsx"
 export type { AnyStreamPart } from "./stream.tsx";
 
 export { ToolPayload } from "./tool-payload.tsx";
+
+export { Icon, Logo } from "./logo.tsx";

@@ -34,8 +34,8 @@ import {
 } from "@trajs/component";
 import { Button } from "@trajs/shadcn/button";
 import { useEffect, useState } from "react";
-import type { ReactNode } from "react";
 
+import { Sample } from "../sample";
 import {
   approvalRequestPart,
   approvedPart,
@@ -63,14 +63,6 @@ import {
   urlSourcePart,
   userMessage,
 } from "./samples";
-
-/** A demo is read in the comparisons it makes, so each one is labelled. */
-const Sample = ({ label, children }: { label: string; children: ReactNode }) => (
-  <div className="flex flex-col gap-2">
-    <div className="text-xs font-medium text-muted-foreground">{label}</div>
-    {children}
-  </div>
-);
 
 export const PromptTextDemo = () => (
   <div className="flex flex-col gap-4">

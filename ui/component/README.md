@@ -98,6 +98,31 @@ instead of an answer.
 when it reads a trajectory, because a trajectory has ended and nothing of it is
 still open. Here it is what is open that is worth showing.
 
+## The mark
+
+The mark trajs is drawn with is held here too, as components rather than as files,
+so that each front end draws it in its own colour and at its own size instead of
+loading the same one:
+
+| Export | Renders                                     |
+| ------ | ------------------------------------------- |
+| `Logo` | the mark, with the wordmark beside it       |
+| `Icon` | the mark alone, for a square or a tall slot |
+
+The logo is the icon and the letters: the mark is one path, drawn in both, and
+both boxes are 146 tall, so a header and a favicon draw the mark the same size.
+
+What a mark looks like where it is drawn is the caller's, and is said with classes
+rather than with props of this package's own: `stroke-[4]` for the weight of the
+mark's lines, `stroke-*`/`fill-*`/`text-*` for colour — the mark is stroked in
+`currentColor`, the letters filled in it — and `h-*`/`w-*` for the size. Each has
+a default in the markup that a class overrides. The drawing is not the caller's:
+the paths, the weight they default to, the gap between the mark and the letters,
+and the boxes they sit in. The path data behind them is the export rounded to two
+decimals with a command to a line, and the wordmark is held as the five letters it
+is made of, so a stroke of the mark or a letter of the name can be found and moved
+without a vector tool.
+
 ## Installing
 
 The package renders with the components in [`@trajs/shadcn`](../shadcn), which is a

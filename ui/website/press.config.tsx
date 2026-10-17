@@ -1,4 +1,5 @@
 import { mcpPlugin } from "@fumapress/ai";
+import { Icon, Logo } from "@trajs/component";
 import { defineDocs } from "fumadocs-mdx/macro";
 import { defineConfig } from "fumapress";
 import { fumadocsMdx } from "fumapress/adapters/mdx";
@@ -31,13 +32,7 @@ const HomePage = createHomeLayoutPage<typeof config.$context>({
       body: (
         <div className="mx-auto flex w-full max-w-3xl flex-col gap-16 py-14">
           <div className="flex flex-col items-center gap-8 text-center">
-            <img
-              src="/Logo-Horizontal.svg"
-              alt={page.data.title}
-              width={1856}
-              height={1147}
-              className="h-auto w-96 max-w-full dark:invert"
-            />
+            <Logo aria-label={page.data.title} className="h-auto w-96 max-w-full" role="img" />
             {page.data.description ? (
               <p className="max-w-2xl text-balance text-xl text-fd-muted-foreground">
                 {page.data.description}
@@ -71,12 +66,14 @@ const config = defineConfig({
     ) : (
       <DocsPage lang={lang} page={page} slugs={slugs} />
     ),
-  // The nav carries the mark alone: a lockup's wordmark is a ~2% monoline,
-  // whose letters land under a pixel at the ~24px a navbar gives it, and
-  // `favicon.svg` is the same mark at the weight that size needs.
+  // The nav carries the mark alone rather than the lockup: at the ~24px a navbar
+  // gives it the wordmark's 2% monoline lands under a pixel, and so does the mark
+  // at the weight it is drawn at. It is stroked at 4 instead, close to as heavy as
+  // the mark's frame takes — the mark sits 2.34 units inside its 146, so a stroke
+  // runs out of it at about 4.6.
   defaultLayoutProps: {
     nav: {
-      title: <img src="/favicon.svg" alt="trajs" className="h-6 w-auto dark:invert" />,
+      title: <Icon aria-label="trajs" className="h-6 w-auto stroke-[4]" role="img" />,
     },
   },
   site: {
