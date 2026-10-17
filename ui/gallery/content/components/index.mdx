@@ -1,0 +1,16 @@
+---
+title: Overview
+description: The shadcn/ui components the trajs front ends render with.
+---
+
+The components are shadcn/ui's `base-nova` preset over
+[Base UI](https://base-ui.com), copied in as source rather than installed, and
+styled entirely with the tokens on the [design language](/design) page. They live
+in `@trajs/shadcn` because two things need the same components — the viewer, and
+`@trajs/component`, which maps `effect/ai`'s prompt and response model onto them
+(see [Prompt](/prompt) and [Response](/response)) — and a component copied twice
+is a component that drifts.
+
+Every demo on these pages mounts the real component from the package, at the
+version the apps use. Nothing here is a screenshot, and nothing is a
+reproduction.

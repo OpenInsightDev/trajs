@@ -1,0 +1,5 @@
+# The Fumapress build writes the site to `dist/`, and the Fumadocs MDX
+# collection cache and generated route table alongside the source.
+dist/
+.source/
+src/pages.gen.ts

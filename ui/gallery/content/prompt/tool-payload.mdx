@@ -1,0 +1,17 @@
+---
+title: ToolPayload
+description: A tool payload, as a JSON tree.
+---
+
+A payload — the parameters of a call, or the result of one — is `unknown` to
+`effect/ai`, so `ToolPayload` is where it is read: an object or an array opens as
+a JSON tree, and anything else is shown as the JSON value it is. Only the first
+level opens, because the top-level fields of a tool payload are the ones worth
+scanning.
+
+<Preview>
+  <ToolPayloadDemo />
+</Preview>
+
+The tree is coloured with the theme's tokens rather than the tree library's own,
+so it keeps the surface it sits on.

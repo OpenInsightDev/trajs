@@ -1,0 +1,16 @@
+---
+title: Overview
+description: The parts only a response carries, and the stream it arrives in.
+---
+
+A response is written with the same parts a prompt is, so its text, its
+reasoning, its files and its tool calls are rendered by the [prompt
+components](/prompt). What is left is the parts only a response carries —
+`ResponseSource`, `ResponseMetadata` and `ResponseFinish` — and the stream it
+arrives in.
+
+`ResponsePart` dispatches over the whole response union the way
+[`PromptPart`](/prompt/part) dispatches over a prompt's, and `ResponseStream`
+reads the parts that have arrived as the answer they have written, with
+`ResponseToolParams` and `ResponseError` for the two things a stream says that a
+finished response does not.

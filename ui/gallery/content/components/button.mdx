@@ -1,0 +1,33 @@
+---
+title: Button
+description: A button, in every variant and at every size.
+---
+
+import { Button } from "@trajs/shadcn/button";
+import { PlusIcon } from "lucide-react";
+
+## Variants and sizes
+
+<Preview>
+  <ButtonVariants />
+</Preview>
+
+## A demo written where it is read
+
+These pages are React, so a demo does not have to be registered anywhere to be
+shown — a page can use the component directly, and this one does:
+
+<Preview>
+  <Button variant="outline">
+    <PlusIcon data-icon="inline-start" />
+    New session
+  </Button>
+  <Button variant="ghost">Cancel</Button>
+  <Button disabled>
+    <PlusIcon data-icon="inline-start" />
+    Importing
+  </Button>
+</Preview>
+
+That is the whole mechanism: `Preview` is a surface with the trajs palette on it,
+and everything inside it is the component itself.

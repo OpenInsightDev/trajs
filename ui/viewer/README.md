@@ -2,9 +2,7 @@
 
 The trajs trajectory viewer, built with [Vite](https://vite.dev) and React. It
 reads a `.trajs` file and shows the sessions it holds as the conversations they
-were, and it is also where the components that do that are read at: the app is
-two pages — the viewer, and `src/components/gallery.tsx`, which renders every
-prompt and response part, so the whole mapping can be read off it.
+were.
 
 Run it from the repository root with `vp run viewer`, or from this directory:
 
@@ -61,20 +59,19 @@ a conversation only where that conversation reads more than one of them, the par
 a fork was made at is on request rather than on the page, and what a session
 holds is what opening it shows.
 
-## What the gallery renders
+## Where the components are shown
 
-The mapping from `effect/ai`'s prompt model to shadcn/ui lives in
+The mapping from `effect/ai`'s prompt and response model to shadcn/ui lives in
 [`@trajs/component`](../component), and the shadcn/ui components it renders
 with live in [`@trajs/shadcn`](../shadcn). Both are workspace packages,
 and
 the app depends on them rather than owning either: a component that is copied
 into an app is a component the next app copies again.
 
-The gallery is reached at `#/components` and is the mapping's own showcase
-rather than a viewer of a trajectory's data: the prompts it renders are written in it
-with `effect/ai`'s own constructors, so it needs no trajectory, no model and no
-network. Each section names the part it shows and the component that part is
-mapped to.
+Every one of those components is shown in [`ui/gallery`](../gallery), one page
+each, beside the tokens they are painted with. The gallery used to be a second
+page here, at `#/components`; it moved so that the mapping is not a showcase the
+viewer and the gallery both keep and let drift apart.
 
 ## The theme
 

@@ -1,0 +1,13 @@
+---
+title: ResponsePart
+description: One response part, rendered by the component its type maps to.
+---
+
+`ResponsePart` is to a response what [`PromptPart`](/prompt/part) is to a prompt:
+it takes a part known only as `effect/ai`'s response union and renders it by the
+component its `type` maps to. The parts only a response carries, after the ones
+it shares with a prompt:
+
+<Preview>
+  <ResponsePartDemo />
+</Preview>

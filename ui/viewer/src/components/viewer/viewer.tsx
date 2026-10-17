@@ -22,7 +22,7 @@ import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@trajs/sha
 import { Spinner } from "@trajs/shadcn/spinner";
 import { cn } from "cn";
 import { Data, Effect } from "effect";
-import { Files, LayoutGrid, TriangleAlert } from "lucide-react";
+import { Files, TriangleAlert } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { read } from "@/lib/trajectory";
@@ -170,15 +170,6 @@ export const Viewer = () => {
         )}
         <div className="ms-auto flex items-center gap-2">
           <OpenFileButton onChoose={() => picker.current?.click()} />
-          <Button
-            aria-label="Component gallery"
-            nativeButton={false}
-            render={<a href="#/components" title="Component gallery" />}
-            size="icon-sm"
-            variant="ghost"
-          >
-            <LayoutGrid />
-          </Button>
         </div>
       </header>
 

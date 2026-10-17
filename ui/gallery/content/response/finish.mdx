@@ -1,0 +1,13 @@
+---
+title: ResponseFinish
+description: Why a response ended, and what it used to get there.
+---
+
+`Response.FinishPart` renders as `ResponseFinish`: the reason a response ended,
+and the tokens it took. A response that reached its own end and one that was cut
+short by its length read differently, which is what tells a reader the answer is
+whole:
+
+<Preview>
+  <ResponseFinishDemo />
+</Preview>

@@ -1,0 +1,40 @@
+{
+  "name": "gallery",
+  "version": "0.0.0",
+  "private": true,
+  "description": "The trajs design language and component library gallery, built with Fumapress.",
+  "type": "module",
+  "scripts": {
+    "dev": "fumapress dev",
+    "build": "fumapress build",
+    "start": "fumapress start"
+  },
+  "dependencies": {
+    "@fontsource-variable/geist": "catalog:",
+    "@trajs/component": "workspace:*",
+    "@trajs/shadcn": "workspace:*",
+    "cn": "catalog:",
+    "effect": "catalog:",
+    "fumadocs-core": "^16.17.3",
+    "fumadocs-mdx": "^15.4.7",
+    "fumadocs-ui": "npm:@fumadocs/base-ui@^16.17.3",
+    "fumapress": "^1.6.1",
+    "lucide-react": "catalog:",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0"
+  },
+  "devDependencies": {
+    "@streamdown/code": "catalog:",
+    "@tailwindcss/vite": "^4.3.3",
+    "@types/mdx": "^2.0.14",
+    "@types/node": "catalog:",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "shadcn": "catalog:",
+    "streamdown": "catalog:",
+    "tailwindcss": "^4.3.3",
+    "tw-animate-css": "catalog:",
+    "typescript": "catalog:",
+    "vite": "catalog:"
+  }
+}

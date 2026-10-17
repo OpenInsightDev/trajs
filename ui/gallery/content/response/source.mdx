@@ -1,0 +1,13 @@
+---
+title: ResponseSource
+description: What a model answered from — a URL or a document.
+---
+
+`Response.UrlSourcePart` and `Response.DocumentSourcePart` share one `type` and
+are told apart by `sourceType`, and they share one component: `ResponseSource`.
+A URL is the link it points at; a document is the reference a response holds, so
+nothing about it is opened.
+
+<Preview>
+  <ResponseSourceDemo />
+</Preview>

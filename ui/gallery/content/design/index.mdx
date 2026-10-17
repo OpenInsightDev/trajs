@@ -1,0 +1,34 @@
+---
+title: Design language
+description: The semantic tokens every trajs component renders with.
+---
+
+The design language is [`ui/shadcn/styles.css`](https://github.com/OpenInsightDev/trajs/blob/main/ui/shadcn/styles.css):
+the light and dark values of every semantic token, the `@theme inline` mapping
+that turns them into Tailwind utilities, and the base layer that applies them.
+
+It is project code, not a copied source — the `shadcn add` CLI never touches it —
+and it is exported as `@trajs/shadcn/styles.css`. An app imports it once, after
+Tailwind:
+
+```css
+@import "tailwindcss";
+@import "@trajs/shadcn/styles.css";
+```
+
+## Palette
+
+<Palette />
+
+The values are `oklch`, and the swatches above resolve `var(--…)` against the
+cascade rather than repeating what the file says — which is why they follow the
+theme switch in the navbar, and why this page is both the light and the dark
+values rather than two lists that can disagree.
+
+## Why the components have no colour of their own
+
+Every component in the library is written against `--background`, `--foreground`,
+`--primary`, `--muted`, `--destructive`, `--border`, `--ring` and `--radius`.
+None of them defines a colour. That is what lets one stylesheet repaint all of
+them, and it is what makes this page worth reading before changing one: a token
+edited below moves every component at once.

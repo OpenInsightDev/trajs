@@ -1,0 +1,12 @@
+---
+title: PromptToolResult
+description: The answer a tool call was given, whether it succeeded or failed.
+---
+
+`Prompt.ToolResultPart` renders as `PromptToolResult`, named by the same name and
+the same id as the call it answers. A failure is a result the tool reported, not
+an error the program threw: it is read as the answer it is, styled apart.
+
+<Preview>
+  <PromptToolResultDemo />
+</Preview>

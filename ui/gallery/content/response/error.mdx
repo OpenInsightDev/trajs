@@ -1,0 +1,13 @@
+---
+title: ResponseError
+description: The error a stream reported in place of an answer.
+---
+
+`Response.ErrorPart` renders as `ResponseError`: a response that failed while it
+was being written. What a provider produced as the error is its own, so it is
+read as the JSON value it is. An error part belongs to a stream and not to a
+response, so a trajectory of a finished turn reads past it.
+
+<Preview>
+  <ResponseErrorDemo />
+</Preview>

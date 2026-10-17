@@ -1,0 +1,14 @@
+---
+title: ResponseToolParams
+description: The parameters of a call that is still being written.
+---
+
+`Response.ToolParamsStartPart`, its deltas and its end are read by
+`ResponseToolParams` as the parameters a model is writing. They are shown as the
+fragments they are rather than as a payload — half a payload reads better as what
+is being written — and the call they belong to arrives whole afterwards, read by
+[`PromptToolCall`](/prompt/tool-call).
+
+<Preview>
+  <ResponseToolParamsDemo />
+</Preview>

@@ -1,0 +1,17 @@
+---
+title: PromptToolCall
+description: A tool a model asked for, with the parameters it asked with.
+---
+
+`Prompt.ToolCallPart` renders as `PromptToolCall`. The parameters are `unknown`
+to `effect/ai` — the toolkit that would name their shape is not the one a
+trajectory is read with — so they are shown as the JSON tree
+[`ToolPayload`](/prompt/tool-payload) renders rather than as a toolkit's own
+types.
+
+<Preview>
+  <PromptToolCallDemo />
+</Preview>
+
+A response's tool call produces the same call, and its parameters are read the
+same way.

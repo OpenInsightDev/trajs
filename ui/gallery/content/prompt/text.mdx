@@ -1,0 +1,17 @@
+---
+title: PromptText
+description: A part's text, in the bubble the message's role calls for.
+---
+
+`Prompt.TextPart` renders as `PromptText`. The text is markdown, so it is written
+by the same reader the rest of the page is and arrives as the markdown it is.
+The variant is what says how the text reads: `secondary` for a user's text,
+`ghost` for the model's.
+
+<Preview>
+  <PromptTextDemo />
+</Preview>
+
+A response's text part carries the text the same way, and is rendered by this
+same component. Text that is still arriving is the same component with
+`streaming` set, which is what [ResponseStream](/response/stream) reads.

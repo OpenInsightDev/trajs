@@ -1,0 +1,16 @@
+---
+title: PromptReasoning
+description: What a model thought before it answered, kept out of the answer's way.
+---
+
+`Prompt.ReasoningPart` renders as `PromptReasoning`: the thinking folds away
+behind a marker, because a thought belongs to the answer it was written for and
+not to the person reading the answer. Open it to read it.
+
+<Preview>
+  <PromptReasoningDemo />
+</Preview>
+
+Thinking a response is still writing is the same component with `streaming` set:
+it is open while it is being thought and folds away once it is written, and the
+reader's own choice is what the panel follows from then on.

@@ -1,0 +1,15 @@
+---
+title: PromptFile
+description: A file a prompt carries, as an attachment.
+---
+
+`Prompt.FilePart` renders as `PromptFile`, named by its file name where it has
+one and by its media type otherwise — a response's file part carries the bytes
+and no name, so the media type is all that names it.
+
+<Preview>
+  <PromptFileDemo />
+</Preview>
+
+The attachment is the reference and not the bytes: nothing about the file is
+opened.

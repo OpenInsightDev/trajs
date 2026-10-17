@@ -1,0 +1,23 @@
+---
+title: Tool approval
+description: A call that paused for a decision, and the decision it was given.
+---
+
+A call can pause for a person to allow it. `Prompt.ToolApprovalRequestPart`
+renders as `PromptToolApprovalRequest`, naming the call and the approval it is
+waiting on:
+
+<Preview>
+  <PromptToolApprovalRequestDemo />
+</Preview>
+
+The decision is `Prompt.ToolApprovalResponsePart`, rendered as
+`PromptToolApprovalResponse` — allowed or denied, and why it was denied where it
+says:
+
+<Preview>
+  <PromptToolApprovalResponseDemo />
+</Preview>
+
+A response asks for a call to be approved the same way a prompt produces that one
+was, so one pair of components reads both.

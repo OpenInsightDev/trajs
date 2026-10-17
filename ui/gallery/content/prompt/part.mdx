@@ -1,0 +1,17 @@
+---
+title: PromptPart
+description: One part, rendered by the component its type maps to.
+---
+
+`PromptPart` takes a part that is known only as the union `effect/ai` gives it — a
+part read out of a trajectory rather than one written out with its own type — and
+renders it by the component its `type` maps to. Every kind of part a prompt
+carries, through the one dispatch:
+
+<Preview>
+  <PromptPartDemo />
+</Preview>
+
+The dispatch reads a part's `type`, so a part `effect/ai` adds stops compiling
+here until this package maps it, which is where a missing component should be
+noticed.

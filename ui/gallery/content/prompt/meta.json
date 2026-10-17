@@ -1,0 +1,16 @@
+{
+  "title": "Prompt",
+  "pages": [
+    "index",
+    "text",
+    "reasoning",
+    "file",
+    "tool-call",
+    "tool-result",
+    "tool-approval",
+    "part",
+    "message",
+    "view",
+    "tool-payload"
+  ]
+}

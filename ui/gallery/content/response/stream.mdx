@@ -1,0 +1,18 @@
+---
+title: ResponseStream
+description: A response that is still arriving, read as the answer written so far.
+---
+
+`ResponseStream` reads the parts of a response that is still arriving as the
+answer they have written. The increments of one chunk are folded into the part
+they complete, so a text arrives as one bubble that grows rather than one bubble
+per increment, and a chunk the stream has not closed is read in the streaming
+state of the component its part maps to — which is what says the answer is not
+finished.
+
+<Preview>
+  <ResponseStreamDemo />
+</Preview>
+
+The demo writes the stream a part at a time, because that is what a stream is:
+what the parts received so far read as is what can be watched here.

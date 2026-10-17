@@ -1,0 +1,30 @@
+---
+title: trajs gallery
+description: The design language every trajs surface is painted with, and the components built on it.
+---
+
+This is the gallery of two things that are usually kept apart: the design
+language trajs is painted with, and the components that paint with it. Both are
+read out of the repository rather than described here, so the pages cannot show
+you a token or a component that has since changed.
+
+## [Design language](/design)
+
+The semantic tokens — colour, radius, the type face — and the `@theme inline`
+mapping that turns them into Tailwind utilities. The page documents them by
+reading them: the swatches call `var(--…)` against the cascade, and follow the
+theme switch.
+
+## [Components](/components)
+
+The shadcn/ui components, over [Base UI](https://base-ui.com), that
+`@trajs/shadcn` publishes. The same source the viewer renders with, and the same
+one `@trajs/component` maps `effect/ai`'s prompt and response model onto — so
+what a demo here shows is what ships.
+
+## [Prompt](/prompt) and [Response](/response)
+
+The components that render an `effect/ai` prompt and response: one page per part,
+every one of them the component the viewer shows a trajectory with. The parts are
+written with `effect/ai`'s own constructors, so the mapping is shown without a
+trajectory, a model or a network.

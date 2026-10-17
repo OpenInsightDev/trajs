@@ -1,16 +1,19 @@
 import { defineConfig } from "vite-plus";
 
-// Agent tooling assets and the vendored anti-slop plugin are copied sources, not
-// project code, so neither linting nor formatting may rewrite them. The shadcn/ui
-// components in `ui/shadcn/src` are copied sources for the same reason: they
-// are re-added with `shadcn add`, so leaving them as written keeps that a no-op.
-const generatedAndVendored = [
+// What fmt and lint stay out of: agent tooling assets and the vendored anti-slop
+// plugin, which are copied sources rather than project code, and the shadcn/ui
+// components in `ui/shadcn/src`, which are copied sources for the same reason —
+// they are re-added with `shadcn add`, so leaving them as written keeps that a
+// no-op. The rest is written by a build.
+const ignoredByFmtAndLint = [
   ".agents/**",
   "tools/oxlint/anti-slop/**",
   "ui/shadcn/src/**",
-  // Written by the Fumapress build and the Fumadocs MDX collection it loads.
+  // Written by the Fumapress builds and the Fumadocs MDX collections they load.
   "ui/website/.source/**",
   "ui/website/src/pages.gen.ts",
+  "ui/gallery/.source/**",
+  "ui/gallery/src/pages.gen.ts",
 ];
 
 export default defineConfig({
@@ -18,14 +21,14 @@ export default defineConfig({
     "*": "vp check --fix",
   },
   fmt: {
-    ignorePatterns: [...generatedAndVendored],
+    ignorePatterns: [...ignoredByFmtAndLint],
     // Organize imports into Oxfmt's default groups (builtin, external,
     // internal, relative, style) and sort within each, so import order is a
     // formatter concern rather than something reviewers have to check.
     sortImports: true,
   },
   lint: {
-    ignorePatterns: [...generatedAndVendored],
+    ignorePatterns: [...ignoredByFmtAndLint],
     jsPlugins: [
       { name: "vite-plus", specifier: "vite-plus/oxlint-plugin" },
       { name: "anti-slop", specifier: "./tools/oxlint/anti-slop/index.ts" },
@@ -81,6 +84,12 @@ export default defineConfig({
       // replayed for the same reason.
       viewer: {
         command: "vp run viewer#dev",
+        cache: false,
+      },
+      // `vp run gallery` starts the component gallery's Fumapress dev server;
+      // the task is never replayed for the same reason.
+      gallery: {
+        command: "vp run gallery#dev",
         cache: false,
       },
     },

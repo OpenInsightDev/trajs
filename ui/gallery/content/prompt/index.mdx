@@ -1,0 +1,22 @@
+---
+title: Overview
+description: The components that render an effect/ai prompt, one per part.
+---
+
+[`@trajs/component`](https://github.com/OpenInsightDev/trajs/tree/main/ui/component) maps
+`effect/ai`'s prompt and response model onto the components on the [design
+language](/design) page: one component per part, and a message and a prompt laid
+out around them. Every page here renders the real component against a part
+written with `effect/ai`'s own constructors, so nothing is produced or requested
+from a model.
+
+A prompt is a sequence of messages, each a sequence of parts. These pages render
+the parts a prompt carries — `PromptText`, `PromptReasoning`, `PromptFile`,
+`PromptToolCall`, `PromptToolResult`, `PromptToolApprovalRequest` and
+`PromptToolApprovalResponse` — then `PromptPart`, which dispatches on a part's
+type, and `PromptMessage` and `PromptView`, which lay the messages out as the
+conversation they are. `ToolPayload` is what a tool part's payload is read in.
+
+The shapes a response shares with a prompt are rendered by these same
+components; the parts only a response carries — and the stream it arrives in —
+are under [Response](/response).

@@ -1,0 +1,27 @@
+/* Three things are shown here: the trajs design language, which is
+   `@trajs/shadcn/styles.css`, the components painted with it, and the mapping
+   of `effect/ai`'s prompt and response model onto them, which is
+   `@trajs/component/styles.css`. Fumadocs' theme paints the documentation
+   around them, so it is imported first — the demos read `--background`,
+   `--primary` and the rest, while the docs chrome keeps reading `--fd-*`. The
+   Geist face is the one the tokens name. */
+@import "tailwindcss";
+@import "fumadocs-ui/css/neutral.css";
+@import "fumadocs-ui/css/preset.css";
+@import "fumapress/css/preset.css";
+@import "@fontsource-variable/geist";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+@import "@trajs/shadcn/styles.css";
+@import "@trajs/component/styles.css";
+
+/* Tailwind scans what it is pointed at. The components are copied sources in
+   other packages, and the markdown a message is read as is written by Streamdown
+   and its code plugin, none of which Tailwind scans on its own: each is
+   registered here rather than imported for classes. The Streamdown paths are
+   written against this stylesheet, which is why the app depends on both
+   packages — they are read here, not imported. */
+@source "../../shadcn/src";
+@source "../../component/src";
+@source "../node_modules/streamdown/dist/*.js";
+@source "../node_modules/@streamdown/code/dist/*.js";

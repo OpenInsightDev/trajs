@@ -1,0 +1,4 @@
+{
+  "title": "Response",
+  "pages": ["index", "source", "metadata", "finish", "part", "stream", "tool-params", "error"]
+}
