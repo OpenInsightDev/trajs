@@ -2,19 +2,12 @@
  * Extra data an extension states of a trajectory, and the record a part holds it
  * as.
  *
- * An {@link Extra} is one kind of extra data an extension names, with the schema
- * of what a prompt part holds of it, the schema of what a response part holds of
- * it, and the schema of what a session part holds of it, each at every version it
- * was written at: what a datum states of one part need not be what it states of
- * another, and an extension declares the schema of whichever parts it states, or
- * of several. {@link makeKit} collects extra data into a kit, {@link mergeKit} adds
- * the extra data of one kit to another's, and {@link ExtraRecord} reads the extra
- * data a part holds as the extra data of that kit for the part it is: the data of
- * every kind the kit declares a schema for there, keyed by its tag, and nothing
- * else, so a kind the kit declares none for there is not data the part is read as
- * holding. A part is read through the kit it was produced with for the same reason
- * a response part is read through the toolkit it was produced with: the part holds
- * the data, and the kit is what says how to read it.
+ * An {@link Extra} names one kind of extra data, with a schema for each of the
+ * prompt, response and session parts it states; what it states of one part need not
+ * be what it states of another, so it declares a schema for whichever parts it
+ * states. {@link makeKit} and {@link mergeKit} collect extra data into kits, and
+ * {@link ExtraRecord} reads a part's extra data as one kit declares it: the kinds
+ * the kit declares a schema for on that part, keyed by tag, and nothing else.
  */
 
 import { Data, Schema } from "effect";
@@ -24,10 +17,8 @@ import * as VersionedSchema from "#/VersionedSchema.ts";
 import type { IndexByKey } from "./internal/types.ts";
 
 /**
- * The part of a trajectory extra data is attached to: what a datum states of a
- * prompt part is read by the schema an extension declares it with for `prompt`,
- * what one states of a response part by the schema it declares for `response`, and
- * what one states of a session part by the schema it declares for `session`.
+ * The part of a trajectory extra data is attached to: a datum's schema for
+ * `prompt`, `response` or `session` reads what it states of a part of that kind.
  *
  * @see {@link Extra} for the schemas an extension declares.
  * @see {@link ExtraRecord} for the record one part holds.
@@ -35,6 +26,25 @@ import type { IndexByKey } from "./internal/types.ts";
  */
 export type Part = "prompt" | "response" | "session";
 
+/**
+ * One kind of extra data an extension names.
+ *
+ * **When to use**
+ *
+ * Use to declare extra data an extension states of a trajectory, or to type one.
+ *
+ * **Details**
+ *
+ * `package` and `id` name it — `tag` is `"pkg/id"` — and `name` and `description`
+ * describe it. `prompt`, `response` and `session` are the schemas it declares for those
+ * parts, each at every version it was written at
+ * ({@link VersionedSchema.VersionedSchema}); a kind need declare only the parts it
+ * states. Collect extra data into a kit with {@link makeKit}.
+ *
+ * @see {@link makeKit} for collecting extra data into a kit.
+ * @see {@link ExtraRecord} for reading a part's extra data.
+ * @category models
+ */
 export class Extra<
   Pkg extends string,
   Id extends string,
@@ -55,6 +65,7 @@ export class Extra<
   }
 }
 
+/** Extra data whose package, id and declared parts are not known. */
 export type Any = Extra<
   string,
   string,
@@ -65,10 +76,33 @@ export type Any = Extra<
 
 type ExtrasByTag<Xs> = IndexByKey<Xs, "tag">;
 
+/**
+ * A kit of extra data, keyed by the tag each kind names.
+ *
+ * @see {@link makeKit} for building one, {@link ExtraRecord} for reading it.
+ * @category models
+ */
 export type Extrakit<Extras extends Record<string, Any>> = Readonly<{
   extra: Extras;
 }>;
 
+/**
+ * Collects extra data into a kit, keyed by the tag each kind names.
+ *
+ * **When to use**
+ *
+ * Use to gather the extra data an extension states into the kit a trajectory is read
+ * with.
+ *
+ * **Details**
+ *
+ * Each kind is keyed by its own `tag`, so a kit names one kind per tag. A kit names
+ * the kinds it was given and no others; {@link emptyKit} names none.
+ *
+ * @see {@link mergeKit} for adding the extra data of one kit to another's.
+ * @see {@link ExtraRecord} for reading a part's extra data under a kit.
+ * @category constructors
+ */
 export const makeKit = <Xs extends ReadonlyArray<Any>>(...extra: Xs) => {
   // SAFETY: every kind of extra data given is inserted under its own tag below, so
   // what the record holds is one kind per tag the kit names.
@@ -83,6 +117,7 @@ export const makeKit = <Xs extends ReadonlyArray<Any>>(...extra: Xs) => {
   return { extra: output } as Extrakit<ExtrasByTag<Xs>>;
 };
 
+/** A kit whose extra data is not known. */
 export type AnyKit = Extrakit<Record<string, Any>>;
 
 /** A kit that declares no extra data. */
@@ -92,19 +127,17 @@ export const emptyKit = makeKit();
 export type EmptyKit = typeof emptyKit;
 
 /**
- * The extra data of the kits given as one, a tag they share holding the extra data
- * of the kit latest among them.
+ * The extra data of the kits given as one, a shared tag holding the extra data of
+ * the latest kit that names it.
  *
  * **When to use**
  *
- * Use to name the extra data {@link mergeKit} returns, such as to type the kit a
- * reader that knows one trajectory's extra data reads another one under.
+ * Use to type the kit {@link mergeKit} returns.
  *
  * **Details**
  *
- * The extra data of every kit given is named, and where two of them name the same
- * tag the one of the kit latest among those given that names it is the one held, as
- * {@link makeKit} holds the extra data it is handed.
+ * Every kit's extra data is named; where two kits name the same tag, the extra data
+ * of the later kit wins.
  *
  * @see {@link mergeKit} for the kit those extra data make.
  * @category models
@@ -122,15 +155,13 @@ export type ExtrasMerged<Ks extends ReadonlyArray<AnyKit>> = Ks extends readonly
  * **When to use**
  *
  * Use when the extra data of several extensions are read together, or when a reader
- * that knows some of a trajectory's extra data should read it under the ones it knows
- * without forgetting the rest — which is what reading two trajectories as one does.
+ * that knows some of a trajectory's extra data reads it under the ones it knows
+ * without forgetting the rest.
  *
  * **Details**
  *
- * A tag the kits share holds the extra data of the kit latest among those given that
- * names it, so a kit of the version an extension states now states over the one a
- * trajectory was read with. The kit returned is a kit like any other: it names the
- * extra data of every kit given and no others.
+ * A shared tag holds the extra data of the latest kit that names it, so a kit of a
+ * version an extension states now states over the one a trajectory was read with.
  *
  * **Example** (Adding the extra data of one kit to another's)
  *
@@ -206,9 +237,8 @@ type DatumEncoded<X extends Any, P extends Part> = [Declared<X, P>] extends [nev
  *
  * **When to use**
  *
- * Use to type a value that holds the extra data of a part beside other keys — what a
- * session is declared with holds the extra data of a session part beside the `id`
- * and `fork` that name it — or to take one as {@link stated} takes it.
+ * Use to type a value that holds a part's extra data beside other keys, or to take one
+ * as {@link stated} takes it.
  *
  * @see {@link ExtraRecord} for the data of the kinds a kit declares of a part.
  * @category models
@@ -229,9 +259,9 @@ export type Held = Schema.Schema.Type<typeof Held>;
  *
  * **Details**
  *
- * - A tag the kit declares a schema for on this part holds the data of that kind,
- *   at the newest version of that schema: {@link ExtraRecord} reads the data of
- *   every version it was written at into that one.
+ * - A tag the kit declares a schema for on this part holds that kind's data at the
+ *   newest version of the schema: {@link ExtraRecord} reads the data of every version
+ *   it was written at into that one.
  * - A tag the kit declares no schema for on this part — a kind it does not name, or
  *   one it declares for another part alone — is stated as `never`: the record holds
  *   no data of such a kind, so a part is not read as holding one, and a part written
@@ -267,16 +297,15 @@ export type ExtraRecordEncoded<Extras extends Record<string, Any>, P extends Par
  * **Details**
  *
  * - Every kind the kit declares a schema for on this part is read by it, keyed by
- *   its tag: a datum of any version of it reads as its newest one, as
+ *   its tag: a datum of any version reads as its newest one, as
  *   {@link VersionedSchema.VersionedSchema} reads one.
  * - A kind the kit declares no schema for on this part is no field of the record, so
- *   what a part states of it is not data the record holds: reading a part states the
- *   kinds the kit in hand declares of it. A kit that declares no kind at all for the
- *   part states no field, and a record of no field is read as it stands.
+ *   what a part states of it is not data the record holds. A kit that declares no
+ *   kind at all for the part states no field, and a record of no field is read as it
+ *   stands.
  * - A kind the kit declares a schema for on this part is read by it or not at all:
- *   a part whose datum no longer matches a version of that schema is not read as
- *   some other shape, which is what keeps a reader from acting on data it did not
- *   read.
+ *   a part whose datum no longer matches a version of that schema is not read as some
+ *   other shape, which keeps a reader from acting on data it did not read.
  *
  * **Example** (Reading one kind on each part, and one the kit declares for no part)
  *
@@ -347,16 +376,14 @@ export const ExtraRecord = <K extends AnyKit, P extends Part>(
  *
  * **When to use**
  *
- * Use to hold the extra data of a part beside the keys that name it — what a session
- * is declared with is the extra data of a session part beside the `id` and `fork`
- * that name the session — or to take the extra data of a part as one kit declares it.
+ * Use to hold the extra data of a part beside the keys that name it, or to take the
+ * extra data of a part as one kit declares it.
  *
  * **Details**
  *
  * - The data of a tag the kit declares for this part is held as the value states it,
  *   keyed by that tag: no schema reads it here, so a datum no schema of the kit states
- *   is held as it was written, rather than failing as it would where
- *   {@link ExtraRecord} reads it.
+ *   is held as it was written rather than failing as {@link ExtraRecord} would.
  * - What a value states of a tag the kit declares no schema for on this part is
  *   dropped, since a part holds the kinds the reading of it knows.
  *

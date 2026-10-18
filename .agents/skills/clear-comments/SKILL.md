@@ -5,6 +5,14 @@ description: Use when user asks to clear the comments in the project, or to writ
 
 # Comment Rules
 
+## The three Cs of writing
+
+Applies to every comment and doc block below: write so a reader gets the point in one pass.
+
+- **Clear**: Use active voice and unambiguous pronouns. One idea per sentence, in short sentences, and define a term before relying on it.
+- **Concise**: Say only as much as the reader needs. Excess detail makes the text tedious and unread; cut anything the code or types already say.
+- **Consistent**: Use the same wording for the same concept throughout a file and across the project.
+
 ## Implementation comments
 
 Implementation comments are the comments inside function bodies and on non-exported code. The JSDoc on public modules and exports is documentation, not implementation commentary: never delete or trim it here, and follow the rules below when writing it.

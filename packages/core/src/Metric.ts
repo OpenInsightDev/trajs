@@ -1,16 +1,12 @@
 /**
- * Metrics a producer reports of a trajectory, and the parts a trajectory holds
- * them as.
+ * Metrics a producer reports of a trajectory, and the parts a trajectory holds them
+ * as.
  *
- * A {@link Metric} is one kind of measurement an extension names, with the
- * schemas of what a producer reports of it and of what producing it fails with.
- * {@link makeKit} collects metrics into a kit, {@link mergeKit} adds the metrics of
- * one kit to another's, and {@link toProducers} provides a kit with the producer of
- * each of them, which {@link produce} runs over a trajectory. {@link MetricParts} reads
- * the parts of a trajectory under the metrics of a kit: what a trajectory holds of a
- * metric is the tag it was reported under and the report itself, so a part is read as
- * the metric its tag names, and a part of a metric the kit does not name is read by no
- * schema of the reading at all.
+ * A {@link Metric} names one kind of measurement, with the schemas of what a
+ * producer reports of it and of what producing it fails with. {@link makeKit} and
+ * {@link mergeKit} collect metrics into kits, {@link toProducers} provides a kit
+ * with a producer per metric, {@link produce} runs them over a trajectory, and
+ * {@link MetricParts} reads a trajectory's metric parts under a kit.
  */
 
 import { Data, DateTime, Effect, Predicate, Schema, Stream } from "effect";
@@ -23,11 +19,36 @@ import * as VersionedSchema from "#/VersionedSchema.ts";
 import type { IndexByKey } from "./internal/types.ts";
 import type { TrajectoryError } from "./TrajectoryError.ts";
 
+/**
+ * Describes a metric: an optional name and description.
+ *
+ * @see {@link Metric} for the metric it describes.
+ * @category models
+ */
 export class Metadata extends Schema.Class<Metadata>("Metadata")({
   name: Schema.optional(Schema.String),
   description: Schema.optional(Schema.String),
 }) {}
 
+/**
+ * One kind of measurement an extension names.
+ *
+ * **When to use**
+ *
+ * Use to declare a metric an extension reports, or to type one.
+ *
+ * **Details**
+ *
+ * `package` and `id` name it — `tag` is `"pkg/id"` — and `metadata` describes it.
+ * `output` is the schema of what a producer reports of it and `failure` the schema of
+ * what producing it fails with, each at every version it was written at
+ * ({@link VersionedSchema.VersionedSchema}). Collect metrics into a kit with
+ * {@link makeKit}.
+ *
+ * @see {@link makeKit} for collecting metrics into a kit.
+ * @see {@link toProducers} for providing a kit with the producer of each metric.
+ * @category models
+ */
 export class Metric<
   Pkg extends string,
   Id extends string,
@@ -45,18 +66,44 @@ export class Metric<
   }
 }
 
+/** A metric whose package, id and schemas are not known. */
 export type Any = Metric<string, string, VersionedSchema.Any, VersionedSchema.Any>;
 
+/** The schema of what a producer reports of a metric, at every version. */
 export type Output<Ext extends Any> = Ext["output"];
 
+/** The schema of what producing a metric fails with, at every version. */
 export type Failure<Ext extends Any> = Ext["failure"];
 
 type MetricsByTag<Ms> = IndexByKey<Ms, "tag">;
 
+/**
+ * A kit of metrics, keyed by the tag each names.
+ *
+ * @see {@link makeKit} for building one, {@link toProducers} for providing it.
+ * @category models
+ */
 export type Metrickit<Metrics extends Record<string, Any>> = Readonly<{
   metrics: Metrics;
 }>;
 
+/**
+ * Collects metrics into a kit, keyed by the tag each names.
+ *
+ * **When to use**
+ *
+ * Use to gather the metrics an extension reports into the kit a trajectory is read
+ * with.
+ *
+ * **Details**
+ *
+ * Each metric is keyed by its own `tag`, so a kit names one metric per tag. A kit
+ * names the metrics it was given and no others; {@link emptyKit} names none.
+ *
+ * @see {@link mergeKit} for adding the metrics of one kit to another's.
+ * @see {@link toProducers} for providing a kit with a producer per metric.
+ * @category constructors
+ */
 export const makeKit = <Ms extends ReadonlyArray<Any>>(...metrics: Ms) => {
   // SAFETY: every metric given is inserted under its own tag below, so what the record
   // holds is one metric per tag the kit names.
@@ -71,6 +118,7 @@ export const makeKit = <Ms extends ReadonlyArray<Any>>(...metrics: Ms) => {
   return { metrics: output } as Metrickit<MetricsByTag<Ms>>;
 };
 
+/** A kit whose metrics are not known. */
 export type AnyKit = Metrickit<Record<string, Any>>;
 
 /** A kit that declares no metric. */
@@ -107,21 +155,17 @@ type ProducersMerged<Ks extends ReadonlyArray<WithProducers<AnyKit>>> = Ks exten
  *
  * **When to use**
  *
- * Use to name the kit {@link mergeKit} returns, such as to type a kit built over
- * the ones of two trajectories.
+ * Use to type the kit {@link mergeKit} returns.
  *
  * **Details**
  *
- * The metrics of every kit given are named, and where two of them name the same
- * tag the metric of the kit latest among those given that names it is the one held.
+ * Every kit's metrics are named; where two kits name the same tag, the metric of
+ * the later kit wins.
  *
- * A producer is what a metric is reported by rather than what a kit states of it in
- * the same way its metrics are — {@link WithProducers} holds one for every metric of
- * the kit it is provided to — so the merged kit states the producers of the kits
- * given where every one of them states all of its own, and states none where any of
- * them does not: producers that cover some of the metrics of a kit alone are not ones
- * that kit can be run by, and {@link produce} reads the producers a kit states as all
- * of them.
+ * A merged kit states the producers of the kits given only where every one of them
+ * states all of its own, and states none otherwise: a kit whose producers cover
+ * some of its metrics alone is not one {@link produce} can run. See
+ * {@link WithProducers}.
  *
  * @see {@link mergeKit} for the kit it types.
  * @see {@link WithProducers} for the kit a metric is reported by a producer of.
@@ -138,20 +182,17 @@ export type MetrickitMerged<Ks extends ReadonlyArray<AnyKit>> =
  * **When to use**
  *
  * Use when the metrics of several extensions are read together, or when a reader
- * that knows some of a trajectory's metrics should read it under the ones it knows
- * without forgetting the rest — which is what reading two trajectories as one does.
+ * that knows some of a trajectory's metrics reads it under the ones it knows without
+ * forgetting the rest.
  *
  * **Details**
  *
- * A tag the kits share holds the metric of the kit latest among those given that
- * names it, so a kit of the version an extension states now states over the one a
- * trajectory was read with. The kit returned is a kit like any other: it names the
- * metrics of every kit given and no others.
+ * A shared tag holds the metric of the latest kit that names it, so a kit of a
+ * version an extension states now states over the one a trajectory was read with.
  *
- * The producers the kits were provided with are added to each other the same way,
- * but a kit is only reported by them where every kit given states all of its own:
- * what a merged kit states of its metrics is what {@link MetrickitMerged} says, and
- * a kit that states some of them alone is not one {@link produce} can run.
+ * The producers the kits were provided with are added the same way, but a merged
+ * kit states producers only where every kit given states all of its own, as
+ * {@link MetrickitMerged} says.
  *
  * **Example** (Adding the metrics of one kit to another's)
  *
@@ -226,8 +267,24 @@ export const mergeKit = <Ks extends ReadonlyArray<AnyKit>>(...kits: Ks): Metrick
   return (reported ? { metrics, producers } : { metrics }) as MetrickitMerged<Ks>;
 };
 
+/** A metric part: its report under the tag it was reported with. */
 export type MetricPart<Tag extends string, Data> = Readonly<{ _tag: Tag; data: Data }>;
 
+/**
+ * Builds the part schema of one metric: its report, under `tag`.
+ *
+ * **When to use**
+ *
+ * Use to build a part schema for a single tag; {@link MetricParts} builds the union
+ * over every metric of a kit.
+ *
+ * **Details**
+ *
+ * The part read is a tagged struct whose `data` is the schema given.
+ *
+ * @see {@link MetricParts} for the parts of a whole kit.
+ * @category schemas
+ */
 export const MetricPart = <Tag extends string, S extends Schema.Top>(
   tag: Tag,
   schema: S,
@@ -272,24 +329,15 @@ const failureSchemaOf = <Ext extends Any>(metric: Ext): FailureSchema<Ext> =>
  *
  * **When to use**
  *
- * Use where the producer of a metric reports a measurement it derived, which is
- * every measurement a producer reports: what is returned is what the kit produces
- * as a metric part of the trajectory, about the parts the measurement was taken
- * for.
+ * Use where the producer of a metric reports a measurement it derived.
  *
  * **Details**
  *
- * The metric is what the output is read as and what tells a report of one from a
- * report of another: a producer names no metric of its own, since the key it is
- * held at in a kit is what names it. `output` is the metric's own output, at the
- * newest version of it, and `attach` names the parts the measurement is about —
- * see {@link ProducerOutput} for what a report holds.
- *
- * The metric is given as a type argument rather than taken as an argument of its
- * own — `makeOutput<typeof metric>(…)` — since nothing a report holds is a
- * property of the metric: what it holds of a run is the output it was handed and
- * the parts it is about, and one report of a metric is built the same way as
- * another.
+ * `output` is the metric's own output at its newest version, and `attach` names the
+ * parts the measurement is about. The metric is given as a type argument —
+ * `makeOutput<typeof metric>(…)` — because nothing a report holds is a property of
+ * the metric; a producer names no metric of its own, since the key it is held at in
+ * a kit does.
  *
  * @see {@link makeFailure} for what a producer reports instead.
  * @category constructors
@@ -320,16 +368,15 @@ export class ProducerFailure<Ext extends Any> extends Data.TaggedClass("Producer
  * **When to use**
  *
  * Use where the producer of a metric reports a part it could not measure, which a
- * kit produces as a metric part of the trajectory rather than failing the run.
+ * kit produces as a metric part rather than failing the run.
  *
  * **Details**
  *
- * It is {@link makeOutput} for the other direction: the metric is given as a type
- * argument for the same reason, `failure` is the metric's own failure at the newest
- * version of it, and `attach` names the parts the failure is about. What a
- * producer reports on its error channel is told from the failure of the run by
- * this shape's tag, so a failure a producer derived is produced rather than
- * thrown.
+ * It is {@link makeOutput} for the other direction: the metric is a type argument
+ * for the same reason, `failure` is the metric's own failure at its newest version,
+ * and `attach` names the parts the failure is about. This shape's tag tells a
+ * failure a producer derived from the failure of the run, so the former is produced
+ * rather than thrown.
  *
  * @see {@link ProducerFailure} for what a report holds.
  * @see {@link makeOutput} for what a producer reports instead.
@@ -346,30 +393,23 @@ export const makeFailure = <Ext extends Any>(
  *
  * **When to use**
  *
- * Use to type the producer of a metric — what {@link Producers} keys by the
- * metric it belongs to — or to write one.
+ * Use to type the producer of a metric — what {@link Producers} keys by the metric
+ * it belongs to — or to write one.
  *
  * **Details**
  *
- * A producer reads a trajectory and reports one {@link ProducerOutput} for each
- * measurement it derived of it, or fails with a {@link ProducerFailure} for one
- * it could not derive. The metric it belongs to is not named by the producer:
- * the key it is held at in a kit does, and that key is the tag of a metric of
- * that kit.
+ * A producer reads a trajectory and reports one {@link ProducerOutput} per
+ * measurement it derived, or fails with a {@link ProducerFailure} for one it could
+ * not derive. It does not name its own metric: the key it is held at in a kit does.
  *
- * The trajectory it reads is one whose response parts are whole —
- * {@link Trajectory.NonStreamConfig} — since what a producer measures is the parts
- * a model was given and returned rather than the increments an answer arrived in:
- * the parts of a streamed answer are folded into the whole parts they complete
- * before a producer reads them, which {@link produce} does for the kit it runs. The
- * kits a trajectory was read with are the reading's rather than the producer's, so a
- * producer measures a trajectory without knowing the toolkit, the kits or the
- * variant it was produced with.
+ * It reads a trajectory whose response parts are whole
+ * ({@link Trajectory.NonStreamConfig}), since what it measures is the parts a model
+ * was given and returned rather than the increments an answer arrived in; {@link
+ * produce} folds streamed parts before a producer reads them. The kits a trajectory
+ * was read with belong to the reading, not the producer.
  *
- * What a run of a producer requires is what the trajectory it reads requires, so
- * a producer asks for no service of its own: a service it is built with is
- * provided where it is built and travels with the producer rather than with the
- * kit that runs it.
+ * A producer asks for no service of its own: what a run of it requires is what the
+ * trajectory requires.
  *
  * @see {@link ProducerOutput} for what a producer reports.
  * @see {@link ProducerFailure} for what it fails with.
@@ -389,11 +429,9 @@ export type Producer<Ext extends Any> = <E, R>(
  *
  * **Details**
  *
- * An entry is the {@link Producer} of the metric at the same key, which is the
- * tag the metric names. A producer is therefore checked against the metric it
- * belongs to: the data it reports must be the data of that metric's own schemas.
- * Every metric of a kit is an entry, since a metric states what it reports and
- * what reporting it fails with, so there is nothing for a kit to leave out.
+ * An entry is the {@link Producer} of the metric at the same key (the metric's
+ * tag), so a producer is checked against its metric: what it reports must match that
+ * metric's schemas. Every metric is an entry, so there is nothing to leave out.
  *
  * @see {@link toProducers} for providing a kit with them.
  * @category models
@@ -412,12 +450,10 @@ export type Producers<Metrics extends Record<string, Any>> = Readonly<{
  *
  * **Details**
  *
- * It is the kit itself, carrying the producers of its metrics beside them: the
- * metrics it holds are the ones a trajectory is read with, and the producers are
- * keyed as those metrics are, so each metric is reported by the producer it
- * names and none is left without one. The producers are held beside the metrics
- * rather than standing for them because a producer does not name its own metric:
- * the key it is held at does, and that key is a key of this kit.
+ * It is the kit itself with the producers of its metrics beside them, keyed as those
+ * metrics are, so each metric is reported by the producer at its tag and none is
+ * left without one. The producers are held beside the metrics rather than standing
+ * for them because a producer does not name its own metric: its key does.
  *
  * @see {@link toProducers} for building one.
  * @see {@link produce} for running it.
@@ -436,14 +472,11 @@ export type WithProducers<Kit extends AnyKit> = Kit & {
  *
  * **Details**
  *
- * The producers are checked against the kit: an entry is the producer of the
- * metric at its key, so a producer that reports another metric's data fails to
- * compile rather than to run. What a producer is built with, and what building it
- * fails with, are read where it is built and nowhere else: neither is a property
- * of the kit.
- *
- * The kit is carried through as it was given, so what is returned holds the
- * metrics it holds.
+ * The producers are checked against the kit — an entry is the producer of the metric
+ * at its key — so a producer that reports another metric's data fails to compile
+ * rather than to run. What a producer is built with, and what building it fails
+ * with, are read where it is built and are not properties of the kit. The kit is
+ * carried through as it was given.
  *
  * **Example** (Providing a kit with the producer of its metric)
  *
@@ -532,11 +565,10 @@ type MetricPartOf<Ext> = Ext extends Any
  * **Details**
  *
  * A part is the tag it was reported under and the report itself: the output a
- * producer yielded of what it read, or the failure it reported of it. The tag
- * alone says which metric the report is of, since a report carries nothing that
- * says so itself, so a part is read as the metric of the reading kit that names
- * its tag and as no other: a metric the kit does not name is one the reading holds
- * no schema of.
+ * producer yielded, or the failure it reported. Since a report does not say which
+ * metric it is of, a part reads as the metric of the reading kit that names its tag
+ * and no other: a metric the kit does not name is one the reading holds no schema
+ * of.
  *
  * @see {@link MetricParts} for the schema that reads one.
  * @category models
@@ -553,13 +585,11 @@ export type MetricParts<Metrics extends Record<string, Any>> = MetricPartOf<Metr
  *
  * **Details**
  *
- * - Every metric of the kit is a member of the union, read under its own tag by
- *   the report that metric states, in the order the kit holds the metrics.
- * - A part of any other metric reads as no member, since what a tag means is the
- *   schema of the metric that names it: reading a trajectory as far as the kits in
- *   hand state it is what leaves the rest to a reading that holds them.
- * - A kit that names no metric reads no part, so a trajectory read with no kit
- *   holds no metric of it.
+ * - Every metric of the kit is a member of the union, read under its own tag by the
+ *   report that metric states.
+ * - A part of any other metric reads as no member: a tag means the schema of the
+ *   metric that names it, so a reading covers only the metrics of the kit in hand.
+ * - A kit that names no metric reads no part.
  *
  * **Example** (Reading the metric parts a kit produced)
  *
@@ -638,34 +668,24 @@ const isProducerFailure = (value: unknown): value is ProducerFailure<Any> =>
  *
  * **Details**
  *
- * A trajectory is read once however many metrics the kit names: the parts are
- * shared between the producers rather than read by each of them, so the trajectory
- * is broadcast and every one of them reads the same parts.
- *
  * The parts a producer reads are the trajectory's own, with the increments a
- * streamed response arrived in folded into the whole parts they complete: a
- * producer measures what a model was given and returned, so it reads a part as it
- * was said rather than as it was produced — see {@link Producer}. The folding is
- * the one `View` reads a streamed answer with, and a folded part carries the `uuid`
- * of the increment that completed it, so what a report attaches to is a part the
- * trajectory holds.
+ * streamed response arrived in folded into the whole parts they complete, so a
+ * producer reads what a model was given and returned as it was said — see
+ * {@link Producer}. A folded part carries the `uuid` of the increment that completed
+ * it, so what a report attaches to is a part the trajectory holds.
  *
- * What is emitted is one report of a metric with the tag of the metric it
- * belongs to, which is the part a trajectory holds a report as, as
- * {@link MetricParts} reads one: the data of the metric it was derived of, about
- * the parts it is attached to, apart from the metadata a trajectory produces
- * every part with. A report of one metric is told from a report of another by
- * that tag alone, since a producer names no metric of its own.
+ * What is emitted is one report of a metric per part, tagged with that metric's tag
+ * — the data of the metric about the parts it is attached to — as {@link MetricParts}
+ * reads one. The tag alone tells one report from another, since a producer names no
+ * metric of its own.
  *
- * The failure a producer reports of a part is not a failure of the run: it is
- * emitted beside what the producers yield, as the metric's own failure, so a
- * part that could not be measured is produced rather than throwing. The stream
- * fails with the trajectory's failure, or with the {@link TrajectoryError} a
- * producer fails with once one has read.
+ * A failure a producer reports is not a failure of the run: it is emitted beside
+ * what the producers yield, as the metric's own failure, so a part that could not be
+ * measured is produced rather than throwing. The stream fails with the trajectory's
+ * failure, or with the {@link TrajectoryError} a producer fails with.
  *
- * What a producer is built with travels with the producer rather than with the
- * kit: a run of it asks for nothing on that account, and the services the
- * trajectory asks for are provided to the run.
+ * What a producer is built with travels with the producer, not the kit, so a run of
+ * it asks for nothing on that account.
  *
  * **Example** (Running a kit's producers over a trajectory)
  *

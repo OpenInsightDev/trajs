@@ -31,12 +31,10 @@ import { TrajectoryError } from "./TrajectoryError.ts";
  *
  * **Details**
  *
- * A part is stated as the trajectory produces it — a prompt, response or event
- * part, carrying the `uuid` it is named by and the session it was produced in — so
- * a stream of them holds the parts themselves rather than the messages they were
- * built from. A session declaration is not among them: a part names the session it
- * belongs to, and a trajectory is read by the sessions its parts name whether or not
- * one of them is declared.
+ * A part is stated as the trajectory produces it, so a stream of them holds the parts
+ * themselves rather than the messages they were built from. A session declaration is
+ * not among them: a part names its session, and a trajectory is read by the sessions
+ * its parts name whether or not one is declared.
  *
  * @see {@link fromSession} for the function that produces them.
  * @see {@link SessionStreams} for the streams of the sessions a trajectory holds one of
@@ -61,9 +59,8 @@ export type PartStream<Config extends Trajectory.AnyConfig, E = never, R = never
  *
  * **Details**
  *
- * A stream holds the parts of one session, as {@link PartStream} reads them, and the
- * id it is keyed by is the session they were produced in, which every part states of
- * itself as `sessionId`.
+ * A stream holds the parts of one session ({@link PartStream}), keyed by the session
+ * they were produced in, which every part states as its `sessionId`.
  *
  * @see {@link fromSessions} for the function that produces them.
  * @category models
@@ -147,11 +144,8 @@ const produceWith =
  *
  * **When to use**
  *
- * Use when what a model was given and returned is already a stream of parts — a
- * session produced elsewhere, or parts a caller assembled — and it should read as
- * a trajectory rather than as the parts it holds: so that its sessions read as one
- * trajectory, the kits it was produced with travel with its parts, and what a kit
- * derives of it is produced among the parts it is about.
+ * Use when what a model was given and returned is already a stream of parts and it
+ * should read as a trajectory rather than as the parts it holds.
  *
  * **Details**
  *
@@ -159,12 +153,11 @@ const produceWith =
  *   trajectory carries the kits given.
  * - The producers the metric kit was provided with are run over the same parts as
  *   they arrive, exactly as {@link Metric.produce} runs them, and the metric parts
- *   they derive are produced among the parts they are about. The stream is read
- *   once — the parts and the producers each read a branch of one broadcast — so a
- *   stream that drives a model is not run twice.
- * - The failure a producer reports of a part is produced as the failure of its
- *   metric rather than failing the trajectory; a failure of the run itself fails the
- *   trajectory, as {@link Metric.produce} states.
+ *   they derive are produced among the parts they are about. The stream is read once,
+ *   so a stream that drives a model is not run twice.
+ * - The failure a producer reports is produced as the failure of its metric rather
+ *   than failing the trajectory; a failure of the run itself fails the trajectory, as
+ *   {@link Metric.produce} states.
  *
  * **Example** (Producing the parts of a session, with what a kit derives of them)
  *
@@ -217,8 +210,8 @@ const produceWith =
  * ```
  *
  * @see {@link PartStream} for the parts it produces.
- * @see {@link fromSessions} for trajectory the streams of several sessions as one.
- * @see {@link produce} for trajectory a run as it happens.
+ * @see {@link fromSessions} for the streams of several sessions as one.
+ * @see {@link produce} for a run as it happens.
  * @see {@link Metric.produce} for what a kit derives of a kind of trajectory.
  * @category constructors
  */
@@ -249,27 +242,25 @@ export const fromSession =
  *
  * **When to use**
  *
- * Use when the sessions that are to read as one trajectory are each already a stream
- * of parts — as {@link fromSession} takes one — and it is the whole of what they did
- * that is worth reading: so that the parts of every session arrive in one stream,
- * what a kit derives of the trajectory is derived of every session of it.
+ * Use when several sessions, each already a stream of parts as {@link fromSession}
+ * takes one, are to read as one trajectory, so that the parts of every session arrive
+ * in one stream and what a kit derives of the trajectory is derived of every session.
  *
  * **Details**
  *
- * - The record given is keyed by session: the id a stream is given is the session its
- *   parts were produced in, and that session is declared among the parts before the
- *   parts of its stream arrive. Every part states the session it was produced in of
- *   itself, as {@link PartStream} reads one, so a session whose stream gives no part
- *   is still declared, and read among the sessions of the trajectory.
+ * - The record is keyed by session: each stream's parts were produced in the session
+ *   it is keyed by, and that session is declared before the parts of its stream
+ *   arrive. Every part states its own session ({@link PartStream}), so a session
+ *   whose stream gives no part is still declared.
  * - The streams are read together rather than one after another, so the trajectory
- *   interleaves the sessions: the parts of one session are not necessarily
- *   contiguous, though the parts of each keep the order its own stream gave them.
+ *   interleaves the sessions: the parts of one session need not be contiguous, though
+ *   each session's parts keep the order its stream gave them.
  * - Every part is produced as {@link fromSession} produces one, and the producers the
  *   metric kit was provided with are run over the parts of every session as they
  *   arrive, so what a kit derives of the trajectory is derived of all its sessions.
  *   Each stream is read once, however many readings the trajectory takes, and the
- *   failure a producer reports of a part is produced as the failure of its metric
- *   rather than failing the trajectory.
+ *   failure a producer reports is produced as the failure of its metric rather than
+ *   failing the trajectory.
  * - The trajectory fails with what any of the streams fails with, and requires the
  *   services any of them requires.
  *
@@ -313,8 +304,8 @@ export const fromSession =
  * ```
  *
  * @see {@link SessionStreams} for what it produces.
- * @see {@link fromSession} for trajectory one session that is already a stream.
- * @see {@link produce} for trajectory the sessions a run opens.
+ * @see {@link fromSession} for one session that is already a stream.
+ * @see {@link produce} for the sessions a run opens.
  * @see {@link Metric.produce} for what a kit derives of a kind of trajectory.
  * @category constructors
  */
@@ -358,29 +349,25 @@ export const fromSessions =
  *
  * **When to use**
  *
- * Use to write the parts of a session while a program runs — what a model was
- * given and returned, and the events a kit produced — rather than to produce a
+ * Use to write the parts of a session while a program runs rather than to produce a
  * stream that already holds them, which is what {@link fromSession} reads.
  *
  * **Details**
  *
  * - A part is written where it is enqueued rather than when the run ends, so a
- *   trajectory is read while the program that writes it runs, and what the part
- *   was produced as is returned to the caller.
- * - `enqueuePrompt` produces what a model was given and `enqueueResponse` one part
- *   of what it returned, each with the extra data the kit declares of the part it
- *   is — {@link Extra.ExtraRecord} — and `enqueueEvent` produces an event of the
- *   event kit.
- * - A prompt or response part is timed where it is produced, and a caller that
- *   knows the moment it happened states it as the last argument of the enqueue
- *   rather than leaving the part to be timed as it is built — which is how a part
- *   read from a record that times it keeps the moment that record gives.
- * - Every part is produced in this session: the `sessionId` of a part is the `id`
- *   of the session that wrote it, so the parts of the sessions a run opens are
- *   read apart.
+ *   trajectory is read while the program that writes it runs, and what the part was
+ *   produced as is returned to the caller.
+ * - `enqueuePrompt` produces what a model was given and `enqueueResponse` one part of
+ *   what it returned, each with the extra data the kit declares of the part it is
+ *   ({@link Extra.ExtraRecord}); `enqueueEvent` produces an event of the event kit.
+ * - A prompt or response part is timed where it is produced, and a caller that knows
+ *   when it happened states it as the last argument of the enqueue rather than
+ *   leaving the part to be timed as it is built.
+ * - Every part is produced in this session: a part's `sessionId` is the `id` of the
+ *   session that wrote it, so the sessions a run opens are read apart.
  *
  * @see {@link Producer} for what hands one out.
- * @see {@link produce} for trajectory a run in one.
+ * @see {@link produce} for a run in one.
  * @category models
  */
 export type ProduceSession<
@@ -449,29 +436,25 @@ type ProduceFn<
  *
  * **When to use**
  *
- * Use when a trajectory is written as the program runs — a session opened, and the
- * prompts a model was given, the parts it returned and the events a kit produced
- * enqueued as they happen — rather than read from a stream that already holds the
- * parts, which is what {@link fromSession} produces.
+ * Use when a trajectory is written as the program runs rather than read from a stream
+ * that already holds the parts, which is what {@link fromSession} produces.
  *
  * **Details**
  *
  * - The program is handed a {@link Producer}, which hands out one
  *   {@link ProduceSession} per session it runs. A session is declared when it is
- *   created, before any of the parts it produces, and every part enqueued is
- *   produced in the session that enqueued it, in the order the program enqueued
- *   it.
+ *   created, before any of the parts it produces, and every part enqueued is produced
+ *   in the session that enqueued it, in the order the program enqueued it.
  * - The producers the metric kit was provided with are run over the parts as they
- *   are produced, exactly as {@link Metric.produce} runs them, and the metric
- *   parts they derive are produced among the parts they are about. The parts are
- *   read once — the trajectory and the producers each read a branch of one
- *   broadcast — so a program that drives a model is not run twice.
- * - A part is produced where it is enqueued rather than when the program ends, so
- *   a trajectory is read while the program that writes it runs. The trajectory ends
+ *   are produced, exactly as {@link Metric.produce} runs them, and the metric parts
+ *   they derive are produced among the parts they are about. The parts are read once,
+ *   so a program that drives a model is not run twice.
+ * - A part is produced where it is enqueued rather than when the program ends, so a
+ *   trajectory is read while the program that writes it runs. The trajectory ends
  *   where the program does, and a program that fails fails the trajectory it left,
  *   since no more of it can arrive.
- * - Creating a session fails rather than trajectory one no reader can reach: an
- *   `id` a session has already declared would be declared after the parts of that
+ * - Creating a session fails rather than producing a trajectory no reader can reach:
+ *   an `id` a session has already declared would be declared after the parts of that
  *   session, and a `fork` naming a part the run has not written has nothing to
  *   continue from — see {@link Producer}.
  *
@@ -506,7 +489,7 @@ type ProduceFn<
  * ```
  *
  * @see {@link Producer} for what the program is handed.
- * @see {@link fromSession} for trajectory a stream that already holds the parts.
+ * @see {@link fromSession} for a stream that already holds the parts.
  * @see {@link Metric.produce} for what a kit derives of a kind of trajectory.
  * @category constructors
  */

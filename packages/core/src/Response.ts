@@ -260,7 +260,7 @@ export const isAnyToolCallPart = (u: unknown): u is RuntimeAnyToolCallPart =>
  *
  * **When to use**
  *
- * Use when trajectory a tool call for a tool that is not part of a toolkit.
+ * Use to produce a tool call for a tool that is not part of a toolkit.
  *
  * @category constructors
  */
@@ -375,15 +375,14 @@ type AnyToolResultParams = Omit<
  *
  * **When to use**
  *
- * Use when trajectory a tool result for a tool that is not part of a toolkit.
+ * Use to produce a tool result for a tool that is not part of a toolkit.
  *
  * **Details**
  *
  * What a result is encoded as is derived from the result, the way decoding a part
- * derives it: the two fields the decoded part holds beyond what a caller states
- * are filled in here, so that the part built is the part a trajectory reads back —
- * which is what `Trajectory.responsePart` refuses a part built without them to
- * be.
+ * derives it: the two fields the decoded part holds beyond what a caller states are
+ * filled in here, so the part built is the part a trajectory reads back — which is
+ * what `Trajectory.responsePart` refuses a part built without them to be.
  *
  * @see {@link AnyToolResultPart} for the schema the part is read by.
  * @category constructors

@@ -2,14 +2,10 @@
  * Events an extension produces of a trajectory, and the parts a trajectory holds
  * them as.
  *
- * An {@link Event} is one kind of event an extension names, with the schema of
- * its data at every version it was written at, {@link makeKit} collects events
- * into a kit and {@link mergeKit} adds the events of one kit to another, and
- * {@link encode} reads the events of a stream as the events a caller names.
- * {@link EventParts} reads the parts of the events a kit names: what a trajectory
- * holds of an event is the tag it was produced under and the data of it, so a part is
- * read as the event its tag names, and a part of an event the kit does not name is
- * read by no schema of the reading at all.
+ * An {@link Event} names one kind of event with the schema of its data at every
+ * version, {@link makeKit} and {@link mergeKit} collect events into kits,
+ * {@link EventParts} reads a trajectory's event parts under a kit, and
+ * {@link encode} reads a stream under events the caller names.
  */
 
 import { Data, Option, Predicate, Schema, Stream } from "effect";
@@ -19,11 +15,34 @@ import * as VersionedSchema from "#/VersionedSchema.ts";
 
 import type { IndexByKey } from "./internal/types.ts";
 
+/**
+ * Describes an event: an optional name and description.
+ *
+ * @see {@link Event} for the event it describes.
+ * @category models
+ */
 export class Metadata extends Schema.Class<Metadata>("Metadata")({
   name: Schema.optional(Schema.String),
   description: Schema.optional(Schema.String),
 }) {}
 
+/**
+ * One kind of event an extension names.
+ *
+ * **When to use**
+ *
+ * Use to declare an event an extension produces, or to type one.
+ *
+ * **Details**
+ *
+ * `package` and `id` name it — `tag` is `"pkg/id"` — and `schema` is its data at every
+ * version it was written at ({@link VersionedSchema.VersionedSchema}). Collect events
+ * into a kit with {@link makeKit}.
+ *
+ * @see {@link makeKit} for collecting events into a kit.
+ * @see {@link EventParts} for reading a trajectory's event parts.
+ * @category models
+ */
 export class Event<
   Pkg extends string,
   Id extends string,
@@ -39,14 +58,38 @@ export class Event<
   }
 }
 
+/** An event whose package, id and data versions are not known. */
 export type Any = Event<string, string, VersionedSchema.Any>;
 
 type EventsByTag<Es> = IndexByKey<Es, "tag">;
 
+/**
+ * A kit of events, keyed by the tag each names.
+ *
+ * @see {@link makeKit} for building one, {@link EventParts} for reading it.
+ * @category models
+ */
 export type Eventkit<Events extends Record<string, Any>> = Readonly<{
   events: Events;
 }>;
 
+/**
+ * Collects events into a kit, keyed by the tag each names.
+ *
+ * **When to use**
+ *
+ * Use to gather the events an extension produces into the kit a trajectory is read
+ * with.
+ *
+ * **Details**
+ *
+ * Each event is keyed by its own `tag`, so a kit names one event per tag. A kit names
+ * the events it was given and no others; {@link emptyKit} names none.
+ *
+ * @see {@link mergeKit} for adding the events of one kit to another's.
+ * @see {@link EventParts} for reading a trajectory's event parts under a kit.
+ * @category constructors
+ */
 export const makeKit = <Es extends ReadonlyArray<Any>>(...events: Es) => {
   // SAFETY: every event given is inserted under its own tag below, so what the record
   // holds is one event per tag the kit names.
@@ -61,6 +104,7 @@ export const makeKit = <Es extends ReadonlyArray<Any>>(...events: Es) => {
   return { events: output } as Eventkit<EventsByTag<Es>>;
 };
 
+/** A kit whose events are not known. */
 export type AnyKit = Eventkit<Record<string, Any>>;
 
 /** A kit that declares no event. */
@@ -70,19 +114,17 @@ export const emptyKit = makeKit();
 export type EmptyKit = typeof emptyKit;
 
 /**
- * The events of the kits given as one, a tag they share holding the event of the
- * kit latest among them.
+ * The events of the kits given as one, a shared tag holding the event of the latest
+ * kit that names it.
  *
  * **When to use**
  *
- * Use to name the events {@link mergeKit} returns, such as to type the kit a reader
- * that knows one trajectory's events reads another one under.
+ * Use to type the kit {@link mergeKit} returns.
  *
  * **Details**
  *
- * The events of every kit given are named, and where two of them name the same tag
- * the one of the kit latest among those given that names it is the one held, as
- * {@link makeKit} holds the events it is handed.
+ * Every kit's events are named; where two kits name the same tag, the event of the
+ * later kit wins.
  *
  * @see {@link mergeKit} for the kit those events make.
  * @category models
@@ -100,16 +142,13 @@ export type EventsMerged<Ks extends ReadonlyArray<AnyKit>> = Ks extends readonly
  * **When to use**
  *
  * Use when the events of several extensions are read together, or when a reader
- * that knows some of a trajectory's events should read it under the ones it knows
- * without forgetting the rest — which is what {@link encode} does with the kit of a
- * trajectory.
+ * that knows some of a trajectory's events reads it under the ones it knows without
+ * forgetting the rest.
  *
  * **Details**
  *
- * A tag the kits share holds the event of the kit latest among those given that
- * names it, so a kit of the version an extension states now states over the one a
- * trajectory was read with. The kit returned is a kit like any other: it names the
- * events of every kit given and no others.
+ * A shared tag holds the event of the latest kit that names it, so a kit of a
+ * version an extension states now states over the one a trajectory was read with.
  *
  * **Example** (Adding the events of one kit to another's)
  *
@@ -161,8 +200,24 @@ export const mergeKit = <Ks extends ReadonlyArray<AnyKit>>(
   return { events } as Eventkit<EventsMerged<Ks>>;
 };
 
+/** An event part: its data under the tag it was produced with. */
 export type EventPart<Tag extends string, Data> = Readonly<{ _tag: Tag; data: Data }>;
 
+/**
+ * Builds the part schema of one event: its data, under `tag`.
+ *
+ * **When to use**
+ *
+ * Use to build a part schema for a single tag; {@link EventParts} builds the union
+ * over every event of a kit.
+ *
+ * **Details**
+ *
+ * The part read is a tagged struct whose `data` is the schema given.
+ *
+ * @see {@link EventParts} for the parts of a whole kit.
+ * @category schemas
+ */
 export const EventPart = <Tag extends string, S extends Schema.Top>(
   tag: Tag,
   schema: S,
@@ -190,10 +245,10 @@ type EventPartOf<Ext> = Ext extends Any
  *
  * **Details**
  *
- * A part is the tag it was produced under and the data of the event at that tag. The
- * tag alone says which event the data is of, since the data carries nothing that says
- * so itself, so a part is read as the event of the reading kit that names its tag and
- * as no other: an event the kit does not name is one the reading holds no schema of.
+ * A part is the tag it was produced under and the data at that tag. Since the data
+ * does not say which event it is of, a part reads as the event of the reading kit
+ * that names its tag and no other: an event the kit does not name is one the reading
+ * holds no schema of.
  *
  * @see {@link EventParts} for the schema that reads one.
  * @category models
@@ -206,18 +261,15 @@ export type EventParts<Events extends Record<string, Any>> = EventPartOf<Events[
  * **When to use**
  *
  * Use to read or write the event parts of a trajectory under the kit that says what
- * they are — the kit a run produces its events with, or one that names the same events.
+ * they are.
  *
  * **Details**
  *
- * - Every event of the kit is a member of the union, read under its own tag by the data
- *   of that event at the version the part was written at, in the order the kit holds
- *   the events.
- * - A part of any other event reads as no member, since what a tag means is the schema
- *   of the event that names it: reading a trajectory as far as the kits in hand state
- *   it is what leaves the rest to a reading that holds them.
- * - A kit that names no event reads no part, so a trajectory read with no event kit
- *   holds no event of it.
+ * - Every event of the kit is a member of the union, read under its own tag by the
+ *   event's data at the version the part was written at.
+ * - A part of any other event reads as no member: a tag means the schema of the
+ *   event that names it, so a reading covers only the events of the kits in hand.
+ * - A kit that names no event reads no part.
  *
  * **Example** (Reading the event parts a kit names)
  *
@@ -269,22 +321,20 @@ export const EventParts = <K extends AnyKit>(
 };
 
 /**
- * The config of a trajectory whose events are the ones given: the config read,
- * with the events given added to the kit it names.
+ * The config of a trajectory whose events are the ones given: the config read, with
+ * the events given added to the kit it names.
  *
  * **When to use**
  *
- * Use to name what {@link encode} returns, such as to type a function that reads
- * a trajectory under the events a caller names.
+ * Use to type what {@link encode} returns.
  *
  * **Details**
  *
- * An event kit is what says which events a trajectory may name and how their data
- * is read, so a kit that names the events given is what makes them readable. The
- * events the config given named are kept beside them, as {@link mergeKit} keeps
- * them, and an event given for a tag the kit named states over the one it was read
- * with. What else a trajectory is read with — whether its responses are streamed,
- * its toolkit, its metric kit and its extra kit — is carried over as it was.
+ * The events the config named are kept beside the events given, as {@link mergeKit}
+ * keeps them, and an event given for a tag the config named states over the one it
+ * was read with. What else the trajectory is read with — whether its responses are
+ * streamed, its toolkit, its metric kit and its extra kit — is carried over as it
+ * was.
  *
  * @see {@link encode} for the function that reads a stream as one.
  * @category models
@@ -310,15 +360,13 @@ type EventsWith<Config extends Trajectory.AnyConfig, Es extends ReadonlyArray<An
  *
  * **When to use**
  *
- * Use to name what {@link encode} returns, such as to pass it on as the reader of
- * a stream, or to type one of the caller's own.
+ * Use to pass a reader on, or to type one of the caller's own.
  *
  * **Details**
  *
- * A trajectory is read as a trajectory, so the kit and the variant it carries
- * travel with the parts it returns — with the events given added to the kit, where
- * {@link WithEvents} says — and any other stream of parts is read as a stream of
- * them.
+ * A trajectory is read as a trajectory, so its kit and variant travel with the
+ * returned parts — with the events given added to the kit, as {@link WithEvents}
+ * says — while any other stream of parts is read as a stream of parts.
  *
  * @see {@link encode} for the function that returns one.
  * @category models
@@ -338,23 +386,20 @@ export type Reader<Es extends ReadonlyArray<Any>> = {
  *
  * **When to use**
  *
- * Use when a stream holds an event at a version before the one in hand — a trajectory
- * an extension wrote before a version it states now — and a reader of it should have
- * that event typed and at the newest version.
+ * Use when a stream holds an event at a version before the one in hand and a reader of
+ * it should have that event typed at the newest version.
  *
  * **Details**
  *
- * - An event part is read from the pair a trajectory holds — the tag it is at and the
- *   data stated at that tag — so the tag alone decides how it reads, and data of any
- *   version of an event reads as the newest one that event states.
- * - A part at a tag none of the events given names, and a part whose data the event
- *   given does not state — one a newer version wrote, or another extension — is
- *   carried over as the trajectory holds it, rather than failing the stream: reading
- *   a trajectory does not depend on the schemas it is read with.
- * - The trajectory returned names the events given in addition to the ones it named
- *   already, so reading a trajectory does not forget what it was read with. An event
- *   given for a tag the trajectory named — the same event at a newer version, say —
- *   states over the one it was read with.
+ * - An event part is read from the tag it is at and the data stated there, so the
+ *   tag alone decides how it reads, and data at any version reads as the newest
+ *   version the event states.
+ * - A part at a tag none of the events names, or whose data the event does not
+ *   state — one a newer version wrote, or another extension — is carried over as the
+ *   trajectory holds it rather than failing the stream: reading a trajectory does not
+ *   depend on the schemas it is read with.
+ * - The returned trajectory names the events given in addition to the ones it named
+ *   already; an event given for a tag it named states over the one it was read with.
  * - The function is curried: given the events it returns the function that reads a
  *   stream with them.
  *

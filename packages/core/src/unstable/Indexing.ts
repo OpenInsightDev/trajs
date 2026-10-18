@@ -55,30 +55,26 @@ type Props<
  *
  * **When to use**
  *
- * Use to state an index of your own — one an extension contributes, say — or to
- * type one a function takes.
+ * Use to state an index of your own or to type one a function takes.
  *
  * **Details**
  *
- * - `package` and `id` name the index — `tag` is the two together, `"pkg/id"` —
- *   so an index is named within the package that states it rather than
- *   globally, and two packages may state indexes of the same id.
- * - `schema` states what the index holds, and `sink` is what holds it: one
- *   reading of a trajectory's parts to their end, so nothing of a part is held
- *   before the whole trajectory is. It is a plain schema rather than a
+ * - `package` and `id` name the index — `tag` is `"pkg/id"` — so an index is named
+ *   within the package that states it, and two packages may state indexes of the same
+ *   id.
+ * - `schema` states what the index holds and `sink` is what holds it: one reading of a
+ *   trajectory's parts to their end, so nothing of a part is held before the whole
+ *   trajectory is. It is a plain schema rather than a
  *   {@link VersionedSchema.VersionedSchema}, since an index is derived from a
  *   trajectory rather than produced.
- * - `config` is what the parts of a trajectory are read with, so an index is of a
- *   reading of a trajectory rather than of a trajectory: an index of
- *   {@link Trajectory.anyConfig} reads the parts of any trajectory, whichever kits
- *   it was written with, and an index of a config of your own reads what that
- *   config states of a part alone.
- * - `dependencies` names the services the sink requires to be run, so what a
- *   program must provide to read a trajectory is stated by the index rather than
- *   read off the sink's type: yielding the index requires them.
+ * - `config` is what the parts are read with, so an index is of a reading rather than of
+ *   a trajectory: an index of {@link Trajectory.anyConfig} reads any trajectory's parts,
+ *   whichever kits it was written with.
+ * - `dependencies` names the services the sink requires, so what a program must provide
+ *   to read a trajectory is stated by the index rather than read off the sink's type.
  *
- * An index is itself an effect: `yield*` gives the sink the index holds and
- * requires the dependencies it declares, which the sink is then run with.
+ * An index is itself an effect: `yield*` gives the sink it holds and requires the
+ * dependencies it declares.
  *
  * **Example** (Reading a trajectory into the ids of its sessions)
  *

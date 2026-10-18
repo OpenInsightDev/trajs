@@ -193,6 +193,23 @@ export const upgrade =
     >(self, [self, step]);
   };
 
+/**
+ * Reads the versions of two shapes as the versions of one union.
+ *
+ * **When to use**
+ *
+ * Use to combine the versions of two shapes into one schema that reads a datum of
+ * either.
+ *
+ * **Details**
+ *
+ * The members of `a` come before the members of `b`, so a datum both could read reads
+ * as a member of `a`. The result is a plain schema union, without the `self` a
+ * {@link VersionedSchema} carries.
+ *
+ * @see {@link VersionedSchema} for a shape stated one version at a time.
+ * @category combinators
+ */
 export const across = <
   AMembers extends ReadonlyArray<Schema.Top>,
   BMembers extends ReadonlyArray<Schema.Top>,
@@ -432,6 +449,8 @@ export const upgradeTags =
   (previous: TaggedUnion<Table>): TaggedUnion<TaggedTable<Next>> =>
     TaggedUnion(mapping(previous.table));
 
+/** A version as a versioned shape states it: a string literal. */
 export type AnyVersion = Schema.Literal<string>;
 
+/** A versioned shape as it is read before its versions are known: a struct stating a `version`. */
 export type AnyVersioned = Schema.Struct<{ readonly version: AnyVersion }>;
