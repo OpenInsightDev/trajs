@@ -225,7 +225,8 @@ export const contextManagement = (
  *
  * Use as the events of the kit a trajectory is written or read with — the
  * `eventkit` of the run that produces it — so that the events this package produces
- * are read back by it rather than as the JSON they were produced as.
+ * are read back with their own schemas: a reading that names no event reads no event
+ * part at all.
  *
  * **Details**
  *

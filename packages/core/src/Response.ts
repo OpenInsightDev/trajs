@@ -40,8 +40,7 @@ export * from "effect/ai/Response";
 
 // HACK: `effect/ai/Response` does not export its `PartTypeId`, so it is copied
 // verbatim; if it drifts, the parts decoded below stop satisfying the
-// `ToolCallPart` / `ToolResultPart` types they are declared as, which
-// `tests/response.test.ts` pins.
+// `ToolCallPart` / `ToolResultPart` types they are declared as.
 const PartTypeId = "~effect/ai/Response/Part" as const;
 
 const AnyToolCallPartTypeId = "~effect/ai/Content/AnyToolCallPart" as const;

@@ -155,10 +155,14 @@ export type EncodingServices<C extends Trajectory.AnyConfig> = Schema.Union<
  *   was made with is known without reading the frame its parts are carried in.
  * - `metadata` reads what a trajectory states at its end off its tail, without
  *   reading that frame either ({@link Metadata}).
- * - `read()` reads the whole trajectory as the trajectory its parts make, read as
- *   the most general one: any trajectory may be of any kind, so its response parts
- *   are read as the streams they arrived in, and its parts are read with no kit at
- *   all — see {@link Part} for what that means for the parts of either kind.
+ * - `read(config)` reads the whole trajectory as the trajectory its parts make, with
+ *   the kits the config names: what a part is read as is what those kits state of the
+ *   tag it carries, and a part none of them reads is stepped over rather than ending
+ *   the reading — an event part of an event the config names none of, or a metric part
+ *   of a metric it names none of, say — since a trajectory is read as far as the kits
+ *   in hand state it ({@link Part}). The extra data of a part is held the same way: a
+ *   kind the config names none of there is not data the part is read as holding. Reading
+ *   with no config names no kit at all.
  *
  * What a load reads is the head of a trajectory alone, so a program that asks what
  * a trajectory states of itself reads neither its parts nor its tail, and what reads
@@ -190,14 +194,13 @@ export interface Loaded {
   readonly metadata: Effect.Effect<Metadata, TrajectoryError | StorageError>;
 
   /**
-   * The trajectory the trajectory holds, and the parts it is made of as the bytes
-   * they are read from.
+   * The trajectory the trajectory holds, read as the config given states it — with no
+   * config, as the trajectory the most general reading makes — and the parts it is made
+   * of as the bytes they are read from.
    */
-  readonly read: () => Trajectory.Trajectory<
-    Trajectory.AnyConfig,
-    TrajectoryError | StorageError,
-    never
-  >;
+  readonly read: <C extends Trajectory.AnyConfig = Trajectory.AnyConfig>(
+    config?: C,
+  ) => Trajectory.Trajectory<C, TrajectoryError | StorageError, never>;
 }
 
 /**

@@ -400,7 +400,7 @@ export type ProduceSession<
     timestamp?: DateTime.Utc,
   ) => Effect.Effect<Trajectory.ResponsePart<Toolkit.Toolkit<Tools>, Extra.Extrakit<Extras>, true>>;
   enqueueEvent: (
-    event: Event.EventPartsView<Events>,
+    event: Event.EventParts<Events>,
   ) => Effect.Effect<Trajectory.EventPart<Event.Eventkit<Events>>>;
 }>;
 
@@ -583,13 +583,7 @@ export const produce =
 
             declared.add(id);
 
-            // What a session is declared with beyond `id` and `fork` is the extra
-            // data the kit declares of a session part: the two name the session
-            // rather than hold data of it, and what remains is exactly that record.
-            // SAFETY: destructuring retains the kit's tags beside the record's index
-            // signature, so the rest is the extra data of a session part; TypeScript
-            // leaves the rest of an intersection unevaluated and does not see it.
-            const extraData = extra as Extra.ExtraRecord<Extrakit["extra"], "session">;
+            const extraData = Extra.stated(extrakit, "session")(extra);
 
             yield* enqueue(sessionPart({ id, fork, extra: extraData }));
 

@@ -4,14 +4,15 @@
  *
  * An {@link Event} is one kind of event an extension names, with the schema of
  * its data at every version it was written at, {@link makeKit} collects events
- * into a kit and {@link mergeKit} adds the events of one kit to another,
- * {@link EventParts} reads the parts of the events a kit names.
- * {@link EventPartsView} reads those parts while tolerating events the kit does
- * not name, so a trajectory another kit wrote still reads, and {@link encode}
- * reads the events of a stream as the events a caller names.
+ * into a kit and {@link mergeKit} adds the events of one kit to another, and
+ * {@link encode} reads the events of a stream as the events a caller names.
+ * {@link EventParts} reads the parts of the events a kit names: what a trajectory
+ * holds of an event is the tag it was produced under and the data of it, so a part is
+ * read as the event its tag names, and a part of an event the kit does not name is
+ * read by no schema of the reading at all.
  */
 
-import { Data, Effect, Option, Predicate, Schema, Stream } from "effect";
+import { Data, Option, Predicate, Schema, Stream } from "effect";
 
 import type * as Trajectory from "#/Trajectory.ts";
 import * as VersionedSchema from "#/VersionedSchema.ts";
@@ -167,152 +168,58 @@ export const EventPart = <Tag extends string, S extends Schema.Top>(
   schema: S,
 ): Schema.TaggedStruct<Tag, { readonly data: S }> => Schema.TaggedStruct(tag, { data: schema });
 
-export type EventPartEncoded = Readonly<{ _tag: string; data: unknown }>;
+/** The part schema of one event: its data, under the tag that event names. */
+type EventPartSchema<Ext> = Ext extends Any
+  ? Schema.TaggedStruct<Ext["tag"], { readonly data: Ext["schema"] }>
+  : never;
 
-const AnyEventPartTypeId = "~trajs/Event/AnyEventPart" as const;
+/** The part schemas the events of the events given state, as one. */
+type EventPartSchemas<Events extends Record<string, Any>> = EventPartSchema<Events[keyof Events]>;
+
+/** The part one event is held as: its data, under the tag that event names. */
+type EventPartOf<Ext> = Ext extends Any
+  ? EventPart<Ext["tag"], Schema.Schema.Type<Ext["schema"]>>
+  : never;
 
 /**
- * An event part whose tag and data are not restricted by a kit.
+ * What a trajectory holds of the events of a kit.
  *
  * **When to use**
  *
- * Use to type an event part of an event the reading kit does not name, as
- * {@link EventPartsView} reads one.
+ * Use to type an event part, such as one a run enqueues or one a trajectory holds.
  *
  * **Details**
  *
- * A part read as this carries the `~trajs/Event/AnyEventPart` marker, so
- * {@link isAnyEventPart} tells it from a part the kit read by the schema of the
- * event it names.
+ * A part is the tag it was produced under and the data of the event at that tag. The
+ * tag alone says which event the data is of, since the data carries nothing that says
+ * so itself, so a part is read as the event of the reading kit that names its tag and
+ * as no other: an event the kit does not name is one the reading holds no schema of.
  *
- * @see {@link EventPart} for a part of an event a kit names.
+ * @see {@link EventParts} for the schema that reads one.
  * @category models
  */
-export type AnyEventPart = EventPart<string, unknown>;
-
-type RuntimeAnyEventPart = AnyEventPart & {
-  readonly [AnyEventPartTypeId]: typeof AnyEventPartTypeId;
-};
+export type EventParts<Events extends Record<string, Any>> = EventPartOf<Events[keyof Events]>;
 
 /**
- * Type guard to check whether an event part is one an event's own schema did not
- * read.
+ * The parts a trajectory holds of the events of a kit, as one schema.
  *
  * **When to use**
  *
- * Use to tell a part {@link EventPartsView} fell back to {@link AnyEventPart} for
- * from a part it read as the event of the kit that names it.
- *
- * @see {@link AnyEventPart} for the part it checks for.
- * @category guards
- */
-export const isAnyEventPart = (u: unknown): u is RuntimeAnyEventPart =>
-  Predicate.hasProperty(u, AnyEventPartTypeId);
-
-/**
- * Schema for an event part whose tag and data are not restricted by a kit.
- *
- * **When to use**
- *
- * Use to decode or encode an event part of an event the reading kit does not
- * name.
+ * Use to read or write the event parts of a trajectory under the kit that says what
+ * they are — the kit a run produces its events with, or one that names the same events.
  *
  * **Details**
  *
- * - The marker is stated on a part when it is read and omitted when it is
- *   written, so a trajectory written again holds what it did.
- * - The tag must be a string and the data must be present: nothing else of a
- *   part of an event a kit does not name is known.
+ * - Every event of the kit is a member of the union, read under its own tag by the data
+ *   of that event at the version the part was written at, in the order the kit holds
+ *   the events.
+ * - A part of any other event reads as no member, since what a tag means is the schema
+ *   of the event that names it: reading a trajectory as far as the kits in hand state
+ *   it is what leaves the rest to a reading that holds them.
+ * - A kit that names no event reads no part, so a trajectory read with no event kit
+ *   holds no event of it.
  *
- * @see {@link EventPart} for the schema of a part of an event a kit names.
- * @category schemas
- */
-export const AnyEventPart: Schema.Codec<AnyEventPart, EventPartEncoded> = Schema.Struct({
-  [AnyEventPartTypeId]: Schema.Literal(AnyEventPartTypeId).pipe(
-    Schema.withDecodingDefaultKey(Effect.succeed(AnyEventPartTypeId), { encodingStrategy: "omit" }),
-  ),
-  _tag: Schema.String,
-  data: Schema.Unknown,
-}).annotate({ identifier: "AnyEventPart" });
-
-/** The part schema each event of a kit states, read as one. */
-type EventPartSchemas<Events extends Record<string, Any>> = {
-  readonly [Tag in keyof Events]: Schema.TaggedStruct<
-    Tag & string,
-    { readonly data: Events[Tag]["schema"] }
-  >;
-}[keyof Events];
-
-export type EventParts<Events extends Record<string, Any>> = {
-  readonly [Tag in keyof Events]: EventPart<
-    Tag & string,
-    Schema.Schema.Type<Events[Tag]["schema"]>
-  >;
-}[keyof Events];
-
-export const EventParts = <K extends AnyKit>(
-  kit: K,
-): Schema.Union<ReadonlyArray<EventPartSchemas<K["events"]>>> => {
-  const parts: Array<Schema.Top> = [];
-
-  for (const event of Object.values(kit.events)) {
-    parts.push(EventPart(event.tag, event.schema));
-  }
-
-  // SAFETY: every member is the part of one event of the kit, which is what
-  // `EventPartSchemas` reads the events of a kit as.
-  return Schema.Union(parts) as any;
-};
-
-/**
- * Union type for event parts that also accepts events the kit does not name.
- *
- * **When to use**
- *
- * Use to type an event part read from a trajectory that may mention events the
- * reading kit does not name.
- *
- * **Details**
- *
- * Every event part is one {@link AnyEventPart} also carries, so a value of this
- * says only that an event was produced, not which event of the kit it was:
- * {@link EventParts} is what types the parts of the events a kit names.
- *
- * @see {@link EventParts} for parts restricted to the events of the kit.
- * @category models
- */
-export type EventPartsView<Events extends Record<string, Any>> = EventParts<Events> | AnyEventPart;
-
-/**
- * The codec {@link EventPartsView} builds, named so that the codec states
- * {@link EventPartsView} as the type it reads: the union it is built from names the kit
- * of every member, so its own type reads as that kit's schema rather than as the parts
- * of an event, and the parts of one kit would not then read as the parts of another.
- */
-type EventPartsViewSchema<Events extends Record<string, Any>> = Schema.Union<
-  ReadonlyArray<EventPartSchemas<Events> | typeof AnyEventPart>
->;
-
-/**
- * Creates a Schema for the parts of the events a kit names, including events the
- * kit does not name.
- *
- * **When to use**
- *
- * Use when decoding or encoding the event parts a trajectory holds that may mention events the
- * reading kit does not name.
- *
- * **Details**
- *
- * - Every event of the kit is read by its own schema, as {@link EventParts} reads
- *   it, in the order the kit holds the events.
- * - A part naming an event of the kit whose data no longer matches a version of
- *   that event's schema falls back to {@link AnyEventPart}, because reading a
- *   trajectory does not depend on the schemas it is read with.
- * - A part read as {@link AnyEventPart} is written back as it was read, so
- *   re-writing a trajectory a kit wrote does not change it.
- *
- * **Example** (Reading events the kit named and one it did not)
+ * **Example** (Reading the event parts a kit names)
  *
  * ```ts import.meta.vitest
  * import { Schema } from "effect"
@@ -328,45 +235,36 @@ type EventPartsViewSchema<Events extends Record<string, Any>> = Schema.Union<
  *   }).pipe(VersionedSchema.make)
  * })
  *
- * const parts = Event.EventPartsView(Event.makeKit(step))
+ * const parts = Event.EventParts(Event.makeKit(step))
  *
- * const named = Schema.decodeUnknownSync(parts)({
+ * const read = Schema.decodeUnknownSync(parts)({
  *   _tag: "atif/step",
  *   data: { version: "0.1.0", index: 1 }
  * })
  *
- * Event.isAnyEventPart(named) // => false
+ * read.data // => { version: "0.1.0", index: 1 }
  *
- * const unnamed = Schema.decodeUnknownSync(parts)({
+ * // An event the kit does not name is not a part it reads.
+ * Schema.is(parts)({
  *   _tag: "tokenize/count",
  *   data: { version: "0.1.0", tokens: 3 }
- * })
- *
- * Event.isAnyEventPart(unnamed) // => true
+ * }) // => false
  * ```
  *
- * @see {@link EventParts} for a Schema restricted to the events of the kit.
- * @see {@link AnyEventPart} for the part an unnamed event is read as.
+ * @see {@link EventParts} for what a part is.
  * @category schemas
  */
-export const EventPartsView = <K extends AnyKit>(
+export const EventParts = <K extends AnyKit>(
   kit: K,
-): Schema.Codec<
-  EventPartsView<K["events"]>,
-  EventPartsViewSchema<K["events"]>["Encoded"],
-  EventPartsViewSchema<K["events"]>["DecodingServices"],
-  EventPartsViewSchema<K["events"]>["EncodingServices"]
-> => {
+): Schema.Union<ReadonlyArray<EventPartSchemas<K["events"]>>> => {
   const parts: Array<Schema.Top> = [];
 
   for (const event of Object.values(kit.events)) {
     parts.push(EventPart(event.tag, event.schema));
   }
 
-  parts.push(AnyEventPart);
-
-  // SAFETY: every member is the part of one event of the kit or the part of an
-  // event the kit does not name, which is what the return type reads it as.
+  // SAFETY: every member is the part of one event of the kit, which is what
+  // `EventPartSchemas` reads the events of a kit as.
   return Schema.Union(parts) as any;
 };
 
@@ -440,21 +338,19 @@ export type Reader<Es extends ReadonlyArray<Any>> = {
  *
  * **When to use**
  *
- * Use when a stream holds events the kit it was read with does not name, or names
- * at a version before the one in hand, and a reader of those events should have
- * them typed and at the newest version: reading a trajectory an extension wrote
- * before a version it states now, or one another kit wrote.
+ * Use when a stream holds an event at a version before the one in hand — a trajectory
+ * an extension wrote before a version it states now — and a reader of it should have
+ * that event typed and at the newest version.
  *
  * **Details**
  *
- * - An event part is read from the pair it was produced as rather than from what
- *   the kit that read the stream made of it, so the tag a part is at alone decides
- *   how it reads, and data of any version of an event reads as the newest one that
- *   event states.
+ * - An event part is read from the pair a trajectory holds — the tag it is at and the
+ *   data stated at that tag — so the tag alone decides how it reads, and data of any
+ *   version of an event reads as the newest one that event states.
  * - A part at a tag none of the events given names, and a part whose data the event
  *   given does not state — one a newer version wrote, or another extension — is
- *   carried over as the pair it was produced as, rather than failing the stream:
- *   reading a trajectory does not depend on the schemas it is read with.
+ *   carried over as the trajectory holds it, rather than failing the stream: reading
+ *   a trajectory does not depend on the schemas it is read with.
  * - The trajectory returned names the events given in addition to the ones it named
  *   already, so reading a trajectory does not forget what it was read with. An event
  *   given for a tag the trajectory named — the same event at a newer version, say —
@@ -468,15 +364,26 @@ export type Reader<Es extends ReadonlyArray<Any>> = {
  * import { Effect, Schema, SchemaGetter, Stream } from "effect"
  * import { Event, Trajectory, VersionedSchema } from "@trajs/core"
  *
+ * const first = Schema.Struct({
+ *   version: Schema.Literal("0.1.0"),
+ *   index: Schema.Number
+ * }).pipe(VersionedSchema.make)
+ *
+ * // The event as the trajectory was written with it: the version before alone.
+ * const before = new Event.Event({
+ *   package: "atif",
+ *   id: "step",
+ *   metadata: new Event.Metadata({ name: "Step" }),
+ *   schema: first
+ * })
+ *
+ * // The event as the extension states it now: the version next, and how the version
+ * // before reads as that one.
  * const step = new Event.Event({
  *   package: "atif",
  *   id: "step",
  *   metadata: new Event.Metadata({ name: "Step" }),
- *   schema: Schema.Struct({
- *     version: Schema.Literal("0.1.0"),
- *     index: Schema.Number
- *   }).pipe(
- *     VersionedSchema.make,
+ *   schema: first.pipe(
  *     VersionedSchema.upgrade(
  *       (fields) => ({
  *         ...fields,
@@ -488,10 +395,10 @@ export type Reader<Es extends ReadonlyArray<Any>> = {
  *   )
  * })
  *
- * // A part as a kit that names no events reads it: what was produced rather than
- * // data of the event's own type.
- * const produced = Stream.make(
- *   Schema.decodeSync(Trajectory.EventPart(Event.makeKit()))({
+ * // What the trajectory holds: the part read by the kit it was written with, so the
+ * // data is at the version the trajectory states rather than at the one in hand.
+ * const written = Stream.make(
+ *   Schema.decodeSync(Trajectory.EventPart(Event.makeKit(before)))({
  *     _tag: "Event",
  *     event: { _tag: "atif/step", data: { version: "0.1.0", index: 1 } },
  *     timestamp: "2024-01-01T00:00:00.000Z",
@@ -500,7 +407,7 @@ export type Reader<Es extends ReadonlyArray<Any>> = {
  *   })
  * )
  *
- * const parts = await Effect.runPromise(Stream.runCollect(Event.encode(step)(produced)))
+ * const parts = await Effect.runPromise(Stream.runCollect(Event.encode(step)(written)))
  * const [part] = Array.from(parts)
  *
  * part._tag // => "Event"
@@ -508,19 +415,21 @@ export type Reader<Es extends ReadonlyArray<Any>> = {
  * ```
  *
  * @see {@link makeKit} — the kit the events given are collected into.
- * @see {@link EventPartsView} — the codec the events are read with.
+ * @see {@link EventParts} — the codec the events are read with.
  * @category combinators
  */
 export function encode<const Es extends ReadonlyArray<Any>>(...events: Es): Reader<Es> {
   const eventkit = makeKit(...events);
 
-  // SAFETY: a kit names the part of each of its events, so the parts of a kit read
-  // an event part of any tag — as the event the kit names for that tag, or as the
-  // pair produced where it names none or the event states other data — and neither
-  // reading nor writing a part takes a service.
-  const readAs: Schema.Codec<AnyEventPart, AnyEventPart, never, never> = EventPartsView(
-    eventkit,
-  ) as any;
+  // SAFETY: the kit the events given make names the part of each of them, so it reads
+  // an event part of any tag — as the event that kit names for that tag, and as nothing
+  // where it names none — and neither reading nor writing one takes a service.
+  const readAs: Schema.Codec<
+    EventPart<string, unknown>,
+    EventPart<string, unknown>,
+    never,
+    never
+  > = EventParts(eventkit) as any;
 
   // SAFETY: the overloads of `Reader` say which of the two a caller gets, while
   // the implementation reads either of them the same way: TypeScript relates those
@@ -536,12 +445,14 @@ export function encode<const Es extends ReadonlyArray<Any>>(...events: Es): Read
           return part;
         }
 
-        // SAFETY: an event part is the pair a kit reads, whether the kit that read
-        // the stream typed the event it names or left it as it was produced.
-        const read = Schema.decodeOption(readAs)(part.event as AnyEventPart);
+        // SAFETY: an event part is the pair the kit that read the stream made of it —
+        // the tag of an event and the data stated at it — which is what the union of
+        // the events given reads.
+        const read = Schema.decodeOption(readAs)(part.event);
 
         // SAFETY: the kit these events make names the events read here, so a part
-        // read as one of them is a part of the trajectory that kit names.
+        // read as one of them is a part of the trajectory that kit names; a part none
+        // of them reads is carried over as it is.
         return (Option.isSome(read) ? { ...part, event: read.value } : part) as Trajectory.Part<
           WithEvents<Config, Es>
         >;

@@ -518,10 +518,9 @@ export const responsePart =
  *
  * **Details**
  *
- * - `event` is the event of the kit the part names, read as
- *   {@link Event.EventPartsView} reads one: by the schema of the event at the version
- *   the part was written at, or as the pair it was produced as where the kit names
- *   no such event or the data no longer states that version.
+ * - `event` is the event of the kit the part names, read as {@link Event.EventParts}
+ *   reads one: by the schema of that event at the version the part was written at, so
+ *   a part naming an event the kit does not name is not a part this reads at all.
  * - `timestamp` is when the event was produced, which `.make` supplies as the time
  *   the part is built, and `sessionId` and `uuid` say where it was produced and
  *   which part it is.
@@ -530,13 +529,13 @@ export const responsePart =
  * extension declares of a part is an {@link Extra} — see {@link Extra.Part} for the
  * parts one is declared of.
  *
- * @see {@link Event.EventPartsView} for the events a part is read as.
+ * @see {@link Event.EventParts} for the events a part is read as.
  * @see {@link Extra.Part} for the parts extra data is declared of.
  * @category schemas
  */
 export const EventPart = <K extends Event.AnyKit>(kit: K) =>
   Schema.TaggedStruct("Event", {
-    event: Event.EventPartsView(kit),
+    event: Event.EventParts(kit),
     timestamp: Timestamp,
     sessionId: Schema.String,
     uuid: Uuid,
@@ -572,19 +571,19 @@ export type EventPartEncoded = Schema.Codec.Encoded<ReturnType<typeof EventPart<
  * **Details**
  *
  * - `metric` is the report of one metric of the kit, keyed by the tag of that metric
- *   and read as {@link Metric.MetricPartsView} reads one: the output a producer
+ *   and read as {@link Metric.MetricParts} reads one: the output a producer
  *   yielded of what it read, or the failure it reported of it.
  * - `timestamp` is when the metric was derived, where the part states it at all.
  *
  * A metric part holds no extra data, as an event part does not.
  *
- * @see {@link Metric.MetricPartsView} for what a part is read as.
+ * @see {@link Metric.MetricParts} for what a part is read as.
  * @see {@link Metric.produce} for deriving the parts of a kit from a trajectory.
  * @category schemas
  */
 export const MetricPart = <K extends Metric.AnyKit>(kit: K) =>
   Schema.TaggedStruct("Metric", {
-    metric: Metric.MetricPartsView(kit),
+    metric: Metric.MetricParts(kit),
     timestamp: Schema.optional(Schema.DateTimeUtcFromString),
   });
 
@@ -709,19 +708,23 @@ export type UnknownConfig = Config<
  *
  * **When to use**
  *
- * Use to read a trajectory that was written with kits a program does not hold —
- * what `Exchange.Service.load` reads one with — or to name the reading of a
- * trajectory that states no kit of its own.
+ * Use to read a trajectory as the part it is rather than as what its kits state — what a
+ * reader that holds none of them reads one with, such as one that shows the shape of a
+ * trajectory rather than what it is worth — or to name the reading of a trajectory that
+ * states no kit of its own.
  *
  * **Details**
  *
- * Every kit of it is empty and its response parts are read as streams, so every
- * part of a trajectory is read as the part it was produced as: a response part
- * whose tool the toolkit does not hold reads as the part it is rather than not at
- * all, and the extra data of a part as the kit that declared it wrote it. What a
- * trajectory was written with is what its header names, which is names alone —
- * {@link AnyConfig} holds anything, so what a trajectory holds is read without the
- * schemas it was written with.
+ * Every kit of it is empty and its response parts are read as streams, so a part is read
+ * as far as a reading of no kit reads the bytes it holds. The parts a model returned are
+ * stated apart from the tools they called, so a response part reads whether or not the
+ * toolkit holds the tool it names; a metric or event part of a kind the reading names
+ * none of is not a part it reads, and the extra data of a part is stated by the kit that
+ * declares it rather than apart from it, so a reading that names none holds none of
+ * either — what reads a trajectory for what a kit makes of it is a config that names
+ * that kit. What a trajectory was written with is what
+ * its header names, which is names alone — {@link AnyConfig} holds anything, so what a
+ * trajectory holds is read without the schemas it was written with.
  *
  * A trajectory is read as a streaming trajectory whatever it was written as, since
  * the increments of a streamed response and the whole parts those increments

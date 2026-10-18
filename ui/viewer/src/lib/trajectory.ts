@@ -9,9 +9,11 @@
  * session it continues from read as the turns that session had reached by then.
  *
  * A trajectory is read with no tools, no events, no metrics and no extra data: its
- * header names the kits it was written with, and a part is read as itself whatever
- * kit it was written with, so the parts a viewer shows do not take the kits to
- * know.
+ * header names the kits it was written with, and what a kit states of a part is read by
+ * a reading that names that kit alone, so a metric or event part of a kind the header
+ * names without stating is stepped over, and the extra data of a part is held as far as
+ * the reading names the kinds of it. What a viewer shows of a trajectory is therefore
+ * the parts that are its own rather than those a kit made of it.
  */
 
 import { Session, Trajectory, View } from "@trajs/core";

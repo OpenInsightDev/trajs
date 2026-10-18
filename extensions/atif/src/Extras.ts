@@ -240,8 +240,8 @@ export type StepFields = Schema.Schema.Type<typeof StepFields>;
  *
  * Use as the extra data of the kit a trajectory is written or read with — the
  * `extrakit` of the run that produces it — so that the fields ATIF states of a document
- * are read back with their types rather than as the JSON they were produced as, and a
- * run read by this package states those fields again where it is written as ATIF.
+ * are read back with their types, and a run read by this package states those fields
+ * again where it is written as ATIF.
  *
  * **Details**
  *

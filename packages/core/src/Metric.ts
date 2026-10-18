@@ -7,9 +7,10 @@
  * {@link makeKit} collects metrics into a kit, {@link mergeKit} adds the metrics of
  * one kit to another's, and {@link toProducers} provides a kit with the producer of
  * each of them, which {@link produce} runs over a trajectory. {@link MetricParts} reads
- * the parts of the metrics a kit names, and {@link MetricPartsView} reads those parts
- * while tolerating metrics the kit does not name, so a trajectory another kit wrote still
- * reads.
+ * the parts of a trajectory under the metrics of a kit: what a trajectory holds of a
+ * metric is the tag it was reported under and the report itself, so a part is read as
+ * the metric its tag names, and a part of a metric the kit does not name is read by no
+ * schema of the reading at all.
  */
 
 import { Data, DateTime, Effect, Predicate, Schema, Stream } from "effect";
@@ -232,76 +233,6 @@ export const MetricPart = <Tag extends string, S extends Schema.Top>(
   schema: S,
 ): Schema.TaggedStruct<Tag, { readonly data: S }> => Schema.TaggedStruct(tag, { data: schema });
 
-export type MetricPartEncoded = Readonly<{ _tag: string; data: unknown }>;
-
-const AnyMetricPartTypeId = "~trajs/Metric/AnyMetricPart" as const;
-
-/**
- * A metric part whose tag and data are not restricted by a kit.
- *
- * **When to use**
- *
- * Use to type a metric part of a metric the reading kit does not name, as
- * {@link MetricPartsView} reads one.
- *
- * **Details**
- *
- * A part read as this carries the `~trajs/Metric/AnyMetricPart` marker, so
- * {@link isAnyMetricPart} tells it from a part the kit read by the schema of the
- * metric it names.
- *
- * @see {@link MetricPart} for a part of a metric a kit names.
- * @category models
- */
-export type AnyMetricPart = MetricPart<string, unknown>;
-
-type RuntimeAnyMetricPart = AnyMetricPart & {
-  readonly [AnyMetricPartTypeId]: typeof AnyMetricPartTypeId;
-};
-
-/**
- * Type guard to check whether a metric part is one a metric's own schema did not
- * read.
- *
- * **When to use**
- *
- * Use to tell a part {@link MetricPartsView} fell back to {@link AnyMetricPart}
- * for from a part it read as the metric of the kit that names it.
- *
- * @see {@link AnyMetricPart} for the part it checks for.
- * @category guards
- */
-export const isAnyMetricPart = (u: unknown): u is RuntimeAnyMetricPart =>
-  Predicate.hasProperty(u, AnyMetricPartTypeId);
-
-/**
- * Schema for a metric part whose tag and data are not restricted by a kit.
- *
- * **When to use**
- *
- * Use to decode or encode a metric part of a metric the reading kit does not
- * name.
- *
- * **Details**
- *
- * - The marker is stated on a part when it is read and omitted when it is
- *   written, so a trajectory written again holds what it did.
- * - The tag must be a string and the data must be present: nothing else of a
- *   part of a metric a kit does not name is known.
- *
- * @see {@link MetricPart} for the schema of a part of a metric a kit names.
- * @category schemas
- */
-export const AnyMetricPart: Schema.Codec<AnyMetricPart, MetricPartEncoded> = Schema.Struct({
-  [AnyMetricPartTypeId]: Schema.Literal(AnyMetricPartTypeId).pipe(
-    Schema.withDecodingDefaultKey(Effect.succeed(AnyMetricPartTypeId), {
-      encodingStrategy: "omit",
-    }),
-  ),
-  _tag: Schema.String,
-  data: Schema.Unknown,
-}).annotate({ identifier: "AnyMetricPart" });
-
 /**
  * What a producer reports of one part: the metric's output, the timestamp it was
  * derived at, and the parts it is about.
@@ -468,7 +399,7 @@ export type Producer<Ext extends Any> = <E, R>(
  * @category models
  */
 export type Producers<Metrics extends Record<string, Any>> = Readonly<{
-  [Tag in keyof Metrics & string]: Producer<Metrics[Tag]>;
+  [Ext in Metrics[keyof Metrics] as Ext["tag"]]: Producer<Ext>;
 }>;
 
 /**
@@ -575,86 +506,62 @@ type ProducedSchema<Ext extends Any> = Schema.Union<
 const produced = <Ext extends Any>(metric: Ext): ProducedSchema<Ext> =>
   Schema.Union([outputSchemaOf(metric), failureSchemaOf(metric)]);
 
-/** The part schema each metric of a kit states, read as one. */
-type MetricPartSchemas<Metrics extends Record<string, Any>> = {
-  readonly [Tag in keyof Metrics]: Schema.TaggedStruct<
-    Tag & string,
-    { readonly data: ProducedSchema<Metrics[Tag]> }
-  >;
-}[keyof Metrics];
+/** The part schema of one metric: its report, under the tag that metric names. */
+type MetricPartSchema<Ext> = Ext extends Any
+  ? Schema.TaggedStruct<Ext["tag"], { readonly data: ProducedSchema<Ext> }>
+  : never;
 
-export type MetricParts<Metrics extends Record<string, Any>> = {
-  readonly [Tag in keyof Metrics]: MetricPart<
-    Tag & string,
-    ProducerOutput<Metrics[Tag]> | ProducerFailure<Metrics[Tag]>
-  >;
-}[keyof Metrics];
-
-export const MetricParts = <K extends AnyKit>(
-  kit: K,
-): Schema.Union<ReadonlyArray<MetricPartSchemas<K["metrics"]>>> => {
-  const parts: Array<Schema.Top> = [];
-
-  for (const metric of Object.values(kit.metrics)) {
-    parts.push(MetricPart(metric.tag, produced(metric)));
-  }
-
-  // SAFETY: every member is the part of one metric of the kit, which is what
-  // `MetricPartSchemas` reads the metrics of a kit as.
-  return Schema.Union(parts) as any;
-};
-
-/**
- * Union type for metric parts that also accepts metrics the kit does not name.
- *
- * **When to use**
- *
- * Use to type a metric part read from a trajectory that may mention metrics the
- * reading kit does not name.
- *
- * **Details**
- *
- * Every metric part is one {@link AnyMetricPart} also carries, so a value of
- * this says only that a metric was reported, not which metric of the kit it was:
- * {@link MetricParts} is what types the parts of the metrics a kit names.
- *
- * @see {@link MetricParts} for parts restricted to the metrics of the kit.
- * @category models
- */
-export type MetricPartsView<Metrics extends Record<string, Any>> =
-  | MetricParts<Metrics>
-  | AnyMetricPart;
-
-/**
- * The codec {@link MetricPartsView} builds, named so that the codec states
- * {@link MetricPartsView} as the type it reads: the union it is built from names the
- * kit of every member, so its own type reads as that kit's schema rather than as the
- * parts of a metric, and the parts of one kit would not then read as another's.
- */
-type MetricPartsViewSchema<Metrics extends Record<string, Any>> = Schema.Union<
-  ReadonlyArray<MetricPartSchemas<Metrics> | typeof AnyMetricPart>
+/** The part schemas the metrics of the metrics given state, as one. */
+type MetricPartSchemas<Metrics extends Record<string, Any>> = MetricPartSchema<
+  Metrics[keyof Metrics]
 >;
 
+/** The part one metric is held as: its report, under the tag that metric names. */
+type MetricPartOf<Ext> = Ext extends Any
+  ? MetricPart<Ext["tag"], ProducerOutput<Ext> | ProducerFailure<Ext>>
+  : never;
+
 /**
- * Creates a Schema for the parts of the metrics a kit names, including metrics
- * the kit does not name.
+ * What a trajectory holds of the metrics of a kit.
  *
  * **When to use**
  *
- * Use when decoding or encoding the metric parts a trajectory holds that may mention metrics
- * the reading kit does not name.
+ * Use to type a metric part, such as one {@link produce} emits or one a
+ * trajectory holds.
  *
  * **Details**
  *
- * - Every metric of the kit is read by its own schema, as {@link MetricParts}
- *   reads it, in the order the kit holds the metrics.
- * - A part naming a metric of the kit whose data no longer matches a version of
- *   the schema that metric states falls back to {@link AnyMetricPart}, because
- *   reading a trajectory does not depend on the schemas it is read with.
- * - A part read as {@link AnyMetricPart} is written back as it was read, so
- *   re-writing a trajectory a kit wrote does not change it.
+ * A part is the tag it was reported under and the report itself: the output a
+ * producer yielded of what it read, or the failure it reported of it. The tag
+ * alone says which metric the report is of, since a report carries nothing that
+ * says so itself, so a part is read as the metric of the reading kit that names
+ * its tag and as no other: a metric the kit does not name is one the reading holds
+ * no schema of.
  *
- * **Example** (Reading metrics the kit named and one it did not)
+ * @see {@link MetricParts} for the schema that reads one.
+ * @category models
+ */
+export type MetricParts<Metrics extends Record<string, Any>> = MetricPartOf<Metrics[keyof Metrics]>;
+
+/**
+ * The parts a trajectory holds of the metrics of a kit, as one schema.
+ *
+ * **When to use**
+ *
+ * Use to read or write the metric parts of a trajectory under the kit that says
+ * what they are — the kit that produced them, or one that states the same metrics.
+ *
+ * **Details**
+ *
+ * - Every metric of the kit is a member of the union, read under its own tag by
+ *   the report that metric states, in the order the kit holds the metrics.
+ * - A part of any other metric reads as no member, since what a tag means is the
+ *   schema of the metric that names it: reading a trajectory as far as the kits in
+ *   hand state it is what leaves the rest to a reading that holds them.
+ * - A kit that names no metric reads no part, so a trajectory read with no kit
+ *   holds no metric of it.
+ *
+ * **Example** (Reading the metric parts a kit produced)
  *
  * ```ts import.meta.vitest
  * import { Schema } from "effect"
@@ -674,21 +581,10 @@ type MetricPartsViewSchema<Metrics extends Record<string, Any>> = Schema.Union<
  *   }).pipe(VersionedSchema.make)
  * })
  *
- * const parts = Metric.MetricPartsView(Metric.makeKit(count))
+ * const parts = Metric.MetricParts(Metric.makeKit(count))
  *
- * const named = Schema.decodeUnknownSync(parts)({
+ * const read = Schema.decodeUnknownSync(parts)({
  *   _tag: "tokenize/count",
- *   data: {
- *     _tag: "ProducerFailure",
- *     failure: { version: "0.1.0", reason: "no tokenizer" },
- *     attach: ["session"]
- *   }
- * })
- *
- * Metric.isAnyMetricPart(named) // => false
- *
- * const unnamed = Schema.decodeUnknownSync(parts)({
- *   _tag: "atif/step",
  *   data: {
  *     _tag: "ProducerOutput",
  *     output: { version: "0.1.0", tokens: 3 },
@@ -696,31 +592,29 @@ type MetricPartsViewSchema<Metrics extends Record<string, Any>> = Schema.Union<
  *   }
  * })
  *
- * Metric.isAnyMetricPart(unnamed) // => true
+ * read.data._tag // => "ProducerOutput"
+ *
+ * // A metric the kit does not name is not a part it reads.
+ * Schema.is(parts)({
+ *   _tag: "atif/step",
+ *   data: { _tag: "ProducerOutput", output: { version: "0.1.0", tokens: 3 }, attach: ["session"] }
+ * }) // => false
  * ```
  *
- * @see {@link MetricParts} for a Schema restricted to the metrics of the kit.
- * @see {@link AnyMetricPart} for the part an unnamed metric is read as.
+ * @see {@link MetricParts} for what a part is.
  * @category schemas
  */
-export const MetricPartsView = <K extends AnyKit>(
+export const MetricParts = <K extends AnyKit>(
   kit: K,
-): Schema.Codec<
-  MetricPartsView<K["metrics"]>,
-  MetricPartsViewSchema<K["metrics"]>["Encoded"],
-  MetricPartsViewSchema<K["metrics"]>["DecodingServices"],
-  MetricPartsViewSchema<K["metrics"]>["EncodingServices"]
-> => {
+): Schema.Union<ReadonlyArray<MetricPartSchemas<K["metrics"]>>> => {
   const parts: Array<Schema.Top> = [];
 
   for (const metric of Object.values(kit.metrics)) {
     parts.push(MetricPart(metric.tag, produced(metric)));
   }
 
-  parts.push(AnyMetricPart);
-
-  // SAFETY: every member is the part of one metric of the kit or the part of a
-  // metric the kit does not name, which is what the return type reads it as.
+  // SAFETY: every member is the part of one metric of the kit, which is what
+  // `MetricPartSchemas` reads the metrics of a kit as.
   return Schema.Union(parts) as any;
 };
 
@@ -777,7 +671,7 @@ const isProducerFailure = (value: unknown): value is ProducerFailure<Any> =>
  *
  * ```ts import.meta.vitest
  * import { Effect, Schema, Stream } from "effect"
- * import { Metric, Trajectory, VersionedSchema } from "@trajs/core"
+ * import { Extra, Metric, Trajectory, VersionedSchema } from "@trajs/core"
  *
  * const count = new Metric.Metric({
  *   package: "tokenize",
@@ -809,12 +703,12 @@ const isProducerFailure = (value: unknown): value is ProducerFailure<Any> =>
  *   "tokenize/count": counting
  * })
  *
- * // A trajectory another kit wrote: the parts are read as they are, whichever
- * // metrics they name, so a producer of the kit still reads every one of them.
+ * // What the producers are run over: a part of a trajectory, whichever kit wrote
+ * // it. A producer reads what a model was given and returned rather than a report
+ * // of its own metric, so every producer of the kit reads every part.
  * const produced = Stream.make(
- *   Schema.decodeSync(Trajectory.MetricPart(Metric.makeKit()))({
- *     _tag: "Metric",
- *     metric: { _tag: "atif/step", data: { version: "0.1.0", index: 1 } }
+ *   Trajectory.sessionPart(Extra.makeKit())({
+ *     id: "01890a5d-ac96-774b-bcce-b302099a8057"
  *   })
  * )
  *
@@ -840,6 +734,8 @@ export const produce =
       return Stream.empty;
     }
 
+    // SAFETY: every report is emitted under the tag of the metric it is reported by,
+    // which is the part the kit holds of that metric — one part per metric it names.
     return foldParts(produced).pipe(
       // A producer reads the trajectory for the parts it measures, so the parts are
       // served to the producers rather than read by each of them: a stream serves
@@ -849,10 +745,9 @@ export const produce =
       Effect.map((readings) =>
         Stream.mergeAll(
           tags.map((tag, index) => {
-            // SAFETY: `Producers` is keyed as the metrics of a kit are, so the
-            // producer read from it is the one that reports the data of the metric
-            // at its own tag.
-            const report = producers[tag] as Producer<Any>;
+            // SAFETY: a kit states its producers keyed as its metrics are, so the
+            // producer at a tag reports the data of the metric at its own tag.
+            const report = (producers as Record<string, Producer<Any>>)[tag]!;
 
             return report(readings[index]).pipe(
               Stream.map((reported) => ({ _tag: tag, data: reported })),
@@ -867,5 +762,5 @@ export const produce =
         ),
       ),
       Stream.unwrap,
-    );
+    ) as Stream.Stream<MetricParts<Kit["metrics"]>, E | TrajectoryError, R>;
   };

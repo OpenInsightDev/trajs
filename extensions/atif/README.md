@@ -176,8 +176,8 @@ const produced = Produce.transform({ toolkit, extkit, metadata })(Stream.make(pa
 ```
 
 A reader installs `extensions` in the kit it reads the trajectory with, and the
-event is read back as `ContextManagement` data rather than as the JSON it was
-produced as. The event states the transformation rather than the context it left:
+event is read back as `ContextManagement` data: a reading that names no event reads
+no event part at all. The event states the transformation rather than the context it left:
 what a `replace` bound leaves is what the messages after it carry, and ATIF's
 boundary rule is what says so.
 

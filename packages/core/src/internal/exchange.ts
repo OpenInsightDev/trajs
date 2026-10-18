@@ -22,12 +22,12 @@ import type { Compression, CompressionError } from "@trajs/utils/Compression";
 import type { Storage, StorageError } from "@trajs/utils/Storage";
 import type { StreamHash } from "@trajs/utils/StreamHash";
 import { Effect, Fiber, Schema, SchemaTransformation, Stream } from "effect";
-import * as Arr from "effect/Array";
 import { SchemaBinary } from "effect/encoding";
 
 import * as Event from "#/Event.ts";
 import type { EncodingServices, Header, Metadata, Service } from "#/Exchange.ts";
 import type * as Extra from "#/Extra.ts";
+import { readFrames } from "#/internal/frames.ts";
 import * as Metric from "#/Metric.ts";
 import * as Prompt from "#/Prompt.ts";
 import * as Toolkit from "#/Toolkit.ts";
@@ -318,42 +318,6 @@ const encodePart = <C extends Trajectory.AnyConfig>(config: C) => {
     );
 };
 
-/**
- * The parts the frames of a body carry, as a stream.
- *
- * A part is one frame, and a frame can span chunks or share one with the frames
- * around it, so the body is fed to one parser as it arrives: the parts come out in
- * the order they were produced, and a body that ends in the middle of a frame fails
- * as a {@link TrajectoryError} rather than losing the part. The parser belongs to a
- * run, since it is the state one body is read with.
- */
-const decodeParts =
-  <C extends Trajectory.AnyConfig>(config: C) =>
-  <E, R>(
-    body: Stream.Stream<Uint8Array, E, R>,
-  ): Stream.Stream<ProducedPart<C>, E | TrajectoryError, R> =>
-    Stream.suspend(() => {
-      const parser = SchemaBinary.parser(part(config));
-
-      return body.pipe(
-        Stream.mapAccumArrayEffect(
-          () => undefined,
-          (state, chunks) =>
-            Effect.forEach(chunks, (chunk) => parser.feed(chunk), { concurrency: 1 }).pipe(
-              Effect.mapError(TrajectoryError.parse),
-              Effect.map((parts) => [state, Arr.flatten(parts)] as const),
-            ),
-        ),
-        Stream.concat(
-          parser.end.pipe(
-            Effect.mapError(TrajectoryError.parse),
-            Effect.as(Stream.empty),
-            Stream.unwrap,
-          ),
-        ),
-      );
-    });
-
 // HACK: `effect/ai` types a file part's data as `string | Uint8Array | URL`, and
 // a `URL` encodes as a string the way any other does, so no binary layout of that
 // union exists at all. The prompt schemas are therefore rebuilt below, the file
@@ -612,19 +576,29 @@ export const service = <
         return {
           header: stated.header,
           metadata: trailingOf(metadata, bytes).pipe(Effect.map((trailing) => trailing.metadata)),
-          read: () =>
+          // SAFETY: reading with no config is reading with the kits that name nothing,
+          // which is what `Trajectory.anyConfig` is.
+          read: <C extends Trajectory.AnyConfig = Trajectory.AnyConfig>(
+            config: C = Trajectory.anyConfig as C,
+          ) =>
             trajectoryOf(
               // The frame lies between the header and the metadata, so neither the
               // head nor the tail is read as part of it.
               trailingOf(metadata, bytes).pipe(
-                Effect.map((trailing) =>
-                  framed(
-                    framesOf(bytes, stated.end, trailing.end).pipe(compression.decompress),
-                  ).pipe(decodeParts(Trajectory.anyConfig)),
+                Effect.map(
+                  (trailing) =>
+                    // SAFETY: what a body reads as is the parts of the config it is read
+                    // with, which is what the trajectory those parts make holds.
+                    framed(
+                      framesOf(bytes, stated.end, trailing.end).pipe(compression.decompress),
+                    ).pipe(readFrames(part(config))) as Stream.Stream<
+                      Trajectory.Part<C>,
+                      TrajectoryError | StorageError
+                    >,
                 ),
                 Stream.unwrap,
               ),
-              Trajectory.anyConfig,
+              config,
             ),
         };
       }),
