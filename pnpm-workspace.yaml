@@ -4,6 +4,7 @@ packages:
   - packages/*
   - apps/*
   - tools/*
+  - examples/*
 
 catalogMode: prefer
 
