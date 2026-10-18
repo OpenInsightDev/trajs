@@ -11,6 +11,8 @@ together.
 
 - [turns](./cases/turns/main.test.ts) — reads a trajectory as the turns its
   conversation was produced in and summarises it.
+- [repeated-tool-calls](./cases/repeated-tool-calls/main.test.ts) — reads a trajectory
+  as the tool calls it holds and reports the ones made over and over.
 
 ## Running
 
