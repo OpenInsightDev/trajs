@@ -43,7 +43,7 @@ interface Hashing {
  * states as `blake2b512`.
  */
 const hashers: Record<Algorithm, () => Hashing> = {
-  [Algorithm.Blake2b]: () => {
+  [Algorithm.enums.Blake2b]: () => {
     const params = new blake.Blake2BParam();
     params.hashLength(32);
 
@@ -59,8 +59,8 @@ const hashers: Record<Algorithm, () => Hashing> = {
       },
     };
   },
-  [Algorithm.Blake3]: () => new blake.Blake3Hasher(),
-  [Algorithm.Sha256]: () => createHash("sha256"),
+  [Algorithm.enums.Blake3]: () => new blake.Blake3Hasher(),
+  [Algorithm.enums.Sha256]: () => createHash("sha256"),
 };
 
 /** One run of a hash of the algorithm given: the bytes of a stream fed to it as they arrive, the digest read off them at the end. */

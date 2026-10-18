@@ -100,9 +100,9 @@ const webAssembly: Hashing = Sink.reduce(
 /** The digest of one algorithm, as the sink a stream is hashed through. */
 const digest = (algorithm: Algorithm): Hashing => {
   switch (algorithm) {
-    case Algorithm.Blake2b:
+    case Algorithm.enums.Blake2b:
       return hashInJavaScript({ algorithm }).digest;
-    case Algorithm.Sha256:
+    case Algorithm.enums.Sha256:
       return webCrypto;
     default:
       return webAssembly;

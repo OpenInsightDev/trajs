@@ -15,10 +15,10 @@
  * this package ships — the bytes a `.trajs` file holds, described on the layer
  * itself — and a program that keeps trajectories some other way provides a layer of
  * its own, which is the only thing that changes. Of that format, a trajectory
- * starts with a header line stating what it was made with, the parts follow in one
+ * starts with a header stating what it was made with, the parts follow in one
  * frame, and the metadata stating how that frame was written and what it is named
  * by follows them ({@link Metadata}); reading at random is what lets the head of a
- * trajectory be read for the header line and its tail for the metadata without
+ * trajectory be read for the header and its tail for the metadata without
  * reading the frame between them. How such a frame is written, how the parts are
  * hashed and where a trajectory is kept are not the format's to state: the layer is
  * built over a compression of the parts, over a hash of them and over a storage,
@@ -104,10 +104,10 @@ export type Header = Schema.Schema.Type<typeof Header>;
  * @category models
  */
 export const Metadata = Schema.Struct({
-  compression: Schema.Enum(CompressionAlgorithm),
-  hash: Schema.Enum(HashAlgorithm),
-  digest: Schema.String,
   version: Schema.String,
+  compression: CompressionAlgorithm,
+  hash: HashAlgorithm,
+  digest: Schema.String,
 });
 
 export type Metadata = Schema.Schema.Type<typeof Metadata>;
@@ -150,7 +150,7 @@ export type EncodingServices<C extends Trajectory.AnyConfig> = Schema.Union<
  *
  * **Details**
  *
- * - `header` is what the header line a trajectory starts with states, decoded
+ * - `header` is what the header a trajectory starts with states, decoded
  *   ({@link Header}), and is read while the trajectory is loaded: what a trajectory
  *   was made with is known without reading the frame its parts are carried in.
  * - `metadata` reads what a trajectory states at its end off its tail, without
@@ -168,9 +168,9 @@ export type EncodingServices<C extends Trajectory.AnyConfig> = Schema.Union<
  * reading already begun, and each reads the frame the parts are carried in again —
  * and the metadata with it, since where that frame ends is what the metadata says.
  *
- * Either of the three fails with what the trajectory fails with — a header line
- * that is not a header, a frame that does not decode, bytes that do not end with
- * the metadata of a trajectory — as {@link TrajectoryError}, and with what the
+ * Either of the three fails with what the trajectory fails with — bytes that do not
+ * hold a header, a frame that does not decode, bytes that do not end with the
+ * metadata of a trajectory — as {@link TrajectoryError}, and with what the
  * storage fails with as a failure of its own.
  *
  * @see {@link Service.load} for the operation that gives these.
@@ -178,8 +178,7 @@ export type EncodingServices<C extends Trajectory.AnyConfig> = Schema.Union<
  */
 export interface Loaded {
   /**
-   * What the trajectory states about itself, as the header line the load of it
-   * read.
+   * What the trajectory states about itself, as the header the load of it read.
    */
   readonly header: Header;
 
@@ -237,11 +236,11 @@ export interface Service {
   /**
    * Reads a trajectory kept under `id` into the operations it is read by.
    *
-   * What loading reads is the head of a trajectory — the line it states itself in
-   * — so a trajectory that is not there, or whose head is not a header, fails here
-   * rather than when its trajectory is read. What is left for the operations is the
-   * frame its parts are carried in and the metadata it ends with, neither of which
-   * a load reads.
+   * What loading reads is the head of a trajectory — the header it states itself
+   * in — so a trajectory that is not there, or whose head is not a header, fails
+   * here rather than when its trajectory is read. What is left for the operations is
+   * the frame its parts are carried in and the metadata it ends with, neither of
+   * which a load reads.
    */
   readonly load: (id: string) => Effect.Effect<Loaded, TrajectoryError | StorageError>;
 
@@ -253,7 +252,7 @@ export interface Service {
    * kept, rather than naming a place and asking what goes in it.
    *
    * The trajectory is encoded as it is produced, so what it holds is never held
-   * whole: what it states of itself is what the header line carries, its parts
+   * whole: what it states of itself is what the header carries, its parts
    * follow in the frame they are compressed into, and the metadata stating how that
    * frame was written and what the trajectory is named by, read off the bytes they
    * are carried in, follows them.
@@ -309,17 +308,18 @@ export class Exchange extends Context.Service<Exchange, Service>()("trajs/core/E
    *
    * **Details**
    *
-   * A trajectory starts with one plain-text line, the encoded {@link Header}, and
-   * nothing before it is compressed, so the head of a file is readable — and its
-   * toolkit and kits knowable — without anything else. Everything after that line
-   * is one frame carrying the trajectory's parts, each encoded as one
+   * A trajectory starts with the length of its header as four bytes, big-endian, and
+   * the encoded {@link Header} after them; neither is compressed, so the head of a
+   * file is readable — and its toolkit and kits knowable — without anything else.
+   * What follows is one frame carrying the trajectory's parts, each encoded as one
    * SchemaBinary frame ({@link Part}), so a trajectory is read as it arrives rather
    * than once it has ended. The frame is followed by the metadata of the trajectory
-   * ({@link Metadata}), as one more SchemaBinary frame, and by the length of that
-   * metadata as four bytes, big-endian: what a trajectory is named by is its tail,
-   * and the length that ends it says where the metadata it names begins, so the
-   * metadata is read without the frame before it being read
-   * ({@link Loaded.metadata}).
+   * ({@link Metadata}) as plain JSON, by the length of that JSON as four bytes,
+   * big-endian, and by the magic `TRAJS` last: what a trajectory is named by is its
+   * tail, and the length of the metadata, read off the end of the file, states where
+   * the metadata begins, so it is read without the frame before it being read either
+   * ({@link Loaded.metadata}). The magic ends every trajectory that was written
+   * whole, so one that does not end with it was cut short.
    *
    * What the metadata states of the algorithms is what the compression and the hash
    * state of themselves ({@link Compression.algorithm}, {@link StreamHash.algorithm}),

@@ -133,18 +133,18 @@ const web =
  * The algorithms a codec is needed for: every one the compression states but the
  * bytes carried as they are.
  */
-type CodedAlgorithm = Exclude<Algorithm, typeof Algorithm.None>;
+type CodedAlgorithm = Exclude<Algorithm, typeof Algorithm.enums.None>;
 
 const compressors: Record<CodedAlgorithm, Frame> = {
-  [Algorithm.Deflate]: web("deflate", "compress"),
-  [Algorithm.Gzip]: web("gzip", "compress"),
-  [Algorithm.Zstd]: (bytes) => carried(() => createCompressStream(), bytes),
+  [Algorithm.enums.Deflate]: web("deflate", "compress"),
+  [Algorithm.enums.Gzip]: web("gzip", "compress"),
+  [Algorithm.enums.Zstd]: (bytes) => carried(() => createCompressStream(), bytes),
 };
 
 const decompressors: Record<CodedAlgorithm, Frame> = {
-  [Algorithm.Deflate]: web("deflate", "decompress"),
-  [Algorithm.Gzip]: web("gzip", "decompress"),
-  [Algorithm.Zstd]: (bytes) => carried(() => createDecompressStream(), bytes),
+  [Algorithm.enums.Deflate]: web("deflate", "decompress"),
+  [Algorithm.enums.Gzip]: web("gzip", "decompress"),
+  [Algorithm.enums.Zstd]: (bytes) => carried(() => createDecompressStream(), bytes),
 };
 
 /**
@@ -178,7 +178,9 @@ export const layer = (options?: Options): Layer.Layer<Compression> => {
 
   return Layer.succeed(Compression, {
     algorithm,
-    compress: (bytes) => (algorithm === Algorithm.None ? bytes : compressors[algorithm](bytes)),
-    decompress: (bytes) => (algorithm === Algorithm.None ? bytes : decompressors[algorithm](bytes)),
+    compress: (bytes) =>
+      algorithm === Algorithm.enums.None ? bytes : compressors[algorithm](bytes),
+    decompress: (bytes) =>
+      algorithm === Algorithm.enums.None ? bytes : decompressors[algorithm](bytes),
   });
 };

@@ -23,19 +23,19 @@ import { Effect, Layer, Stream } from "effect";
  * The algorithms Bun states a codec for: every one the compression states but the
  * bytes carried as they are, which no codec is needed for.
  */
-type BunAlgorithm = Exclude<Algorithm, typeof Algorithm.None>;
+type BunAlgorithm = Exclude<Algorithm, typeof Algorithm.enums.None>;
 
 const compressors: Record<BunAlgorithm, (bytes: Uint8Array) => Uint8Array | Promise<Uint8Array>> = {
-  [Algorithm.Deflate]: deflateSync,
-  [Algorithm.Gzip]: gzipSync,
-  [Algorithm.Zstd]: zstdCompress,
+  [Algorithm.enums.Deflate]: deflateSync,
+  [Algorithm.enums.Gzip]: gzipSync,
+  [Algorithm.enums.Zstd]: zstdCompress,
 };
 
 const decompressors: Record<BunAlgorithm, (bytes: Uint8Array) => Uint8Array | Promise<Uint8Array>> =
   {
-    [Algorithm.Deflate]: inflateSync,
-    [Algorithm.Gzip]: gunzipSync,
-    [Algorithm.Zstd]: zstdDecompress,
+    [Algorithm.enums.Deflate]: inflateSync,
+    [Algorithm.enums.Gzip]: gunzipSync,
+    [Algorithm.enums.Zstd]: zstdDecompress,
   };
 
 /** What Bun refuses a frame for, as the compression that failed. */
@@ -110,8 +110,8 @@ export const layer = (options?: Options): Layer.Layer<Compression> => {
   return Layer.succeed(Compression, {
     algorithm,
     compress: (bytes) =>
-      algorithm === Algorithm.None ? bytes : carried(compressors[algorithm], bytes),
+      algorithm === Algorithm.enums.None ? bytes : carried(compressors[algorithm], bytes),
     decompress: (bytes) =>
-      algorithm === Algorithm.None ? bytes : carried(decompressors[algorithm], bytes),
+      algorithm === Algorithm.enums.None ? bytes : carried(decompressors[algorithm], bytes),
   });
 };

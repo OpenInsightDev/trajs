@@ -17,7 +17,7 @@
  * trajectory rather than assumed by whatever reads it.
  */
 
-import { Context, Data, Stream } from "effect";
+import { Context, Data, Schema, Stream } from "effect";
 
 /**
  * What writing or reading the frame a trajectory's parts are carried in failed
@@ -82,14 +82,14 @@ export class CompressionError extends Data.TaggedError("CompressionError")<{
  * @see {@link Compression.algorithm} for what a compression states of itself.
  * @category models
  */
-export const Algorithm = {
+export const Algorithm = Schema.Enum({
   None: 0,
   Zstd: 1,
   Gzip: 2,
   Deflate: 3,
-} as const;
+} as const);
 
-export type Algorithm = (typeof Algorithm)[keyof typeof Algorithm];
+export type Algorithm = Schema.Schema.Type<typeof Algorithm>;
 
 /**
  * The frame a compression layer is built over.
@@ -139,7 +139,7 @@ export interface Options {
  * @see {@link Algorithm} for what it names.
  * @category constants
  */
-export const defaultAlgorithm: Algorithm = Algorithm.Zstd;
+export const defaultAlgorithm: Algorithm = Algorithm.enums.Zstd;
 
 /**
  * A compression of a trajectory's parts: the chunks of a stream in, the chunks of

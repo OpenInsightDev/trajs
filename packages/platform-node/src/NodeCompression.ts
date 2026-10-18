@@ -32,18 +32,18 @@ import { Layer, Stream } from "effect";
  * The algorithms `node:zlib` writes a frame with: every one the compression states
  * but the bytes carried as they are, which no codec is needed for.
  */
-type ZlibAlgorithm = Exclude<Algorithm, typeof Algorithm.None>;
+type ZlibAlgorithm = Exclude<Algorithm, typeof Algorithm.enums.None>;
 
 const compressors: Record<ZlibAlgorithm, () => Transform> = {
-  [Algorithm.Deflate]: () => createDeflate(),
-  [Algorithm.Gzip]: () => createGzip(),
-  [Algorithm.Zstd]: () => createZstdCompress(),
+  [Algorithm.enums.Deflate]: () => createDeflate(),
+  [Algorithm.enums.Gzip]: () => createGzip(),
+  [Algorithm.enums.Zstd]: () => createZstdCompress(),
 };
 
 const decompressors: Record<ZlibAlgorithm, () => Transform> = {
-  [Algorithm.Deflate]: () => createInflate(),
-  [Algorithm.Gzip]: () => createGunzip(),
-  [Algorithm.Zstd]: () => createZstdDecompress(),
+  [Algorithm.enums.Deflate]: () => createInflate(),
+  [Algorithm.enums.Gzip]: () => createGunzip(),
+  [Algorithm.enums.Zstd]: () => createZstdDecompress(),
 };
 
 /**
@@ -95,7 +95,7 @@ const through = (open: () => Transform) =>
  * const source = Stream.make(new TextEncoder().encode("hello ".repeat(1024)))
  *
  * const program = Effect.gen(function*() {
- *   const frame = yield* source.pipe(compress({ algorithm: Algorithm.Gzip }), Stream.runCollect)
+ *   const frame = yield* source.pipe(compress({ algorithm: Algorithm.enums.Gzip }), Stream.runCollect)
  *
  *   gunzipSync(Buffer.concat(frame)).toString().length // => 6144
  * })
@@ -112,7 +112,7 @@ export const compress =
   ): Stream.Stream<Uint8Array, E | CompressionError, R> => {
     const algorithm = options?.algorithm ?? defaultAlgorithm;
 
-    return algorithm === Algorithm.None ? self : self.pipe(through(compressors[algorithm]));
+    return algorithm === Algorithm.enums.None ? self : self.pipe(through(compressors[algorithm]));
   };
 
 /**
@@ -164,7 +164,7 @@ export const decompress =
   ): Stream.Stream<Uint8Array, E | CompressionError, R> => {
     const algorithm = options?.algorithm ?? defaultAlgorithm;
 
-    return algorithm === Algorithm.None ? self : self.pipe(through(decompressors[algorithm]));
+    return algorithm === Algorithm.enums.None ? self : self.pipe(through(decompressors[algorithm]));
   };
 
 /**

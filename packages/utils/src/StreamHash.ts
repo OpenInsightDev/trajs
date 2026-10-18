@@ -19,7 +19,7 @@ import { blake2b } from "@noble/hashes/blake2.js";
 import { blake3 } from "@noble/hashes/blake3.js";
 import { sha256 } from "@noble/hashes/sha2.js";
 import { bytesToHex } from "@noble/hashes/utils.js";
-import { Context, Layer, Sink } from "effect";
+import { Context, Layer, Schema, Sink } from "effect";
 
 /**
  * The digest a trajectory is named by: the algorithm it is read with.
@@ -54,13 +54,13 @@ import { Context, Layer, Sink } from "effect";
  * @see {@link StreamHash.algorithm} for what a hash states of itself.
  * @category models
  */
-export const Algorithm = {
+export const Algorithm = Schema.Enum({
   Blake3: 0,
   Blake2b: 1,
   Sha256: 2,
-} as const;
+} as const);
 
-export type Algorithm = (typeof Algorithm)[keyof typeof Algorithm];
+export type Algorithm = Schema.Schema.Type<typeof Algorithm>;
 
 /**
  * The digest a hash layer is built over.
@@ -108,7 +108,7 @@ export interface Options {
  * @see {@link Algorithm} for what it names.
  * @category constants
  */
-export const defaultAlgorithm: Algorithm = Algorithm.Blake3;
+export const defaultAlgorithm: Algorithm = Algorithm.enums.Blake3;
 
 /**
  * A hash of a stream of bytes: the bytes are given to it as a sink, and the digest
@@ -178,11 +178,11 @@ const hashing = (algorithm: Algorithm): Sink.Sink<string, Uint8Array, never, nev
   Sink.reduce(
     () => {
       switch (algorithm) {
-        case Algorithm.Blake2b:
+        case Algorithm.enums.Blake2b:
           // BLAKE2b of the length the other two digests are of, rather than the 64
           // bytes one computes where its length is not stated.
           return blake2b.create({ dkLen: 32 });
-        case Algorithm.Sha256:
+        case Algorithm.enums.Sha256:
           return sha256.create();
         default:
           return blake3.create();

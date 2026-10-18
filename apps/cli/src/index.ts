@@ -26,6 +26,10 @@ const cli = Command.make("trajs").pipe(
       description: "Print the header a trajectory states, on one line",
     },
     {
+      command: "trajs inspect trajectory.trajs --metadata",
+      description: "Print what the trajectory states at its end, on one line",
+    },
+    {
       command: "trajs inspect trajectory.trajs --indent 2",
       description: "Print the header indented by two spaces",
     },

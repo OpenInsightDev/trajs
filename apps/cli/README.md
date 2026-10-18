@@ -7,13 +7,16 @@ opening it in a viewer.
 
 ### `trajs inspect <file-path>`
 
-Prints the header a `.trajs` file starts with — the toolkit and kits it was
-written with — as JSON. The header is written on one line until `--indent` says
-otherwise:
+Prints what a `.trajs` file states — the toolkit and kits it was written with, or
+with `--metadata` how its parts were carried and what it is named by — as JSON. A
+trajectory states each of those algorithms as the code the format carries it as, and
+the metadata is printed with the name instead. The JSON is written on one line
+until `--indent` says otherwise:
 
 ```bash
 trajs inspect trajectory.trajs
-trajs inspect trajectory.trajs --indent 2
+trajs inspect trajectory.trajs --metadata
+trajs inspect trajectory.trajs --metadata --indent 2
 ```
 
 ## Development

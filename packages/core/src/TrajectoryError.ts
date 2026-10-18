@@ -107,9 +107,9 @@ export class SessionError extends Data.TaggedError("SessionError")<{
  * **Details**
  *
  * `cause` is what the trajectory failed with, as the layer that failed reported
- * it: the `SchemaError` of a part, of the header line or of the metadata a
- * trajectory ends with, the failure of the codec the frame is carried in, or the
- * description of the bytes ending before a header line or before that metadata.
+ * it: the `SchemaError` of a part, of the header or of the metadata a trajectory
+ * ends with, the failure of the codec the frame is carried in, or the description of
+ * the bytes ending before a header or before that metadata.
  *
  * @see {@link TrajectoryError.parse} for the error that carries it.
  * @category errors

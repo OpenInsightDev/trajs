@@ -1,8 +1,8 @@
 /**
- * The format the exchange layer this package ships writes: the header line a
- * trajectory starts with, the frame the parts of a trajectory are carried in, the
- * metadata the trajectory ends with, and the two directions of the trajectory's
- * bytes — written into a storage, and read out of the bytes it serves.
+ * The format the exchange layer this package ships writes: the header a trajectory
+ * starts with, the frame the parts of a trajectory are carried in, the metadata the
+ * trajectory ends with, and the two directions of the trajectory's bytes — written
+ * into a storage, and read out of the bytes it serves.
  *
  * Nothing here is published: a program reaches the format through
  * `Exchange.layer`, and the parts a trajectory holds through `Exchange.Part`. What
@@ -12,9 +12,9 @@
  * one takes the bytes from there rather than carrying them.
  *
  * A trajectory is read at random where a part of it alone is wanted — the head for
- * the header line, the tail for the metadata — and as a stream where the trajectory
- * is: the parts are carried in one frame, so reading them is reading the bytes from
- * the header line to the metadata that follows them.
+ * the header, the tail for the metadata — and as a stream where the trajectory is:
+ * the parts are carried in one frame, so reading them is reading the bytes from the
+ * header to the metadata that follows them.
  */
 
 import type { Bytes } from "@trajs/utils/Bytes";
@@ -61,7 +61,7 @@ const contribute = <Entry>(
 ): Record<string, Schema.Schema.Type<typeof Contribution>> =>
   Object.fromEntries(Object.entries(contributions).map(([tag, entry]) => [tag, stated(entry)]));
 
-/** The header line a trajectory starts with, as the JSON text it is carried in. */
+/** The header a trajectory starts with, as the JSON text it is carried in. */
 const encodeHeader = ({
   extrakit,
   eventkit,
@@ -87,22 +87,54 @@ const encodeHeader = ({
     })),
   });
 
-/** The byte a header line ends with. */
-const Newline = 0x0a;
+/**
+ * How many bytes state the length of the header a trajectory starts with and of the
+ * metadata it ends with: four, big-endian, before the header and after the metadata.
+ */
+const LengthBytes = 4;
 
 /**
- * How many bytes of the head of a trajectory are read at a time while the header
- * line is looked for: a line is read in the order it is carried, so what is read
- * of it first is where it starts.
+ * What a trajectory ends with once it was written whole: the ASCII `TRAJS`, which is
+ * what tells a reader the bytes it read are a trajectory written to its end rather
+ * than one that was cut short.
  */
-const HeaderChunk = 4 * 1024;
+const Magic = new TextEncoder().encode("TRAJS");
+
+/** The length `length`, as the four big-endian bytes that state it. */
+const encodeLength = (length: number): Uint8Array => {
+  const bytes = new Uint8Array(LengthBytes);
+
+  new DataView(bytes.buffer).setUint32(0, length, false);
+
+  return bytes;
+};
+
+/** The length four big-endian bytes state, or `undefined` where fewer than four are read. */
+const decodeLength = (bytes: Uint8Array): number | undefined =>
+  bytes.length < LengthBytes
+    ? undefined
+    : new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength).getUint32(0, false);
+
+/** `body` as the bytes it is carried in: the length of it first, and the body after that. */
+const lengthPrefixed = (body: Uint8Array): Uint8Array => {
+  const bytes = new Uint8Array(LengthBytes + body.length);
+
+  bytes.set(encodeLength(body.length));
+  bytes.set(body, LengthBytes);
+
+  return bytes;
+};
+
+/** Whether `bytes` are exactly the magic a whole trajectory ends with. */
+const isMagic = (bytes: Uint8Array): boolean =>
+  bytes.length === Magic.length && Magic.every((byte, at) => bytes[at] === byte);
 
 /**
  * The header a trajectory states, and how much of the trajectory it takes to state
- * it: the line a trajectory starts with, and the offset just past it, which is
+ * it: the header a trajectory starts with, and the offset just past it, which is
  * where the frame the parts are carried in begins.
  *
- * The line is read to be read again as what it describes — a trajectory is read
+ * The header is read to be read again as what it describes — a trajectory is read
  * with no kit of its own — so where it ends is kept with it rather than read a
  * second time to find.
  */
@@ -112,60 +144,47 @@ export interface Stated {
 }
 
 /**
- * Reads the header line a trajectory starts with, as the head of the bytes it is
- * held in.
+ * Reads the header a trajectory starts with, as the head of the bytes it is held in.
  *
- * The line ends wherever the newline fell, which is not known before it is read,
- * so the head of the trajectory is read a chunk at a time until one of them holds
- * that newline ({@link HeaderChunk}); the length of the bytes is not read to tell
- * where that is, since a line is short and one read of the head answers it.
+ * The header is carried as its length, four big-endian bytes, and the bytes of the
+ * header after them ({@link LengthBytes}), so the head of a trajectory is read as far
+ * as that length states and no further: what a trajectory states of itself is
+ * knowable without the frame the parts are carried in being read.
  *
- * Bytes that end before a newline, and a line that is not a header, fail as
- * {@link TrajectoryError}: what a trajectory is of is the format's, so bytes that
- * do not hold its first line are a trajectory that failed rather than bytes a
- * storage did not serve. The services are the ones the header's own schemas
- * state, so a model of plain schemas needs none.
+ * Bytes that end before a length, and bytes that end before the header it states,
+ * fail as {@link TrajectoryError}: what a trajectory is of is the format's, so bytes
+ * that do not hold its header are a trajectory that failed rather than bytes a
+ * storage did not serve. The services are the ones the header's own schemas state,
+ * so a model of plain schemas needs none.
  */
 export const headerOf = <S extends Schema.ConstraintCodec<Header, unknown, never, never>>(
   header: S,
   bytes: Bytes<StorageError>,
 ): Effect.Effect<Stated, TrajectoryError | StorageError> => {
-  const line = Schema.fromJsonString(header);
+  const stated = Schema.fromJsonString(header);
 
   return Effect.gen(function* () {
-    const decoder = new TextDecoder();
-    let text = "";
-    let read = 0n;
+    const prefix = yield* bytes.readAlloc({ offset: 0n, size: LengthBytes });
+    const size = decodeLength(prefix);
 
-    while (true) {
-      const start = read;
-      const chunk = yield* bytes.readAlloc({ offset: start, size: HeaderChunk });
-
-      // The bytes ending before a newline is a file with no header line, and the
-      // header line is what tells a reader the file is a trajectory at all.
-      if (chunk.length === 0) {
-        return yield* Effect.fail(TrajectoryError.parse("the bytes end before a header line"));
-      }
-
-      read = start + BigInt(chunk.length);
-
-      const at = chunk.indexOf(Newline);
-
-      if (at === -1) {
-        text += decoder.decode(chunk, { stream: true });
-        continue;
-      }
-
-      text += decoder.decode(chunk.subarray(0, at));
-
-      const stated = yield* Schema.decodeUnknownEffect(line)(text).pipe(
-        Effect.mapError(TrajectoryError.parse),
-      );
-
-      // The newline ends the line, so the frame follows it rather than the chunk
-      // the newline happened to fall in.
-      return { header: stated, end: start + BigInt(at + 1) };
+    // The length of the header is what a trajectory starts with, so bytes that end
+    // before one are not a trajectory at all.
+    if (size === undefined) {
+      return yield* Effect.fail(TrajectoryError.parse("the bytes end before a header length"));
     }
+
+    const held = yield* bytes.readAlloc({ offset: BigInt(LengthBytes), size });
+
+    if (held.length < size) {
+      return yield* Effect.fail(TrajectoryError.parse("the bytes end before a header"));
+    }
+
+    return {
+      header: yield* Schema.decodeUnknownEffect(stated)(new TextDecoder().decode(held)).pipe(
+        Effect.mapError(TrajectoryError.parse),
+      ),
+      end: BigInt(LengthBytes + size),
+    };
   });
 };
 
@@ -443,13 +462,6 @@ const trajectoryOf = <C extends Trajectory.AnyConfig, E, R>(
 ): Trajectory.Trajectory<C, E, R> => Object.assign(parts, config);
 
 /**
- * How many bytes state the length of the metadata a trajectory ends with: the four
- * bytes it ends with rather than begins with, so what reads a trajectory at random
- * reads them off the end of it and knows where the metadata before them begins.
- */
-const TrailerBytes = 4;
-
-/**
  * What a trajectory ends with: the metadata it states of its own bytes, and where
  * the frame those bytes carry the parts in ends.
  *
@@ -464,82 +476,81 @@ export interface Trailing {
 
 /**
  * Reads the metadata a trajectory ends with off the tail of the bytes it is held in,
- * which is what it is named by and how it states it was written: the metadata, as
- * one SchemaBinary frame, preceded by nothing and followed by the length of that
- * frame as four bytes, big-endian ({@link TrailerBytes}).
+ * which is what it is named by and how it states it was written: the metadata as
+ * plain JSON, the length of it as four bytes after it, big-endian
+ * ({@link LengthBytes}), and the magic of a whole trajectory last ({@link Magic}).
  *
  * The metadata follows the parts rather than being one, so it is read where it lies
  * rather than by reading the frame those parts are carried in — and how much of it
- * there is is read off the end instead, which is what states where it begins
- * without that frame being read either. Bytes that end in anything that is not a
- * length and a frame before it are a trajectory that does not end with the metadata
- * of one — one written before the format held it, or one that was cut short —
- * which is a trajectory that failed rather than bytes a storage did not serve.
+ * there is is read off the end instead, which is what states where it begins without
+ * that frame being read either. Bytes that do not end with the magic were cut short,
+ * and bytes that end with anything that is not a length before it hold no metadata —
+ * either way a trajectory that failed rather than bytes a storage did not serve.
  *
- * The model is the schema of the metadata the layer holds, so what parses the frame
+ * The model is the schema of the metadata the layer holds, so what parses the JSON
  * is built from that model rather than stated again here ({@link Metadata}).
  */
 export const trailingOf = <S extends Schema.ConstraintCodec<Metadata, unknown, never, never>>(
   metadata: S,
   bytes: Bytes<StorageError>,
 ): Effect.Effect<Trailing, TrajectoryError | StorageError> => {
-  const frame = SchemaBinary.toCodec(metadata);
+  const stated = Schema.fromJsonString(metadata);
 
   return Effect.gen(function* () {
     const length = yield* bytes.length;
+    const trailer = LengthBytes + Magic.length;
 
-    // Bytes that hold no length hold no metadata either, so none are read of them:
-    // what is there would be read as a length that is not one.
-    const trailer =
-      length < BigInt(TrailerBytes)
+    // Bytes shorter than the length and the magic hold no metadata either, so none
+    // are read of them: what is there would be read as a length that is not one.
+    const tail =
+      length < BigInt(trailer)
         ? new Uint8Array()
-        : yield* bytes.readAlloc({ offset: length - BigInt(TrailerBytes), size: TrailerBytes });
+        : yield* bytes.readAlloc({ offset: length - BigInt(trailer), size: trailer });
 
-    const size =
-      trailer.length < TrailerBytes
-        ? undefined
-        : BigInt(
-            new DataView(trailer.buffer, trailer.byteOffset, trailer.byteLength).getUint32(
-              0,
-              false,
-            ),
-          );
+    const size = decodeLength(tail);
 
-    // The metadata lies before the length that states it, so bytes whose length
-    // does not fit before that length hold no metadata at all.
-    if (size === undefined || size > length - BigInt(TrailerBytes)) {
+    // A trajectory ends with the metadata of one only where it was written whole:
+    // bytes that do not end with the magic were cut short, and bytes whose length
+    // does not fit before the magic hold no metadata at all.
+    if (
+      size === undefined ||
+      !isMagic(tail.subarray(LengthBytes)) ||
+      BigInt(size) > length - BigInt(trailer)
+    ) {
       return yield* Effect.fail(
         TrajectoryError.parse("the bytes do not end with the metadata of a trajectory"),
       );
     }
 
-    const start = length - BigInt(TrailerBytes) - size;
+    const start = length - BigInt(trailer) - BigInt(size);
 
-    const held = yield* bytes.readAlloc({ offset: start, size: Number(size) });
+    const held = yield* bytes.readAlloc({ offset: start, size });
 
-    const stated = yield* Schema.decodeUnknownEffect(frame)(held).pipe(
-      Effect.mapError(TrajectoryError.parse),
-    );
-
-    return { metadata: stated, end: start };
+    return {
+      metadata: yield* Schema.decodeUnknownEffect(stated)(new TextDecoder().decode(held)).pipe(
+        Effect.mapError(TrajectoryError.parse),
+      ),
+      end: start,
+    };
   });
 };
 
 /**
  * The metadata a trajectory ends with, as the bytes it is carried in: the metadata
- * itself, as one SchemaBinary frame, and the length of that frame as four bytes
- * after it, big-endian ({@link TrailerBytes}), which is what says where the
- * metadata begins to what reads a trajectory from its end.
+ * itself as plain JSON, the length of it as four bytes after it, big-endian
+ * ({@link LengthBytes}), which is what says where the metadata begins to what reads a
+ * trajectory from its end, and the magic of a whole trajectory last ({@link Magic}).
  */
 const encodeTrailing = <S extends Schema.ConstraintCodec<Metadata, unknown, never, never>>(
   metadata: S,
   stated: Metadata,
 ): Uint8Array => {
-  const frame = Schema.encodeSync(SchemaBinary.toCodec(metadata))(stated);
-  const bytes = new Uint8Array(frame.length + TrailerBytes);
+  const json = new TextEncoder().encode(Schema.encodeSync(Schema.fromJsonString(metadata))(stated));
+  const bytes = new Uint8Array(json.length + LengthBytes + Magic.length);
 
-  bytes.set(frame);
-  new DataView(bytes.buffer).setUint32(frame.length, frame.length, false);
+  bytes.set(json);
+  bytes.set(encodeLength(json.length), json.length);
+  bytes.set(Magic, json.length + LengthBytes);
 
   return bytes;
 };
@@ -566,8 +577,8 @@ const framed = <E, R>(
  * what the storage offers.
  *
  * A trajectory is read at random where one part of it alone is wanted — the head for
- * the header line, the tail for the metadata — and as a stream where what is wanted
- * is the trajectory: the frame is read from the header line to the metadata that
+ * the header, the tail for the metadata — and as a stream where what is wanted
+ * is the trajectory: the frame is read from the header to the metadata that
  * follows it.
  *
  * A compression reports a frame it cannot write or read as a
@@ -579,7 +590,7 @@ const framed = <E, R>(
  *
  * The models are the schemas of the header and of the metadata the layer holds,
  * constrained to ones plain enough to parse without a service of their own: what
- * parses the line a trajectory starts with and the metadata it ends with is built
+ * parses the header a trajectory starts with and the metadata it ends with is built
  * from them, and what `load` gives out is typed by them.
  */
 export const service = <
@@ -603,8 +614,8 @@ export const service = <
           metadata: trailingOf(metadata, bytes).pipe(Effect.map((trailing) => trailing.metadata)),
           read: () =>
             trajectoryOf(
-              // The frame lies between the header line and the metadata, so
-              // neither the head nor the tail is read as part of it.
+              // The frame lies between the header and the metadata, so neither the
+              // head nor the tail is read as part of it.
               trailingOf(metadata, bytes).pipe(
                 Effect.map((trailing) =>
                   framed(
@@ -623,7 +634,7 @@ export const service = <
         const config = configOf(trajectory);
 
         const encoded = Effect.gen(function* () {
-          const line = encodeHeader(config);
+          const headerText = encodeHeader(config);
 
           const frames = trajectory.pipe(Stream.mapEffect(encodePart(config), { concurrency: 1 }));
 
@@ -646,7 +657,7 @@ export const service = <
           // and what they are named by, so it is emitted once the compression has
           // finished the frame it wrote for them and the digest has been read off
           // the parts it is of.
-          return Stream.make(new TextEncoder().encode(`${line}\n`)).pipe(
+          return Stream.make(lengthPrefixed(new TextEncoder().encode(headerText))).pipe(
             Stream.concat(framed(written.pipe(compression.compress))),
             Stream.concat(
               Fiber.join(digest).pipe(
