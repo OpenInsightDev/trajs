@@ -8,12 +8,12 @@
  * `@trajs/utils/Bytes`.
  *
  * Where a trajectory is kept and what reads a digest are stated here over what any
- * platform provides — `Storage.layerFileSystem` and `StreamHash.layer` — and what
- * carries a trajectory's parts in a frame is a platform package's to state, which is
- * what `@trajs/platform-node`, `@trajs/platform-bun` and `@trajs/platform-browser`
- * provide. Where a trajectory's bytes are kept between readings is stated over the
- * key/value store of `effect/persistence` ({@link ByteStore.layerKVStore}) or over
- * the one in memory ({@link ByteStore.layer}).
+ * platform provides — `Storage.layerFileSystem`, `Storage.layerS3` and
+ * `StreamHash.layer` — and what carries a trajectory's parts in a frame is a platform
+ * package's to state, which is what `@trajs/platform-node`, `@trajs/platform-bun` and
+ * `@trajs/platform-browser` provide. Where a trajectory's bytes are kept between
+ * readings is stated over the key/value store of `effect/persistence`
+ * ({@link ByteStore.layerKVStore}) or over the one in memory ({@link ByteStore.layer}).
  */
 
 export * as Bytes from "#/Bytes.ts";

@@ -11,6 +11,7 @@ catalogMode: prefer
 
 catalog:
   "@anthropic-ai/tokenizer": ^0.0.4
+  "@aws-sdk/client-s3": ^3.1147.0
   "@base-ui/react": ^1.9.0
   "@changesets/changelog-github": ^1.0.1
   "@changesets/cli": ^3.0.3
