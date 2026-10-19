@@ -9,10 +9,17 @@
 
 import { Schema, SchemaGetter } from "effect";
 
-type Reading<Prev extends Schema.Top, Next extends Schema.Top, RD> = Schema.decodeTo<
+/** A codec that takes no service of its own: what a shape a trajectory holds is made of. */
+type ServiceFree = Schema.Codec<unknown, unknown, never, never>;
+
+/** The fields a shape states, as a trajectory holds them: the services of none at each. */
+type ServiceFreeFields = Readonly<Record<PropertyKey, ServiceFree>>;
+
+/** How data of a version before reads as the version next: the codec that reads it, which takes no service. */
+type Reading<Prev extends Schema.Top, Next extends Schema.Top> = Schema.decodeTo<
   Next,
   Prev,
-  RD,
+  never,
   never
 >;
 
@@ -33,24 +40,43 @@ type Reading<Prev extends Schema.Top, Next extends Schema.Top, RD> = Schema.deco
  * every member {@link upgrade} adds reads the version before it, which is how a
  * trajectory written at an older version still reads.
  *
+ * - Every version states no service of its own: a shape is what a trajectory holds, and
+ *   a trajectory is read from the bytes it is kept in synchronously rather than run, so
+ *   no version of a shape may need a service a caller could provide. The services a
+ *   codec states are covariant, so stating them as none is what makes a version that
+ *   states one refusable where a shape is stated — and a kit states each of its
+ *   contributions as {@link Any}.
+ *
  * @see {@link make} for the first version of a shape.
  * @see {@link upgrade} for deriving the version next.
  * @category models
  */
 export type VersionedSchema<
-  Self extends Schema.Struct<Schema.Struct.Fields>,
-  Members extends ReadonlyArray<Schema.Top> = ReadonlyArray<Schema.Top>,
+  Self extends Schema.Struct<ServiceFreeFields>,
+  Members extends ReadonlyArray<ServiceFree> = ReadonlyArray<ServiceFree>,
 > = Schema.Union<Members> & {
   readonly self: Self;
 };
 
 /**
- * A shape whose versions are not known.
+ * A shape a trajectory holds: what a shape is typed as before its versions are known.
+ *
+ * **When to use**
+ *
+ * Use to read data a trajectory holds of a shape whose versions are not known, or to
+ * type one before its versions are: what a kit states each of its contributions as.
+ *
+ * **Details**
+ *
+ * It is {@link VersionedSchema} with nothing of its versions known: the versions of a shape
+ * are the codecs of none, and so are the fields it states, so a shape whose versions or
+ * fields state a service is not one of these — and a contribution stated as one is not a
+ * contribution a trajectory holds.
  *
  * @see {@link VersionedSchema} for a shape of known versions.
  * @category models
  */
-export type Any = VersionedSchema<Schema.Struct<Schema.Struct.Fields>, ReadonlyArray<Schema.Top>>;
+export type Any = VersionedSchema<Schema.Struct<ServiceFreeFields>>;
 
 /**
  * The versioned schema `Prev` is at once `More` is derived of it: the version next,
@@ -66,17 +92,16 @@ export type Any = VersionedSchema<Schema.Struct<Schema.Struct.Fields>, ReadonlyA
  */
 export type Upgraded<
   Prev extends Any,
-  More extends Schema.Struct.Fields & { readonly version: AnyVersion },
-  RD = never,
+  More extends ServiceFreeFields & { readonly version: AnyVersion },
 > = VersionedSchema<
   Schema.Struct<More>,
-  readonly [Schema.Struct<More>, Reading<Prev, Schema.Struct<More>, RD>]
+  readonly [Schema.Struct<More>, Reading<Prev, Schema.Struct<More>>]
 >;
 
 function assemble<
-  Self extends Schema.Struct<Schema.Struct.Fields>,
-  Members extends ReadonlyArray<Schema.Top>,
->(self: Self, readers: ReadonlyArray<Schema.Top>): VersionedSchema<Self, Members>;
+  Self extends Schema.Struct<ServiceFreeFields>,
+  Members extends ReadonlyArray<ServiceFree>,
+>(self: Self, readers: ReadonlyArray<ServiceFree>): VersionedSchema<Self, Members>;
 function assemble(self: Schema.Top, readers: ReadonlyArray<Schema.Top>): Schema.Top {
   return Object.assign(Schema.Union(readers), { self });
 }
@@ -136,6 +161,11 @@ export const make = <Self extends Schema.Struct<{ readonly version: Schema.Liter
  * The function is curried, and given the step returns the function that moves a
  * shape, so it is given to `pipe` — see the example.
  *
+ * - The reading added states no service of its own ({@link VersionedSchema}): a shape is
+ *   what a trajectory holds, and a trajectory is read from its bytes synchronously rather
+ *   than run, so a step that reads a version through a service is not one a shape is
+ *   derived by.
+ *
  * **Example** (Deriving the version next of a shape, and reading the one before it)
  *
  * ```ts import.meta.vitest
@@ -169,27 +199,23 @@ export const make = <Self extends Schema.Struct<{ readonly version: Schema.Liter
  * @category combinators
  */
 export const upgrade =
-  <
-    Prev extends Any,
-    More extends Schema.Struct.Fields & { readonly version: AnyVersion },
-    RD = never,
-  >(
+  <Prev extends Any, More extends ServiceFreeFields & { readonly version: AnyVersion }>(
     fields: (previous: Prev["self"]["fields"]) => More,
     change: {
-      readonly decode: SchemaGetter.Getter<Schema.Struct<More>["Encoded"], Prev["Type"], RD>;
+      readonly decode: SchemaGetter.Getter<Schema.Struct<More>["Encoded"], Prev["Type"]>;
     },
   ) =>
-  (previous: Prev): Upgraded<Prev, More, RD> => {
+  (previous: Prev): Upgraded<Prev, More> => {
     const self = previous.self.mapFields(fields);
 
-    const step = Schema.decodeTo<Schema.Struct<More>, Prev, RD, never>(self, {
+    const step = Schema.decodeTo<Schema.Struct<More>, Prev, never, never>(self, {
       decode: change.decode,
       encode: SchemaGetter.forbiddenEncoding,
     })(previous);
 
     return assemble<
       Schema.Struct<More>,
-      readonly [Schema.Struct<More>, Reading<Prev, Schema.Struct<More>, RD>]
+      readonly [Schema.Struct<More>, Reading<Prev, Schema.Struct<More>>]
     >(self, [self, step]);
   };
 
@@ -232,7 +258,7 @@ type TaggedSelf<Tag extends string, Entry extends Any> = Schema.Struct<
  */
 type TaggedEntry<Tag extends string, Entry extends Any> = VersionedSchema<
   TaggedSelf<Tag, Entry>,
-  readonly [TaggedSelf<Tag, Entry>, Reading<Writing<Entry>, TaggedSelf<Tag, Entry>, never>]
+  readonly [TaggedSelf<Tag, Entry>, Reading<Writing<Entry>, TaggedSelf<Tag, Entry>>]
 >;
 
 /**
@@ -240,7 +266,7 @@ type TaggedEntry<Tag extends string, Entry extends Any> = VersionedSchema<
  * direction a version is written in, so that a tag is stated on the data rather than on
  * what was read.
  */
-type Writing<Entry extends Any> = Reading<Entry, Schema.flip<Entry>, never>;
+type Writing<Entry extends Any> = Reading<Entry, Schema.flip<Entry>>;
 
 /** The schemas a table holds once the tag of each key is stated on the schema that key names. */
 type TaggedTable<Table extends Schemas> = {
@@ -285,14 +311,17 @@ function assembleTagged(table: Schemas, members: ReadonlyArray<Schema.Top>): Sch
 const tagSchema = (tag: string, entry: Any): Any => {
   const self = entry.self.mapFields((fields) => ({ ...fields, _tag: Schema.Literal(tag) }));
 
-  const writing = Schema.decodeTo(Schema.flip(entry), {
+  // The shapes are stated rather than inferred: a transformation that reads one shape as
+  // another names neither of them, and every shape here is the `Any` the entry is — one a
+  // trajectory holds, which states the services of none.
+  const writing = Schema.decodeTo<Schema.flip<Any>, Any, never, never>(Schema.flip(entry), {
     decode: SchemaGetter.passthrough(),
     encode: SchemaGetter.forbiddenEncoding,
   })(entry);
 
   // SAFETY: every version states its version, so what a version is written as is an
   // object the tag is stated beside rather than a value of no fields.
-  const reading = Schema.decodeTo(self, {
+  const reading = Schema.decodeTo<typeof self, typeof writing, never, never>(self, {
     decode: SchemaGetter.transform((from) => ({
       ...(from as AnyVersioned["Encoded"]),
       _tag: tag,

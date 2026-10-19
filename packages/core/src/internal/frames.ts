@@ -81,22 +81,16 @@ export const joined = (carried: Uint8Array, chunks: ReadonlyArray<Uint8Array>): 
  *   if it were not there.
  * - A body that ends in the middle of a frame fails as a {@link TrajectoryError} rather
  *   than losing the value silently.
+ *
+ * The schema is stated as one that takes no service at decoding, since a frame is read
+ * synchronously rather than run: a schema that needs a service to read one is not one a
+ * body is read with.
  */
 export const readFrames =
-  <S extends Schema.Constraint>(schema: S) =>
+  <S extends Schema.ConstraintDecoder<unknown>>(schema: S) =>
   <E, R>(body: Stream.Stream<Uint8Array, E, R>): Stream.Stream<S["Type"], E | TrajectoryError, R> =>
     Stream.suspend(() => {
-      // SAFETY: only the reading of a frame is taken of the codec, and a part schema reads
-      // as the plain schemas it is rebuilt from state it, which take no service; the
-      // services a schema states are those of writing it, which nothing here does.
-      const decode = Schema.decodeUnknownSync(
-        SchemaBinary.toCodec(schema) as Schema.Codec<
-          S["Type"],
-          Uint8Array<ArrayBuffer>,
-          never,
-          never
-        >,
-      );
+      const decode = Schema.decodeUnknownSync(SchemaBinary.toCodec(schema));
 
       // A reading starts afresh, so the bytes a chunk ended in the middle of a frame with
       // are held per reading rather than by the combinator.

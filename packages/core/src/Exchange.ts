@@ -18,7 +18,13 @@ import { Storage, type StorageError } from "@trajs/utils/Storage";
 import { Algorithm as HashAlgorithm, StreamHash } from "@trajs/utils/StreamHash";
 import { Context, Effect, Layer, Schema } from "effect";
 
-import { Contribution, part, service, type PartMembers } from "#/internal/exchange.ts";
+import {
+  Contribution,
+  part,
+  service,
+  type PartMembers,
+  type Readable,
+} from "#/internal/exchange.ts";
 import * as Trajectory from "#/Trajectory.ts";
 import { TrajectoryError } from "#/TrajectoryError.ts";
 
@@ -191,6 +197,12 @@ export type EncodingServices<C extends Trajectory.AnyConfig> = Schema.Union<
  * gives the parts as they are read, and reads the frame again — or, where those bytes
  * were kept by a reading before it, reads them from there.
  *
+ * A config a trajectory is read as is one whose parts take no service to read: a
+ * trajectory is read from its bytes synchronously rather than run, so a part read through
+ * a schema that needs a service is not one a trajectory is read with. What a kit states
+ * is read as the plain schemas it is rebuilt from, which take none; a toolkit is what can
+ * state one, through the schemas its own tools state their results with ({@link Part}).
+ *
  * Each fails with {@link TrajectoryError} where the trajectory cannot be read — bytes
  * that hold no header, a frame that does not decode, bytes that do not end with the
  * metadata — and with the failure of what served the bytes: the storage's own failure,
@@ -218,7 +230,7 @@ export interface Loaded {
    * of as the bytes they are read from.
    */
   readonly read: <C extends Trajectory.AnyConfig = Trajectory.AnyConfig>(
-    config?: C,
+    config?: C & Readable<C>,
   ) => Trajectory.Trajectory<C, TrajectoryError | StorageError, never>;
 
   /**
@@ -251,7 +263,7 @@ export interface Loaded {
    * @see {@link Loaded.read} for reading a trajectory without keeping its bytes.
    */
   readonly readCached: <C extends Trajectory.AnyConfig = Trajectory.AnyConfig>(
-    config?: C,
+    config?: C & Readable<C>,
   ) => Trajectory.Trajectory<C, TrajectoryError | StorageError | ByteStoreError, ByteStore>;
 }
 

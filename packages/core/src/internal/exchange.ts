@@ -220,45 +220,48 @@ const framesOf =
     });
 
 /**
- * A schema as the format states it: the part it reads and writes, and the services
- * of none.
+ * Reads the parts of a trajectory as a reading of one has them: the same parts, read with
+ * no service of their own ({@link Readable}).
  *
- * A part of a trajectory is rebuilt from plain schemas, so what those schemas state
- * is the services of none; a response part is the one that is not, and keeps what
- * the toolkit's own schemas state of it.
+ * A reading of a trajectory takes no service, and what the parts of a config of unknown kits
+ * state is not knowable, so they are read as ones that take none rather than shown to be.
  */
-type ServiceFree<S> =
-  S extends Schema.Codec<infer A, infer I, infer _D, infer _E>
-    ? Schema.Codec<A, I, never, never>
-    : never;
+const asReadable = <A, I, E>(parts: Schema.Codec<A, I, unknown, E>): Schema.Codec<A, I, never, E> =>
+  // SAFETY: a trajectory is read from its bytes synchronously rather than run, so a reading
+  // of one takes no service: what a schema states of reading a part is not carried by one,
+  // and what it states of writing one is kept as it is.
+  parts as Schema.Codec<A, I, never, E>;
 
 /** The part schemas {@link part} builds, in the order a trajectory states them. */
 export type PartMembers<C extends Trajectory.AnyConfig> = readonly [
-  ServiceFree<ReturnType<typeof PromptPartTagged<C["extrakit"]>>>,
-  ServiceFree<ReturnType<typeof Trajectory.SessionPart<C["extrakit"]>>>,
+  ReturnType<typeof PromptPartTagged<C["extrakit"]>>,
+  ReturnType<typeof Trajectory.SessionPart<C["extrakit"]>>,
   ReturnType<typeof Trajectory.ResponsePart<C["toolkit"], C["extrakit"], true>>,
-  ServiceFree<ReturnType<typeof Trajectory.EventPart<C["eventkit"]>>>,
-  ServiceFree<ReturnType<typeof Trajectory.MetricPart<C["metrickit"]>>>,
+  ReturnType<typeof Trajectory.EventPart<C["eventkit"]>>,
+  ReturnType<typeof Trajectory.MetricPart<C["metrickit"]>>,
 ];
+
+// HACK: which parts a config states a service for is computed rather than declared, so it
+// cannot be a constraint of the config: a config that states one fails it by a marker it
+// does not state instead. What such a config is refused with is `readable` rather than the
+// part that states the service, which is a message only the doc below explains.
+/**
+ * A config a trajectory is read as: one whose parts take no service to read, since a
+ * trajectory is read from the bytes it is kept in synchronously rather than run
+ * ({@link Loaded.read}).
+ *
+ * A part is read as the plain schemas a trajectory is rebuilt from, so what a kit states
+ * of its contributions is read with no service; a response part is the one part read
+ * through the toolkit's own schemas, so a toolkit whose own schemas need a service to read
+ * a result of one of its tools is not one a trajectory is read with.
+ */
+export type Readable<C extends Trajectory.AnyConfig> = C &
+  (Schema.Union<PartMembers<C>>["DecodingServices"] extends never
+    ? unknown
+    : { readonly readable: never });
 
 /** The part a trajectory holds, as the format reads and writes one. */
 type ProducedPart<C extends Trajectory.AnyConfig> = Schema.Union<PartMembers<C>>["Type"];
-
-/**
- * A part schema as the format reads and writes it: the same part, stated as one that
- * needs no service of its own.
- *
- * A part of a trajectory is rebuilt from plain schemas, so what one takes is no
- * service of its own; a response part is the one that is not, so it is not passed
- * through here.
- */
-const serviceFree = <A, I>(
-  schema: Schema.Codec<A, I, unknown, unknown>,
-): Schema.Codec<A, I, never, never> =>
-  // SAFETY: a part schema states the services of the plain schemas it is rebuilt from,
-  // which are none; the loose statement Effect's `mapFields` and `mapMembers` leave
-  // behind is what this drops.
-  schema as Schema.Codec<A, I, never, never>;
 
 /**
  * The parts of a trajectory as the frames of the format carry them.
@@ -280,16 +283,16 @@ export const part = <C extends Trajectory.AnyConfig>(config: C): Schema.Union<Pa
   const members: PartMembers<C> = [
     // Every member is stated with the kit of the config, since what a part is read as
     // is what that kit states of it rather than what the call alone infers.
-    serviceFree(PromptPartTagged<C["extrakit"]>(config.extrakit)),
-    serviceFree(Trajectory.SessionPart<C["extrakit"]>(config.extrakit)),
+    PromptPartTagged<C["extrakit"]>(config.extrakit),
+    Trajectory.SessionPart<C["extrakit"]>(config.extrakit),
     // What a trajectory is read as, whatever it was written as.
     Trajectory.ResponsePart<C["toolkit"], C["extrakit"], true>({
       toolkit: config.toolkit,
       extrakit: config.extrakit,
       stream: true,
     }),
-    serviceFree(Trajectory.EventPart<C["eventkit"]>(config.eventkit)),
-    serviceFree(Trajectory.MetricPart<C["metrickit"]>(config.metrickit)),
+    Trajectory.EventPart<C["eventkit"]>(config.eventkit),
+    Trajectory.MetricPart<C["metrickit"]>(config.metrickit),
   ];
 
   return Schema.Union(members);
@@ -526,17 +529,17 @@ const reading =
   // is what `Trajectory.anyConfig` is.
   <C extends Trajectory.AnyConfig = Trajectory.AnyConfig>(
     config: C = Trajectory.anyConfig as C,
-  ): Trajectory.Trajectory<C, E | TrajectoryError, R> =>
-    trajectoryOf(
+  ): Trajectory.Trajectory<C, E | TrajectoryError, R> => {
+    const parts = asReadable(part(config));
+    const frames = readFrames(parts);
+
+    return trajectoryOf(
       // SAFETY: what a body reads as is the parts of the config it is read with,
       // which is what the trajectory those parts make holds.
-      bytes.pipe(readFrames(part(config))) as Stream.Stream<
-        Trajectory.Part<C>,
-        E | TrajectoryError,
-        R
-      >,
+      bytes.pipe(frames) as Stream.Stream<Trajectory.Part<C>, E | TrajectoryError, R>,
       config,
     );
+  };
 
 /**
  * The key a trajectory's bytes are kept under: the hash and the digest the trajectory
