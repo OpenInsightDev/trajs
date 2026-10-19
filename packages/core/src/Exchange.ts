@@ -7,14 +7,16 @@
  * states of itself, the metadata it ends with, and the trajectory its parts make. An
  * exchange performs no IO of its own — what writes and reads the bytes is a storage, a
  * compression and a hash from `@trajs/utils`, provided with a layer such as
- * {@link Exchange.layer} or one a platform package states.
+ * {@link Exchange.layer} or one a platform package states — and a reading that keeps the
+ * bytes of a frame between its readings requires a store of sequences beside them
+ * ({@link Loaded.readCached}).
  */
 
+import type { ByteStore, ByteStoreError } from "@trajs/utils/ByteStore";
 import { Algorithm as CompressionAlgorithm, Compression } from "@trajs/utils/Compression";
 import { Storage, type StorageError } from "@trajs/utils/Storage";
 import { Algorithm as HashAlgorithm, StreamHash } from "@trajs/utils/StreamHash";
 import { Context, Effect, Layer, Schema } from "effect";
-import type { KeyValueStore } from "effect/persistence";
 
 import { Contribution, part, service, type PartMembers } from "#/internal/exchange.ts";
 import * as Trajectory from "#/Trajectory.ts";
@@ -234,23 +236,23 @@ export interface Loaded {
    * with them: the bytes are the frame a trajectory is carried in, so they are read as
    * the kits any reading of it states.
    *
-   * The store is the key/value store of `effect/persistence` (`KeyValueStore`), which a
+   * The store is a store of byte sequences (`@trajs/utils`'s `ByteStore`), which a
    * reading of a trajectory this way requires and one through {@link Loaded.read} does
-   * not: a store's layers are its own — memory, a file system, a database — so where
+   * not: a store's layers are their own — memory, a file system, a database — so where
    * the bytes live is the program's to say, and one that reads a trajectory again
-   * provides one. A frame is held whole to be written, so this reads a trajectory that
-   * is read more than once rather than one too large to hold; a reading that ends before
-   * the frame does keeps nothing.
+   * provides a store. `ByteStore.layer` keeps them in memory, which is what a reading
+   * that keeps them no longer than the program runs takes, and `ByteStore.layerKVStore`
+   * keeps them in the key/value store a program states.
+   *
+   * The frame is kept in that store as it is read rather than held whole, and is cut
+   * into chunks of a size the store states: so a trajectory too large to hold is read
+   * this way all the same, and a reading that ends before the frame does keeps nothing.
    *
    * @see {@link Loaded.read} for reading a trajectory without keeping its bytes.
    */
   readonly readCached: <C extends Trajectory.AnyConfig = Trajectory.AnyConfig>(
     config?: C,
-  ) => Trajectory.Trajectory<
-    C,
-    TrajectoryError | StorageError | KeyValueStore.KeyValueStoreError,
-    KeyValueStore.KeyValueStore
-  >;
+  ) => Trajectory.Trajectory<C, TrajectoryError | StorageError | ByteStoreError, ByteStore>;
 }
 
 /**
@@ -370,7 +372,11 @@ export class Exchange extends Context.Service<Exchange, Service>()("trajs/core/E
    * what hashes the parts is the hash it is provided with, and what holds the bytes of a
    * trajectory is the storage — so the layer requires all three rather than holding any.
    * These are `@trajs/utils`'s services: a program provides the layer a platform package
-   * states them with, such as `@trajs/platform-node` or `@trajs/platform-browser`.
+   * states them with, such as `@trajs/platform-node` or `@trajs/platform-browser`. A
+   * reading that keeps the bytes of a frame requires a store of sequences beside them
+   * ({@link Loaded.readCached}), which this layer holds no more than it holds a storage:
+   * a program provides one (`@trajs/utils`'s `ByteStore.layer`) where it reads
+   * trajectories again.
    *
    * @see {@link Service} for the exchange the layer provides.
    * @category constructors

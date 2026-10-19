@@ -5,7 +5,9 @@
  * What holds them is the key/value store of `effect/persistence`
  * (`KeyValueStore`) — memory, a file system, a database — so where the bytes live
  * is the store layer's to say rather than this module's, and nothing of how a
- * sequence is kept changes when another store is provided. What is kept of a
+ * sequence is kept changes when another store is provided. The store this package
+ * ships keeps them in memory ({@link layer}), and one over the key/value store a
+ * program holds is stated beside it ({@link layerKVStore}). What is kept of a
  * sequence is the chunks it is cut into rather than one value, so a sequence too
  * large for a store to hold whole is still written to it and read from it: what a
  * read reaches is read, and the chunks it does not are left where they are.
@@ -47,9 +49,9 @@ export interface WriteOptions {
  *
  * **When to use**
  *
- * Use where a store is built ({@link layer}) and how it cuts a sequence matters —
- * the size a store underneath it serves, or the quota one of a limited size
- * imposes.
+ * Use where a store is built ({@link layer}, {@link layerKVStore}) and how it cuts a
+ * sequence matters — the size a store underneath it serves, or the quota one of a
+ * limited size imposes.
  *
  * **Details**
  *
@@ -116,7 +118,6 @@ export const defaultChunkSize = 64 * 1024;
  *
  * ```ts import.meta.vitest
  * import { Effect, Stream } from "effect"
- * import { KeyValueStore } from "effect/persistence"
  *
  * import { ByteStore } from "@trajs/utils"
  *
@@ -130,10 +131,7 @@ export const defaultChunkSize = 64 * 1024;
  * })
  *
  * const bytes = await Effect.runPromise(
- *   program.pipe(
- *     Effect.provide(ByteStore.layer({ chunkSize: 4 })),
- *     Effect.provide(KeyValueStore.layerMemory),
- *   ),
+ *   program.pipe(Effect.provide(ByteStore.layer({ chunkSize: 4 }))),
  * )
  *
  * new TextDecoder().decode(bytes) // => "ajs"
@@ -191,8 +189,8 @@ export interface ByteStore {
  *
  * **When to use**
  *
- * Use to require a store of a program, and {@link layer} or {@link make} to provide
- * it.
+ * Use to require a store of a program, and {@link layer}, {@link layerKVStore} or
+ * {@link make} to provide it.
  *
  * **Details**
  *
@@ -476,7 +474,7 @@ const prepare = (
  *
  * Use where a program holds the store itself rather than requiring the one of
  * `effect/persistence` — building this over a store only it knows, say — or to state
- * the layer this package ships from ({@link layer}).
+ * the layer over a store at hand from ({@link layerKVStore}).
  *
  * **Details**
  *
@@ -486,7 +484,7 @@ const prepare = (
  * arrived in.
  *
  * @see {@link ByteStore} for what the store gives.
- * @see {@link layer} for the same store as a layer.
+ * @see {@link layerKVStore} for the same store as a layer over a key/value store.
  * @category constructors
  */
 export const make = (store: KeyValueStore.KeyValueStore, options?: Options): ByteStore => {
@@ -537,13 +535,38 @@ export const make = (store: KeyValueStore.KeyValueStore, options?: Options): Byt
  * sequence written by a store built with another size.
  *
  * @see {@link ByteStore} for the store this provides.
+ * @see {@link layer} for the same store over the key/value store in memory.
  * @see {@link make} for the same store built over a store at hand.
  * @category layers
  */
-export const layer = (
+export const layerKVStore = (
   options?: Options,
 ): Layer.Layer<ByteStore, never, KeyValueStore.KeyValueStore> =>
   Layer.effect(
     ByteStore,
     KeyValueStore.KeyValueStore.pipe(Effect.map((store) => make(store, options))),
   );
+
+/**
+ * The store this package ships where a program states nothing: byte sequences kept
+ * in the key/value store in memory.
+ *
+ * **When to use**
+ *
+ * Use where the bytes are kept for as long as the program runs and no longer — what a
+ * reading of a trajectory keeps between its readings, say — and provide
+ * {@link layerKVStore} instead where they are to outlive it.
+ *
+ * **Details**
+ *
+ * It is {@link layerKVStore} over `KeyValueStore.layerMemory`, so a sequence is kept
+ * in the chunks that store cuts it into ({@link Options}) and nothing of it is left
+ * when the program ends; nothing else is required of a program, since the key/value
+ * store is this layer's own.
+ *
+ * @see {@link ByteStore} for the store this provides.
+ * @see {@link layerKVStore} for the same store over a key/value store a program states.
+ * @category layers
+ */
+export const layer = (options?: Options): Layer.Layer<ByteStore> =>
+  layerKVStore(options).pipe(Layer.provide(KeyValueStore.layerMemory));

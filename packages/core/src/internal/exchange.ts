@@ -19,12 +19,12 @@
  */
 
 import type { Bytes } from "@trajs/utils/Bytes";
+import { ByteStore, type ByteStoreError } from "@trajs/utils/ByteStore";
 import type { Compression, CompressionError } from "@trajs/utils/Compression";
 import type { Storage, StorageError } from "@trajs/utils/Storage";
 import type { StreamHash } from "@trajs/utils/StreamHash";
 import { Effect, Fiber, Schema, SchemaTransformation, Stream } from "effect";
 import { SchemaBinary } from "effect/encoding";
-import { KeyValueStore } from "effect/persistence";
 
 import * as Event from "#/Event.ts";
 import {
@@ -36,7 +36,7 @@ import {
   type Service,
 } from "#/Exchange.ts";
 import type * as Extra from "#/Extra.ts";
-import { joined, readFrames } from "#/internal/frames.ts";
+import { readFrames } from "#/internal/frames.ts";
 import * as Metric from "#/Metric.ts";
 import * as Prompt from "#/Prompt.ts";
 import * as Toolkit from "#/Toolkit.ts";
@@ -550,47 +550,43 @@ const nameOf = (metadata: Metadata): string => `${metadata.hash}:${metadata.dige
 
 /**
  * The bytes of a trajectory's frame as a store keeps them, and from the storage as the
- * store does not hold them: the store is read first, and the bytes read from the storage
- * the first time are kept, so reading a trajectory again — here, or in a load of it with
- * the same bytes — takes them from the store rather than reading the storage and the
- * frame a second time.
+ * store does not hold them: the store is read first, and the frame the storage serves is
+ * kept as it arrives, so reading a trajectory again — here, or in a load of it with the
+ * same bytes — takes them from the store rather than reading the storage and the frame a
+ * second time.
  *
- * What keeps them is the key/value store of `effect/persistence`, which a trajectory
- * read this way requires and one read through `read` does not: the store's own layers
- * say where the bytes live — memory, a file system, a database — so a program provides
- * one where it reads trajectories again, and an exchange holds none.
+ * What keeps them is a store of byte sequences ({@link ByteStore}), which writes a
+ * sequence as it arrives and reads one back at random: the frame is kept in the chunks
+ * that store cuts it into rather than held whole, so a trajectory too large to hold is
+ * kept this way all the same. Where those chunks are is the store layer's to say —
+ * memory, a file system, a database — which is what a trajectory read this way requires
+ * and one read through `read` does not: a program provides a store where it reads
+ * trajectories again, and an exchange holds none.
  *
- * A store is given one value, so the frame is held whole to be written, and it is
- * written once it has been read whole: a reading that ends before the frame does — a
- * consumer that takes what it came for and stops — keeps nothing rather than a prefix
- * of the frame.
+ * A store names a sequence by the name of a trajectory alone ({@link nameOf}), and a
+ * sequence is served only once it is whole: the record that names one is written once the
+ * frame has been read to its end, so a reading that ends before the frame does — a
+ * consumer that takes what it came for and stops — keeps nothing another reading is
+ * served, and what it wrote before stopping is dropped when the sequence is written again.
  */
 const keptBytes = <E, R>(
   metadata: Metadata,
   frame: Stream.Stream<Uint8Array, E, R>,
-): Stream.Stream<
-  Uint8Array,
-  E | KeyValueStore.KeyValueStoreError,
-  R | KeyValueStore.KeyValueStore
-> => {
+): Stream.Stream<Uint8Array, E | ByteStoreError, R | ByteStore> => {
   const key = nameOf(metadata);
 
   return Effect.gen(function* () {
-    const store = yield* KeyValueStore.KeyValueStore;
-    const held = yield* store.getUint8Array(key);
+    const store = yield* ByteStore;
 
-    if (held !== undefined) {
-      return Stream.make(held);
+    // What the store holds is the frame of a reading before this one, so it is served
+    // from there rather than read from the storage a second time.
+    if (yield* store.has(key)) {
+      return (yield* store.read(key)).stream();
     }
 
-    // What is read is kept as it arrives, and joined once it has all arrived:
-    // what a store is given is one value rather than the chunks a read takes.
-    const chunks: Array<Uint8Array> = [];
-
-    return frame.pipe(
-      Stream.tap((chunk) => Effect.sync(() => void chunks.push(chunk))),
-      Stream.onEnd(Effect.suspend(() => store.set(key, joined(new Uint8Array(), chunks)))),
-    );
+    // The frame is kept as it is read: the store writes a sequence as it arrives, and the
+    // bytes are passed on to the reading all the same.
+    return frame.pipe(Stream.tapSink(store.write(key)));
   }).pipe(Stream.unwrap);
 };
 
