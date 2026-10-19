@@ -20,6 +20,7 @@
     ".": "./src/index.ts",
     "./package.json": "./package.json",
     "./*": "./src/*.ts",
+    "./internal/*": null,
     "./*/index": null
   },
   "publishConfig": {
@@ -27,6 +28,7 @@
       ".": "./dist/index.mjs",
       "./package.json": "./package.json",
       "./*": "./dist/*.mjs",
+      "./internal/*": null,
       "./*/index": null
     },
     "access": "public"

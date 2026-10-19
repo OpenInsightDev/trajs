@@ -30,6 +30,10 @@ release. Add a tool name to select part of the graph. For example, run
 
 - Prefer `.pipe()` over function composition.
 
+## Package Layout
+
+- Keep a public module's private logic in the package's `src/internal/` (lowercase files, imported as `#/internal/*.ts`, never re-exported), and block `"./internal/*"` from the public surface.
+
 ## Comment Style
 
 Public API comments strictly follow the [Effect](https://github.com/Effect-TS/effect) documentation style: every public module and export has a JSDoc block with a description, optional `**When to use**`, `**Details**` and `**Example**` sections in that order, and `@see` and `@category` tags.

@@ -12,6 +12,7 @@ export default defineConfig({
       customExports: (exports, { isPublish }) => ({
         ...exports,
         "./*": isPublish ? "./dist/*.mjs" : "./src/*.ts",
+        "./internal/*": null,
         "./*/index": null,
       }),
     },
