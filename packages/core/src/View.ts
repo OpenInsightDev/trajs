@@ -238,7 +238,7 @@ export type Conversation = ReadonlyArray<Prompt.Message>;
  * ```
  *
  * @see {@link Conversation} for one session's messages.
- * @see {@link Session.sessions} for the sessions a trajectory is read as.
+ * @see {@link Session.toSessions} for the sessions a trajectory is read as.
  * @see {@link prompt} for the whole trajectory read as one prompt instead.
  * @category combinators
  */

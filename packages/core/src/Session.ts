@@ -3,7 +3,7 @@
  *
  * A trajectory carries the parts of all its sessions in one stream (see
  * {@link Trajectory}), so its sessions are read from that stream rather than from a
- * structure built apart from it: {@link sessions} reads a trajectory as the
+ * structure built apart from it: {@link toSessions} reads a trajectory as the
  * {@link Sessions} it declares, {@link of} reads the parts of one session by its id,
  * and a session forked off another continues from it through
  * {@link Session.forkedFrom} rather than repeating its parts.
@@ -14,6 +14,33 @@ import { type Option, Stream } from "effect";
 import { find, read } from "#/internal/sessions.ts";
 import type * as Trajectory from "#/Trajectory.ts";
 import type { TrajectoryError } from "#/TrajectoryError.ts";
+
+/**
+ * A part of a trajectory a session continues from: a prompt, a response, or the
+ * declaration of a session.
+ *
+ * **When to use**
+ *
+ * Use to type the part of another session a session carries on from — where it was
+ * started — rather than every part a trajectory holds.
+ *
+ * **Details**
+ *
+ * A session produces the prompts it was given, the responses it returned, and the
+ * declaration that names it (see {@link Trajectory.Part}), and what a session forked
+ * off it inherited is those parts up to and including the one a `fork` names. The
+ * parts a kit contributes of its own — the events of a trajectory, and its metrics —
+ * are read with the parts they are attached to, so they are not a part a session
+ * continues from and a `fork` never names one.
+ *
+ * @see {@link Fork} for the session a session forked from and the part it continues from.
+ * @see {@link Trajectory.Part} for every part a trajectory holds.
+ * @category models
+ */
+export type ForkPart<Config extends Trajectory.AnyConfig> =
+  | Trajectory.PromptPart<Config["extrakit"]>
+  | Trajectory.SessionPart<Config["extrakit"]>
+  | Trajectory.ResponsePart<Config["toolkit"], Config["extrakit"], Config["stream"]>;
 
 /**
  * The session a session forked from, and the part of it that it continues from.
@@ -27,21 +54,22 @@ import type { TrajectoryError } from "#/TrajectoryError.ts";
  *
  * `session` is the session that produced `part`, and the parts it produced up to and
  * including that part are what this session inherited from it; the ones after are the
- * parts it produced for itself. `part` is the part a {@link Trajectory.SessionPart}'s
- * `fork` named by `uuid`.
+ * parts it produced for itself. `part` is the {@link ForkPart} a
+ * {@link Trajectory.SessionPart}'s `fork` named by `uuid`.
  *
  * A session that continues from nothing has no `fork`, and its
  * {@link Session.forkedFrom} is `None`. A `fork` naming a part the trajectory does not
  * hold by the time it is read is not a session forked from nothing: the reading fails
- * with a {@link TrajectoryError} (see {@link sessions}).
+ * with a {@link TrajectoryError} (see {@link toSessions}).
  *
  * @see {@link Session.forkedFrom} for the fork a session is read with.
+ * @see {@link ForkPart} for the parts a fork names.
  * @see {@link Trajectory.SessionPart} for the part that produces one.
  * @category models
  */
 export interface Fork<Config extends Trajectory.AnyConfig, E = never, R = never> {
   readonly session: Session<Config, E, R>;
-  readonly part: Trajectory.Part<Config>;
+  readonly part: ForkPart<Config>;
 }
 
 /**
@@ -62,7 +90,7 @@ export interface Fork<Config extends Trajectory.AnyConfig, E = never, R = never>
  * declaration with no `fork` continues from nothing, and its session is a root. A
  * trajectory that declares a session after the parts it produced, or reaches a session
  * before the part it continues from, is one the reading fails with (see
- * {@link sessions}).
+ * {@link toSessions}).
  *
  * `parts` are the parts this session produced — those of the trajectory that name it,
  * in order, beginning with the `SessionPart` that declared it, or the part the
@@ -76,7 +104,7 @@ export interface Fork<Config extends Trajectory.AnyConfig, E = never, R = never>
  * `parts` and `forkedBy` are read from the trajectory the session was produced in: they
  * fail with `E` on top of the {@link TrajectoryError} a produced trajectory fails with,
  * and require the services `R` names. Each is a reading of its own, served by the
- * reading of the trajectory that emitted the session (see {@link sessions}), so the
+ * reading of the trajectory that emitted the session (see {@link toSessions}), so the
  * parts of a session are taken by one reader rather than read by each.
  *
  * @see {@link Fork} for the session this one forked from.
@@ -126,7 +154,7 @@ export type AnySession = Session<Trajectory.AnyConfig, any, any>;
  * The stream fails with `E` on top of the {@link TrajectoryError} a produced trajectory
  * fails with, and requires the services `R` names.
  *
- * @see {@link sessions} for reading a trajectory as the sessions it produces.
+ * @see {@link toSessions} for reading a trajectory as the sessions it produces.
  * @see {@link Session} for one session of a trajectory.
  * @category models
  */
@@ -201,7 +229,7 @@ export type AnySessions = Sessions<Trajectory.AnyConfig, any, any>;
  *   forking
  * )
  *
- * const roots = Array.from(await Effect.runPromise(Stream.runCollect(Session.sessions(trajectory))))
+ * const roots = Array.from(await Effect.runPromise(Stream.runCollect(Session.toSessions(trajectory))))
  * roots.map((session) => session.id) // => ["asking"]
  *
  * const forks = Array.from(await Effect.runPromise(Stream.runCollect(roots[0].forkedBy)))
@@ -213,7 +241,7 @@ export type AnySessions = Sessions<Trajectory.AnyConfig, any, any>;
  * @see {@link of} for reading the parts of one session by its id.
  * @category constructors
  */
-export const sessions = <Config extends Trajectory.AnyConfig, E, R>(
+export const toSessions = <Config extends Trajectory.AnyConfig, E, R>(
   trajectory: Trajectory.TrajectoryStream<Config, E, R>,
 ): Sessions<Config, E, R> => read(trajectory);
 
@@ -240,7 +268,7 @@ export const sessions = <Config extends Trajectory.AnyConfig, E, R>(
  * The stream fails with `E` on top of the {@link TrajectoryError} a produced trajectory
  * fails with, and requires the services `R` names.
  *
- * @see {@link sessions} for the sessions it is found among.
+ * @see {@link toSessions} for the sessions it is found among.
  * @see {@link Fork} for the part a session continues from.
  * @see {@link Session.parts} for the parts of a session already in hand.
  * @category combinators

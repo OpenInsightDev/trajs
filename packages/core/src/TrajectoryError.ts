@@ -56,10 +56,11 @@ export class ToolDecodeError extends Data.TaggedError("ToolDecodeError")<{
  * **Details**
  *
  * - `"unproduced-fork"`: the session continues from a part the trajectory does not
- *   hold. A `fork` names a part produced before the declaration that reads it, so
- *   a session that continues from a part the trajectory has not reached cannot be
- *   read — which is also what a cycle of forks is, no session in it being
- *   reachable without a fork into the future.
+ *   hold, or one no session continues from — a part that is not a prompt, response or
+ *   session part. A `fork` names a part produced before the declaration that reads it,
+ *   so a session that continues from a part the trajectory has not reached cannot be
+ *   read — which is also what a cycle of forks is, no session in it being reachable
+ *   without a fork into the future.
  * - `"late-declaration"`: the session was declared after the parts it produced. A
  *   session is declared before the parts it produced, so there is no declaration
  *   left to wait for.
@@ -74,7 +75,8 @@ export type SessionErrorReason = "unproduced-fork" | "late-declaration" | "sever
 
 /** What each reason says is wrong with the session it names, as {@link SessionError} words it. */
 const sessionFailure: Record<SessionErrorReason, string> = {
-  "unproduced-fork": "it continues from a part the trajectory does not hold",
+  "unproduced-fork":
+    "it continues from a part the trajectory does not hold, or one no session continues from",
   "late-declaration": "it was declared after the parts it produced",
   "several-sessions": "the trajectory declares more than one session",
 };

@@ -166,7 +166,7 @@ const openingAnswer = [
       "So the sessions of a trajectory are read by grouping its parts, once:",
       "",
       "```ts",
-      "const sessions = await Effect.runPromise(Stream.runCollect(Session.sessions(trajectory)))",
+      "const sessions = await Effect.runPromise(Stream.runCollect(Session.toSessions(trajectory)))",
       "```",
       "",
       "What tells the grouping apart from a mere partition is the fork: a session that continues from one of the parts of another holds none of that session's parts itself.",

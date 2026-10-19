@@ -130,7 +130,7 @@ const turnsOf = (parts: ReadonlyArray<Part>): Effect.Effect<ReadonlyArray<Turn>>
 /**
  * One session as the viewer reads it, over the stretches it inherited.
  *
- * A session is read from the sessions handed out by {@link Session.sessions}, which
+ * A session is read from the sessions handed out by {@link Session.toSessions}, which
  * route the parts of a trajectory to the session that names them as it is read, so
  * the parts of a session are taken by this one reader rather than read again.
  */
@@ -197,7 +197,7 @@ export const read = (bytes: Uint8Array): Effect.Effect<Trajectory, Failure, Scop
 
     const loaded = yield* exchange.load(Handed);
 
-    const roots = yield* Session.sessions(loaded.read()).pipe(Stream.runCollect);
+    const roots = yield* Session.toSessions(loaded.read()).pipe(Stream.runCollect);
 
     return {
       roots: yield* Effect.forEach(roots, (session) => readSession(session, [])),

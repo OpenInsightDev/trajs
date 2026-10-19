@@ -145,7 +145,7 @@ export const readConversations = <Config extends Trajectory.AnyConfig, E, R>(
   trajectory: Trajectory.TrajectoryStream<Config, E, R>,
 ): Effect.Effect<Record<string, Conversation>, E | TrajectoryError, R> =>
   Effect.gen(function* () {
-    const roots = yield* Session.sessions(trajectory).pipe(Stream.runCollect);
+    const roots = yield* Session.toSessions(trajectory).pipe(Stream.runCollect);
 
     const read = yield* Effect.forEach(roots, (session) => readSession(session, []));
 

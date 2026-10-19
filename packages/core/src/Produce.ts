@@ -405,7 +405,7 @@ export type ProduceSession<
  * that produces in it, before any of the parts it holds. It fails with the
  * {@link TrajectoryError} of a trajectory whose sessions cannot be read: an `id` a
  * session has already declared would be declared after the parts of that session,
- * and a `fork` naming a part the run has not written has nothing to continue
+ * and a `fork` naming a part no session continues from has nothing to continue
  * from. What a session is declared with beyond `id` and `fork` is the extra data
  * the kit declares of a session part.
  *
@@ -455,7 +455,7 @@ type ProduceFn<
  *   since no more of it can arrive.
  * - Creating a session fails rather than producing a trajectory no reader can reach:
  *   an `id` a session has already declared would be declared after the parts of that
- *   session, and a `fork` naming a part the run has not written has nothing to
+ *   session, and a `fork` naming a part no session continues from has nothing to
  *   continue from — see {@link Producer}.
  *
  * **Example** (Producing a run that answers a prompt)
@@ -525,14 +525,20 @@ export const produce =
       const parts = yield* Queue.unbounded<Trajectory.Part<Config>, Cause.Done>();
 
       const declared = new Set<string>();
-      const written = new Set<string>();
+      /** The parts the run wrote that a session continues from, by `uuid`: what a `fork` is resolved against. */
+      const forkable = new Set<string>();
 
       const enqueue = <P extends Trajectory.Part<Config> & { readonly uuid: string }>(
         part: P,
       ): Effect.Effect<P> =>
         Effect.gen(function* () {
           yield* Queue.offer(parts, part);
-          written.add(part.uuid);
+
+          // A `fork` names a part a session continues from, so an event is written
+          // without being remembered to fork from.
+          if (part._tag !== "Event") {
+            forkable.add(part.uuid);
+          }
 
           return part;
         });
@@ -558,9 +564,9 @@ export const produce =
               return yield* Effect.fail(TrajectoryError.session(id, "late-declaration"));
             }
 
-            // A `fork` names a part the trajectory holds by the time it is read, so a
-            // part the run has not written has nothing to continue from.
-            if (fork !== undefined && !written.has(fork)) {
+            // A `fork` names a part a session continues from, so a part the run did not
+            // write as one has nothing to continue from.
+            if (fork !== undefined && !forkable.has(fork)) {
               return yield* Effect.fail(TrajectoryError.session(id, "unproduced-fork"));
             }
 

@@ -166,16 +166,16 @@ export const promptPart =
  * - `id` names the session the parts after the declaration are produced in, and
  *   `uuid` identifies the declaration.
  * - `fork` names the part a session continues from, where it continues from another:
- *   it is the `uuid` of a part of the forked-from session rather than that session's
- *   id, so a fork relates two parts. A session is declared before the parts it
- *   produces, so a fork names a part the trajectory already reached — see
+ *   it is the `uuid` of a {@link Session.ForkPart} of the forked-from session rather
+ *   than that session's id, so a fork relates two parts. A session is declared before
+ *   the parts it produces, so a fork names a part the trajectory already reached — see
  *   {@link TrajectoryError.SessionError} for what reading one fails with where it has
  *   not.
  * - `extra` is the extra data the kit declares of a session part
  *   ({@link Extra.ExtraRecord}).
  *
  * @see {@link sessionPart} for building a part of this schema.
- * @see {@link Session.sessions} for reading a trajectory as its sessions.
+ * @see {@link Session.toSessions} for reading a trajectory as its sessions.
  * @category schemas
  */
 export const SessionPart = <K extends Extra.AnyKit>(extrakit: K) =>
@@ -217,9 +217,9 @@ export type SessionPartEncoded = Schema.Codec.Encoded<ReturnType<typeof SessionP
  *
  * - The kit is asked for first ({@link SessionPart}) and the fields second, so the
  *   part states the extra data of that kit.
- * - `fork` is the `uuid` of the part the session continues from — a part of another
- *   session, not the session itself — and `extra` may be left out, the part then
- *   stating none of it.
+ * - `fork` is the `uuid` of the {@link Session.ForkPart} the session continues from —
+ *   a part of another session, not the session itself — and `extra` may be left out,
+ *   the part then stating none of it.
  *
  * **Example** (Continuing a session from the part a fork left off at)
  *
@@ -241,7 +241,7 @@ export type SessionPartEncoded = Schema.Codec.Encoded<ReturnType<typeof SessionP
  * ```
  *
  * @see {@link SessionPart} for the schema the part is built of.
- * @see {@link Session.sessions} for reading a trajectory as its sessions.
+ * @see {@link Session.toSessions} for reading a trajectory as its sessions.
  * @category constructors
  */
 export const sessionPart =

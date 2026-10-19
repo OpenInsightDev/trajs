@@ -1,15 +1,15 @@
 /**
- * The reading behind {@link Session.sessions}: one pass over a trajectory routes
+ * The reading behind {@link Session.toSessions}: one pass over a trajectory routes
  * each of its parts to the session that names it, so the sessions of a trajectory
  * are read as it is produced rather than once it has ended.
  *
  * Nothing here is published: a program reaches the reading through
- * `Session.sessions` and `Session.of`.
+ * `Session.toSessions` and `Session.of`.
  */
 
 import { Cause, Effect, Exit, Option, Queue, Stream } from "effect";
 
-import type { Fork, Session, Sessions } from "#/Session.ts";
+import type { Fork, ForkPart, Session, Sessions } from "#/Session.ts";
 import type * as Trajectory from "#/Trajectory.ts";
 import { TrajectoryError } from "#/TrajectoryError.ts";
 
@@ -46,7 +46,7 @@ interface Opened<Config extends Trajectory.AnyConfig, E, R> {
  */
 interface Produced<Config extends Trajectory.AnyConfig, E, R> {
   readonly reading: Opened<Config, E, R>;
-  readonly part: Trajectory.Part<Config>;
+  readonly part: ForkPart<Config>;
 }
 
 /**
@@ -83,7 +83,7 @@ export const read = <Config extends Trajectory.AnyConfig, E, R>(
 
     /** The sessions the trajectory has named so far, by id, in the order it first named them. */
     const opened = new Map<string, Opened<Config, E, R>>();
-    /** The session that produced each part read so far, by the part's `uuid`: what a `fork` is resolved against. */
+    /** The session that produced each part a session continues from, by the part's `uuid`: what a `fork` is resolved against. */
     const produced = new Map<string, Produced<Config, E, R>>();
 
     /** The reading of the session `id`, opened on the first part that names it. */
@@ -216,8 +216,12 @@ export const read = <Config extends Trajectory.AnyConfig, E, R>(
         const reading = yield* opening(part._tag === "Session" ? part.id : part.sessionId);
 
         // A `fork` names the part it continues from by `uuid` rather than by session,
-        // so the reading remembers the session that produced every part it reads.
-        produced.set(part.uuid, { reading, part });
+        // so the reading remembers the session that produced each part a session
+        // continues from — the prompt, response and session parts — and not the events
+        // a kit produces beside them.
+        if (part._tag !== "Event") {
+          produced.set(part.uuid, { reading, part });
+        }
 
         yield* Queue.offer(reading.parts, part);
 
