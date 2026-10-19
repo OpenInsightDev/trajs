@@ -37,10 +37,8 @@ const LengthPrefixBytes = 10;
  * The first frame `bytes` holds whole, with how many bytes of `bytes` it takes, or
  * `undefined` where `bytes` do not hold one.
  *
- * A frame states the length of what follows it before it states anything else of it
- * ({@link SchemaBinary}), so where a frame ends is read off the bytes themselves: what a
- * frame carries does not have to be read to know how much of it there is. The length
- * prefix is the only part of a frame read here ({@link readFrames}).
+ * Where a frame ends is read off the bytes themselves, so what a frame carries does not
+ * have to be read to know how much of it there is.
  */
 const frameOf = (bytes: Uint8Array): readonly [Uint8Array, number] | undefined => {
   let prefix = 0;
@@ -114,13 +112,31 @@ export const readFrames =
   <S extends Schema.Constraint>(schema: S) =>
   <E, R>(body: Stream.Stream<Uint8Array, E, R>): Stream.Stream<S["Type"], E | TrajectoryError, R> =>
     Stream.suspend(() => {
-      // A frame is read by a parser of its own rather than by one parser for the body: a
-      // parser that failed a frame is spent, and the frames after it are read as if it
-      // were not there.
-      const read = (frame: Uint8Array) =>
-        SchemaBinary.parser(schema)
-          .feed(frame)
-          .pipe(Effect.orElseSucceed(() => []));
+      // The frames are not handed to one parser for the whole body: a parser that failed
+      // a frame is spent, and the frames after it are read as if it were not there. A
+      // codec states one frame of the schema and `SchemaBinary` keeps one per schema, so
+      // it is derived here once rather than for every frame, and a frame it does not read
+      // is the failure it throws — which leaves the frames after it untouched.
+      const decode = Schema.decodeUnknownSync(
+        // SAFETY: a frame is read synchronously, which only a reading that takes no
+        // service can do; what a schema states its own reading takes is not taken by
+        // `readFrames`, whose reading carries the services of the stream it is given.
+        SchemaBinary.toCodec(schema) as Schema.Codec<
+          S["Type"],
+          Uint8Array<ArrayBuffer>,
+          never,
+          never
+        >,
+      );
+
+      // A frame the schema does not read states no value of the body.
+      const read = (frame: Uint8Array): ReadonlyArray<S["Type"]> => {
+        try {
+          return [decode(frame)];
+        } catch {
+          return [];
+        }
+      };
 
       // The bytes a chunk ended in the middle of a frame with, which the next chunk
       // completes.
@@ -143,9 +159,9 @@ export const readFrames =
 
             carried = rest;
 
-            return Effect.forEach(frames, read, { concurrency: 1 }).pipe(
-              Effect.map((values) => [state, Arr.flatten(values)] as const),
-            );
+            // Reading a frame takes no effect of its own, so the frames of a chunk are
+            // read at once rather than one effect at a time.
+            return Effect.succeed([state, Arr.flatMap(frames, read)] as const);
           },
         ),
         Stream.concat(
