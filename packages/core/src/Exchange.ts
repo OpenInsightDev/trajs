@@ -14,6 +14,7 @@ import { Algorithm as CompressionAlgorithm, Compression } from "@trajs/utils/Com
 import { Storage, type StorageError } from "@trajs/utils/Storage";
 import { Algorithm as HashAlgorithm, StreamHash } from "@trajs/utils/StreamHash";
 import { Context, Effect, Layer, Schema } from "effect";
+import type { KeyValueStore } from "effect/persistence";
 
 import { Contribution, part, service, type PartMembers } from "#/internal/exchange.ts";
 import * as Trajectory from "#/Trajectory.ts";
@@ -135,16 +136,20 @@ export type EncodingServices<C extends Trajectory.AnyConfig> = Schema.Union<
  *   reading — an event part of an event the config does not name, say — since a
  *   trajectory is read as far as the kits in hand state it ({@link Part}). The extra
  *   data of a part is held the same way, and a reading with no config names no kit.
+ * - `readCached(config)` reads it the same way, over the bytes a store keeps for it
+ *   rather than the storage ({@link Loaded.readCached}).
  *
  * A load reads what a trajectory states of itself and nothing else — the header at its
  * head and the metadata at its tail — so what a trajectory states of itself is known
  * without reading its parts or the frame they are carried in ({@link Service.load}).
  * `read` is a function rather than a value because a stream is read once: each call
- * gives the parts as they are read, and reads the frame again.
+ * gives the parts as they are read, and reads the frame again — or, where those bytes
+ * were kept by a reading before it, reads them from there.
  *
  * Each fails with {@link TrajectoryError} where the trajectory cannot be read — bytes
  * that hold no header, a frame that does not decode, bytes that do not end with the
- * metadata — and with the storage's own failure.
+ * metadata — and with the failure of what served the bytes: the storage's own failure,
+ * and the store's where a reading keeps the bytes in one.
  *
  * @see {@link Service.load} for the operation that gives these.
  * @category models
@@ -170,6 +175,39 @@ export interface Loaded {
   readonly read: <C extends Trajectory.AnyConfig = Trajectory.AnyConfig>(
     config?: C,
   ) => Trajectory.Trajectory<C, TrajectoryError | StorageError, never>;
+
+  /**
+   * The trajectory the trajectory holds, read as {@link Loaded.read} reads it, except
+   * that the bytes its parts are carried in are kept in a store rather than read from
+   * the storage again.
+   *
+   * **Details**
+   *
+   * The bytes read from the storage the first time are written to the store under what
+   * the trajectory states of them — the hash and the digest of its parts, which is what
+   * {@link Metadata} names it by — so every reading after that, here and in any other
+   * load of a trajectory whose bytes are the same, takes them from the store rather
+   * than reading the storage and the frame a second time. Nothing of a config travels
+   * with them: the bytes are the frame a trajectory is carried in, so they are read as
+   * the kits any reading of it states.
+   *
+   * The store is the key/value store of `effect/persistence` (`KeyValueStore`), which a
+   * reading of a trajectory this way requires and one through {@link Loaded.read} does
+   * not: a store's layers are its own — memory, a file system, a database — so where
+   * the bytes live is the program's to say, and one that reads a trajectory again
+   * provides one. A frame is held whole to be written, so this reads a trajectory that
+   * is read more than once rather than one too large to hold; a reading that ends before
+   * the frame does keeps nothing.
+   *
+   * @see {@link Loaded.read} for reading a trajectory without keeping its bytes.
+   */
+  readonly readCached: <C extends Trajectory.AnyConfig = Trajectory.AnyConfig>(
+    config?: C,
+  ) => Trajectory.Trajectory<
+    C,
+    TrajectoryError | StorageError | KeyValueStore.KeyValueStoreError,
+    KeyValueStore.KeyValueStore
+  >;
 }
 
 /**
