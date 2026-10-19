@@ -7,6 +7,9 @@ platform package can say what each is over.
   a source serves.
 - `Storage` — where a trajectory is kept, what a place that could not serve one
   failed with (`StorageError`), and the file storage this package ships.
+- `ByteStore` — the bytes a program keeps between readings, held in chunks in the
+  key/value store of `effect/persistence` (`ByteStore`), read back as a `Bytes` and
+  written a chunk at a time.
 - `Compression` — what carries a trajectory's parts in a frame: zstd, gzip,
   deflate, or the bytes as they are, stated where the layer is built
   (`Compression.Options`) and written into the metadata a trajectory ends with.
@@ -16,5 +19,6 @@ platform package can say what each is over.
   ships for all three.
 
 `@trajs/platform-node` and `@trajs/platform-browser` provide the layers these
-services are read through, and
-[`@trajs/core`](../core)'s `Exchange.layer` is built over them.
+services are read through, and [`@trajs/core`](../core)'s `Exchange.layer` is built
+over them. A `ByteStore` is provided by a program instead, over the key/value store
+it keeps its bytes in.

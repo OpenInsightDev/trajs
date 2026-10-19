@@ -11,10 +11,13 @@
  * platform provides — `Storage.layerFileSystem` and `StreamHash.layer` — and what
  * carries a trajectory's parts in a frame is a platform package's to state, which is
  * what `@trajs/platform-node`, `@trajs/platform-bun` and `@trajs/platform-browser`
- * provide.
+ * provide. Where a trajectory's bytes are kept between readings is stated over the
+ * key/value store of `effect/persistence` ({@link ByteStore}).
  */
 
 export * as Bytes from "#/Bytes.ts";
+
+export * as ByteStore from "#/ByteStore.ts";
 
 export * as Compression from "#/Compression.ts";
 
