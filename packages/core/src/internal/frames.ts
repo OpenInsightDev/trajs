@@ -63,7 +63,7 @@ const frameOf = (bytes: Uint8Array): readonly [Uint8Array, number] | undefined =
 };
 
 /** The bytes of `chunks` as they arrive, after the bytes `carried` read before them. */
-const joined = (carried: Uint8Array, chunks: ReadonlyArray<Uint8Array>): Uint8Array => {
+export const joined = (carried: Uint8Array, chunks: ReadonlyArray<Uint8Array>): Uint8Array => {
   if (carried.length === 0 && chunks.length === 1) {
     return chunks[0]!;
   }

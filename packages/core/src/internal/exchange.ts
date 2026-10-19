@@ -23,11 +23,12 @@ import type { Storage, StorageError } from "@trajs/utils/Storage";
 import type { StreamHash } from "@trajs/utils/StreamHash";
 import { Effect, Fiber, Schema, SchemaTransformation, Stream } from "effect";
 import { SchemaBinary } from "effect/encoding";
+import { KeyValueStore } from "effect/persistence";
 
 import * as Event from "#/Event.ts";
 import type { EncodingServices, Header, Metadata, Service } from "#/Exchange.ts";
 import type * as Extra from "#/Extra.ts";
-import { readFrames } from "#/internal/frames.ts";
+import { joined, readFrames } from "#/internal/frames.ts";
 import * as Metric from "#/Metric.ts";
 import * as Prompt from "#/Prompt.ts";
 import * as Toolkit from "#/Toolkit.ts";
@@ -520,6 +521,85 @@ const encodeTrailing = <S extends Schema.ConstraintCodec<Metadata, unknown, neve
 };
 
 /**
+ * A reading of a trajectory, curried out of the bytes its parts are carried in: the
+ * frame the storage serves and the frame a store keeps are the same bytes of the same
+ * trajectory ({@link keptBytes}), so `read` and `readCached` differ in those alone.
+ */
+const reading =
+  <E, R>(bytes: Stream.Stream<Uint8Array, E, R>) =>
+  // SAFETY: reading with no config is reading with the kits that name nothing, which
+  // is what `Trajectory.anyConfig` is.
+  <C extends Trajectory.AnyConfig = Trajectory.AnyConfig>(
+    config: C = Trajectory.anyConfig as C,
+  ): Trajectory.Trajectory<C, E | TrajectoryError, R> =>
+    trajectoryOf(
+      // SAFETY: what a body reads as is the parts of the config it is read with,
+      // which is what the trajectory those parts make holds.
+      bytes.pipe(readFrames(part(config))) as Stream.Stream<
+        Trajectory.Part<C>,
+        E | TrajectoryError,
+        R
+      >,
+      config,
+    );
+
+/**
+ * The key a trajectory's bytes are kept under: the hash and the digest the trajectory
+ * states of its parts.
+ *
+ * The key is read off what the trajectory states of itself rather than given with it,
+ * so what a store holds under one is the bytes that digest is of, whatever id they were
+ * loaded by, and a trajectory written again is kept under the digest of its own parts.
+ */
+const nameOf = (metadata: Metadata): string => `${metadata.hash}:${metadata.digest}`;
+
+/**
+ * The bytes of a trajectory's frame as a store keeps them, and from the storage as the
+ * store does not hold them: the store is read first, and the bytes read from the storage
+ * the first time are kept, so reading a trajectory again — here, or in a load of it with
+ * the same bytes — takes them from the store rather than reading the storage and the
+ * frame a second time.
+ *
+ * What keeps them is the key/value store of `effect/persistence`, which a trajectory
+ * read this way requires and one read through `read` does not: the store's own layers
+ * say where the bytes live — memory, a file system, a database — so a program provides
+ * one where it reads trajectories again, and an exchange holds none.
+ *
+ * A store is given one value, so the frame is held whole to be written, and it is
+ * written once it has been read whole: a reading that ends before the frame does — a
+ * consumer that takes what it came for and stops — keeps nothing rather than a prefix
+ * of the frame.
+ */
+const keptBytes = <E, R>(
+  metadata: Metadata,
+  frame: Stream.Stream<Uint8Array, E, R>,
+): Stream.Stream<
+  Uint8Array,
+  E | KeyValueStore.KeyValueStoreError,
+  R | KeyValueStore.KeyValueStore
+> => {
+  const key = nameOf(metadata);
+
+  return Effect.gen(function* () {
+    const store = yield* KeyValueStore.KeyValueStore;
+    const held = yield* store.getUint8Array(key);
+
+    if (held !== undefined) {
+      return Stream.make(held);
+    }
+
+    // What is read is kept as it arrives, and joined once it has all arrived:
+    // what a store is given is one value rather than the chunks a read takes.
+    const chunks: Array<Uint8Array> = [];
+
+    return frame.pipe(
+      Stream.tap((chunk) => Effect.sync(() => void chunks.push(chunk))),
+      Stream.onEnd(Effect.suspend(() => store.set(key, joined(new Uint8Array(), chunks)))),
+    );
+  }).pipe(Stream.unwrap);
+};
+
+/**
  * What a compression failed a frame it was asked to write or read with, as the
  * trajectory that failed: the bytes a frame carries are the format's, so a frame
  * that cannot be written or read is a trajectory that failed rather than a
@@ -574,24 +654,17 @@ export const service = <
         const stated = yield* headerOf(header, bytes);
         const trailing = yield* trailingOf(metadata, bytes);
 
+        // The frame lies between the header and the metadata, so neither the head
+        // nor the tail is read as part of it.
+        const frame = framed(
+          framesOf(bytes, stated.end, trailing.end).pipe(compression.decompress),
+        );
+
         return {
           header: stated.header,
           metadata: trailing.metadata,
-          // SAFETY: reading with no config is reading with the kits that name nothing,
-          // which is what `Trajectory.anyConfig` is.
-          read: <C extends Trajectory.AnyConfig = Trajectory.AnyConfig>(
-            config: C = Trajectory.anyConfig as C,
-          ) =>
-            trajectoryOf(
-              // The frame lies between the header and the metadata, so neither the
-              // head nor the tail is read as part of it.
-              // SAFETY: what a body reads as is the parts of the config it is read
-              // with, which is what the trajectory those parts make holds.
-              framed(framesOf(bytes, stated.end, trailing.end).pipe(compression.decompress)).pipe(
-                readFrames(part(config)),
-              ) as Stream.Stream<Trajectory.Part<C>, TrajectoryError | StorageError>,
-              config,
-            ),
+          read: reading(frame),
+          readCached: reading(keptBytes(trailing.metadata, frame)),
         };
       }),
     save:
