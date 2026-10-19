@@ -5,6 +5,8 @@ import { noManualTagComparisonRule } from "./rules/no-manual-tag-comparison.ts";
 import { noManualTaggedConstructionRule } from "./rules/no-manual-tagged-construction.ts";
 import { noServiceConstructorImportsRule } from "./rules/no-service-constructor-imports.ts";
 import { preferEffectMatchRule } from "./rules/prefer-effect-match.ts";
+import { preferPipeForDataLastApisRule } from "./rules/prefer-pipe-for-data-last-apis.ts";
+import { preferPipeOverNestingRule } from "./rules/prefer-pipe-over-nesting.ts";
 
 /** Opt-in Oxlint rules for Effect service and Layer architecture. */
 const antiSlopEffectPlugin = eslintCompatPlugin({
@@ -15,6 +17,8 @@ const antiSlopEffectPlugin = eslintCompatPlugin({
 		"no-manual-tagged-construction": noManualTaggedConstructionRule,
 		"no-service-constructor-imports": noServiceConstructorImportsRule,
 		"prefer-effect-match": preferEffectMatchRule,
+		"prefer-pipe-for-data-last-apis": preferPipeForDataLastApisRule,
+		"prefer-pipe-over-nesting": preferPipeOverNestingRule,
 	},
 });
 

@@ -7,7 +7,7 @@
  * results each call was answered with. The rest of `effect/ai/Toolkit` is re-exported.
  */
 
-import { JsonSchema, Schema, Stream } from "effect";
+import { JsonSchema, pipe, Schema, Stream } from "effect";
 import { Tool, type Toolkit } from "effect/ai";
 
 import type * as Response from "#/Response.ts";
@@ -38,8 +38,12 @@ export const encode = (toolkit: Toolkit.Any): ToolkitEncoded =>
       const encoded = {
         id: tool.id,
         name: tool.name,
-        parameters: JsonSchema.toDocumentDraft07(
-          JsonSchema.fromSchemaDraft2020_12(Tool.getJsonSchema(tool)),
+        // `Tool.getJsonSchema` states the schema as `unknown`, so it is read into
+        // a document through `pipe` rather than a `.pipe(...)` of its own.
+        parameters: pipe(
+          Tool.getJsonSchema(tool),
+          JsonSchema.fromSchemaDraft2020_12,
+          JsonSchema.toDocumentDraft07,
         ),
         success: JsonSchema.toDocumentDraft07(Schema.toJsonSchemaDocument(tool.successSchema)),
         failure: JsonSchema.toDocumentDraft07(Schema.toJsonSchemaDocument(tool.failureSchema)),

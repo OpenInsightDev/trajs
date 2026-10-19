@@ -308,7 +308,7 @@ export const part = <C extends Trajectory.AnyConfig>(config: C): Schema.Union<Pa
  * unrestricted part it was produced as.
  */
 const encodePart = <C extends Trajectory.AnyConfig>(config: C) => {
-  const encode = Schema.encodeEffect(SchemaBinary.toCodec(part(config)));
+  const encode = part(config).pipe(SchemaBinary.toCodec, Schema.encodeEffect);
 
   return (part: ProducedPart<C>): Effect.Effect<Uint8Array, TrajectoryError, EncodingServices<C>> =>
     encode(part).pipe(
@@ -692,26 +692,30 @@ export const service = <
 
           const digest = yield* Stream.run(hashed, hasher.digest).pipe(Effect.forkScoped);
 
+          // The header is a frame of its own that the parts are written after, and the
+          // frame it was written with is one stream the compression is read through
+          // once it has finished with them.
+          const headerBytes = new TextEncoder().encode(headerText);
+          const header = Stream.make(lengthPrefixed(headerBytes));
+          const writtenFrame = framed(written.pipe(compression.compress));
+
+          const trailing = Fiber.join(digest).pipe(
+            Effect.map((digest) =>
+              encodeTrailing(metadata, {
+                compression: compression.algorithm,
+                hash: hasher.algorithm,
+                digest,
+                version: Version,
+              }),
+            ),
+            Stream.fromEffect,
+          );
+
           // The metadata states what the bytes of the trajectory were written with
           // and what they are named by, so it is emitted once the compression has
           // finished the frame it wrote for them and the digest has been read off
           // the parts it is of.
-          return Stream.make(lengthPrefixed(new TextEncoder().encode(headerText))).pipe(
-            Stream.concat(framed(written.pipe(compression.compress))),
-            Stream.concat(
-              Fiber.join(digest).pipe(
-                Effect.map((digest) =>
-                  encodeTrailing(metadata, {
-                    compression: compression.algorithm,
-                    hash: hasher.algorithm,
-                    digest,
-                    version: Version,
-                  }),
-                ),
-                Stream.fromEffect,
-              ),
-            ),
-          );
+          return header.pipe(Stream.concat(writtenFrame), Stream.concat(trailing));
         }).pipe(Stream.unwrap, Stream.scoped);
 
         // What holds the bytes of a trajectory is held open for as long as they are

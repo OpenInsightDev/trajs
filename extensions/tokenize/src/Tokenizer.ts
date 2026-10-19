@@ -97,9 +97,11 @@ export const layerAnthropic: Layer.Layer<AiTokenizer.Tokenizer> = Layer.effect(
     (tokenizer) => Effect.sync(() => tokenizer.free()),
   ).pipe(
     Effect.map((tokenizer) =>
-      makeTokenizer("AnthropicTokenizer", (text) =>
-        Array.from(tokenizer.encode(text.normalize("NFKC"), "all")),
-      ),
+      makeTokenizer("AnthropicTokenizer", (text) => {
+        const normalized = text.normalize("NFKC");
+
+        return Array.from(tokenizer.encode(normalized, "all"));
+      }),
     ),
   ),
 );

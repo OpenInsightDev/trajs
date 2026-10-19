@@ -56,6 +56,9 @@ const parts = [
  */
 const trajectory = Object.assign(Stream.fromIterable(parts), config);
 
+/** The file system a Node program reads and writes through, under the layer that states it. */
+const nodeFileSystem = Layer.merge(NodeServices.layer(), layerFileSystem);
+
 /**
  * What a program on Node is made of: the file system and the terminal the platform
  * package states, beside the exchange of `@trajs/core` reading and writing through
@@ -63,10 +66,7 @@ const trajectory = Object.assign(Stream.fromIterable(parts), config);
  */
 const Nodes = Layer.merge(
   PlatformNodeServices.layer,
-  Exchange.layer.pipe(
-    Layer.provide(Layer.merge(NodeServices.layer(), layerFileSystem)),
-    Layer.provide(PlatformNodeServices.layer),
-  ),
+  Exchange.layer.pipe(Layer.provide(nodeFileSystem), Layer.provide(PlatformNodeServices.layer)),
 );
 
 /**
@@ -87,13 +87,13 @@ const roundTrip = Effect.gen(function* () {
   return {
     header: loaded.header,
     metadata: loaded.metadata,
-    read: Array.from(yield* Stream.runCollect(loaded.read(config))),
+    read: Array.from(yield* loaded.read(config).pipe(Stream.runCollect)),
   };
 }).pipe(Effect.scoped, Effect.provide(Nodes));
 
 describe("a trajectory kept as a file", () => {
   it("reads back the parts it was written with, in the order they were written", async () => {
-    const { read } = await Effect.runPromise(roundTrip);
+    const { read } = await roundTrip.pipe(Effect.runPromise);
 
     expect(read.map((part) => part._tag)).toEqual(parts.map((part) => part._tag));
 
@@ -108,7 +108,7 @@ describe("a trajectory kept as a file", () => {
   });
 
   it("states what wrote it and what names it, at the end of its bytes", async () => {
-    const { header, metadata } = await Effect.runPromise(roundTrip);
+    const { header, metadata } = await roundTrip.pipe(Effect.runPromise);
 
     // What it states of itself is the kits it was made with, and none were named.
     expect(header.toolkit).toEqual(Toolkit.encode(Toolkit.empty));

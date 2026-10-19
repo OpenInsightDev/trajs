@@ -555,7 +555,7 @@ export const ObservationResult = Schema.Struct({
    * The trajectories a delegated call left, each of them referenced by an embedded
    * document's id or by the path of a file beside the document.
    */
-  subagent_trajectory_ref: Schema.optional(Schema.NullOr(Schema.Array(SubagentTrajectoryRef))),
+  subagent_trajectory_ref: Schema.Array(SubagentTrajectoryRef).pipe(Schema.NullOr, Schema.optional),
   /** What a producer states of the result beyond the format. */
   extra: Schema.optional(ProducerFields),
 });
@@ -639,11 +639,11 @@ export const Metrics = Schema.Struct({
   /** What the call cost, as the producer read it when the call was made. */
   cost_usd: Schema.optional(Schema.NullOr(Schema.Number)),
   /** The ids of the `prompt_tokens`, for a pipeline that must not retokenize them. */
-  prompt_token_ids: Schema.optional(Schema.NullOr(Schema.Array(Schema.Int))),
+  prompt_token_ids: Schema.Array(Schema.Int).pipe(Schema.NullOr, Schema.optional),
   /** The ids of the `completion_tokens`, which `logprobs` align with. */
-  completion_token_ids: Schema.optional(Schema.NullOr(Schema.Array(Schema.Int))),
+  completion_token_ids: Schema.Array(Schema.Int).pipe(Schema.NullOr, Schema.optional),
   /** The log probability of each completion token. */
-  logprobs: Schema.optional(Schema.NullOr(Schema.Array(Schema.Number))),
+  logprobs: Schema.Array(Schema.Number).pipe(Schema.NullOr, Schema.optional),
   /** What a provider states of the inference beyond the format. */
   extra: Schema.optional(ProducerFields),
 });
@@ -785,7 +785,7 @@ export const Agent = Schema.Struct({
   /** The model the agent ran on by default, which a step's own `model_name` overrides. */
   model_name: Schema.optional(Schema.NullOr(Schema.String)),
   /** The tools the agent was given (v1.5+), each of them an OpenAI function definition. */
-  tool_definitions: Schema.optional(Schema.NullOr(Schema.Array(ToolDefinition))),
+  tool_definitions: Schema.Array(ToolDefinition).pipe(Schema.NullOr, Schema.optional),
   /** What a producer states of the agent beyond the format. */
   extra: Schema.optional(ProducerFields),
 });
@@ -842,13 +842,16 @@ export const StepObject = Schema.Struct({
   /** The model this step was answered by, where it is an agent step. */
   model_name: Schema.optional(Schema.NullOr(Schema.String)),
   /** How much effort the step took: a qualitative name, or a numeric score. */
-  reasoning_effort: Schema.optional(Schema.NullOr(Schema.Union([Schema.String, Schema.Number]))),
+  reasoning_effort: Schema.Union([Schema.String, Schema.Number]).pipe(
+    Schema.NullOr,
+    Schema.optional,
+  ),
   /** What the step said: the dialogue of a message, or what the agent answered. */
   message: Content,
   /** What the agent thought, where it is an agent step that thought. */
   reasoning_content: Schema.optional(Schema.NullOr(Schema.String)),
   /** The tools the step called, where it is an agent step that called any. */
-  tool_calls: Schema.optional(Schema.NullOr(Schema.Array(ToolCall))),
+  tool_calls: Schema.Array(ToolCall).pipe(Schema.NullOr, Schema.optional),
   /** What the step was answered with, where it was answered by anything. */
   observation: Schema.optional(Schema.NullOr(Observation)),
   /** The tokens, the cost and the confidence data of the step, where the document states them. */
@@ -930,7 +933,7 @@ export const Document: Schema.Codec<Document> = Schema.Struct({
   /** What a producer states of the document beyond the format. */
   extra: Schema.optional(ProducerFields),
   /** The trajectories of the subagents a step delegated work to (v1.7+). */
-  subagent_trajectories: Schema.optional(Schema.Array(Schema.suspend(() => Document))),
+  subagent_trajectories: Schema.suspend(() => Document).pipe(Schema.Array, Schema.optional),
 });
 
 /**

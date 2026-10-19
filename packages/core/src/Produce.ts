@@ -330,18 +330,18 @@ export const fromSessions =
   > => {
     const sessionPart = Trajectory.sessionPart(extrakit);
 
-    return produceWith({ toolkit, eventkit, metrickit, extrakit })(
-      Stream.mergeAll(
-        Object.entries(sessions).map(([id, parts]) =>
-          parts.pipe(
-            // A stream of a session names it rather than declaring it, so the session
-            // is declared here: a session is read before the parts of it arrive.
-            Stream.prepend([sessionPart({ id })]),
-          ),
+    const parts = Stream.mergeAll(
+      Object.entries(sessions).map(([id, stream]) =>
+        stream.pipe(
+          // A stream of a session names it rather than declaring it, so the session
+          // is declared here: a session is read before the parts of it arrive.
+          Stream.prepend([sessionPart({ id })]),
         ),
-        { concurrency: "unbounded" },
       ),
+      { concurrency: "unbounded" },
     );
+
+    return produceWith({ toolkit, eventkit, metrickit, extrakit })(parts);
   };
 
 /**

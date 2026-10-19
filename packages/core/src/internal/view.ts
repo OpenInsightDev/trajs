@@ -165,8 +165,8 @@ const readSession = <Config extends Trajectory.AnyConfig, E, R>(
   inherited: Conversation,
 ): Effect.Effect<ReadonlyArray<readonly [string, Conversation]>, E | TrajectoryError, R> =>
   Effect.gen(function* () {
-    const parts = Array.from(yield* Stream.runCollect(session.parts));
-    const forks = Array.from(yield* Stream.runCollect(session.forkedBy));
+    const parts = Array.from(yield* session.parts.pipe(Stream.runCollect));
+    const forks = Array.from(yield* session.forkedBy.pipe(Stream.runCollect));
 
     const entry: readonly [string, Conversation] = [
       session.id,

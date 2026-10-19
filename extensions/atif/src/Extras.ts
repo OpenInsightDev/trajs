@@ -48,7 +48,10 @@ const step180 = Schema.Struct({
   /**
    * How much effort the step took: a qualitative name, or a numeric score.
    */
-  reasoning_effort: Schema.optional(Schema.NullOr(Schema.Union([Schema.String, Schema.Number]))),
+  reasoning_effort: Schema.Union([Schema.String, Schema.Number]).pipe(
+    Schema.NullOr,
+    Schema.optional,
+  ),
   /**
    * How many inferences the step stands for, where the producer tracked it.
    */

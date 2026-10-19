@@ -149,7 +149,8 @@ const report = async (): Promise<Map<string, Estimate>> => {
     );
 
     const runnable = Metric.toProducers(metrickit, { [tokenEstimate.tag]: producer });
-    const reported = Array.from(yield* Stream.runCollect(Metric.produce(runnable)(trajectory)));
+    const estimates = Metric.produce(runnable)(trajectory);
+    const reported = Array.from(yield* estimates.pipe(Stream.runCollect));
     const byPart = new Map<string, Estimate>();
 
     for (const { _tag, data } of reported) {
@@ -162,7 +163,7 @@ const report = async (): Promise<Map<string, Estimate>> => {
     return byPart;
   });
 
-  return Effect.runPromise(program);
+  return program.pipe(Effect.runPromise);
 };
 
 /** What was reported of one part, which fails a case where nothing was. */

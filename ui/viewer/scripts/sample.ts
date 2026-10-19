@@ -341,18 +341,14 @@ const program = Effect.gen(function* () {
   yield* Effect.log(`Wrote ${id}`);
 });
 
-// The file storage reads through the file system `@effect/platform-node` provides.
-void program
-  .pipe(
-    Effect.provide(
-      Layer.provide(
-        Layer.provide(Exchange.layer, Layer.merge(NodeServices.layer(), layerFileSystem)),
-        PlatformNode.layer,
-      ),
-    ),
-    Effect.runPromise,
-  )
-  .catch((cause) => {
-    console.error(Formatter.format(cause));
-    process.exitCode = 1;
-  });
+// The file storage reads through the file system `@effect/platform-node` provides,
+// under the codecs of `@trajs/platform-node`.
+const exchangeOverFiles = Layer.provide(
+  Layer.provide(Exchange.layer, Layer.merge(NodeServices.layer(), layerFileSystem)),
+  PlatformNode.layer,
+);
+
+void program.pipe(Effect.provide(exchangeOverFiles), Effect.runPromise).catch((cause) => {
+  console.error(Formatter.format(cause));
+  process.exitCode = 1;
+});

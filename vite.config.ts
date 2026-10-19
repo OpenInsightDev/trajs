@@ -65,6 +65,12 @@ export default defineConfig({
       "anti-slop-effect/no-manual-tagged-construction": "error",
       "anti-slop-effect/no-service-constructor-imports": "error",
       "anti-slop-effect/prefer-effect-match": "error",
+      // These APIs take the value itself, so a call reads inside out where a
+      // `.pipe(...)` stage reads left to right; the rewrite is mechanical.
+      "anti-slop-effect/prefer-pipe-for-data-last-apis": "warn",
+      // Deep call nesting is a readability prompt, not a defect, and a nested
+      // value does not always have the `.pipe(...)` a staged chain would call.
+      "anti-slop-effect/prefer-pipe-over-nesting": "warn",
     },
     options: { typeAware: true, typeCheck: true },
   },

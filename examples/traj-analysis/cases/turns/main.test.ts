@@ -66,7 +66,7 @@ const main = async (): Promise<Summary> => {
   );
 
   const turns = Array.from(
-    await Effect.runPromise(Stream.runCollect(View.promptTurns(trajectory))),
+    await View.promptTurns(trajectory).pipe(Stream.runCollect, Effect.runPromise),
   );
 
   let messages = 0;

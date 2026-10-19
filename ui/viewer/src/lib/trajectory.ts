@@ -56,6 +56,9 @@ const handed = (bytes: Uint8Array): Storage => ({
   write: () => Sink.fail(new StorageError({ id: Handed, cause: "a page only reads a trajectory" })),
 });
 
+/** The exchange a page reads through: its own codecs, over the services a page runs. */
+const browserExchange = Layer.provide(Exchange.layer, BrowserServices.layer());
+
 /** One turn of a session's conversation: what a model was given, and what it answered. */
 export type Turn = View.PromptTurn<Trajectory.AnyConfig>;
 
@@ -139,8 +142,8 @@ const readSession = (
   inherited: ReadonlyArray<Stretch>,
 ): Effect.Effect<TrajectorySession, Failure, Scope.Scope> =>
   Effect.gen(function* () {
-    const parts = Array.from(yield* Stream.runCollect(session.parts));
-    const forks = Array.from(yield* Stream.runCollect(session.forkedBy));
+    const parts = Array.from(yield* session.parts.pipe(Stream.runCollect));
+    const forks = Array.from(yield* session.forkedBy.pipe(Stream.runCollect));
 
     const readForks = yield* Effect.forEach(forks, (forked) =>
       Effect.gen(function* () {
@@ -202,11 +205,4 @@ export const read = (bytes: Uint8Array): Effect.Effect<Trajectory, Failure, Scop
     return {
       roots: yield* Effect.forEach(roots, (session) => readSession(session, [])),
     };
-  }).pipe(
-    Effect.provide(
-      Layer.provide(
-        Layer.provide(Exchange.layer, BrowserServices.layer()),
-        Layer.succeed(Storage, handed(bytes)),
-      ),
-    ),
-  );
+  }).pipe(Effect.provide(Layer.provide(browserExchange, Layer.succeed(Storage, handed(bytes)))));
