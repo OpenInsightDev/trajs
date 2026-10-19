@@ -5,7 +5,7 @@
  *
  * A trajectory carries its header at the head of the file and its metadata at its
  * tail, and neither is compressed, so loading one does not read the trajectory: the
- * exchange reads the head for the header, or the tail for the metadata, and stops
+ * exchange reads the head for the header and the tail for the metadata, and stops
  * before the frame the parts are carried in.
  *
  * What is printed is what the file states — the header as the format encodes it, and
@@ -96,11 +96,8 @@ export const inspect = Command.make(
 
       const loaded = yield* exchange.load(file);
 
-      // What a trajectory states of itself is its head, and how its own bytes were
-      // written is its tail: a load reads the head alone, so `--metadata` asks for
-      // the tail to be read where what is wanted is the metadata.
       const stated = metadata
-        ? metadataJson(yield* loaded.metadata, indent)
+        ? metadataJson(loaded.metadata, indent)
         : headerJson(loaded.header, indent);
 
       yield* Console.log(stated);

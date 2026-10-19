@@ -86,7 +86,7 @@ const roundTrip = Effect.gen(function* () {
 
   return {
     header: loaded.header,
-    metadata: yield* loaded.metadata,
+    metadata: loaded.metadata,
     read: Array.from(yield* Stream.runCollect(loaded.read(config))),
   };
 }).pipe(Effect.scoped, Effect.provide(Nodes));

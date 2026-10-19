@@ -572,10 +572,11 @@ export const service = <
       Effect.gen(function* () {
         const bytes = yield* storage.read(id);
         const stated = yield* headerOf(header, bytes);
+        const trailing = yield* trailingOf(metadata, bytes);
 
         return {
           header: stated.header,
-          metadata: trailingOf(metadata, bytes).pipe(Effect.map((trailing) => trailing.metadata)),
+          metadata: trailing.metadata,
           // SAFETY: reading with no config is reading with the kits that name nothing,
           // which is what `Trajectory.anyConfig` is.
           read: <C extends Trajectory.AnyConfig = Trajectory.AnyConfig>(
@@ -584,20 +585,11 @@ export const service = <
             trajectoryOf(
               // The frame lies between the header and the metadata, so neither the
               // head nor the tail is read as part of it.
-              trailingOf(metadata, bytes).pipe(
-                Effect.map(
-                  (trailing) =>
-                    // SAFETY: what a body reads as is the parts of the config it is read
-                    // with, which is what the trajectory those parts make holds.
-                    framed(
-                      framesOf(bytes, stated.end, trailing.end).pipe(compression.decompress),
-                    ).pipe(readFrames(part(config))) as Stream.Stream<
-                      Trajectory.Part<C>,
-                      TrajectoryError | StorageError
-                    >,
-                ),
-                Stream.unwrap,
-              ),
+              // SAFETY: what a body reads as is the parts of the config it is read
+              // with, which is what the trajectory those parts make holds.
+              framed(framesOf(bytes, stated.end, trailing.end).pipe(compression.decompress)).pipe(
+                readFrames(part(config)),
+              ) as Stream.Stream<Trajectory.Part<C>, TrajectoryError | StorageError>,
               config,
             ),
         };

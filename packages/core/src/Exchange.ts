@@ -127,19 +127,20 @@ export type EncodingServices<C extends Trajectory.AnyConfig> = Schema.Union<
  * - `header` is what the header a trajectory starts with states ({@link Header}),
  *   decoded while the trajectory is loaded — so what it was made with is known
  *   without reading the frame.
- * - `metadata` reads what a trajectory states at its end off its tail, without
- *   reading that frame either ({@link Metadata}).
+ * - `metadata` is what the metadata a trajectory ends with states ({@link Metadata}),
+ *   read off its tail while the trajectory is loaded — so how its parts were written
+ *   and what it is named by are known without reading that frame either.
  * - `read(config)` reads the whole trajectory as its parts make it, under the kits
  *   the config names: a part none of them reads is stepped over rather than ending the
  *   reading — an event part of an event the config does not name, say — since a
  *   trajectory is read as far as the kits in hand state it ({@link Part}). The extra
  *   data of a part is held the same way, and a reading with no config names no kit.
  *
- * A load reads the head of a trajectory alone, so a program that asks what a
- * trajectory states of itself reads neither its parts nor its tail ({@link
- * Service.load}). `read` is a function rather than a value because a stream is read
- * once: each call gives the parts as they are read, and reads the frame again — and
- * the metadata with it, since where the frame ends is what the metadata says.
+ * A load reads what a trajectory states of itself and nothing else — the header at its
+ * head and the metadata at its tail — so what a trajectory states of itself is known
+ * without reading its parts or the frame they are carried in ({@link Service.load}).
+ * `read` is a function rather than a value because a stream is read once: each call
+ * gives the parts as they are read, and reads the frame again.
  *
  * Each fails with {@link TrajectoryError} where the trajectory cannot be read — bytes
  * that hold no header, a frame that does not decode, bytes that do not end with the
@@ -155,11 +156,11 @@ export interface Loaded {
   readonly header: Header;
 
   /**
-   * What the trajectory states at its end about its own bytes — how the frame was
-   * written and what the trajectory is named by — read from the tail of them
-   * ({@link Metadata}).
+   * What the trajectory states at its end about its own bytes, as the metadata read
+   * off the tail of them — how the frame was written and what the trajectory is named
+   * by ({@link Metadata}).
    */
-  readonly metadata: Effect.Effect<Metadata, TrajectoryError | StorageError>;
+  readonly metadata: Metadata;
 
   /**
    * The trajectory the trajectory holds, read as the config given states it — with no
@@ -204,10 +205,11 @@ export interface Service {
   /**
    * Reads a trajectory kept under `id` into the operations it is read by.
    *
-   * What loading reads is the head of a trajectory — the header it states itself in —
-   * so a trajectory that is not there, or whose head is not a header, fails here
-   * rather than when its trajectory is read. The frame and the metadata it ends with
-   * are left for the operations, neither of which a load reads.
+   * What loading reads is what a trajectory states of itself — the header at its head
+   * and the metadata at its tail — so a trajectory that is not there, whose head is
+   * not a header, or whose bytes do not end with the metadata fails here rather than
+   * when its trajectory is read. The frame the parts are carried in is left for
+   * `read`, which a load never reads.
    */
   readonly load: (id: string) => Effect.Effect<Loaded, TrajectoryError | StorageError>;
 
