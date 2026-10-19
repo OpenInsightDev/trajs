@@ -1,31 +1,15 @@
 /**
- * The frames a body is carried in: where one ends in a stream of bytes, and reading a
- * body as the values of one schema they carry.
+ * The frames a body is carried in: where one ends in a stream of bytes, and reading a body
+ * as the values of one schema they carry.
  *
- * A frame is one value of a schema written by `SchemaBinary`, which states the length of
- * everything after it before it states anything else of it, so where a frame ends is
- * known before what it carries is read. The frames of a body are therefore cut by their
- * own lengths rather than handed to one parser, which is what the exchange reads a
- * trajectory's parts with: a frame the schema does not read — a metric part of a metric
- * the kit names none of, say — is stepped over, and the frames after it are read as if it
- * were not there. That is what lets a trajectory one kit wrote be read under another.
- *
- * Nothing here says what a frame means: the schema given states that. What this states is
- * the framing — how many bytes a frame is, and what a body that is not a whole number of
- * frames is.
- *
- * One thing of `SchemaBinary` is assumed, since the boundary of a frame is read before the
- * value it carries: a frame states the length of everything after its length prefix, as a
- * uvarint, and that prefix is the only part of a frame this reads — the envelope byte, the
- * fingerprint of a mode and the body all lie inside the length it states. A change to how
- * a value is framed would move the boundaries read here, and since a frame that does not
- * read is stepped over rather than failing ({@link readFrames}), such a change shows up as
- * values missing from a body rather than as an error: this is the first thing to look at
- * where a trajectory reads as too few parts.
+ * A frame states the length of everything after it before it states anything else of it
+ * ({@link SchemaBinary}), so a body is cut into frames by their own lengths rather than
+ * handed to one parser: a frame the schema does not read — a metric part of a metric a kit
+ * names none of, say — is stepped over, and the frames after it are read as if it were not
+ * there. That is what lets a trajectory one kit wrote be read under another.
  */
 
-import { Effect, Schema, Stream } from "effect";
-import * as Arr from "effect/Array";
+import { Schema, Stream } from "effect";
 import { SchemaBinary } from "effect/encoding";
 
 import { TrajectoryError } from "#/TrajectoryError.ts";
@@ -34,31 +18,34 @@ import { TrajectoryError } from "#/TrajectoryError.ts";
 const LengthPrefixBytes = 10;
 
 /**
- * The first frame `bytes` holds whole, with how many bytes of `bytes` it takes, or
- * `undefined` where `bytes` do not hold one.
+ * How many bytes the first whole frame of `bytes` takes, or `undefined` where they hold
+ * none.
  *
- * Where a frame ends is read off the bytes themselves, so what a frame carries does not
- * have to be read to know how much of it there is.
+ * A frame states the length of everything after its prefix before it states anything else
+ * of it, so where one ends is read off the bytes rather than off the value it carries — the
+ * one thing of `SchemaBinary` assumed here: a change to it moves those boundaries without
+ * failing, and shows up as values missing from a body.
  */
-const frameOf = (bytes: Uint8Array): readonly [Uint8Array, number] | undefined => {
-  let prefix = 0;
+const frameLength = (bytes: Uint8Array): number | undefined => {
+  let scale = 1;
   let length = 0;
 
-  while (prefix < LengthPrefixBytes && prefix < bytes.length) {
-    const byte = bytes[prefix]!;
+  for (let at = 0; at < LengthPrefixBytes && at < bytes.length; at += 1) {
+    const byte = bytes[at]!;
 
-    length += (byte & 0x7f) * 2 ** (7 * prefix);
-    prefix += 1;
+    length += (byte & 0x7f) * scale;
 
     if ((byte & 0x80) === 0) {
-      const end = prefix + length;
+      const end = at + 1 + length;
 
-      return end > bytes.length ? undefined : [bytes.subarray(0, end), end];
+      return end > bytes.length ? undefined : end;
     }
+
+    scale *= 128;
   }
 
-  // A length no frame states is not a frame at all, so there is no end of one to step
-  // over: what is read of such bytes is the failure of a body that does not end.
+  // A length a frame never states is no frame at all, so there is no end of one to step
+  // over: such bytes are what the body ends in the middle of.
   return undefined;
 };
 
@@ -85,42 +72,24 @@ export const joined = (carried: Uint8Array, chunks: ReadonlyArray<Uint8Array>): 
 };
 
 /**
- * Reads the frames of a body as the values the schema states.
+ * Reads the frames of a body as the values the schema given states, whatever stream the
+ * bytes arrive in.
  *
- * **When to use**
- *
- * Use to read a body of frames as the values they carry, whatever stream the bytes
- * arrive in.
- *
- * **Details**
- *
- * - A frame is one value, and the frames of a body come out in the order they were
- *   written, whether a frame shares a chunk with the frames around it or spans several.
- * - A frame the schema does not read is stepped over, and the frames after it are read
- *   as if it were not there: a value is read by the schema that states it, so what a
- *   schema does not state is not a value of the reading.
+ * - A frame is one value, and the frames come out in the order they were written, whether
+ *   a frame shares a chunk with the frames around it or spans several.
+ * - A frame the schema does not read is stepped over, and the frames after it are read as
+ *   if it were not there.
  * - A body that ends in the middle of a frame fails as a {@link TrajectoryError} rather
  *   than losing the value silently.
- *
- * The schema is given first and a stream of the bytes after, so that what reads them is
- * curried out of the schema alone.
- *
- * @see {@link SchemaBinary} for the frame a value is written as.
- * @category combinators
  */
 export const readFrames =
   <S extends Schema.Constraint>(schema: S) =>
   <E, R>(body: Stream.Stream<Uint8Array, E, R>): Stream.Stream<S["Type"], E | TrajectoryError, R> =>
     Stream.suspend(() => {
-      // The frames are not handed to one parser for the whole body: a parser that failed
-      // a frame is spent, and the frames after it are read as if it were not there. A
-      // codec states one frame of the schema and `SchemaBinary` keeps one per schema, so
-      // it is derived here once rather than for every frame, and a frame it does not read
-      // is the failure it throws — which leaves the frames after it untouched.
+      // SAFETY: only the reading of a frame is taken of the codec, and a part schema reads
+      // as the plain schemas it is rebuilt from state it, which take no service; the
+      // services a schema states are those of writing it, which nothing here does.
       const decode = Schema.decodeUnknownSync(
-        // SAFETY: a frame is read synchronously, which only a reading that takes no
-        // service can do; what a schema states its own reading takes is not taken by
-        // `readFrames`, whose reading carries the services of the stream it is given.
         SchemaBinary.toCodec(schema) as Schema.Codec<
           S["Type"],
           Uint8Array<ArrayBuffer>,
@@ -129,47 +98,46 @@ export const readFrames =
         >,
       );
 
-      // A frame the schema does not read states no value of the body.
-      const read = (frame: Uint8Array): ReadonlyArray<S["Type"]> => {
-        try {
-          return [decode(frame)];
-        } catch {
-          return [];
-        }
-      };
-
-      // The bytes a chunk ended in the middle of a frame with, which the next chunk
-      // completes.
+      // A reading starts afresh, so the bytes a chunk ended in the middle of a frame with
+      // are held per reading rather than by the combinator.
       let carried: Uint8Array = new Uint8Array();
 
       return body.pipe(
-        Stream.mapAccumArrayEffect(
+        // Not `Stream.mapArray`: a chunk that holds no whole frame yields nothing.
+        Stream.mapAccumArray(
           () => undefined,
           (state, chunks) => {
-            const buffered = joined(carried, chunks);
-            const frames: Array<Uint8Array> = [];
-            let rest = buffered;
-            let frame = frameOf(rest);
+            let rest = joined(carried, chunks);
+            const values: Array<S["Type"]> = [];
+            let size = frameLength(rest);
 
-            while (frame !== undefined) {
-              frames.push(frame[0]);
-              rest = rest.subarray(frame[1]);
-              frame = frameOf(rest);
+            while (size !== undefined) {
+              const frame = rest.subarray(0, size);
+
+              rest = rest.subarray(size);
+
+              // A frame the schema does not read states no value of the body; a schema that
+              // fails any other way is a defect of its own rather than one of the bytes.
+              try {
+                values.push(decode(frame));
+              } catch (error) {
+                if (!Schema.isSchemaError(error)) throw error;
+              }
+
+              size = frameLength(rest);
             }
 
             carried = rest;
 
-            // Reading a frame takes no effect of its own, so the frames of a chunk are
-            // read at once rather than one effect at a time.
-            return Effect.succeed([state, Arr.flatMap(frames, read)] as const);
+            return [state, values] as const;
           },
         ),
         Stream.concat(
-          Effect.suspend(() =>
+          Stream.suspend(() =>
             carried.length === 0
-              ? Effect.void
-              : Effect.fail(TrajectoryError.parse("the bytes end in the middle of a frame")),
-          ).pipe(Effect.as(Stream.empty), Stream.unwrap),
+              ? Stream.empty
+              : Stream.fail(TrajectoryError.parse("the bytes end in the middle of a frame")),
+          ),
         ),
       );
     });
