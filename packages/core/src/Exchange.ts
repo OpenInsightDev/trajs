@@ -20,6 +20,49 @@ import { Contribution, part, service, type PartMembers } from "#/internal/exchan
 import * as Trajectory from "#/Trajectory.ts";
 import { TrajectoryError } from "#/TrajectoryError.ts";
 
+import pkg from "../package.json" with { type: "json" };
+
+/**
+ * The magic a trajectory written whole ends with: the ASCII `TRAJS`.
+ *
+ * **When to use**
+ *
+ * Use to end a trajectory of your own the way this format does, or to tell a
+ * trajectory written whole from one that was cut short without going through an
+ * exchange.
+ *
+ * **Details**
+ *
+ * The magic is the last of the bytes a trajectory carries ({@link Exchange.layer}), and
+ * only a trajectory written whole carries it, so bytes that end with anything else were
+ * cut short rather than holding a metadata. It is stated as the bytes a trajectory is
+ * held in — the text they encode is `TRAJS` — and the exchange itself writes and reads
+ * this same value, so it is read rather than changed.
+ *
+ * @see {@link Metadata} for what a trajectory states before the magic.
+ * @category constants
+ */
+export const Magic = new TextEncoder().encode("TRAJS");
+
+/**
+ * The version of this package, which is the version a trajectory states of itself: the
+ * one its bytes were written at.
+ *
+ * **When to use**
+ *
+ * Use to state the version of a trajectory of your own in this format, or to compare
+ * what a trajectory states of itself ({@link Metadata}) with what wrote it.
+ *
+ * **Details**
+ *
+ * The version is read from this package's `package.json`, so what a trajectory states
+ * is the version of trajs that wrote it rather than a version of the format's own.
+ *
+ * @see {@link Metadata} for where a trajectory states it.
+ * @category constants
+ */
+export const Version = pkg.version;
+
 /**
  * What a trajectory states about itself, before any of its parts.
  *
@@ -68,8 +111,8 @@ export type Header = Schema.Schema.Type<typeof Header>;
  *   states what wrote it rather than leaving the reader to assume.
  * - `digest` is the digest of those parts, which is what names the trajectory — the
  *   lowercase hex a {@link StreamHash} reads one off with.
- * - `version` is the version of this package that wrote the trajectory, as its
- *   `package.json` states it.
+ * - `version` is the version of this package that wrote the trajectory
+ *   ({@link Version}).
  *
  * Where a trajectory carries it is the layer's to say; {@link Exchange.layer} says it
  * for the one this package ships: the metadata is the last thing a trajectory holds,
@@ -314,14 +357,14 @@ export class Exchange extends Context.Service<Exchange, Service>()("trajs/core/E
    * SchemaBinary frame ({@link Part}), so a trajectory is read as it arrives rather
    * than once it has ended. The frame is followed by the metadata of the trajectory
    * ({@link Metadata}) as plain JSON, by the length of that JSON as four bytes,
-   * big-endian, and by the magic `TRAJS` last: the metadata's length, read off the end
-   * of the file, states where it begins, so it is read without the frame before it
-   * ({@link Loaded.metadata}). The magic ends every trajectory that was written whole,
-   * so one that does not end with it was cut short.
+   * big-endian, and by the magic {@link Magic} last: the metadata's length, read off
+   * the end of the file, states where it begins, so it is read without the frame before
+   * it ({@link Loaded.metadata}). The magic ends every trajectory that was written
+   * whole, so one that does not end with it was cut short.
    *
    * What the metadata states of the algorithms is what the compression and the hash
    * state of themselves ({@link Compression.algorithm}, {@link StreamHash.algorithm}),
-   * and its version is the one this package is at, as its `package.json` states it.
+   * and its version is the one this package is at ({@link Version}).
    *
    * What writes and reads that frame is the compression the layer is provided with,
    * what hashes the parts is the hash it is provided with, and what holds the bytes of a

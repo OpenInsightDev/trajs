@@ -6,10 +6,11 @@
  *
  * Nothing here is published: a program reaches the format through
  * `Exchange.layer`, and the parts a trajectory holds through `Exchange.Part`. What
- * a trajectory states of itself is the layer's to state — the header it starts with
- * and the metadata it ends with — so what reads either is built from the model the
- * layer holds; where a trajectory is kept is a storage's, so what reads and writes
- * one takes the bytes from there rather than carrying them.
+ * a trajectory states of itself is the layer's to state — the header it starts with,
+ * the metadata it ends with, the version that metadata carries, and the magic those
+ * bytes end with — so what reads either is built from the model the layer holds;
+ * where a trajectory is kept is a storage's, so what reads and writes one takes the
+ * bytes from there rather than carrying them.
  *
  * A trajectory is read at random where a part of it alone is wanted — the head for
  * the header, the tail for the metadata — and as a stream where the trajectory is:
@@ -26,7 +27,14 @@ import { SchemaBinary } from "effect/encoding";
 import { KeyValueStore } from "effect/persistence";
 
 import * as Event from "#/Event.ts";
-import type { EncodingServices, Header, Metadata, Service } from "#/Exchange.ts";
+import {
+  Magic,
+  Version,
+  type EncodingServices,
+  type Header,
+  type Metadata,
+  type Service,
+} from "#/Exchange.ts";
 import type * as Extra from "#/Extra.ts";
 import { joined, readFrames } from "#/internal/frames.ts";
 import * as Metric from "#/Metric.ts";
@@ -34,14 +42,6 @@ import * as Prompt from "#/Prompt.ts";
 import * as Toolkit from "#/Toolkit.ts";
 import * as Trajectory from "#/Trajectory.ts";
 import { TrajectoryError } from "#/TrajectoryError.ts";
-
-import pkg from "../../package.json" with { type: "json" };
-
-/**
- * The version of this package, as `package.json` states it: the version of trajs a
- * trajectory states of itself, since the format a trajectory is in is this package's.
- */
-const Version = pkg.version;
 
 /**
  * How one contribution of a kit names itself, as a trajectory states it: the name it
@@ -93,13 +93,6 @@ const encodeHeader = ({
  * metadata it ends with: four, big-endian, before the header and after the metadata.
  */
 const LengthBytes = 4;
-
-/**
- * What a trajectory ends with once it was written whole: the ASCII `TRAJS`, which is
- * what tells a reader the bytes it read are a trajectory written to its end rather
- * than one that was cut short.
- */
-const Magic = new TextEncoder().encode("TRAJS");
 
 /** The length `length`, as the four big-endian bytes that state it. */
 const encodeLength = (length: number): Uint8Array => {
@@ -200,29 +193,31 @@ const FrameChunk = 64 * 1024;
  * A range that is not a range — one that ends before it begins, which is what
  * bytes holding a metadata but no frame hold — is read as nothing at all, so what
  * is read of such a trajectory is nothing rather than its metadata read as a frame.
+ *
+ * The range is given first and the bytes after, so that what reads one is curried out
+ * of the range alone, and what those bytes fail with is the caller's to state rather
+ * than the format's: one range is read the same way wherever a trajectory is kept.
  */
-const framesOf = (
-  bytes: Bytes<StorageError>,
-  from: bigint,
-  to: bigint,
-): Stream.Stream<Uint8Array, StorageError> =>
-  Stream.unfold(from, (offset) => {
-    const left = to - offset;
+const framesOf =
+  <E>({ from, to }: { readonly from: bigint; readonly to: bigint }) =>
+  (bytes: Bytes<E>): Stream.Stream<Uint8Array, E> =>
+    Stream.unfold(from, (offset) => {
+      const left = to - offset;
 
-    if (left <= 0n) {
-      return Effect.succeed(undefined);
-    }
+      if (left <= 0n) {
+        return Effect.succeed(undefined);
+      }
 
-    return bytes
-      .readAlloc({ offset, size: left < BigInt(FrameChunk) ? Number(left) : FrameChunk })
-      .pipe(
-        // A read that takes nothing is what ends the frame, so a file shorter than
-        // the range the frame was read for ends it where the file does.
-        Effect.map((chunk) =>
-          chunk.length === 0 ? undefined : ([chunk, offset + BigInt(chunk.length)] as const),
-        ),
-      );
-  });
+      return bytes
+        .readAlloc({ offset, size: left < BigInt(FrameChunk) ? Number(left) : FrameChunk })
+        .pipe(
+          // A read that takes nothing is what ends the frame, so a file shorter than
+          // the range the frame was read for ends it where the file does.
+          Effect.map((chunk) =>
+            chunk.length === 0 ? undefined : ([chunk, offset + BigInt(chunk.length)] as const),
+          ),
+        );
+    });
 
 /**
  * A schema as the format states it: the part it reads and writes, and the services
@@ -657,7 +652,9 @@ export const service = <
         // The frame lies between the header and the metadata, so neither the head
         // nor the tail is read as part of it.
         const frame = framed(
-          framesOf(bytes, stated.end, trailing.end).pipe(compression.decompress),
+          framesOf<StorageError>({ from: stated.end, to: trailing.end })(bytes).pipe(
+            compression.decompress,
+          ),
         );
 
         return {
