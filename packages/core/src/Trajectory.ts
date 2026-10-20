@@ -89,6 +89,20 @@ export type PromptPart<K extends Extra.AnyKit> = Schema.Schema.Type<
 export type PromptPartEncoded = Schema.Codec.Encoded<ReturnType<typeof PromptPart<Extra.AnyKit>>>;
 
 /**
+ * The session a part built without one belongs to: `"root"`.
+ *
+ * **When to use**
+ *
+ * Use to name the session a part built by {@link promptPart} or {@link responsePart}
+ * without one belongs to, rather than repeating the id.
+ *
+ * @see {@link promptPart} for a builder that states it as the default.
+ * @see {@link responsePart} for the other one.
+ * @category constants
+ */
+export const rootSession = "root";
+
+/**
  * Builds a prompt part from the prompt a model was given.
  *
  * **When to use**
@@ -98,11 +112,11 @@ export type PromptPartEncoded = Schema.Codec.Encoded<ReturnType<typeof PromptPar
  *
  * **Details**
  *
- * - The kit is asked for first ({@link PromptPart}) and the fields second: the kit
- *   says how the part's extra data is read, so the part states the extra data of
- *   that kit.
+ * - The kit is asked for first ({@link PromptPart}) and the prompt second, with the
+ *   fields the part is built with: the kit says how the part's extra data is read, so
+ *   the part states the extra data of that kit.
  * - `messages` are the content of the prompt given, and `sessionId` the session the
- *   part is produced in.
+ *   part is produced in; a part built without one belongs to {@link rootSession}.
  * - `timestamp` is when the part was produced, where what produces it states a moment.
  *   A part that states no moment had none to state; see {@link PromptPart}.
  * - `extra` may be left out, and the part then states none of it. A datum the kit
@@ -123,11 +137,13 @@ export type PromptPartEncoded = Schema.Codec.Encoded<ReturnType<typeof PromptPar
  *   }).pipe(VersionedSchema.make)
  * })
  *
- * const part = Trajectory.promptPart(Extra.makeKit(estimate))({
- *   prompt: Prompt.make("What is 2 + 2?"),
- *   sessionId: "01890a5d-ac96-774b-bcce-b302099a8057",
- *   extra: { "tokenize/estimate": { version: "0.1.0", tokens: 7 } }
- * })
+ * const part = Trajectory.promptPart(Extra.makeKit(estimate))(
+ *   Prompt.make("What is 2 + 2?"),
+ *   {
+ *     sessionId: "01890a5d-ac96-774b-bcce-b302099a8057",
+ *     extra: { "tokenize/estimate": { version: "0.1.0", tokens: 7 } }
+ *   }
+ * )
  *
  * part.messages.map((message) => message.role) // => ["user"]
  * part.extra["tokenize/estimate"]?.tokens // => 7
@@ -139,17 +155,18 @@ export type PromptPartEncoded = Schema.Codec.Encoded<ReturnType<typeof PromptPar
  */
 export const promptPart =
   <K extends Extra.AnyKit>(extrakit: K) =>
-  ({
-    prompt,
-    sessionId,
-    extra = {},
-    timestamp,
-  }: {
-    prompt: Prompt.Prompt;
-    sessionId: string;
-    extra?: Extra.ExtraRecord<K["extra"], "prompt">;
-    timestamp?: DateTime.Utc;
-  }) =>
+  (
+    prompt: Prompt.Prompt,
+    {
+      timestamp,
+      sessionId = rootSession,
+      extra = {},
+    }: {
+      sessionId?: string;
+      extra?: Extra.ExtraRecord<K["extra"], "prompt">;
+      timestamp?: DateTime.Utc;
+    } = {},
+  ) =>
     PromptPart(extrakit).make({ messages: prompt.content, sessionId, extra, timestamp });
 
 /**
@@ -215,8 +232,8 @@ export type SessionPartEncoded = Schema.Codec.Encoded<ReturnType<typeof SessionP
  *
  * **Details**
  *
- * - The kit is asked for first ({@link SessionPart}) and the fields second, so the
- *   part states the extra data of that kit.
+ * - The kit is asked for first ({@link SessionPart}) and the session second, with the
+ *   fields it is declared with: the part states the extra data of that kit.
  * - `fork` is the `uuid` of the {@link Session.ForkPart} the session continues from —
  *   a part of another session, not the session itself — and `extra` may be left out,
  *   the part then stating none of it.
@@ -228,12 +245,9 @@ export type SessionPartEncoded = Schema.Codec.Encoded<ReturnType<typeof SessionP
  *
  * const extrakit = Extra.makeKit()
  *
- * const root = Trajectory.sessionPart(extrakit)({
- *   id: "01890a5d-ac96-774b-bcce-b302099a8057"
- * })
+ * const root = Trajectory.sessionPart(extrakit)("01890a5d-ac96-774b-bcce-b302099a8057")
  *
- * const forked = Trajectory.sessionPart(extrakit)({
- *   id: "01890a5d-ac96-774b-bcce-b302099a8058",
+ * const forked = Trajectory.sessionPart(extrakit)("01890a5d-ac96-774b-bcce-b302099a8058", {
  *   fork: root.uuid
  * })
  *
@@ -246,15 +260,16 @@ export type SessionPartEncoded = Schema.Codec.Encoded<ReturnType<typeof SessionP
  */
 export const sessionPart =
   <K extends Extra.AnyKit>(extrakit: K) =>
-  ({
-    id,
-    fork,
-    extra = {},
-  }: {
-    id: string;
-    fork?: string;
-    extra?: Extra.ExtraRecord<K["extra"], "session">;
-  }) =>
+  (
+    id: string,
+    {
+      fork,
+      extra = {},
+    }: {
+      fork?: string;
+      extra?: Extra.ExtraRecord<K["extra"], "session">;
+    } = {},
+  ) =>
     SessionPart(extrakit).make({ id, fork, extra });
 
 const responseFields = {
@@ -408,16 +423,18 @@ export type ResponsePartEncoded = Schema.Codec.Encoded<
  *
  * **Details**
  *
- * - The kit is asked for first ({@link ResponsePart}) and the fields second: the
- *   toolkit says how the part's response is read and the extra kit how its extra data
- *   is, so the part states the extra data of that kit.
+ * - The kit is asked for first ({@link ResponsePart}) and the response second, with
+ *   the fields the part is built with: the toolkit says how the part's response is
+ *   read and the extra kit how its extra data is, so the part states the extra data
+ *   of that kit.
  * - `response` is one part of what the model returned, as {@link Response.makePart}
  *   builds one: an increment the response arrived in where the config streams, and a
  *   part the response is whole in where it does not.
- * - `sessionId` names the session the part is produced in; `timestamp` and `uuid` are
- *   supplied where the part is built, as for every other part, and a caller that
- *   knows when the response happened states it rather than leaving the part to be
- *   timed as it is built.
+ * - `sessionId` names the session the part is produced in, a part built without one
+ *   belonging to {@link rootSession}; `timestamp` and `uuid` are supplied where
+ *   the part is built, as for every other part, and a caller that knows when the
+ *   response happened states it rather than leaving the part to be timed as it is
+ *   built.
  * - `extra` may be left out, and the part then states none of it.
  *
  * **Example** (Producing what a model returned, with what it was estimated to cost)
@@ -439,11 +456,13 @@ export type ResponsePartEncoded = Schema.Codec.Encoded<
  *   toolkit: Toolkit.empty,
  *   extrakit: Extra.makeKit(estimate),
  *   stream: false
- * })({
- *   response: Response.makePart("text", { text: "4" }),
- *   sessionId: "01890a5d-ac96-774b-bcce-b302099a8057",
- *   extra: { "tokenize/estimate": { version: "0.1.0", tokens: 3 } }
- * })
+ * })(
+ *   Response.makePart("text", { text: "4" }),
+ *   {
+ *     sessionId: "01890a5d-ac96-774b-bcce-b302099a8057",
+ *     extra: { "tokenize/estimate": { version: "0.1.0", tokens: 3 } }
+ *   }
+ * )
  *
  * part.response.type // => "text"
  * part.extra["tokenize/estimate"]?.tokens // => 3
@@ -463,17 +482,18 @@ export const responsePart =
     extrakit: Extrakit;
     stream: Stream;
   }) =>
-  ({
-    response,
-    sessionId,
-    extra = {},
-    timestamp,
-  }: {
-    response: ResponsePart<Toolkit, Extrakit, Stream>["response"];
-    sessionId: string;
-    extra?: Extra.ExtraRecord<Extrakit["extra"], "response">;
-    timestamp?: DateTime.Utc;
-  }): ResponsePart<Toolkit, Extrakit, Stream> =>
+  (
+    response: ResponsePart<Toolkit, Extrakit, Stream>["response"],
+    {
+      sessionId = rootSession,
+      extra = {},
+      timestamp,
+    }: {
+      sessionId?: string;
+      extra?: Extra.ExtraRecord<Extrakit["extra"], "response">;
+      timestamp?: DateTime.Utc;
+    } = {},
+  ): ResponsePart<Toolkit, Extrakit, Stream> =>
     // SAFETY: `ResponsePart` selects its variant by `stream`, which the fields were
     // read under, so what it makes is the part they state; TypeScript leaves that
     // selection unevaluated where `stream` is a type parameter and reads the part it
@@ -764,7 +784,11 @@ export type Part<Config extends AnyConfig> =
  * @see {@link Trajectory} for a stream of parts that carries what it is read with.
  * @category models
  */
-export type TrajectoryStream<Config extends AnyConfig, E, R> = Stream.Stream<Part<Config>, E, R>;
+export type TrajectoryStream<Config extends AnyConfig, E = never, R = never> = Stream.Stream<
+  Part<Config>,
+  E,
+  R
+>;
 
 /**
  * A trajectory: the parts of a trajectory as one stream, carrying what they are read
@@ -871,7 +895,7 @@ export type MergedConfig<Left extends AnyConfig, Right extends AnyConfig> = Conf
  *     metrickit,
  *     extrakit
  *   })(Stream.make(
- *     Trajectory.promptPart(extrakit)({ prompt: Prompt.make(content), sessionId })
+ *     Trajectory.promptPart(extrakit)(Prompt.make(content), { sessionId })
  *   ))
  *
  * const merged = Trajectory.merge(

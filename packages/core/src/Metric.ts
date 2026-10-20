@@ -727,9 +727,7 @@ const isProducerFailure = (value: unknown): value is ProducerFailure<Any> =>
  * // it. A producer reads what a model was given and returned rather than a report
  * // of its own metric, so every producer of the kit reads every part.
  * const produced = Stream.make(
- *   Trajectory.sessionPart(Extra.makeKit())({
- *     id: "01890a5d-ac96-774b-bcce-b302099a8057"
- *   })
+ *   Trajectory.sessionPart(Extra.makeKit())("01890a5d-ac96-774b-bcce-b302099a8057")
  * )
  *
  * const parts = await Effect.runPromise(Stream.runCollect(Metric.produce(runnable)(produced)))

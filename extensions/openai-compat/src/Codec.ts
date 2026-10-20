@@ -95,11 +95,11 @@ export type OpenAiCompatSessions = Record<string, OpenAiCompatMessage[]>;
  * // An exchange a trajectory holds: what a model was given, the tool it called for it, the
  * // result that call was answered with, and what it answered of that result.
  * const parts = [
- *   Trajectory.sessionPart(extrakit)({ id: sessionId }),
- *   Trajectory.promptPart(extrakit)({
- *     prompt: Prompt.make("What is the weather in Paris?"),
- *     sessionId
- *   }),
+ *   Trajectory.sessionPart(extrakit)(sessionId),
+ *   Trajectory.promptPart(extrakit)(
+ *     Prompt.make("What is the weather in Paris?"),
+ *     { sessionId }
+ *   ),
  *   response.make({
  *     response: Response.anyToolCallPart({
  *       id: "call_1",
@@ -110,8 +110,8 @@ export type OpenAiCompatSessions = Record<string, OpenAiCompatMessage[]>;
  *     sessionId,
  *     extra: {}
  *   }),
- *   Trajectory.promptPart(extrakit)({
- *     prompt: Prompt.fromMessages([
+ *   Trajectory.promptPart(extrakit)(
+ *     Prompt.fromMessages([
  *       Prompt.makeMessage("tool", {
  *         content: [
  *           Prompt.makePart("tool-result", {
@@ -124,8 +124,8 @@ export type OpenAiCompatSessions = Record<string, OpenAiCompatMessage[]>;
  *         ]
  *       })
  *     ]),
- *     sessionId
- *   }),
+ *     { sessionId }
+ *   ),
  *   response.make({
  *     response: Response.makePart("text", { text: "It is 18°C." }),
  *     sessionId,

@@ -104,8 +104,8 @@ type Props<
  * })
  *
  * const trajectory = Stream.make(
- *   Trajectory.sessionPart(extrakit)({ id: "asking" }),
- *   Trajectory.sessionPart(extrakit)({ id: "replying" })
+ *   Trajectory.sessionPart(extrakit)("asking"),
+ *   Trajectory.sessionPart(extrakit)("replying")
  * )
  *
  * const read = Effect.gen(function*() {

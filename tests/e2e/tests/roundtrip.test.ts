@@ -39,15 +39,12 @@ const config = {
 
 /** The parts of the trajectory, in the one order a trajectory carries them in. */
 const parts = [
-  Trajectory.sessionPart(extrakit)({ id: session }),
-  Trajectory.promptPart(extrakit)({
-    prompt: Prompt.make(question),
-    sessionId: session,
-  }),
-  Trajectory.responsePart({ toolkit: Toolkit.empty, extrakit, stream: false })({
-    response: Response.makePart("text", { text: "let me look that up" }),
-    sessionId: session,
-  }),
+  Trajectory.sessionPart(extrakit)(session),
+  Trajectory.promptPart(extrakit)(Prompt.make(question), { sessionId: session }),
+  Trajectory.responsePart({ toolkit: Toolkit.empty, extrakit, stream: false })(
+    Response.makePart("text", { text: "let me look that up" }),
+    { sessionId: session },
+  ),
 ];
 
 /**

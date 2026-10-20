@@ -27,7 +27,7 @@ const extrakit = Extra.makeKit();
 
 /** A prompt part, as a trajectory holds one. */
 const promptPart = (prompt: Prompt.Prompt, sessionId: string) =>
-  Trajectory.promptPart(extrakit)({ prompt, sessionId });
+  Trajectory.promptPart(extrakit)(prompt, { sessionId });
 
 /** A response part that was produced whole, as a trajectory holds one. */
 const responsePart = Trajectory.responsePart({
@@ -52,48 +52,47 @@ const png = (width: number, height: number): Uint8Array => {
 
 // One turn of a session that called a tool: what the model was given, what it
 // answered, the call it made, the result of that call, and why it stopped.
-const declared = Trajectory.sessionPart(extrakit)({ id: asking });
+const declared = Trajectory.sessionPart(extrakit)(asking);
 
 const question = promptPart(Prompt.make("what is the weather in SF"), asking);
 
-const answer = responsePart({
-  response: Response.makePart("text", { text: "let me look that up" }),
+const answer = responsePart(Response.makePart("text", { text: "let me look that up" }), {
   sessionId: asking,
 });
 
-const call = responsePart({
-  response: Response.anyToolCallPart({
+const call = responsePart(
+  Response.anyToolCallPart({
     id: "call_1",
     name: "get_weather",
     params: { city: "SF" },
     providerExecuted: false,
   }),
-  sessionId: asking,
-});
+  { sessionId: asking },
+);
 
-const result = responsePart({
-  response: Response.anyToolResultPart({
+const result = responsePart(
+  Response.anyToolResultPart({
     id: "call_1",
     name: "get_weather",
     result: { temp: 22 },
     isFailure: false,
     providerExecuted: false,
   }),
-  sessionId: asking,
-});
+  { sessionId: asking },
+);
 
-const stopped = responsePart({
-  response: Response.makePart("finish", {
+const stopped = responsePart(
+  Response.makePart("finish", {
     reason: "stop",
     usage: new Response.Usage({ inputTokens: { total: 12 }, outputTokens: { total: 3 } }),
     response: undefined,
   }),
-  sessionId: asking,
-});
+  { sessionId: asking },
+);
 
 // A session that ran on a tool result alone, and was given a payload that is not
 // text: the kinds of count the other session does not hold.
-const forked = Trajectory.sessionPart(extrakit)({ id: answering });
+const forked = Trajectory.sessionPart(extrakit)(answering);
 
 const carried = promptPart(
   Prompt.fromMessages([
@@ -112,10 +111,10 @@ const carried = promptPart(
   answering,
 );
 
-const image = responsePart({
-  response: Response.makePart("file", { mediaType: "image/png", data: png(512, 512) }),
-  sessionId: answering,
-});
+const image = responsePart(
+  Response.makePart("file", { mediaType: "image/png", data: png(512, 512) }),
+  { sessionId: answering },
+);
 
 /** The trajectory's parts, in the one order a trajectory carries them in. */
 const parts = [declared, question, answer, call, result, stopped, forked, carried, image];

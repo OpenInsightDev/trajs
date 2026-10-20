@@ -217,14 +217,14 @@ export type AnySessions = Sessions<Trajectory.AnyConfig, any, any>;
  *
  * const extrakit = Extra.makeKit()
  *
- * const asked = Trajectory.promptPart(extrakit)({
- *   prompt: Prompt.make("What is a fork?"),
- *   sessionId: "asking"
- * })
- * const forking = Trajectory.sessionPart(extrakit)({ id: "reply", fork: asked.uuid })
+ * const asked = Trajectory.promptPart(extrakit)(
+ *   Prompt.make("What is a fork?"),
+ *   { sessionId: "asking" }
+ * )
+ * const forking = Trajectory.sessionPart(extrakit)("reply", { fork: asked.uuid })
  *
  * const trajectory = Stream.make(
- *   Trajectory.sessionPart(extrakit)({ id: "asking" }),
+ *   Trajectory.sessionPart(extrakit)("asking"),
  *   asked,
  *   forking
  * )

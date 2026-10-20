@@ -242,7 +242,7 @@ const stepsOf = <Config extends Trajectory.AnyConfig>(
  * // A trajectory of one exchange: what a model was given, and what it returned for
  * // it as one whole part.
  * const trajectory = Stream.make(
- *   Trajectory.promptPart(extrakit)({ prompt: Prompt.make("What is 2 + 2?"), sessionId }),
+ *   Trajectory.promptPart(extrakit)(Prompt.make("What is 2 + 2?"), { sessionId }),
  *   response.make({ response: Response.makePart("text", { text: "4" }), sessionId, extra: {} })
  * )
  *

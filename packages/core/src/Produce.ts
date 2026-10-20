@@ -202,7 +202,7 @@ const produceWith =
  *   metrickit,
  *   extrakit
  * })(Stream.make(
- *   Trajectory.promptPart(extrakit)({ prompt: Prompt.make("What is 2 + 2?"), sessionId })
+ *   Trajectory.promptPart(extrakit)(Prompt.make("What is 2 + 2?"), { sessionId })
  * ))
  *
  * const parts = Array.from(await Effect.runPromise(Stream.runCollect(produced)))
@@ -282,16 +282,16 @@ export const fromSession =
  *   extrakit
  * })({
  *   asking: Stream.make(
- *     Trajectory.promptPart(extrakit)({
- *       prompt: Prompt.make("What is 2 + 2?"),
- *       sessionId: "asking"
- *     })
+ *     Trajectory.promptPart(extrakit)(
+ *       Prompt.make("What is 2 + 2?"),
+ *       { sessionId: "asking" }
+ *     )
  *   ),
  *   answering: Stream.make(
- *     Trajectory.promptPart(extrakit)({
- *       prompt: Prompt.make("What is 4 + 4?"),
- *       sessionId: "answering"
- *     })
+ *     Trajectory.promptPart(extrakit)(
+ *       Prompt.make("What is 4 + 4?"),
+ *       { sessionId: "answering" }
+ *     )
  *   )
  * })
  *
@@ -335,7 +335,7 @@ export const fromSessions =
         stream.pipe(
           // A stream of a session names it rather than declaring it, so the session
           // is declared here: a session is read before the parts of it arrive.
-          Stream.prepend([sessionPart({ id })]),
+          Stream.prepend([sessionPart(id)]),
         ),
       ),
       { concurrency: "unbounded" },
@@ -548,9 +548,9 @@ export const produce =
       ): ProduceSession<Toolkit["tools"], Eventkit["events"], Extrakit["extra"]> => ({
         id,
         enqueuePrompt: (prompt, extra = {}, timestamp) =>
-          enqueue(promptPart({ prompt, sessionId: id, extra, timestamp })),
+          enqueue(promptPart(prompt, { sessionId: id, extra, timestamp })),
         enqueueResponse: (response, extra = {}, timestamp) =>
-          enqueue(responsePart({ response, sessionId: id, extra, timestamp })),
+          enqueue(responsePart(response, { sessionId: id, extra, timestamp })),
         enqueueEvent: (event) => enqueue(eventPart.make({ event, sessionId: id })),
       });
 
@@ -574,7 +574,7 @@ export const produce =
 
             const extraData = Extra.stated(extrakit, "session")(extra);
 
-            yield* enqueue(sessionPart({ id, fork, extra: extraData }));
+            yield* enqueue(sessionPart(id, { fork, extra: extraData }));
 
             return session(id);
           }),

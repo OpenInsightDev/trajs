@@ -86,7 +86,7 @@ export type PromptTurn<Config extends Trajectory.AnyConfig> = Readonly<{
  * // A trajectory of one exchange: what a model was given, and what it returned for
  * // it as one whole part.
  * const trajectory = Stream.make(
- *   Trajectory.promptPart(extrakit)({ prompt: Prompt.make("What is 2 + 2?"), sessionId }),
+ *   Trajectory.promptPart(extrakit)(Prompt.make("What is 2 + 2?"), { sessionId }),
  *   response.make({ response: Response.makePart("text", { text: "4" }), sessionId, extra: {} })
  * )
  *
@@ -142,8 +142,8 @@ export const promptTurns = <Config extends Trajectory.AnyConfig, E, R>(
  *
  * // A trajectory of one session: what a model was given, and what it answered.
  * const trajectory = Stream.make(
- *   Trajectory.sessionPart(extrakit)({ id: sessionId }),
- *   Trajectory.promptPart(extrakit)({ prompt: Prompt.make("What is 2 + 2?"), sessionId }),
+ *   Trajectory.sessionPart(extrakit)(sessionId),
+ *   Trajectory.promptPart(extrakit)(Prompt.make("What is 2 + 2?"), { sessionId }),
  *   response.make({ response: Response.makePart("text", { text: "4" }), sessionId, extra: {} })
  * )
  *
@@ -211,10 +211,10 @@ export type Conversation = ReadonlyArray<Prompt.Message>;
  * const extrakit = Extra.makeKit()
  * const response = Trajectory.ResponsePart({ toolkit: Toolkit.empty, extrakit, stream: false })
  *
- * const asked = Trajectory.promptPart(extrakit)({
- *   prompt: Prompt.make("What is a fork?"),
- *   sessionId: "asking"
- * })
+ * const asked = Trajectory.promptPart(extrakit)(
+ *   Prompt.make("What is a fork?"),
+ *   { sessionId: "asking" }
+ * )
  * const answered = response.make({
  *   response: Response.makePart("text", { text: "It is a session that continues another." }),
  *   sessionId: "asking",
@@ -224,11 +224,11 @@ export type Conversation = ReadonlyArray<Prompt.Message>;
  * // One session asks and is answered, and a session forked off the answer asks again:
  * // its conversation is the answer that was given, then its own question.
  * const trajectory = Stream.make(
- *   Trajectory.sessionPart(extrakit)({ id: "asking" }),
+ *   Trajectory.sessionPart(extrakit)("asking"),
  *   asked,
  *   answered,
- *   Trajectory.sessionPart(extrakit)({ id: "reply", fork: answered.uuid }),
- *   Trajectory.promptPart(extrakit)({ prompt: Prompt.make("And what does it hold?"), sessionId: "reply" })
+ *   Trajectory.sessionPart(extrakit)("reply", { fork: answered.uuid }),
+ *   Trajectory.promptPart(extrakit)(Prompt.make("And what does it hold?"), { sessionId: "reply" })
  * )
  *
  * const conversations = await Effect.runPromise(View.conversations(trajectory))

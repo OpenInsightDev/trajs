@@ -1,6 +1,11 @@
 /**
- * A short conversation, read as the turns it was produced in and summarised. The
- * trajectory is built here rather than read from a `.trajs` file so the case stands on
+ * A short conversation, read as the turns it was produced in and summarised.
+ *
+ * The trajectory is read as the turns it was produced in — every prompt, with the response
+ * that answered it — and each turn is counted into the summary: the messages it was asked
+ * and answered with, the characters of the text it holds, and the tools it called.
+ *
+ * The trajectory is built here rather than read from a `.trajs` file so the case stands on
  * its own; a real analysis reads the same parts with `Exchange`.
  */
 
@@ -8,12 +13,10 @@ import { Extra, Prompt, Response, Toolkit, Trajectory, View } from "@trajs/core"
 import { Effect, Stream } from "effect";
 import { expect, it } from "vite-plus/test";
 
-const sessionId = "01890a5d-ac96-774b-bcce-b302099a8057";
+const toolkit = Toolkit.empty;
+const extrakit = Extra.emptyKit;
 
-const extrakit = Extra.makeKit();
-
-const response = Trajectory.ResponsePart({ toolkit: Toolkit.empty, extrakit, stream: false });
-
+/** The conversation counted: messages of both sides, text characters, and tools called. */
 interface Summary {
   readonly turns: number;
   readonly messages: number;
@@ -21,62 +24,41 @@ interface Summary {
   readonly toolCalls: Readonly<Record<string, number>>;
 }
 
-// A trajectory is a stream of parts and a stream is read once, so the sample is built
-// on each call and read by the one call that asks for it.
-const main = async (): Promise<Summary> => {
-  const trajectory = Stream.make(
-    Trajectory.promptPart(extrakit)({
-      prompt: Prompt.make("What is the weather in Paris?"),
-      sessionId,
-    }),
-    response.make({
-      response: Response.anyToolCallPart({
-        id: "call_1",
-        name: "get_weather",
-        params: { city: "Paris" },
-        providerExecuted: false,
-      }),
-      sessionId,
-      extra: {},
-    }),
-    response.make({
-      response: Response.makePart("text", { text: "It is sunny." }),
-      sessionId,
-      extra: {},
-    }),
-    Trajectory.promptPart(extrakit)({
-      prompt: Prompt.make("And in Berlin?"),
-      sessionId,
-    }),
-    response.make({
-      response: Response.anyToolCallPart({
-        id: "call_2",
-        name: "get_weather",
-        params: { city: "Berlin" },
-        providerExecuted: false,
-      }),
-      sessionId,
-      extra: {},
-    }),
-    response.make({
-      response: Response.makePart("text", { text: "It is raining." }),
-      sessionId,
-      extra: {},
-    }),
-  );
+const prompt = (text: string) => Trajectory.promptPart(extrakit)(Prompt.make(text));
+const makeResponse = Trajectory.responsePart({ toolkit, extrakit, stream: false });
 
+const turn = (id: string, city: string, answer: string) => [
+  makeResponse(
+    Response.anyToolCallPart({
+      id,
+      name: "get_weather",
+      params: { city },
+      providerExecuted: false,
+    }),
+  ),
+  makeResponse(Response.makePart("text", { text: answer })),
+];
+
+const trajStream = Stream.fromArray([
+  prompt("What is the weather in Paris?"),
+  ...turn("call_1", "Paris", "It is sunny."),
+  prompt("And in Berlin?"),
+  ...turn("call_2", "Berlin", "It is raining."),
+]) satisfies Trajectory.TrajectoryStream<Trajectory.AnyConfig>;
+
+const main = async (): Promise<Summary> => {
   const turns = Array.from(
-    await View.promptTurns(trajectory).pipe(Stream.runCollect, Effect.runPromise),
+    await View.promptTurns(trajStream).pipe(Stream.runCollect, Effect.runPromise),
   );
 
   let messages = 0;
   let characters = 0;
   const toolCalls: Record<string, number> = {};
 
-  for (const turn of turns) {
-    messages += turn.prompt.messages.length;
+  for (const promptTurn of turns) {
+    messages += promptTurn.prompt.messages.length;
 
-    for (const part of turn.response) {
+    for (const part of promptTurn.response) {
       messages += 1;
 
       if (part.type === "text") {
@@ -90,11 +72,10 @@ const main = async (): Promise<Summary> => {
   return { turns: turns.length, messages, characters, toolCalls };
 };
 
-it("main", async () => {
-  await expect(main()).resolves.toEqual({
+it("main", () =>
+  expect(main()).resolves.toEqual({
     turns: 2,
     messages: 6,
     characters: 26,
     toolCalls: { get_weather: 2 },
-  });
-});
+  }));

@@ -116,16 +116,16 @@ export type AnthropicSessions = Record<string, AnthropicConversation>;
  * // An exchange a trajectory holds: what a model was given, the tool it called for it, the
  * // result that call was answered with, and what it answered of that result.
  * const parts = [
- *   Trajectory.sessionPart(extrakit)({ id: sessionId }),
- *   Trajectory.promptPart(extrakit)({
- *     prompt: Prompt.fromMessages([
+ *   Trajectory.sessionPart(extrakit)(sessionId),
+ *   Trajectory.promptPart(extrakit)(
+ *     Prompt.fromMessages([
  *       Prompt.makeMessage("system", { content: "Answer in one sentence." }),
  *       Prompt.makeMessage("user", {
  *         content: [Prompt.makePart("text", { text: "What is the weather in Paris?" })]
  *       })
  *     ]),
- *     sessionId
- *   }),
+ *     { sessionId }
+ *   ),
  *   response.make({
  *     response: Response.anyToolCallPart({
  *       id: "call_1",
@@ -136,8 +136,8 @@ export type AnthropicSessions = Record<string, AnthropicConversation>;
  *     sessionId,
  *     extra: {}
  *   }),
- *   Trajectory.promptPart(extrakit)({
- *     prompt: Prompt.fromMessages([
+ *   Trajectory.promptPart(extrakit)(
+ *     Prompt.fromMessages([
  *       Prompt.makeMessage("tool", {
  *         content: [
  *           Prompt.makePart("tool-result", {
@@ -150,8 +150,8 @@ export type AnthropicSessions = Record<string, AnthropicConversation>;
  *         ]
  *       })
  *     ]),
- *     sessionId
- *   }),
+ *     { sessionId }
+ *   ),
  *   response.make({
  *     response: Response.makePart("text", { text: "It is 18°C." }),
  *     sessionId,

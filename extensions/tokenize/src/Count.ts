@@ -145,10 +145,10 @@ export interface CountOptions {
  * import { Extra, Trajectory } from "@trajs/core"
  * import { Count, Tokenizer } from "@trajs/extension-tokenize"
  *
- * const part = Trajectory.promptPart(Extra.makeKit())({
- *   prompt: Prompt.make("Hello"),
- *   sessionId: "01890a5d-ac96-774b-bcce-b302099a8057"
- * })
+ * const part = Trajectory.promptPart(Extra.makeKit())(
+ *   Prompt.make("Hello"),
+ *   { sessionId: "01890a5d-ac96-774b-bcce-b302099a8057" }
+ * )
  *
  * const count = await Effect.runPromise(
  *   Count.promptPart(part).pipe(Effect.provide(Tokenizer.layerOpenAi({ model: "gpt-4o" })))
