@@ -8,7 +8,7 @@
  * its own; a real analysis reads the same parts with `Exchange`.
  */
 
-import { Extra, Prompt, Response, Toolkit, Trajectory } from "@trajs/core";
+import { Extra, Prompt, Response, Toolkit, Trajectory, View } from "@trajs/core";
 import { Effect, Stream } from "effect";
 import { expect, it } from "vite-plus/test";
 
@@ -61,7 +61,7 @@ const trajStream = Stream.fromArray([
 const main = (threshold: number) =>
   trajStream.pipe(
     // Parts to turns: a call with the result that answered it
-    Toolkit.toolTurns,
+    View.toolTurns,
     // Turns to runs: the calls made one after another with equal inputs, compared with
     // `Equal.equals`, so two calls of one input are one run whatever ids they carry.
     Stream.groupAdjacentBy(({ call: { name, params } }) => ({ name, params })),

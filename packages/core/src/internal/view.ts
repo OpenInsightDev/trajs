@@ -1,23 +1,25 @@
 /**
- * The reading behind {@link View.promptTurns}, {@link View.prompt} and
- * {@link View.conversations}: one pass over a trajectory groups its parts into the
- * turns they were produced in, folding the increments of a streamed response into
- * the parts they complete, and the turns are folded back into the prompt one
- * session's model was given — or, session by session, into the conversation each of
- * them ran in.
+ * The reading behind {@link View.promptTurns}, {@link View.prompt},
+ * {@link View.conversations} and {@link View.toolTurns}: one pass over a
+ * trajectory groups its parts into the turns they were produced in, folding the
+ * increments of a streamed response into the parts they complete, and the turns are
+ * folded back into the prompt one session's model was given — or, session by
+ * session, into the conversation each of them ran in. A tool call is held by the id
+ * it is answered with, so the calls a trajectory made are read as the tool turns
+ * they are answered in.
  *
- * Nothing here is published: a program reaches the reading through those three.
+ * Nothing here is published: a program reaches the reading through those four.
  */
 
 import { Effect, Option, Stream } from "effect";
 import { Prompt } from "effect/ai";
 
+import { collapse, initial, type State } from "#/internal/folding.ts";
+import type * as Response from "#/Response.ts";
 import * as Session from "#/Session.ts";
-import * as Trajectory from "#/Trajectory.ts";
+import type * as Trajectory from "#/Trajectory.ts";
 import { TrajectoryError } from "#/TrajectoryError.ts";
-import type { Conversation, PromptTurn } from "#/View.ts";
-
-import { collapse, initial, type State } from "./folding.ts";
+import type { Conversation, PromptTurn, ToolTurn } from "#/View.ts";
 
 /** The turn being assembled from the parts read so far, and the folding of its responses. */
 interface Assembly<Config extends Trajectory.AnyConfig> {
@@ -221,3 +223,43 @@ const messagesOf = <Config extends Trajectory.AnyConfig>(
   readPrompt(
     Stream.fromIterable(parts).pipe(Stream.filter((part) => part._tag !== "Session")),
   ).pipe(Effect.map((prompt) => prompt.content));
+
+/**
+ * Reads a trajectory as the tool turns it holds: a call is held by the id it
+ * carries from where it is read to where the result that answers it arrives, and
+ * the two are emitted as one turn there.
+ */
+export const readToolTurns = <Config extends Trajectory.AnyConfig, E, R>(
+  trajectory: Trajectory.TrajectoryStream<Config, E, R>,
+): Stream.Stream<ToolTurn<Config>, E, R> =>
+  trajectory.pipe(
+    Stream.mapAccum(
+      () => new Map<string, Response.ToolCallPartsView<Config["toolkit"]["tools"]>>(),
+      (calls, part) => {
+        if (part._tag !== "Response") return [calls, []];
+
+        const response = part.response;
+
+        switch (response.type) {
+          case "tool-call":
+            calls.set(response.id, response);
+
+            return [calls, []];
+          case "tool-result": {
+            if (response.preliminary) return [calls, []];
+
+            const call = calls.get(response.id);
+
+            if (call === undefined) return [calls, []];
+
+            calls.delete(response.id);
+
+            return [calls, [{ call, result: response }]];
+          }
+
+          default:
+            return [calls, []];
+        }
+      },
+    ),
+  );

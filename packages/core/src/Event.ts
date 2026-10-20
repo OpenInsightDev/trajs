@@ -10,10 +10,9 @@
 
 import { Data, Option, Predicate, Schema, Stream } from "effect";
 
+import type { IndexByKey } from "#/internal/types.ts";
 import type * as Trajectory from "#/Trajectory.ts";
 import * as VersionedSchema from "#/VersionedSchema.ts";
-
-import type { IndexByKey } from "./internal/types.ts";
 
 /**
  * Describes an event: an optional name and description.

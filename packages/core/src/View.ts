@@ -1,10 +1,12 @@
 /**
- * Ways of reading a trajectory as the conversation it produces: {@link promptTurns}
- * groups the parts of one into the turns a model was given and answered, folding
- * the increments of a streamed response into the parts they complete,
- * {@link prompt} folds those turns back into the one prompt a model was given, and
- * {@link conversations} reads a trajectory session by session, as the messages each
- * of them ran on — which is what a provider's API is handed.
+ * Ways of reading a trajectory as what it holds rather than as the parts it arrived
+ * in: {@link promptTurns} groups the parts of one into the turns a model was given
+ * and answered, folding the increments of a streamed response into the parts they
+ * complete, {@link prompt} folds those turns back into the one prompt a model was
+ * given, {@link conversations} reads a trajectory session by session, as the
+ * messages each of them ran on — which is what a provider's API is handed — and
+ * {@link toolTurns} reads it as the calls it made with its tools, each with the
+ * result it was answered with.
  *
  * A trajectory is one stream of parts in total order — see {@link Trajectory} — so
  * what a model was given and what it returned are read by grouping the parts that
@@ -14,11 +16,10 @@
 import type { Effect, Stream } from "effect";
 import type { Prompt } from "effect/ai";
 
+import { readConversations, readPrompt, readToolTurns, readTurns } from "#/internal/view.ts";
 import type * as Response from "#/Response.ts";
 import type * as Trajectory from "#/Trajectory.ts";
 import type { TrajectoryError } from "#/TrajectoryError.ts";
-
-import { readConversations, readPrompt, readTurns } from "./internal/view.ts";
 
 /** The tools of a config's toolkit, which the response parts read from it are typed by. */
 type Tools<Config extends Trajectory.AnyConfig> = Config["toolkit"]["tools"];
@@ -246,3 +247,106 @@ export const conversations = <Config extends Trajectory.AnyConfig, E, R>(
   trajectory: Trajectory.TrajectoryStream<Config, E, R>,
 ): Effect.Effect<Record<string, Conversation>, E | TrajectoryError, R> =>
   readConversations(trajectory);
+
+/**
+ * One tool turn of a trajectory: a tool a model called, and the result that call was
+ * answered with.
+ *
+ * **When to use**
+ *
+ * Use to type a tool turn read from a trajectory — what {@link toolTurns} emits — such
+ * as to read what a run asked of its tools, one call at a time.
+ *
+ * **Details**
+ *
+ * The two parts are read the way every part of a trajectory is: through the toolkit,
+ * so a call or a result of a tool the toolkit does not describe reads as the part the
+ * trajectory holds rather than failing to read at all — see
+ * {@link Response.ToolCallPartsView}.
+ *
+ * @see {@link toolTurns} for the reader that emits one tool turn per call.
+ * @category models
+ */
+export type ToolTurn<Config extends Trajectory.AnyConfig> = Readonly<{
+  call: Response.ToolCallPartsView<Tools<Config>>;
+  result: Response.ToolResultPartsView<Tools<Config>>;
+}>;
+
+/**
+ * Reads a trajectory as the tool turns it holds: every tool a model called, with the
+ * result that call was answered with.
+ *
+ * **When to use**
+ *
+ * Use to read a trajectory for what it did with its tools rather than for the
+ * conversation it had: to score a run by the tools it used, to find the calls a model
+ * made over and over, or to display each call beside what its tool returned. A
+ * trajectory read as the conversation instead is what {@link promptTurns} emits.
+ *
+ * **Details**
+ *
+ * - A tool turn is emitted where the result that answers a call arrives, which is the
+ *   result whose `id` is the call's.
+ * - A preliminary result is the progress of a call rather than the answer to it and is
+ *   read past, so the result of a tool turn is the final one.
+ * - A call a trajectory holds no such result for is not a tool turn, and neither is a
+ *   result whose call it does not hold: a trajectory that ends while a tool still runs
+ *   holds the call alone, and a result no call of this reading was made for has nothing
+ *   to pair it with.
+ * - The turns are emitted in the order the calls were answered, which is the order the
+ *   calls were made in a trajectory that answers each one as it runs, and a call is held
+ *   only until then, so the trajectory is read once rather than held whole.
+ * - Only the parts that carry a tool call or a tool result are read: the increments a
+ *   streamed response arrived in, and the text and reasoning a model answered with, are
+ *   read past.
+ *
+ * The stream fails with the trajectory's failure — `E` — and requires the services `R`
+ * names.
+ *
+ * **Example** (Reading a trajectory as its tool turns)
+ *
+ * ```ts import.meta.vitest
+ * import { Effect, Stream } from "effect"
+ * import { Extra, Response, Toolkit, Trajectory, View } from "@trajs/core"
+ *
+ * const sessionId = "01890a5d-ac96-774b-bcce-b302099a8057"
+ * const extrakit = Extra.makeKit()
+ * const response = Trajectory.ResponsePart({ toolkit: Toolkit.empty, extrakit, stream: false })
+ *
+ * // A trajectory of one call: the tool a model called, and the result it was answered with.
+ * const trajectory = Stream.make(
+ *   response.make({
+ *     response: Response.anyToolCallPart({
+ *       id: "call_1",
+ *       name: "get_weather",
+ *       params: { city: "Paris" },
+ *       providerExecuted: false
+ *     }),
+ *     sessionId,
+ *     extra: {}
+ *   }),
+ *   response.make({
+ *     response: Response.anyToolResultPart({
+ *       id: "call_1",
+ *       name: "get_weather",
+ *       isFailure: false,
+ *       result: "sunny",
+ *       providerExecuted: false
+ *     }),
+ *     sessionId,
+ *     extra: {}
+ *   })
+ * )
+ *
+ * const turns = await Effect.runPromise(Stream.runCollect(View.toolTurns(trajectory)))
+ *
+ * Array.from(turns).map((turn) => [turn.call.name, turn.result.result]) // => [["get_weather", "sunny"]]
+ * ```
+ *
+ * @see {@link ToolTurn} for the turn it emits.
+ * @see {@link promptTurns} for the conversation read instead.
+ * @category combinators
+ */
+export const toolTurns = <Config extends Trajectory.AnyConfig, E, R>(
+  trajectory: Trajectory.TrajectoryStream<Config, E, R>,
+): Stream.Stream<ToolTurn<Config>, E, R> => readToolTurns(trajectory);
