@@ -18,8 +18,7 @@ import * as Response from "#/Response.ts";
 import * as Tool from "#/Tool.ts";
 import * as Toolkit from "#/Toolkit.ts";
 import * as Trajectory from "#/Trajectory.ts";
-
-import { TrajectoryError } from "./TrajectoryError.ts";
+import { TrajectoryError } from "#/TrajectoryError.ts";
 
 /**
  * The parts a trajectory is produced from: what a model was given and returned,

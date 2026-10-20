@@ -9,11 +9,12 @@
 
 import { Schema, SchemaGetter } from "effect";
 
-/** A codec that takes no service of its own: what a shape a trajectory holds is made of. */
-type ServiceFree = Schema.Codec<unknown, unknown, never, never>;
-
-/** The fields a shape states, as a trajectory holds them: the services of none at each. */
-type ServiceFreeFields = Readonly<Record<PropertyKey, ServiceFree>>;
+import {
+  assemble,
+  type ServiceFree,
+  type ServiceFreeFields,
+  tagSchema,
+} from "#/internal/versioned.ts";
 
 /** How data of a version before reads as the version next: the codec that reads it, which takes no service. */
 type Reading<Prev extends Schema.Top, Next extends Schema.Top> = Schema.decodeTo<
@@ -97,14 +98,6 @@ export type Upgraded<
   Schema.Struct<More>,
   readonly [Schema.Struct<More>, Reading<Prev, Schema.Struct<More>>]
 >;
-
-function assemble<
-  Self extends Schema.Struct<ServiceFreeFields>,
-  Members extends ReadonlyArray<ServiceFree>,
->(self: Self, readers: ReadonlyArray<ServiceFree>): VersionedSchema<Self, Members>;
-function assemble(self: Schema.Top, readers: ReadonlyArray<Schema.Top>): Schema.Top {
-  return Object.assign(Schema.Union(readers), { self });
-}
 
 /**
  * States the first version of a shape.
@@ -307,30 +300,6 @@ function assembleTagged<Table extends Schemas>(
 function assembleTagged(table: Schemas, members: ReadonlyArray<Schema.Top>): Schema.Top {
   return Object.assign(Schema.Union(members), { table });
 }
-
-const tagSchema = (tag: string, entry: Any): Any => {
-  const self = entry.self.mapFields((fields) => ({ ...fields, _tag: Schema.Literal(tag) }));
-
-  // The shapes are stated rather than inferred: a transformation that reads one shape as
-  // another names neither of them, and every shape here is the `Any` the entry is — one a
-  // trajectory holds, which states the services of none.
-  const writing = Schema.decodeTo<Schema.flip<Any>, Any, never, never>(Schema.flip(entry), {
-    decode: SchemaGetter.passthrough(),
-    encode: SchemaGetter.forbiddenEncoding,
-  })(entry);
-
-  // SAFETY: every version states its version, so what a version is written as is an
-  // object the tag is stated beside rather than a value of no fields.
-  const reading = Schema.decodeTo<typeof self, typeof writing, never, never>(self, {
-    decode: SchemaGetter.transform((from) => ({
-      ...(from as AnyVersioned["Encoded"]),
-      _tag: tag,
-    })),
-    encode: SchemaGetter.forbiddenEncoding,
-  })(writing);
-
-  return assemble(self, [self, reading]);
-};
 
 /**
  * States the schemas of several tags as one tagged union.

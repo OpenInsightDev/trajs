@@ -2,8 +2,8 @@
 "@trajs/core": minor
 ---
 
-`Toolkit.toolTurns` reads a trajectory as the tool turns it holds: every tool a model
-called, with the result that call was answered with. `Toolkit.ToolTurn` is one of them,
+`View.toolTurns` reads a trajectory as the tool turns it holds: every tool a model
+called, with the result that call was answered with. `View.ToolTurn` is one of them,
 and the two parts of it are read through the toolkit, so a call or a result of a tool the
 toolkit does not describe reads as the part the trajectory holds rather than failing to
 read at all.

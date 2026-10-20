@@ -12,9 +12,8 @@
 
 import { Data, Schema } from "effect";
 
+import type { IndexByKey } from "#/internal/types.ts";
 import * as VersionedSchema from "#/VersionedSchema.ts";
-
-import type { IndexByKey } from "./internal/types.ts";
 
 /**
  * The part of a trajectory extra data is attached to: a datum's schema for

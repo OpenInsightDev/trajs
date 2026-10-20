@@ -20,13 +20,12 @@ import { DateTime, Effect, Schema, Stream } from "effect";
 
 import * as Event from "#/Event.ts";
 import * as Extra from "#/Extra.ts";
+import { Timestamp, Uuid } from "#/internal/schema.ts";
+import type { Select } from "#/internal/types.ts";
 import * as Metric from "#/Metric.ts";
 import * as Prompt from "#/Prompt.ts";
 import * as Response from "#/Response.ts";
 import * as Toolkit from "#/Toolkit.ts";
-
-import { Timestamp, Uuid } from "./internal/schema.ts";
-import type { Select } from "./internal/types.ts";
 
 /**
  * The extra data a part holds, read as the kit declares it of the part it is: a part a
