@@ -1,4 +1,4 @@
-# @trajs/shadcn
+# @trajs/ui-shadcn
 
 The shadcn/ui components the trajs front end renders with — the `base-nova`
 preset over [Base UI](https://base-ui.com) primitives, copied in as source by
@@ -6,11 +6,11 @@ the `shadcn` CLI rather than installed — together with the design language the
 are styled with, shipped as [`styles.css`](#the-theme).
 
 They live in their own package because two things need the same components —
-the viewer app, and [`@trajs/component`](../component), the component library
+the viewer app, and [`@trajs/ui-component`](../component), the component library
 that maps `effect/ai`'s prompt model onto them — and a component copied twice is
 a component that drifts. Each is a workspace dep of whatever renders it, so a
-consumer swaps the whole set by aliasing `@trajs/shadcn`, and no component's look
-is decided inside `@trajs/component`.
+consumer swaps the whole set by aliasing `@trajs/ui-shadcn`, and no component's look
+is decided inside `@trajs/ui-component`.
 
 ## The components
 
@@ -22,10 +22,10 @@ own import map — `#components/bubble` — which is what makes them relocatable
 
 ## Import paths
 
-A consumer imports a component from the package root — `@trajs/shadcn/badge`
+A consumer imports a component from the package root — `@trajs/ui-shadcn/badge`
 — which is the `./*` export. The `./components/*` export resolves to the same
 files and exists only for the `shadcn` CLI: `shadcn add` resolves the `ui` alias
-(`@trajs/shadcn/components`) by matching a wildcard export key, so the
+(`@trajs/ui-shadcn/components`) by matching a wildcard export key, so the
 subpath it names has to exist. `./*` alone leaves the CLI no subpath to match,
 and a bare package alias does not resolve.
 
@@ -34,13 +34,13 @@ and a bare package alias does not resolve.
 Every component is styled with shadcn's semantic tokens — `--background`,
 `--foreground`, `--muted`, `--primary`, `--destructive`, `--border`, `--ring`,
 `--radius` — and none of them are defined inside a component. They come from
-`styles.css`, exported as `@trajs/shadcn/styles.css`: the trajs design
+`styles.css`, exported as `@trajs/ui-shadcn/styles.css`: the trajs design
 language — the light and dark values, the `@theme inline` mapping that turns them
 into Tailwind utilities, and the base layer that applies them.
 
 ```css
 @import "tailwindcss";
-@import "@trajs/shadcn/styles.css";
+@import "@trajs/ui-shadcn/styles.css";
 ```
 
 It sits at the package root, not under `src/`, so it is project code: the

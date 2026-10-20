@@ -1,7 +1,7 @@
 "use client";
 
-import { Button } from "@trajs/shadcn/button";
-import { Toaster } from "@trajs/shadcn/sonner";
+import { Button } from "@trajs/ui-shadcn/button";
+import { Toaster } from "@trajs/ui-shadcn/sonner";
 import { toast } from "sonner";
 
 /**

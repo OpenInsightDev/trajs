@@ -1,5 +1,5 @@
 {
-  "name": "@trajs/shadcn",
+  "name": "@trajs/ui-shadcn",
   "version": "0.0.0-alpha.0",
   "private": true,
   "description": "The shadcn/ui components, copied in from upstream, and the trajs design language they are styled with.",

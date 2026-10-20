@@ -16,11 +16,11 @@
  * which a trajectory of a finished turn carries nothing of, reads as itself.
  */
 
-import { Alert, AlertDescription, AlertTitle } from "@trajs/shadcn/alert";
-import { Badge } from "@trajs/shadcn/badge";
-import { Item, ItemContent, ItemDescription, ItemMedia, ItemTitle } from "@trajs/shadcn/item";
-import { MessageContent } from "@trajs/shadcn/message";
-import { Spinner } from "@trajs/shadcn/spinner";
+import { Alert, AlertDescription, AlertTitle } from "@trajs/ui-shadcn/alert";
+import { Badge } from "@trajs/ui-shadcn/badge";
+import { Item, ItemContent, ItemDescription, ItemMedia, ItemTitle } from "@trajs/ui-shadcn/item";
+import { MessageContent } from "@trajs/ui-shadcn/message";
+import { Spinner } from "@trajs/ui-shadcn/spinner";
 import type { Response, Tool } from "effect/ai";
 import { TriangleAlert, Wrench } from "lucide-react";
 

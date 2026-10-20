@@ -1,7 +1,7 @@
 /**
  * One session's conversation, as the message stream it is.
  *
- * The parts are `@trajs/component`'s: the messages a model was given are read by
+ * The parts are `@trajs/ui-component`'s: the messages a model was given are read by
  * `PromptMessage`, which is what a message of a prompt is mapped to, and what it
  * answered with by `ResponsePart`, which is what a response part is mapped to. What
  * this adds is the arrangement neither of those models states: the turns of one
@@ -13,17 +13,17 @@
  * than its own turns, and a reader meets one session's turns after another's.
  */
 
-import { PromptMessage, ResponsePart } from "@trajs/component";
-import type { AnyResponsePart } from "@trajs/component";
-import { Avatar, AvatarFallback } from "@trajs/shadcn/avatar";
-import { Marker, MarkerContent } from "@trajs/shadcn/marker";
+import { PromptMessage, ResponsePart } from "@trajs/ui-component";
+import type { AnyResponsePart } from "@trajs/ui-component";
+import { Avatar, AvatarFallback } from "@trajs/ui-shadcn/avatar";
+import { Marker, MarkerContent } from "@trajs/ui-shadcn/marker";
 import {
   Message,
   MessageAvatar,
   MessageContent,
   MessageGroup,
   MessageHeader,
-} from "@trajs/shadcn/message";
+} from "@trajs/ui-shadcn/message";
 import {
   MessageScroller,
   MessageScrollerButton,
@@ -31,7 +31,7 @@ import {
   MessageScrollerItem,
   MessageScrollerProvider,
   MessageScrollerViewport,
-} from "@trajs/shadcn/message-scroller";
+} from "@trajs/ui-shadcn/message-scroller";
 import { Option } from "effect";
 import { Fragment } from "react";
 

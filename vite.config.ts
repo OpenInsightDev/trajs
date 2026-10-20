@@ -9,10 +9,10 @@ const ignoredByFmtAndLint = [
   ".agents/**",
   "tools/oxlint/anti-slop/**",
   "ui/shadcn/src/**",
-  // The shader runtime the landing page draws its fills with, copied from
-  // https://github.com/figma/expressive-components — see the README beside it.
-  // Kept as written so it can be diffed against upstream.
-  "ui/website/src/shader-runtime/**",
+  // The shader runtime the fills are drawn with, copied from
+  // https://github.com/figma/expressive-components into `@trajs/ui-shaders` — see
+  // the README beside it. Kept as written so it can be diffed against upstream.
+  "ui/shaders/src/internal/runtime/**",
   // Written by the Fumapress builds and the Fumadocs MDX collections they load.
   "ui/website/.source/**",
   "ui/website/src/pages.gen.ts",

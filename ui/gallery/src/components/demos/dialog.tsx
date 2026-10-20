@@ -1,6 +1,6 @@
 "use client";
 
-import { Button } from "@trajs/shadcn/button";
+import { Button } from "@trajs/ui-shadcn/button";
 import {
   Dialog,
   DialogContent,
@@ -9,7 +9,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from "@trajs/shadcn/dialog";
+} from "@trajs/ui-shadcn/dialog";
 
 /**
  * A dialog cannot be rendered in the server graph a page is rendered in, so it

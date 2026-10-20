@@ -1,4 +1,4 @@
-import { Icon, Logo } from "@trajs/component";
+import { Icon, Logo } from "@trajs/ui-component";
 import { ArrowRight, ArrowRightLeft, ArrowUpRight, CircleDot, TrendingUp } from "lucide-react";
 import type { ReactNode } from "react";
 

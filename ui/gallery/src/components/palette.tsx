@@ -1,4 +1,4 @@
-// The names are the custom properties `@trajs/shadcn/styles.css` defines. The
+// The names are the custom properties `@trajs/ui-shadcn/styles.css` defines. The
 // swatches read them from the cascade rather than repeating their values, so a
 // token that changes there shows up here without an edit to this file.
 const tokens = [

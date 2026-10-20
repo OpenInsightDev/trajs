@@ -6,5 +6,6 @@
   "baseBranch": "main",
   "updateInternalDependencies": "patch",
   "privatePackages": false,
-  "fixed": [["@trajs/*", "!@trajs/extension-*", "!@trajs/component", "!@trajs/shadcn"]]
+  "ignore": ["@trajs/ui-*"],
+  "fixed": [["@trajs/*", "!@trajs/extension-*", "!@trajs/ui-*"]]
 }

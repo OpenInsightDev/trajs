@@ -11,8 +11,8 @@
   },
   "dependencies": {
     "@fontsource-variable/geist": "catalog:",
-    "@trajs/component": "workspace:*",
-    "@trajs/shadcn": "workspace:*",
+    "@trajs/ui-component": "workspace:*",
+    "@trajs/ui-shadcn": "workspace:*",
     "cn": "catalog:",
     "effect": "catalog:",
     "fumadocs-core": "^16.17.3",

@@ -1,11 +1,8 @@
 "use client";
 
+import { Haze, ShaderFill } from "@trajs/ui-shaders";
 import { useTheme } from "fumadocs-ui/provider/base";
 import { type CSSProperties, useSyncExternalStore } from "react";
-
-import { ShaderFill } from "../../shader-runtime";
-import { apricotHaze, type HazeParams } from "./apricot-haze";
-import { type DriftMotion, hazeDrift } from "./apricot-haze-drift";
 
 /**
  * The hero's two shader fills, one per ground the design is drawn on.
@@ -18,15 +15,15 @@ import { type DriftMotion, hazeDrift } from "./apricot-haze-drift";
  * page that is watched rather than read, and the ground is the size of the page,
  * so it is also the fill there is something to save in holding still. The mark is
  * the subject: it is carried by the file's animated build, `Apricot haze — drift`
- * in `hero/apricot-haze-drift.ts`, the same painting advected through one current.
- * A reader who asks for less motion is given the still painting in its place.
+ * in `@trajs/ui-shaders`, the same painting advected through one current. A reader
+ * who asks for less motion is given the still painting in its place.
  *
  * The parameters are the Figma file's: the marks' are read off nodes `140:5`
  * (dark) and `135:95` (light) as they stand, and the ground's are the file's own
  * greys opened out — see {@link groundParams}. They are module constants rather
- * than values built when the theme is read, because the runtime sets a shader up
- * again whenever it is handed a different object, and an object built during a
- * render is a new one every time.
+ * than values built when the theme is read, because a fill is remembered per
+ * parameters object, and an object built during a render is a new one every
+ * time.
  *
  * The ground covers the whole page, which is the page's one fill measured in tens
  * of millions of pixels. So it is drawn into a canvas smaller than the box it
@@ -76,10 +73,17 @@ const groundParams = {
     grainSize: 1.3,
     seed: 111,
   },
-} satisfies Record<"light" | "dark", HazeParams>;
+} satisfies Record<"light" | "dark", Haze.Params>;
+
+/** The paper, painted once: the runtime is handed the same fill every render,
+ * and nothing here is built when the theme is read. */
+const ground = {
+  light: Haze.still(groundParams.light),
+  dark: Haze.still(groundParams.dark),
+};
 
 /** The mark's pigments: nodes `135:95` (light) and `140:5` (dark), as the design
- * draws them standing still. {@link markMotion} is what carries them. */
+ * draws them standing still. {@link Haze.motion} is what carries them. */
 const markParams = {
   light: {
     coral: { r: 1, g: 0.565, b: 0.548, a: 1 },
@@ -111,36 +115,18 @@ const markParams = {
     grainSize: 0.7,
     seed: 42,
   },
-} satisfies Record<"light" | "dark", HazeParams>;
+} satisfies Record<"light" | "dark", Haze.Params>;
 
-/**
- * How the mark is carried: one current, a speed and a heading, at the values every
- * one of the design's drift swatches is drawn with — `hazeDriftPresets`' own three,
- * so the mark moves at the rate the file moves the fill it is painted from.
- */
-const markMotion = {
-  motionSpeed: 3,
-  driftAmount: 1,
-  flowDirection: 32,
-} satisfies DriftMotion;
-
-/** The two grounds, painted once: the runtime is handed the same object every
- * render, and nothing here is built when the theme is read. */
-const ground = {
-  light: apricotHaze(groundParams.light),
-  dark: apricotHaze(groundParams.dark),
-};
-
-/** The mark both ways, painted once: the same pigments, with the drift's current
- * running through the moving pair. */
+/** The mark both ways, at the parameters the file draws it with: the painting
+ * standing still, and the same painting on the design's current. */
 const mark = {
   still: {
-    light: apricotHaze(markParams.light),
-    dark: apricotHaze(markParams.dark),
+    light: Haze.still(markParams.light),
+    dark: Haze.still(markParams.dark),
   },
   moving: {
-    light: hazeDrift({ ...markParams.light, ...markMotion }),
-    dark: hazeDrift({ ...markParams.dark, ...markMotion }),
+    light: Haze.drift({ ...markParams.light, ...Haze.motion }),
+    dark: Haze.drift({ ...markParams.dark, ...Haze.motion }),
   },
 };
 

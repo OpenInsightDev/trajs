@@ -7,7 +7,7 @@ import {
   MessageScrollerItem,
   MessageScrollerProvider,
   MessageScrollerViewport,
-} from "@trajs/shadcn/message-scroller";
+} from "@trajs/ui-shadcn/message-scroller";
 
 /**
  * A message scroller reads the viewport and holds its scroll position, so it is

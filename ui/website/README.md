@@ -30,19 +30,16 @@ masthead is the page's only navigation. `content/index.mdx` still carries the
 title and description the page's head and its Markdown are built from.
 
 The lockup's mark is filled with a shader exported from Figma — `Apricot haze`,
-the same fill the design draws the page's ground with. `hero/apricot-haze.ts`
-holds the shader (its WGSL is the export's own text, unchanged) and the
-parameters of each of the design's four fills; `hero/hero-fills.tsx` opens the
-paper's greys out so its clouds and grain are read at all, paints the ground still
-— a page whose paper moves is a page that is watched rather than read — and carries
-the mark on the file's animated build, `Apricot haze — drift`, the painting advected
-through one current, ported in `hero/apricot-haze-drift.ts` with the six colourways
-the design draws it in as `hazeDriftPresets`. A reader who asks for less motion gets
-the still painting for the mark too.
-`src/shader-runtime/` is the runtime that draws the fills, a copy of
-[`@figma/expressive-components`](https://github.com/figma/expressive-components)
-with a README of its own saying what was changed. Fills need WebGPU, so a
-browser without it shows the page's flat colours and the mark's outline.
+the same fill the design draws the page's ground with. `hero/hero-fills.tsx`
+holds the parameters of each of the page's fills and opens the paper's greys out
+so its clouds and grain are read at all; the fills themselves are
+[`@trajs/ui-shaders`](../shaders), which holds the shader (its WGSL is the export's
+own text, unchanged) beside the six colourways the design draws it in. The ground
+is painted still — a page whose paper moves is a page that is watched rather than
+read — and the mark is carried on the file's animated build, `Apricot haze —
+drift`, the painting advected through one current. A reader who asks for less
+motion gets the still painting for the mark too. Fills need WebGPU, so a browser
+without it shows the page's flat colours and the mark's outline.
 
 The ground is the page's size, which makes it the page's one fill measured in tens
 of millions of pixels. So it is drawn into a canvas smaller than the page and

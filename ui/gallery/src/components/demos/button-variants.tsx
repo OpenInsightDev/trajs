@@ -1,4 +1,4 @@
-import { Button } from "@trajs/shadcn/button";
+import { Button } from "@trajs/ui-shadcn/button";
 
 const variants = ["default", "outline", "secondary", "ghost", "destructive", "link"] as const;
 

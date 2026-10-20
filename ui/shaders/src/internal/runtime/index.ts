@@ -11,8 +11,8 @@ export type {
   Manifest,
   MousePosition,
   Shader,
-} from "./types";
+} from "./types.ts";
 
-export { ShaderFill } from "./ShaderFill";
+export { ShaderFill } from "./ShaderFill.tsx";
 
-export type { ShaderFillProps } from "./ShaderFill";
+export type { ShaderFillProps } from "./ShaderFill.tsx";

@@ -11,7 +11,7 @@
  * the stream that writes it.
  */
 
-import type { AnyResponsePart, AnyStreamPart } from "@trajs/component";
+import type { AnyResponsePart, AnyStreamPart } from "@trajs/ui-component";
 import { DateTime, Schema } from "effect";
 import { Prompt, Response } from "effect/ai";
 

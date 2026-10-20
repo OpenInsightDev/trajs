@@ -12,9 +12,9 @@
  * are read.
  */
 
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@trajs/shadcn/collapsible";
-import { Item, ItemContent, ItemDescription, ItemMedia, ItemTitle } from "@trajs/shadcn/item";
-import { Marker, MarkerContent, MarkerIcon } from "@trajs/shadcn/marker";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@trajs/ui-shadcn/collapsible";
+import { Item, ItemContent, ItemDescription, ItemMedia, ItemTitle } from "@trajs/ui-shadcn/item";
+import { Marker, MarkerContent, MarkerIcon } from "@trajs/ui-shadcn/marker";
 import { DateTime } from "effect";
 import type { Response, Tool } from "effect/ai";
 import {

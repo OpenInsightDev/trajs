@@ -1,6 +1,6 @@
 "use client";
 
-import { Button } from "@trajs/shadcn/button";
+import { Button } from "@trajs/ui-shadcn/button";
 import {
   Sheet,
   SheetClose,
@@ -10,7 +10,7 @@ import {
   SheetHeader,
   SheetTitle,
   SheetTrigger,
-} from "@trajs/shadcn/sheet";
+} from "@trajs/ui-shadcn/sheet";
 
 /**
  * A sheet is a dialog anchored to an edge, and cannot be rendered in the server

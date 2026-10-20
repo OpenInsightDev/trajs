@@ -32,12 +32,12 @@ swatch with `var(--…)` rather than a copy of the value — so the page cannot
 describe a token that has since changed, and it follows the theme switch without
 knowing about it.
 
-The **components** are `@trajs/shadcn`'s: the same source the viewer renders
-with, and the same one `@trajs/component` maps `effect/ai`'s prompt and response
+The **components** are `@trajs/ui-shadcn`'s: the same source the viewer renders
+with, and the same one `@trajs/ui-component` maps `effect/ai`'s prompt and response
 model onto. A demo imports the component from the package, so a page cannot show
 a component that differs from the one that ships.
 
-The **mapping** is `@trajs/component`'s: `content/prompt/` and `content/response/`
+The **mapping** is `@trajs/ui-component`'s: `content/prompt/` and `content/response/`
 carry one page per component, each rendering the real component against a part
 written with `effect/ai`'s own constructors, so the mapping is read without a
 trajectory, a model or a network. This is the gallery the viewer used to carry at
@@ -66,7 +66,7 @@ this, and the component it shows is the component it runs:
 Anything else a page needs, it imports itself, exactly like any other React file:
 
 ```mdx
-import { Button } from "@trajs/shadcn/button";
+import { Button } from "@trajs/ui-shadcn/button";
 
 <Preview>
   <Button variant="outline">New session</Button>
@@ -123,6 +123,6 @@ Cloudflare adapter and has no `wrangler.jsonc`, so `pnpm run build` produces a
 Node-served build. Deploying it needs that decision — its own Worker, or serving
 it out of the documentation site.
 
-The shadcn/ui pages cover every component `@trajs/shadcn` publishes. The mapping
+The shadcn/ui pages cover every component `@trajs/ui-shadcn` publishes. The mapping
 pages under `content/prompt/` and `content/response/` are complete for the
-components `@trajs/component` publishes today.
+components `@trajs/ui-component` publishes today.

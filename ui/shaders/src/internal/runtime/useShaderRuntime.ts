@@ -10,10 +10,10 @@ import type {
   MousePosition,
   PaintEvent,
   ShaderData,
-} from './types'
-import { useWebGPUDevice } from './webgpu'
-import { beginGpuErrorScope } from './gpuErrors'
-import { getRenderSize } from './renderSize'
+} from './types.ts'
+import { useWebGPUDevice } from './webgpu.ts'
+import { beginGpuErrorScope } from './gpuErrors.ts'
+import { getRenderSize } from './renderSize.ts'
 
 export type DpiGPUTexture = GPUTexture & {
   dpi: number

@@ -1,6 +1,6 @@
 <!-- The region the hero's shader fill shows through: the mark's inner triangle,
      opened to the left edge of its frame, in the coordinates the mark is drawn
-     in — see `Icon` in `@trajs/component`. The viewBox is exactly that region's
+     in — see `Icon` in `@trajs/ui-component`. The viewBox is exactly that region's
      box (87.23 x 114.19 of the mark's 92 x 146), so a CSS mask sized to 100% of
      the fill lines the two up without further arithmetic.
 

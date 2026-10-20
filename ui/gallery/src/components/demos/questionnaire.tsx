@@ -15,7 +15,7 @@ import {
   QuestionnaireSkip,
   QuestionnaireSubmit,
   QuestionnaireTitle,
-} from "@trajs/shadcn/questionnaire";
+} from "@trajs/ui-shadcn/questionnaire";
 
 /**
  * The root owns the flow, so the items are declared once in `items` — what the

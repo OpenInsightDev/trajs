@@ -1,37 +1,38 @@
 # Vendored shader runtime
 
 `@figma/expressive-components` is not published to npm — its README says to
-`npm pack` it — so the files here are a copy of the parts the site draws shader
-fills with, taken from
+`npm pack` it — so the files here are a copy of the parts these fills are drawn
+with, taken from
 [figma/expressive-components](https://github.com/figma/expressive-components) at
 commit `5b77f902fe203990ce720c1cf7475bf61859a296` (v0.1.0).
 
-The site uses it because the hero's fills are authored shaders exported from
+The fills in this package use it because they are authored shaders exported from
 Figma, and this is the runtime those shaders are written against: `setup` and
 `render` take a `CustomEffectState` whose `input`/`output`/`params`/`state` this
-runtime supplies, so a shader module moves between Figma and the page
-unchanged.
+runtime supplies, so a shader module moves between Figma and a page unchanged.
 
 ## What changed from upstream
 
 Nothing in the drawing, the render loop or the device handling. Four mechanical
 edits:
 
-- `ShaderFill.tsx` starts with `"use client"`, because Waku renders the hero as
-a server component and a component with hooks has to be in a client module.
-- Relative imports lost their `.js` extension, which the package build wanted
-and this app's TypeScript (`moduleResolution: bundler`) resolves without.
+- `ShaderFill.tsx` starts with `"use client"`, because the apps that draw fills
+can render them as server components and a component with hooks has to be in a
+client module.
+- Relative imports are spelled with the `.ts` extension this package's
+TypeScript (`moduleResolution: nodenext`) requires, where upstream leaves them
+out.
 - The files sit flat rather than under `components/`.
-- `ShaderEffect.tsx` and the `CustomEffect` alias are not included: the site
+- `ShaderEffect.tsx` and the `CustomEffect` alias are not included: this package
 only draws fills, and `ShaderEffect` additionally needs HTML-in-Canvas. The
 render loop in `useShaderRuntime.ts` is upstream's whole file, children branch
 included, so adding it back is a copy rather than a merge.
 
 Because they are copied sources rather than project code, this directory is in
-the `fmt`/`lint` ignore lists in the repository's `vite.config.ts` — the same
-treatment as the shadcn/ui components in `ui/shadcn/src`. Reformatting it would
-break the only thing that makes it checkable against upstream, which is that it
-is the same text.
+the `fmt`/`lint` ignore lists of both the repository's `vite.config.ts` and this
+package's — the same treatment as the shadcn/ui components in `ui/shadcn/src`.
+Reformatting it would break the only thing that makes it checkable against
+upstream, which is that it is the same text.
 
 ## Licence
 

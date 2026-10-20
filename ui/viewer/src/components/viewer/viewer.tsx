@@ -15,11 +15,11 @@
  * viewer goes anywhere.
  */
 
-import { Alert, AlertDescription, AlertTitle } from "@trajs/shadcn/alert";
-import { Button } from "@trajs/shadcn/button";
-import { Empty, EmptyContent, EmptyHeader, EmptyMedia, EmptyTitle } from "@trajs/shadcn/empty";
-import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@trajs/shadcn/resizable";
-import { Spinner } from "@trajs/shadcn/spinner";
+import { Alert, AlertDescription, AlertTitle } from "@trajs/ui-shadcn/alert";
+import { Button } from "@trajs/ui-shadcn/button";
+import { Empty, EmptyContent, EmptyHeader, EmptyMedia, EmptyTitle } from "@trajs/ui-shadcn/empty";
+import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@trajs/ui-shadcn/resizable";
+import { Spinner } from "@trajs/ui-shadcn/spinner";
 import { cn } from "cn";
 import { Data, Effect } from "effect";
 import { Files, TriangleAlert } from "lucide-react";

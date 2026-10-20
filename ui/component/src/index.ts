@@ -9,9 +9,9 @@
  * `stream.tsx` adds the stream those parts arrive in.
  *
  * The components are styled with shadcn's semantic tokens and render with the
- * components `@trajs/shadcn` copies in; {@link ToolPayload} and the message
+ * components `@trajs/ui-shadcn` copies in; {@link ToolPayload} and the message
  * stylesheet they are read with are this package's own. Import
- * `@trajs/component/styles.css` once, in the stylesheet that imports Tailwind, and
+ * `@trajs/ui-component/styles.css` once, in the stylesheet that imports Tailwind, and
  * see the README for the `@source` lines Tailwind needs to see the classes.
  *
  * The mark trajs is drawn with is drawn here as well: {@link Logo} and

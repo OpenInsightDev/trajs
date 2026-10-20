@@ -1,7 +1,7 @@
 /**
- * The fill the hero is drawn with: `Apricot haze`, the shader fill authored in the
- * Figma file and exported from it, brought to the runtime the page draws it with
- * (`src/shader-runtime`).
+ * The fill standing still: `Apricot haze`, the shader fill authored in the Figma
+ * file and exported from it, brought to the runtime this package draws it with
+ * (`internal/runtime`).
  *
  * ---------------------------------------------------------------------------
  * Apricot haze — Figma shader fill `e1ad0ef3-ad80-4486-8954-5cbbc25dd52a`,
@@ -15,13 +15,14 @@
  *
  * What is not the export's text is the plumbing. Figma's `render` reads its
  * parameters out of an untyped dictionary on every frame and carries a branch for
- * every control its property panel can produce; this page names its parameters
+ * every control its property panel can produce; this package names its parameters
  * when it builds the shader, so the ones it uses are read typed, once, and the
  * ones it cannot produce (gradients, colour points, booleans) are not carried at
  * all. The uniform block, the pipeline and the draw are the export's.
  */
 
-import type { Manifest, Shader } from "../../shader-runtime";
+import { remembered } from "#/internal/remember.ts";
+import type { Manifest, Shader } from "#/internal/runtime/index.ts";
 
 /** A pigment, as the exported properties hold one: straight-alpha sRGB in 0..1. */
 export type Pigment = Readonly<{ r: number; g: number; b: number; a: number }>;
@@ -39,12 +40,13 @@ export type ColorField = Readonly<{
 
 /**
  * What the fill draws, named the way the exported properties are named, so a
- * value can be carried between the Figma file and this page without translation.
+ * value can be carried between the Figma file and this package without
+ * translation.
  */
-export type HazeParams = Readonly<{
+export type Params = Readonly<{
   /** The three pigments. In the export the first is coral pink, the second
    * apricot orange and the third golden yellow; a composition may recolour all
-   * three, and the dark hero does. */
+   * three, and the design recolours them in every colourway it draws. */
   coral: Pigment;
   apricot: Pigment;
   golden: Pigment;
@@ -53,7 +55,7 @@ export type HazeParams = Readonly<{
    * Which of the three compositions to draw: 0 places nine warm washes, 1 draws
    * veils of one colour through another, and 2 runs a broad diagonal front
    * between two pigments with a mixing body along it. The export also swaps in a
-   * palette per preset; this page passes its pigments explicitly, so a preset
+   * palette per preset; this package passes its pigments explicitly, so a preset
    * only changes the drawing.
    */
   preset: number;
@@ -354,7 +356,7 @@ fn glaze(base: vec4f, pigment: vec4f, coverage: f32) -> vec4f {
  * and are written by `render`; the eighth and ninth describe an input image,
  * which a fill does not have.
  */
-const uniformsOf = (params: HazeParams): Float32Array => {
+const uniformsOf = (params: Params): Float32Array => {
   const { apricot, coral, fieldLayout: field, golden } = params;
   const values = new Float32Array(uniformSize);
 
@@ -425,24 +427,12 @@ const pipelineOf = (
  * The fill, as a shader the runtime can draw: the export's drawing, drawn into a
  * target of the runtime's choosing with the parameters given here.
  *
- * **When to use**
- *
- * Build one per set of parameters and keep it — pass the same object on every
- * render, and a new one only when the parameters change, since a new object is
- * what makes the runtime set the shader up again.
- *
- * **Example**
- *
- * ```tsx
- * const shader = apricotHaze({
- *   coral: { r: 1, g: 0.565, b: 0.548, a: 1 },
- *   // …the rest of the pigments and the field
- *   preset: 0,
- * })
- * <ShaderFill shader={shader} className="absolute inset-0" />
- * ```
+ * The manifest says the fill is not animated, so the runtime draws one frame and
+ * holds it: a painting that does not move costs nothing after it is painted.
+ * {@link remembered} keeps the build per parameters object, so `ApricotHaze`'s
+ * caller can hand it an object it builds while rendering.
  */
-export const apricotHaze = (params: HazeParams): Shader => ({
+export const apricotHaze = remembered((params: Params): Shader => ({
   manifest,
   params,
   setup: (device, frame) => {
@@ -524,4 +514,4 @@ export const apricotHaze = (params: HazeParams): Shader => ({
     pass.end();
     device.queue.submit([encoder.finish()]);
   },
-});
+}));

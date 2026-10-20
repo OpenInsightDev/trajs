@@ -3,7 +3,7 @@
 // prerendered files on GitHub Pages, which has no server for that endpoint to
 // answer on. Uncomment the import and the plugin below to give it one back.
 // import { mcpPlugin } from "@fumapress/ai";
-import { Icon } from "@trajs/component";
+import { Icon } from "@trajs/ui-component";
 import { defineDocs } from "fumadocs-mdx/macro";
 import { defineConfig } from "fumapress";
 import { fumadocsMdx } from "fumapress/adapters/mdx";

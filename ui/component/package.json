@@ -1,5 +1,5 @@
 {
-  "name": "@trajs/component",
+  "name": "@trajs/ui-component",
   "version": "0.0.0-alpha.0",
   "private": true,
   "description": "The trajs component library: React components that render effect/ai prompts and responses with shadcn/ui.",
@@ -23,7 +23,7 @@
   },
   "dependencies": {
     "@streamdown/code": "catalog:",
-    "@trajs/shadcn": "workspace:*",
+    "@trajs/ui-shadcn": "workspace:*",
     "cn": "catalog:",
     "effect": "catalog:",
     "lucide-react": "catalog:",

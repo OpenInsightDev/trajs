@@ -2,8 +2,8 @@
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 @import "@fontsource-variable/geist";
-@import "@trajs/shadcn/styles.css";
-@import "@trajs/component/styles.css";
+@import "@trajs/ui-shadcn/styles.css";
+@import "@trajs/ui-component/styles.css";
 
 /* The components are styled with utility classes that live in the two workspace
    packages and in Streamdown's own bundle, none of which Tailwind scans on its

@@ -1,4 +1,4 @@
-import { Icon, Logo } from "@trajs/component";
+import { Icon, Logo } from "@trajs/ui-component";
 import { cn } from "cn";
 import type { ReactNode } from "react";
 

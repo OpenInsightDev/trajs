@@ -1,6 +1,6 @@
 "use client";
 
-import { HoverCard, HoverCardContent, HoverCardTrigger } from "@trajs/shadcn/hover-card";
+import { HoverCard, HoverCardContent, HoverCardTrigger } from "@trajs/ui-shadcn/hover-card";
 
 /**
  * A hover card cannot be rendered in the server graph a page is rendered in, so

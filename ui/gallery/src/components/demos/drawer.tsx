@@ -1,6 +1,6 @@
 "use client";
 
-import { Button } from "@trajs/shadcn/button";
+import { Button } from "@trajs/ui-shadcn/button";
 import {
   Drawer,
   DrawerClose,
@@ -10,7 +10,7 @@ import {
   DrawerHeader,
   DrawerTitle,
   DrawerTrigger,
-} from "@trajs/shadcn/drawer";
+} from "@trajs/ui-shadcn/drawer";
 
 /**
  * A drawer holds the gesture it is being swiped with, so it cannot be rendered

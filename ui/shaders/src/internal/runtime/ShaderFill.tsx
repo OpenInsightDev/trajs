@@ -2,9 +2,9 @@
 
 import { useCallback, useMemo, useState, type CSSProperties, type JSX } from 'react'
 
-import type { Shader, HtmlInCanvasElement } from './types'
-import { useProcessMaskUrl } from './mask'
-import { useShaderRuntime } from './useShaderRuntime'
+import type { Shader, HtmlInCanvasElement } from './types.ts'
+import { useProcessMaskUrl } from './mask.ts'
+import { useShaderRuntime } from './useShaderRuntime.ts'
 
 export type ShaderFillProps = {
   shader: Shader

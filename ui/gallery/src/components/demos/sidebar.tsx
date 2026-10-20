@@ -1,7 +1,7 @@
 "use client";
 
-import { Avatar, AvatarFallback } from "@trajs/shadcn/avatar";
-import { Badge } from "@trajs/shadcn/badge";
+import { Avatar, AvatarFallback } from "@trajs/ui-shadcn/avatar";
+import { Badge } from "@trajs/ui-shadcn/badge";
 import {
   Sidebar,
   SidebarContent,
@@ -22,7 +22,7 @@ import {
   SidebarProvider,
   SidebarSeparator,
   SidebarTrigger,
-} from "@trajs/shadcn/sidebar";
+} from "@trajs/ui-shadcn/sidebar";
 import { SearchIcon } from "lucide-react";
 
 /**

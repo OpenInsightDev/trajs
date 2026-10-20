@@ -31,8 +31,8 @@ import {
   ResponseStream,
   ResponseToolParams,
   ToolPayload,
-} from "@trajs/component";
-import { Button } from "@trajs/shadcn/button";
+} from "@trajs/ui-component";
+import { Button } from "@trajs/ui-shadcn/button";
 import { useEffect, useState } from "react";
 
 import { Sample } from "../sample";
