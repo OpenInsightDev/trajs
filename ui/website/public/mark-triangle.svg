@@ -1,0 +1,14 @@
+<!-- The region the hero's shader fill shows through: the mark's inner triangle,
+     opened to the left edge of its frame, in the coordinates the mark is drawn
+     in — see `Icon` in `@trajs/component`. The viewBox is exactly that region's
+     box (87.23 x 114.19 of the mark's 92 x 146), so a CSS mask sized to 100% of
+     the fill lines the two up without further arithmetic.
+
+     Used as `mask` by `HeroMark`, which turns an SVG into an alpha mask. -->
+<svg
+  xmlns="http://www.w3.org/2000/svg"
+  viewBox="2.35 2.34 87.23 114.19"
+  preserveAspectRatio="xMidYMid meet"
+>
+  <path d="M2.35 2.34 L2.35 72.91 L45.97 116.53 L89.58 89.57 Z" fill="#000000" />
+</svg>

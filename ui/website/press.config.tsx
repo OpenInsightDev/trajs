@@ -1,11 +1,13 @@
 import { mcpPlugin } from "@fumapress/ai";
-import { Icon, Logo } from "@trajs/component";
+import { Icon } from "@trajs/component";
 import { defineDocs } from "fumadocs-mdx/macro";
 import { defineConfig } from "fumapress";
 import { fumadocsMdx } from "fumapress/adapters/mdx";
 import { metaSchema, pageSchema } from "fumapress/adapters/mdx/schema";
 import { createDocsLayoutPage } from "fumapress/layouts/docs";
 import { createHomeLayoutPage } from "fumapress/layouts/home";
+
+import { Hero } from "./src/components/hero/hero";
 
 const docs = defineDocs({
   dir: "content",
@@ -20,49 +22,22 @@ const docs = defineDocs({
 
 const DocsPage = createDocsLayoutPage<typeof config.$context>();
 
-// The docs layout would put a text title and the page actions above the logo,
-// so the landing page renders under the navbar-only home layout; the copy stays
-// in `content/index.mdx` so the Markdown the site serves to LLMs keeps no JSX.
-const HomePage = createHomeLayoutPage<typeof config.$context>({
-  async render(page) {
-    const body = (await this.getPageBody(page))?.node;
-    const { git } = this.siteConfig;
-
-    return {
-      body: (
-        <div className="mx-auto flex w-full max-w-3xl flex-col gap-16 py-14">
-          <div className="flex flex-col items-center gap-8 text-center">
-            <Logo aria-label={page.data.title} className="h-auto w-96 max-w-full" role="img" />
-            {page.data.description ? (
-              <p className="max-w-2xl text-balance text-xl text-fd-muted-foreground">
-                {page.data.description}
-              </p>
-            ) : null}
-            {/* The repository URL, assembled the way Fumapress assembles its
-                own: its helper is not part of the public API. */}
-            {git ? (
-              <a
-                className="inline-flex items-center rounded-md border bg-fd-secondary px-5 py-2.5 text-sm font-medium text-fd-secondary-foreground transition-colors hover:bg-fd-accent hover:text-fd-accent-foreground"
-                href={`${git.url}/${git.user}/${git.repo}`}
-                rel="noreferrer noopener"
-                target="_blank"
-              >
-                GitHub
-              </a>
-            ) : null}
-          </div>
-          <div className="prose mx-auto w-full max-w-2xl">{body}</div>
-        </div>
-      ),
-    };
-  },
+// The landing page is its own composition — a masthead, a hero and an index, in
+// the design's 1920 × 1080 proportions — so it renders under neither the docs
+// layout nor the home layout's navbar, which would put a second masthead above the
+// one the page draws. `content/index.mdx` still holds the page's title and
+// description, which is what its head and the Markdown the site serves to LLMs
+// read; the landing page does not render that copy.
+const HeroPage = createHomeLayoutPage<typeof config.$context>({
+  layout: ({ children }) => <>{children}</>,
+  render: () => ({ body: <Hero /> }),
 });
 
 const config = defineConfig({
   content: docs.toFumadocsSource(),
   renderPage: ({ lang, slugs, page }) =>
     page.url === "/" ? (
-      <HomePage lang={lang} page={page} slugs={slugs} />
+      <HeroPage lang={lang} page={page} slugs={slugs} />
     ) : (
       <DocsPage lang={lang} page={page} slugs={slugs} />
     ),
@@ -85,17 +60,13 @@ const config = defineConfig({
       branch: "main",
     },
   },
+  // The site's faces are imported by `src/app.css` rather than linked from a font
+  // CDN, so the head only carries what the markup cannot: the favicon.
   meta: {
     root() {
       return (
         <>
           <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
-          <link rel="preconnect" href="https://fonts.googleapis.com" />
-          <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
-          <link
-            href="https://fonts.googleapis.com/css2?family=Geist:ital,wght@0,100..900;1,100..900&family=JetBrains+Mono:ital,wght@0,100..800;1,100..800&display=swap"
-            rel="stylesheet"
-          />
         </>
       );
     },

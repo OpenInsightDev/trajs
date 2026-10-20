@@ -12,6 +12,9 @@
   },
   "dependencies": {
     "@base-ui/react": "catalog:",
+    "@fontsource-variable/geist": "catalog:",
+    "@fontsource/ibm-plex-mono": "catalog:",
+    "@fontsource/poppins": "catalog:",
     "@fumapress/ai": "catalog:",
     "@trajs/component": "workspace:*",
     "fumadocs-core": "^16.17.3",
@@ -27,6 +30,7 @@
     "@types/node": "catalog:",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
+    "@webgpu/types": "catalog:",
     "tailwindcss": "^4.3.3",
     "typescript": "catalog:",
     "vite": "catalog:",

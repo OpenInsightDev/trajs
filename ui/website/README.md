@@ -20,6 +20,36 @@ are Vite+'s built-ins, so they would run a plain Vite app and skip the Waku
 server Fumapress needs. Use `vp run dev` and `vp run build` so the package
 scripts run.
 
+## The landing page
+
+Every page but `/` is a Markdown file under `content/` rendered by the docs
+layout. `/` is drawn instead: `src/components/hero/` is the masthead, the
+headline, the two calls to action, the lockup and the index, and
+`press.config.tsx` renders it under a layout of its own so that the design's
+masthead is the page's only navigation. `content/index.mdx` still carries the
+title and description the page's head and its Markdown are built from.
+
+The lockup's mark is filled with a shader exported from Figma — `Apricot haze`,
+the same fill the design draws the page's ground with. `hero/apricot-haze.ts`
+holds the shader (its WGSL is the export's own text, unchanged) and the
+parameters of each of the design's four fills; `src/shader-runtime/` is the
+runtime that draws them, a copy of
+[`@figma/expressive-components`](https://github.com/figma/expressive-components)
+with a README of its own saying what was changed. Fills need WebGPU, so a
+browser without it shows the page's flat colours and the mark's outline.
+
+The page is laid out in a unit of the design's 1920 × 1080 canvas rather than in
+pixels, so it keeps its proportions and fits one screen at any window size; see
+the comment at the top of `hero/hero.tsx`.
+
+Its type is served from this package rather than from a font CDN: `app.css`
+imports the weights the designs name from `@fontsource`, as the gallery and the
+viewer do, so the page fetches nothing from a third party before it paints. The
+landing page is set in Poppins — Light for the wordmark, the index and the
+prose, Medium for the button, and ExtraLight for the headline, which the design
+draws in a lighter build of the family that Google does not ship; the comment
+above the headline in `hero/hero.tsx` has the measurements.
+
 ## Deploying
 
 The site is a Cloudflare Worker with static assets. `vite.config.ts` names the
