@@ -1,3 +1,4 @@
+/// <reference types="vite/client" />
 /// <reference types="@webgpu/types" />
 
 // WebGPU's objects and its constant namespaces are declared by `@webgpu/types`.

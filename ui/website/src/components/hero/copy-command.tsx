@@ -1,5 +1,6 @@
 "use client";
 
+import { Check, Copy } from "lucide-react";
 import { useState } from "react";
 
 export const installCommand = "npm i effect @trajs/core";
@@ -7,36 +8,7 @@ export const installCommand = "npm i effect @trajs/core";
 /** How long the button says it copied, in milliseconds. */
 const confirmation = 1600;
 
-const Copy = () => (
-  <svg
-    aria-hidden
-    className="size-[max(calc(1.3*var(--u)),12px)] shrink-0"
-    fill="none"
-    stroke="currentColor"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    strokeWidth={1.3}
-    viewBox="0 0 16 16"
-  >
-    <rect x="6" y="6" width="7.5" height="7.5" rx="1.6" />
-    <path d="M10 6V4.6A1.6 1.6 0 0 0 8.4 3H4.6A1.6 1.6 0 0 0 3 4.6v3.8A1.6 1.6 0 0 0 4.6 10H6" />
-  </svg>
-);
-
-const Copied = () => (
-  <svg
-    aria-hidden
-    className="size-[max(calc(1.3*var(--u)),12px)] shrink-0"
-    fill="none"
-    stroke="currentColor"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    strokeWidth={1.6}
-    viewBox="0 0 16 16"
-  >
-    <path d="M3 8.5 6.5 12 13 4.5" />
-  </svg>
-);
+const icon = "size-[max(calc(1.6*var(--u)),14px)] shrink-0";
 
 /**
  * The copy control at the end of the install pill.
@@ -69,7 +41,11 @@ export const CopyCommand = () => {
       onClick={copy}
       type="button"
     >
-      {copied ? <Copied /> : <Copy />}
+      {copied ? (
+        <Check aria-hidden absoluteStrokeWidth className={icon} strokeWidth={1.6} />
+      ) : (
+        <Copy aria-hidden absoluteStrokeWidth className={icon} strokeWidth={1.6} />
+      )}
     </button>
   );
 };

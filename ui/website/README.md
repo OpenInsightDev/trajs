@@ -32,11 +32,24 @@ title and description the page's head and its Markdown are built from.
 The lockup's mark is filled with a shader exported from Figma — `Apricot haze`,
 the same fill the design draws the page's ground with. `hero/apricot-haze.ts`
 holds the shader (its WGSL is the export's own text, unchanged) and the
-parameters of each of the design's four fills; `src/shader-runtime/` is the
-runtime that draws them, a copy of
+parameters of each of the design's four fills; `hero/hero-fills.tsx` opens the
+paper's greys out so its clouds and grain are read at all, paints the ground still
+— a page whose paper moves is a page that is watched rather than read — and carries
+the mark on the file's animated build, `Apricot haze — drift`, the painting advected
+through one current, ported in `hero/apricot-haze-drift.ts` with the six colourways
+the design draws it in as `hazeDriftPresets`. A reader who asks for less motion gets
+the still painting for the mark too.
+`src/shader-runtime/` is the runtime that draws the fills, a copy of
 [`@figma/expressive-components`](https://github.com/figma/expressive-components)
 with a README of its own saying what was changed. Fills need WebGPU, so a
 browser without it shows the page's flat colours and the mark's outline.
+
+The ground is the page's size, which makes it the page's one fill measured in tens
+of millions of pixels. So it is drawn into a canvas smaller than the page and
+stretched over it — half a canvas pixel for every CSS pixel of the hero, on any
+display — which is not visible in a painting of clouds and grain, and is the
+difference between 33ms and 16ms a frame at 1920 × 1080. The mark is small enough
+to be drawn at its own size.
 
 The page is laid out in a unit of the design's 1920 × 1080 canvas rather than in
 pixels, so it keeps its proportions and fits one screen at any window size; see
@@ -52,34 +65,20 @@ above the headline in `hero/hero.tsx` has the measurements.
 
 ## Deploying
 
-The site is a Cloudflare Worker with static assets. `vite.config.ts` names the
-Cloudflare adapter because Fumapress otherwise infers it from the build
-environment, which Cloudflare's Workers Builds sets and GitHub Actions does not.
-A build prerenders every page into `dist/public`, then emits the Worker that
-serves the rest — including the `/mcp` endpoint — into `dist/server`, and points
-Wrangler at it through `.wrangler/deploy/config.json`.
+`.github/workflows/deploy.yml` publishes the site to GitHub Pages. The build
+prerenders every page into `dist/public` — search included, since `press.config.tsx`
+builds in `mode: "static"` — and that directory is what the workflow uploads. A
+project site answers under a path of its own, so `actions/configure-pages` reads the
+path and address off the repository's Pages settings, and the build takes them as
+`SITE_BASE_PATH` and `SITE_URL` (`vite.config.ts`, `press.config.tsx`). Enable Pages
+on the repository with "GitHub Actions" as its source before the first run.
 
-`wrangler.jsonc` is the project's own Wrangler config, rather than the one the
-build would otherwise generate: it pins the Worker name, the trailing-slash
-handling, and the compatibility flags. `nodejs_compat` and
-`new_module_registry` are both required — Vite 8's rolldown runtime imports
-`node:module` and calls `createRequire(import.meta.url)` at module load, and
-workerd only defines `import.meta.url` under `new_module_registry`. The build
-reuses the file's `name`, compatibility settings and `assets`, and fills in the
-Worker entry itself.
+Nothing is served on a request any more, so the site has no MCP endpoint: the
+`mcpPlugin` import and plugin in `press.config.tsx` are commented out, along with
+the Cloudflare adapter in `vite.config.ts` and the `pnpm run deploy` step that
+uploaded the Worker. `wrangler.jsonc` and the `deploy` script are kept as they were
+for when the Worker comes back; uncomment the three together.
 
-`.github/workflows/deploy.yml` runs `pnpm run deploy` after a build, which needs
-two repository secrets: `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`.
-Deploying from a machine that has run `wrangler login` needs neither.
-
-The Worker has no domain of its own yet. `tra.js.org` is a js.org subdomain, and
-js.org only CNAMEs a subdomain at a third-party host, while a Workers Custom
-Domain needs the zone in this Cloudflare account, so the two cannot meet until
-the site moves to a domain registered there. In the meantime the site is
-reachable at `https://trajs-website.cc-route.workers.dev`, and `site.baseUrl` in
-`press.config.tsx` still names `tra.js.org`.
-
-Unlike a static build, this one needs a server for `/api/search` and `/mcp`, so
-the site cannot go back to GitHub Pages — a static host would drop both. `pnpm
-run start` runs the Node target for that reason, mostly useful for checking the
-built app locally.
+`pnpm run build` on its own builds for `/`, which is what `pnpm run dev` serves.
+`pnpm run start` still runs the Node target, mostly useful for checking the built
+app locally.

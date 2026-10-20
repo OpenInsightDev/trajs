@@ -1,5 +1,16 @@
 name: Deploy docs
 
+# Publishes the documentation site to GitHub Pages: the workflow builds it, which
+# prerenders every page into `ui/website/dist/public`, and hands that directory to
+# Pages as the site. Nothing is served on a request — search is built into the
+# files and the MCP endpoint is off — so the deploy needs no server and no
+# secrets beyond the token Pages gives the job.
+#
+# The site answers on a path of its own (`/trajs/` for a project site, `/` once a
+# domain points at it). `configure-pages` reads that path and address off the
+# repository's Pages settings, and the build's `SITE_BASE_PATH` and `SITE_URL`
+# carry them in, so moving the site to a domain later needs no change here.
+
 on:
   push:
     branches: [main]
@@ -13,15 +24,19 @@ on:
       - ".github/workflows/deploy.yml"
   workflow_dispatch:
 
+# `pages: write` publishes the artifact and `id-token: write` is the OIDC token
+# Pages accepts the deployment with; the build job only reads the repository.
 permissions:
   contents: read
+  pages: write
+  id-token: write
 
 concurrency:
-  group: deploy-docs
+  group: pages
   cancel-in-progress: false
 
 jobs:
-  deploy:
+  build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -33,10 +48,36 @@ jobs:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: "pnpm exec vp run website#build"
-      # The Fumapress build points Wrangler at the Worker it emitted, so the
-      # deploy has to run from the app directory and right after a build.
-      - run: pnpm --filter website run deploy
+      # `enablement` turns Pages on for the repository the first time this runs,
+      # where the token may; without it the job fails until Pages is enabled by
+      # hand with "GitHub Actions" as its source.
+      - uses: actions/configure-pages@v5
+        id: pages
+        with:
+          enablement: true
+      # The build is run through its package script rather than `vp run`, which
+      # strips the environment the base path arrives in.
+      - run: pnpm --filter website run build
         env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          SITE_URL: ${{ steps.pages.outputs.base_url }}
+          SITE_BASE_PATH: ${{ steps.pages.outputs.base_path }}/
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: ui/website/dist/public
+      # The Cloudflare Worker the site used to be, kept for when it returns:
+      # uncomment this step, the adapter in `vite.config.ts` and the MCP plugin in
+      # `press.config.tsx`, and add the secrets it names.
+      # - run: pnpm --filter website run deploy
+      #   env:
+      #     CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      #     CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/deploy-pages@v4
+        id: deployment

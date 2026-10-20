@@ -21,6 +21,7 @@
     "fumadocs-mdx": "^15.4.7",
     "fumadocs-ui": "npm:@fumadocs/base-ui@^16.17.3",
     "fumapress": "^1.6.1",
+    "lucide-react": "catalog:",
     "react": "^19.3.0",
     "react-dom": "^19.3.0"
   },
