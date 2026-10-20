@@ -20,6 +20,7 @@ catalog:
   # Pinned to the `effect` release the workspace is on: the 4.0.3 line peers on
   # `effect@^4.0.3`.
   "@effect/platform-node": 4.0.2
+  "@effect/sql-clickhouse": 4.0.2
   "@fontsource-variable/geist": ^5.3.0
   "@fontsource/ibm-plex-mono": ^5.3.0
   "@fontsource/poppins": ^5.3.0
@@ -33,6 +34,7 @@ catalog:
   "@webgpu/types": ^0.1.74
   blake3-wasm: ^2.1.5
   bson: ^7.3.3
+  chdb: ^3.4.0
   class-variance-authority: ^0.7.1
   cmdk: ^1.1.1
   cn: ^0.4.0
@@ -66,6 +68,10 @@ minimumReleaseAgeExclude:
   - "@fumadocs/base-ui@16.17.3"
   - fumadocs-core@16.17.3
 allowBuilds:
+  # `chdb` states its install script as a no-op and ships its engine as the
+  # prebuilt `@chdb/lib-*` package of the platform it runs on, so there is
+  # nothing to build.
+  chdb: false
   esbuild: true
   # `workerd` ships the Workers runtime binary that `wrangler` runs.
   workerd: true
