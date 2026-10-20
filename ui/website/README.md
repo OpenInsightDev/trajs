@@ -20,46 +20,6 @@ are Vite+'s built-ins, so they would run a plain Vite app and skip the Waku
 server Fumapress needs. Use `vp run dev` and `vp run build` so the package
 scripts run.
 
-## The landing page
-
-Every page but `/` is a Markdown file under `content/` rendered by the docs
-layout. `/` is drawn instead: `src/components/hero/` is the masthead, the
-headline, the two calls to action, the lockup and the index, and
-`press.config.tsx` renders it under a layout of its own so that the design's
-masthead is the page's only navigation. `content/index.mdx` still carries the
-title and description the page's head and its Markdown are built from.
-
-The lockup's mark is filled with a shader exported from Figma — `Apricot haze`,
-the same fill the design draws the page's ground with. `hero/hero-fills.tsx`
-holds the parameters of each of the page's fills and opens the paper's greys out
-so its clouds and grain are read at all; the fills themselves are
-[`@trajs/ui-shaders`](../shaders), which holds the shader (its WGSL is the export's
-own text, unchanged) beside the six colourways the design draws it in. The ground
-is painted still — a page whose paper moves is a page that is watched rather than
-read — and the mark is carried on the file's animated build, `Apricot haze —
-drift`, the painting advected through one current. A reader who asks for less
-motion gets the still painting for the mark too. Fills need WebGPU, so a browser
-without it shows the page's flat colours and the mark's outline.
-
-The ground is the page's size, which makes it the page's one fill measured in tens
-of millions of pixels. So it is drawn into a canvas smaller than the page and
-stretched over it — half a canvas pixel for every CSS pixel of the hero, on any
-display — which is not visible in a painting of clouds and grain, and is the
-difference between 33ms and 16ms a frame at 1920 × 1080. The mark is small enough
-to be drawn at its own size.
-
-The page is laid out in a unit of the design's 1920 × 1080 canvas rather than in
-pixels, so it keeps its proportions and fits one screen at any window size; see
-the comment at the top of `hero/hero.tsx`.
-
-Its type is served from this package rather than from a font CDN: `app.css`
-imports the weights the designs name from `@fontsource`, as the gallery and the
-viewer do, so the page fetches nothing from a third party before it paints. The
-landing page is set in Poppins — Light for the wordmark, the index and the
-prose, Medium for the button, and ExtraLight for the headline, which the design
-draws in a lighter build of the family that Google does not ship; the comment
-above the headline in `hero/hero.tsx` has the measurements.
-
 ## Deploying
 
 `.github/workflows/deploy.yml` publishes the site to GitHub Pages. The build

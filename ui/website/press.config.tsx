@@ -10,9 +10,6 @@ import { fumadocsMdx } from "fumapress/adapters/mdx";
 import { metaSchema, pageSchema } from "fumapress/adapters/mdx/schema";
 import { createDocsLayoutPage } from "fumapress/layouts/docs";
 import { createHomeLayoutPage } from "fumapress/layouts/home";
-import { createRootLayout } from "fumapress/layouts/root";
-
-import { Hero } from "./src/components/hero/hero";
 
 const docs = defineDocs({
   dir: "content",
@@ -27,23 +24,48 @@ const docs = defineDocs({
 
 const DocsPage = createDocsLayoutPage<typeof config.$context>();
 
-// The site is read on the dark ground the design draws it on, so that is the one
-// a reader is given before they ask for the other: the header's switch (`170:15`)
-// and the documentation's own both write the same preference through
-// `next-themes`, and once one is written it is what the page is read in.
-const Root = createRootLayout({
-  providerProps: { theme: { defaultTheme: "dark" } },
-});
+// The docs layout would put a text title and the page actions above the logo,
+// so the landing page renders under the navbar-only home layout; the copy stays
+// in `content/index.mdx` so the Markdown the site serves to LLMs keeps no JSX.
+const HomePage = createHomeLayoutPage<typeof config.$context>({
+  async render(page) {
+    const body = (await this.getPageBody(page))?.node;
+    const { git } = this.siteConfig;
 
-// The landing page is its own composition — a floating header, a hero and an
-// index, in the design's 1920 × 1080 proportions — so it renders under neither
-// the docs layout nor the home layout's navbar, which would put a second header
-// above the one the page draws. `content/index.mdx` still holds the page's title
-// and description, which is what its head and the Markdown the site serves to
-// LLMs read; the landing page does not render that copy.
-const HeroPage = createHomeLayoutPage<typeof config.$context>({
-  layout: ({ children }) => <>{children}</>,
-  render: () => ({ body: <Hero /> }),
+    return {
+      body: (
+        <div className="mx-auto flex w-full max-w-3xl flex-col gap-16 py-14">
+          <div className="flex flex-col items-center gap-8 text-center">
+            <img
+              src={`${import.meta.env.BASE_URL}Logo-Horizontal.svg`}
+              alt={page.data.title}
+              width={1856}
+              height={1147}
+              className="h-auto w-96 max-w-full dark:invert"
+            />
+            {page.data.description ? (
+              <p className="max-w-2xl text-balance text-xl text-fd-muted-foreground">
+                {page.data.description}
+              </p>
+            ) : null}
+            {/* The repository URL, assembled the way Fumapress assembles its
+                own: its helper is not part of the public API. */}
+            {git ? (
+              <a
+                className="inline-flex items-center rounded-md border bg-fd-secondary px-5 py-2.5 text-sm font-medium text-fd-secondary-foreground transition-colors hover:bg-fd-accent hover:text-fd-accent-foreground"
+                href={`${git.url}/${git.user}/${git.repo}`}
+                rel="noreferrer noopener"
+                target="_blank"
+              >
+                GitHub
+              </a>
+            ) : null}
+          </div>
+          <div className="prose mx-auto w-full max-w-2xl">{body}</div>
+        </div>
+      ),
+    };
+  },
 });
 
 const config = defineConfig({
@@ -51,10 +73,9 @@ const config = defineConfig({
   // served as files, so there is no request for a server to answer.
   mode: "static",
   content: docs.toFumadocsSource(),
-  renderRoot: Root,
   renderPage: ({ lang, slugs, page }) =>
     page.url === "/" ? (
-      <HeroPage lang={lang} page={page} slugs={slugs} />
+      <HomePage lang={lang} page={page} slugs={slugs} />
     ) : (
       <DocsPage lang={lang} page={page} slugs={slugs} />
     ),

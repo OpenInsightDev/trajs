@@ -6,32 +6,13 @@
 /* The site serves its own type, the way the gallery and the viewer do, instead
    of asking fonts.googleapis.com for a stylesheet: the page then has no
    third-party request standing between it and its first paint, and it fetches
-   only the weights the designs name — Geist's variable axis for the
-   documentation, Poppins ExtraLight, Light and Medium for the landing page, IBM
-   Plex Mono Regular and Medium for the labels and the command. */
+   only the weights it is read in — Geist's variable axis for the prose, and IBM
+   Plex Mono's Regular and Medium for the code blocks and the labels. */
 @import "@fontsource-variable/geist";
-@import "@fontsource/poppins/latin-200.css";
-@import "@fontsource/poppins/latin-300.css";
-@import "@fontsource/poppins/latin-500.css";
 @import "@fontsource/ibm-plex-mono/latin-400.css";
 @import "@fontsource/ibm-plex-mono/latin-500.css";
 
-/* `--font-display` is the landing page's face: the hero design sets its headline,
-   its wordmark and its column titles in Poppins, 128px of the headline, which
-   Geist — the face the documentation is read in, and the default here — does not
-   have.
-
-   Only the weights the design names are loaded, so every display run below has
-   to name its weight explicitly: 300 for the wordmark and the index, 500 for the
-   button, and 200 for the headline, which is one step lighter than the rest for
-   the reason given at the headline itself.
-
-   `--font-mono` is IBM Plex Mono, the family the wordmark's letters are drawn
-   from, rather than a second monospace loaded beside it: the hero sets its labels
-   in it, and a code block in the docs set in the same face is one fewer font for
-   the page to fetch. */
 @theme {
   --font-mono: "IBM Plex Mono", monospace;
-  --font-display: "Poppins", "Geist Variable", sans-serif;
   --default-font-family: "Geist Variable", sans-serif;
 }
