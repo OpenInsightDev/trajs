@@ -30,13 +30,13 @@ const session = "01890a5d-ac96-774b-bcce-b302099a8057";
 const extrakit = Extra.makeKit();
 
 /** The kits the trajectory is built with: no tools, no events, and whole response parts. */
-const config = {
-  stream: false as const,
+const config = Trajectory.config({
+  stream: false,
   toolkit: Toolkit.empty,
   eventkit: Event.makeKit(),
   metrickit: Metric.makeKit(),
   extrakit,
-};
+});
 
 /** The one response part builder the parts below are built with. */
 const responsePart = Trajectory.responsePart({ toolkit: Toolkit.empty, extrakit, stream: false });
@@ -153,11 +153,10 @@ it("states what an event and a metric name, and the session a metric does not st
     timestamp: at,
   });
 
-  const trajectory = Object.assign(Stream.fromIterable([eventPart, metricPart]), {
-    ...config,
-    eventkit,
-    metrickit,
-  });
+  const trajectory = Object.assign(
+    Stream.fromIterable([eventPart, metricPart]),
+    Trajectory.config({ ...config, eventkit, metrickit }),
+  );
 
   const rows = Array.from(
     await Parts.rows("digest")(trajectory).pipe(Stream.runCollect, Effect.runPromise),

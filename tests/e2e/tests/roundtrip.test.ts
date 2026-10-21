@@ -29,13 +29,13 @@ const extrakit = Extra.makeKit();
  * The kits the trajectory is built and read with: no tools, no events, no metrics,
  * and a response part stated whole rather than as the increments of a stream.
  */
-const config = {
-  stream: false as const,
+const config = Trajectory.config({
+  stream: false,
   toolkit: Toolkit.empty,
   eventkit: Event.makeKit(),
   metrickit: Metric.makeKit(),
   extrakit,
-};
+});
 
 /** The parts of the trajectory, in the one order a trajectory carries them in. */
 const parts = [

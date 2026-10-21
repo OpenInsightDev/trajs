@@ -321,13 +321,16 @@ const parts = [
   ...answeredAnswer,
 ];
 
-const trajectory = Object.assign(Stream.fromIterable(parts), {
-  stream: true as const,
-  toolkit: Toolkit.empty,
-  eventkit: Event.makeKit(),
-  metrickit: Metric.makeKit(),
-  extrakit: Extra.makeKit(),
-});
+const trajectory = Object.assign(
+  Stream.fromIterable(parts),
+  Trajectory.config({
+    stream: true,
+    toolkit: Toolkit.empty,
+    eventkit: Event.makeKit(),
+    metrickit: Metric.makeKit(),
+    extrakit: Extra.makeKit(),
+  }),
+);
 
 const program = Effect.gen(function* () {
   const exchange = yield* Exchange;

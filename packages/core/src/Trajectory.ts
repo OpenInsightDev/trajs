@@ -621,6 +621,7 @@ export type MetricPartEncoded = Schema.Codec.Encoded<ReturnType<typeof MetricPar
  * Every type parameter defaults to `never`, so a config names what it holds; the
  * config of a trajectory read without knowing its kits is {@link AnyConfig}.
  *
+ * @see {@link config} for stating one as a value.
  * @see {@link AnyConfig} for the config that holds anything.
  * @see {@link Part} for the parts a config reads.
  * @category models
@@ -638,6 +639,85 @@ export interface Config<
   metrickit: Metrickit;
   extrakit: Extrakit;
 }
+
+/**
+ * States what a trajectory is read with, as the value of the {@link Config} a
+ * program names once and hands to every reading.
+ *
+ * **When to use**
+ *
+ * Use where the kits a trajectory is read with are known — a program that reads the
+ * trajectories of one format, an example that builds one by hand — rather than
+ * writing the five fields out at every call, or handing the kits to each reading
+ * apart.
+ *
+ * **Details**
+ *
+ * - The fields are the ones {@link Config} states. A config holds the kits it is
+ *   stated with rather than what they declare, so one built from a kit an extension
+ *   merged into ({@link Extra.mergeKit}) reads the merged kit.
+ * - Each type parameter is read off the field given, so `stream: false` is the literal
+ *   `false` rather than `boolean`, and each kit is the kit given rather than any kit.
+ *   That is what lets a reading be typed as
+ *   `Trajectory.TrajectoryStream<typeof config>`, and why no field of one is stated
+ *   `as const`.
+ * - What `stream` says of a response part is {@link ResponsePart}'s to say: `true`
+ *   reads one as every part a response may hold, `false` as the whole parts alone.
+ *
+ * **Example** (Naming what a trajectory is read with)
+ *
+ * ```ts import.meta.vitest
+ * import { Effect, Stream } from "effect"
+ * import { Event, Extra, Metric, Prompt, Toolkit, Trajectory, View } from "@trajs/core"
+ *
+ * // What a trajectory is read with: no tool it calls, no event or metric it holds, no
+ * // extra data of its own, and the whole parts a model returned rather than the
+ * // increments an answer arrived in.
+ * const config = Trajectory.config({
+ *   stream: false,
+ *   toolkit: Toolkit.empty,
+ *   eventkit: Event.makeKit(),
+ *   metrickit: Metric.makeKit(),
+ *   extrakit: Extra.makeKit()
+ * })
+ *
+ * // The parts are built with the kit the config states, so what a part holds of its
+ * // extra data is what every reading of the trajectory declares of it.
+ * const trajectory: Trajectory.TrajectoryStream<typeof config> = Stream.make(
+ *   Trajectory.promptPart(config.extrakit)(Prompt.make("What is 2 + 2?"))
+ * )
+ *
+ * const turns = await Effect.runPromise(Stream.runCollect(View.promptTurns(trajectory)))
+ *
+ * // `stream` is the literal `false` the config was stated with rather than `boolean`,
+ * // which is what a reading typed by it states of the parts it yields.
+ * config.stream // => false
+ * ```
+ *
+ * @see {@link Config} for what a config is made of.
+ * @see {@link AnyConfig} for the config of a reading that names no kit.
+ * @see {@link Exchange.Loaded.read} for where a config is handed to a reading.
+ * @category constructors
+ */
+export const config = <
+  Stream extends boolean,
+  Toolkit extends Toolkit.Any,
+  Eventkit extends Event.AnyKit,
+  Metrickit extends Metric.AnyKit,
+  Extrakit extends Extra.AnyKit,
+>({
+  stream,
+  toolkit,
+  eventkit,
+  metrickit,
+  extrakit,
+}: Config<Stream, Toolkit, Eventkit, Metrickit, Extrakit>): Config<
+  Stream,
+  Toolkit,
+  Eventkit,
+  Metrickit,
+  Extrakit
+> => ({ stream, toolkit, eventkit, metrickit, extrakit });
 
 /**
  * The config of a trajectory read without knowing what it holds: response parts of
@@ -723,13 +803,13 @@ export type UnknownConfig = Config<
  * @see {@link Config} for what a config names.
  * @category constants
  */
-export const anyConfig: AnyConfig = {
+export const anyConfig: AnyConfig = config({
   stream: true,
   toolkit: Toolkit.empty,
   eventkit: Event.makeKit(),
   metrickit: Metric.makeKit(),
   extrakit: Extra.makeKit(),
-};
+});
 
 /**
  * A part of a trajectory of the config given.
@@ -924,11 +1004,14 @@ export const merge = <Left extends AnyConfig, Right extends AnyConfig, E, R, E2,
   // trajectory whose response parts are whole are members of the streaming schema
   // too, and a merged trajectory that streams states nothing of the parts of one
   // that does not.
-  return Object.assign(parts, {
-    stream: left.stream || right.stream,
-    toolkit: Toolkit.merge(left.toolkit, right.toolkit),
-    eventkit: Event.mergeKit(left.eventkit, right.eventkit),
-    metrickit: Metric.mergeKit(left.metrickit, right.metrickit),
-    extrakit: Extra.mergeKit(left.extrakit, right.extrakit),
-  }) as Trajectory<MergedConfig<Left, Right>, E | E2, R | R2>;
+  return Object.assign(
+    parts,
+    config({
+      stream: left.stream || right.stream,
+      toolkit: Toolkit.merge(left.toolkit, right.toolkit),
+      eventkit: Event.mergeKit(left.eventkit, right.eventkit),
+      metrickit: Metric.mergeKit(left.metrickit, right.metrickit),
+      extrakit: Extra.mergeKit(left.extrakit, right.extrakit),
+    }),
+  ) as Trajectory<MergedConfig<Left, Right>, E | E2, R | R2>;
 };

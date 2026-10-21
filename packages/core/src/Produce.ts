@@ -128,13 +128,10 @@ const produceWith =
       ),
       Stream.unwrap,
       (parts) =>
-        Object.assign(parts, {
-          stream: true as const,
-          toolkit,
-          eventkit,
-          metrickit,
-          extrakit,
-        }),
+        Object.assign(
+          parts,
+          Trajectory.config({ stream: true, toolkit, eventkit, metrickit, extrakit }),
+        ),
     );
 
 /**

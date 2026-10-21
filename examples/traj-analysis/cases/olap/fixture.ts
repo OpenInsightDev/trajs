@@ -17,13 +17,13 @@ const toolkit = Toolkit.empty;
 const extrakit = Extra.emptyKit;
 
 /** The kits the fixtures are built and read with: no events, no metrics, and whole response parts. */
-export const config = {
-  stream: false as const,
+export const config = Trajectory.config({
+  stream: false,
   toolkit,
   extrakit,
   eventkit: Event.makeKit(),
   metrickit: Metric.makeKit(),
-};
+});
 
 /** The parts of one fixture, as the builders below produce them and the exchange keeps them. */
 type Produced = ReadonlyArray<Trajectory.Part<typeof config>>;

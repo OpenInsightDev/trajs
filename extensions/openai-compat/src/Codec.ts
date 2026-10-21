@@ -133,13 +133,16 @@ export type OpenAiCompatSessions = Record<string, OpenAiCompatMessage[]>;
  *   })
  * ]
  *
- * const trajectory = Object.assign(Stream.fromIterable(parts), {
- *   stream: false as const,
- *   toolkit: Toolkit.empty,
- *   eventkit: Event.makeKit(),
- *   metrickit: Metric.makeKit(),
- *   extrakit
- * })
+ * const trajectory = Object.assign(
+ *   Stream.fromIterable(parts),
+ *   Trajectory.config({
+ *     stream: false,
+ *     toolkit: Toolkit.empty,
+ *     eventkit: Event.makeKit(),
+ *     metrickit: Metric.makeKit(),
+ *     extrakit
+ *   })
+ * )
  *
  * const sessions = await Effect.runPromise(Codec.makeOpenAiCompat(trajectory))
  *

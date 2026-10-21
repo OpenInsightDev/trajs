@@ -159,13 +159,16 @@ export type AnthropicSessions = Record<string, AnthropicConversation>;
  *   })
  * ]
  *
- * const trajectory = Object.assign(Stream.fromIterable(parts), {
- *   stream: false as const,
- *   toolkit: Toolkit.empty,
- *   eventkit: Event.makeKit(),
- *   metrickit: Metric.makeKit(),
- *   extrakit
- * })
+ * const trajectory = Object.assign(
+ *   Stream.fromIterable(parts),
+ *   Trajectory.config({
+ *     stream: false,
+ *     toolkit: Toolkit.empty,
+ *     eventkit: Event.makeKit(),
+ *     metrickit: Metric.makeKit(),
+ *     extrakit
+ *   })
+ * )
  *
  * const sessions = await Effect.runPromise(Codec.makeAnthropic(trajectory))
  * const conversation = sessions[sessionId]

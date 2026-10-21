@@ -183,10 +183,10 @@ export const writeFixture = () =>
   });
 
 /** What the fixture is read with: whole response parts, and the metric kit its counts are of. */
-export const config = {
-  stream: false as const,
+export const config = Trajectory.config({
+  stream: false,
   toolkit,
   eventkit,
   metrickit,
   extrakit,
-};
+});

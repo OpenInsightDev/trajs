@@ -126,13 +126,16 @@ const parts = [declared, question, answer, call, result, stopped, forked, carrie
  * trajectory a producer is given: the increments a streamed response arrived in are
  * folded into the parts they complete before a kit counts one.
  */
-const trajectory = Object.assign(Stream.fromIterable(parts), {
-  stream: false as const,
-  toolkit: Toolkit.empty,
-  eventkit: Event.makeKit(),
-  metrickit: Metric.makeKit(),
-  extrakit,
-});
+const trajectory = Object.assign(
+  Stream.fromIterable(parts),
+  Trajectory.config({
+    stream: false,
+    toolkit: Toolkit.empty,
+    eventkit: Event.makeKit(),
+    metrickit: Metric.makeKit(),
+    extrakit,
+  }),
+);
 
 /**
  * Runs the metric over the trajectory, as a kit does: the producer the package builds
