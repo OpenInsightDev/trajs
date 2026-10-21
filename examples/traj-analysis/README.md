@@ -16,6 +16,9 @@ together.
 - [toolkit](./cases/toolkit/README.md) — reads a trajectory typed with the toolkit
   its responses were returned by, so each call is counted in the terms its own tool's
   parameters state.
+- [tokenize](./cases/tokenize/README.md) — produces a trajectory with the token count
+  of each of its parts, and reads it back for how the session grew and what its context
+  was made of.
 - [olap](./cases/olap/README.md) — generates hundreds of trajectories from
   known weights, imports them into the ClickHouse engine `chdb` embeds, and
   answers the shares and averages they were drawn from with SQL aggregates over

@@ -16,6 +16,9 @@ Effect runs as the test, and failing or dying is what fails it.
 4. Write the `README.md` beside it — `# Case: <name>`, then what it shows and when you need it
    — without describing the file: the reader can open the test.
 
+`main` is read in one pass: its steps stay in it rather than becoming functions of their own,
+so a reader never leaves it to finish a thought.
+
 A case that generates what it reads writes it under its own `fixtures/`, which
 `.gitignore` keeps out of the repository.
 

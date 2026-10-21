@@ -354,6 +354,9 @@ importers:
       '@trajs/core':
         specifier: workspace:*
         version: link:../../packages/core
+      '@trajs/extension-tokenize':
+        specifier: workspace:*
+        version: link:../../extensions/tokenize
       '@trajs/olap':
         specifier: workspace:*
         version: link:../../packages/olap
