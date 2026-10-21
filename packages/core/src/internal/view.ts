@@ -56,6 +56,16 @@ const assemble = <Config extends Trajectory.AnyConfig>(
 
       // A response the open turn is not the prompt of — one no prompt precedes, or
       // one of another session — is on no turn of this reading.
+      //
+      // FIXME: it is dropped rather than held, and interleaving is what
+      // `Produce.fromSessions` produces — the sessions of a trajectory are read
+      // together rather than one after another — so a trajectory of several sessions
+      // loses every response that arrives while another session's prompt is open,
+      // rather than reading one session at a time. A turn belongs to the session that
+      // produced it, which is what `conversations` reads of the messages alone: this
+      // reading should hold a turn and a folding per session and emit each session's
+      // turns as they are produced — or, if it is to read one session alone, say so
+      // rather than dropping what it is not given.
       if (Option.isNone(open) || open.value.prompt.sessionId !== part.sessionId) {
         return [assembly, []];
       }

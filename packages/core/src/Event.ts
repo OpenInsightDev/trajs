@@ -3,14 +3,15 @@
  * them as.
  *
  * An {@link Event} names one kind of event with the schema of its data at every
- * version, {@link makeKit} and {@link mergeKit} collect events into kits,
- * {@link EventParts} reads a trajectory's event parts under a kit, and
+ * version, {@link EventKit.make} and {@link EventKit.merge} collect events into
+ * kits, {@link EventParts} reads a trajectory's event parts under a kit, and
  * {@link encode} reads a stream under events the caller names.
  */
 
 import { Data, Option, Predicate, Schema, Stream } from "effect";
 
-import type { IndexByKey } from "#/internal/types.ts";
+import * as EventKit from "#/EventKit.ts";
+import { attach } from "#/internal/trajectory.ts";
 import type * as Trajectory from "#/Trajectory.ts";
 import * as VersionedSchema from "#/VersionedSchema.ts";
 
@@ -36,9 +37,9 @@ export class Metadata extends Schema.Class<Metadata>("Metadata")({
  *
  * `package` and `id` name it — `tag` is `"pkg/id"` — and `schema` is its data at every
  * version it was written at ({@link VersionedSchema.VersionedSchema}). Collect events
- * into a kit with {@link makeKit}.
+ * into a kit with {@link EventKit.make}.
  *
- * @see {@link makeKit} for collecting events into a kit.
+ * @see {@link EventKit.make} for collecting events into a kit.
  * @see {@link EventParts} for reading a trajectory's event parts.
  * @category models
  */
@@ -59,145 +60,6 @@ export class Event<
 
 /** An event whose package, id and data versions are not known. */
 export type Any = Event<string, string, VersionedSchema.Any>;
-
-type EventsByTag<Es> = IndexByKey<Es, "tag">;
-
-/**
- * A kit of events, keyed by the tag each names.
- *
- * @see {@link makeKit} for building one, {@link EventParts} for reading it.
- * @category models
- */
-export type Eventkit<Events extends Record<string, Any>> = Readonly<{
-  events: Events;
-}>;
-
-/**
- * Collects events into a kit, keyed by the tag each names.
- *
- * **When to use**
- *
- * Use to gather the events an extension produces into the kit a trajectory is read
- * with.
- *
- * **Details**
- *
- * Each event is keyed by its own `tag`, so a kit names one event per tag. A kit names
- * the events it was given and no others; {@link emptyKit} names none.
- *
- * @see {@link mergeKit} for adding the events of one kit to another's.
- * @see {@link EventParts} for reading a trajectory's event parts under a kit.
- * @category constructors
- */
-export const makeKit = <Es extends ReadonlyArray<Any>>(...events: Es) => {
-  // SAFETY: every event given is inserted under its own tag below, so what the record
-  // holds is one event per tag the kit names.
-  const output = {} as Record<string, Any>;
-
-  for (const event of events) {
-    output[event.tag] = event;
-  }
-
-  // SAFETY: `output` holds the event of every tag in `Es`, which is what `EventsByTag`
-  // reads the events given as.
-  return { events: output } as Eventkit<EventsByTag<Es>>;
-};
-
-/** A kit whose events are not known. */
-export type AnyKit = Eventkit<Record<string, Any>>;
-
-/** A kit that declares no event. */
-export const emptyKit = makeKit();
-
-/** The type of {@link emptyKit}. */
-export type EmptyKit = typeof emptyKit;
-
-/**
- * The events of the kits given as one, a shared tag holding the event of the latest
- * kit that names it.
- *
- * **When to use**
- *
- * Use to type the kit {@link mergeKit} returns.
- *
- * **Details**
- *
- * Every kit's events are named; where two kits name the same tag, the event of the
- * later kit wins.
- *
- * @see {@link mergeKit} for the kit those events make.
- * @category models
- */
-export type EventsMerged<Ks extends ReadonlyArray<AnyKit>> = Ks extends readonly [
-  infer Head extends AnyKit,
-  ...infer Tail extends ReadonlyArray<AnyKit>,
-]
-  ? Omit<Head["events"], keyof EventsMerged<Tail>> & EventsMerged<Tail>
-  : {};
-
-/**
- * Adds the events of each kit given to the ones of the kits before it.
- *
- * **When to use**
- *
- * Use when the events of several extensions are read together, or when a reader
- * that knows some of a trajectory's events reads it under the ones it knows without
- * forgetting the rest.
- *
- * **Details**
- *
- * A shared tag holds the event of the latest kit that names it, so a kit of a
- * version an extension states now states over the one a trajectory was read with.
- *
- * **Example** (Adding the events of one kit to another's)
- *
- * ```ts import.meta.vitest
- * import { Schema } from "effect"
- * import { Event, VersionedSchema } from "@trajs/core"
- *
- * const step = new Event.Event({
- *   package: "atif",
- *   id: "step",
- *   metadata: new Event.Metadata({ name: "Step" }),
- *   schema: Schema.Struct({
- *     version: Schema.Literal("0.1.0"),
- *     index: Schema.Number
- *   }).pipe(VersionedSchema.make)
- * })
- *
- * const count = new Event.Event({
- *   package: "tokenize",
- *   id: "count",
- *   metadata: new Event.Metadata({ name: "Count" }),
- *   schema: Schema.Struct({
- *     version: Schema.Literal("0.1.0"),
- *     tokens: Schema.Number
- *   }).pipe(VersionedSchema.make)
- * })
- *
- * const merged = Event.mergeKit(Event.makeKit(step), Event.makeKit(count))
- * Object.keys(merged.events) // => ["atif/step", "tokenize/count"]
- * ```
- *
- * @see {@link makeKit} for a kit of the events given alone.
- * @see {@link encode} — the reader that adds events to the kit of a trajectory.
- * @category constructors
- */
-export const mergeKit = <Ks extends ReadonlyArray<AnyKit>>(
-  ...kits: Ks
-): Eventkit<EventsMerged<Ks>> => {
-  // SAFETY: every event of every kit is inserted under its own tag below, so what
-  // the record holds is one event per tag the kits name.
-  const events = {} as Record<string, Any>;
-
-  for (const kit of kits) {
-    Object.assign(events, kit.events);
-  }
-
-  // SAFETY: `events` holds the event of every tag in `Ks`, the one of the kit latest
-  // among those that names it, which is what `EventsMerged` reads the kits as.
-  return { events } as Eventkit<EventsMerged<Ks>>;
-};
 
 /** An event part: its data under the tag it was produced with. */
 export type EventPart<Tag extends string, Data> = Readonly<{ _tag: Tag; data: Data }>;
@@ -274,7 +136,7 @@ export type EventParts<Events extends Record<string, Any>> = EventPartOf<Events[
  *
  * ```ts import.meta.vitest
  * import { Schema } from "effect"
- * import { Event, VersionedSchema } from "@trajs/core"
+ * import { Event, EventKit, VersionedSchema } from "@trajs/core"
  *
  * const step = new Event.Event({
  *   package: "atif",
@@ -286,7 +148,7 @@ export type EventParts<Events extends Record<string, Any>> = EventPartOf<Events[
  *   }).pipe(VersionedSchema.make)
  * })
  *
- * const parts = Event.EventParts(Event.makeKit(step))
+ * const parts = Event.EventParts(EventKit.make(step))
  *
  * const read = Schema.decodeUnknownSync(parts)({
  *   _tag: "atif/step",
@@ -305,7 +167,7 @@ export type EventParts<Events extends Record<string, Any>> = EventPartOf<Events[
  * @see {@link EventParts} for what a part is.
  * @category schemas
  */
-export const EventParts = <K extends AnyKit>(
+export const EventParts = <K extends EventKit.Any>(
   kit: K,
 ): Schema.Union<ReadonlyArray<EventPartSchemas<K["events"]>>> => {
   const parts: Array<Schema.Top> = [];
@@ -329,7 +191,7 @@ export const EventParts = <K extends AnyKit>(
  *
  * **Details**
  *
- * The events the config named are kept beside the events given, as {@link mergeKit}
+ * The events the config named are kept beside the events given, as {@link EventKit.merge}
  * keeps them, and an event given for a tag the config named states over the one it
  * was read with. What else the trajectory is read with — whether its responses are
  * streamed, its toolkit, its metric kit and its extra kit — is carried over as it
@@ -344,15 +206,16 @@ export type WithEvents<
 > = Trajectory.Config<
   Config["stream"],
   Config["toolkit"],
-  Eventkit<EventsWith<Config, Es>>,
+  EventsWith<Config, Es>,
   Config["metrickit"],
   Config["extrakit"]
 >;
 
-/** The events a kit names with the events given added to them, which {@link mergeKit} states as one kit over another. */
-type EventsWith<Config extends Trajectory.AnyConfig, Es extends ReadonlyArray<Any>> = EventsMerged<
-  readonly [Config["eventkit"], Eventkit<EventsByTag<Es>>]
->;
+/** The kit a config's events make with the events given added, which {@link EventKit.merge} states as one kit over another. */
+type EventsWith<
+  Config extends Trajectory.AnyConfig,
+  Es extends ReadonlyArray<Any>,
+> = EventKit.Merged<readonly [Config["eventkit"], ReturnType<typeof EventKit.make<Es>>]>;
 
 /**
  * The events of a stream read as the events given, as {@link encode} returns it.
@@ -406,7 +269,7 @@ export type Reader<Es extends ReadonlyArray<Any>> = {
  *
  * ```ts import.meta.vitest
  * import { Effect, Schema, SchemaGetter, Stream } from "effect"
- * import { Event, Trajectory, VersionedSchema } from "@trajs/core"
+ * import { Event, EventKit, Trajectory, VersionedSchema } from "@trajs/core"
  *
  * const first = Schema.Struct({
  *   version: Schema.Literal("0.1.0"),
@@ -442,7 +305,7 @@ export type Reader<Es extends ReadonlyArray<Any>> = {
  * // What the trajectory holds: the part read by the kit it was written with, so the
  * // data is at the version the trajectory states rather than at the one in hand.
  * const written = Stream.make(
- *   Schema.decodeSync(Trajectory.EventPart(Event.makeKit(before)))({
+ *   Schema.decodeSync(Trajectory.EventPart(EventKit.make(before)))({
  *     _tag: "Event",
  *     event: { _tag: "atif/step", data: { version: "0.1.0", index: 1 } },
  *     timestamp: "2024-01-01T00:00:00.000Z",
@@ -458,12 +321,12 @@ export type Reader<Es extends ReadonlyArray<Any>> = {
  * part._tag === "Event" && part.event.data // => { version: "0.1.1", index: 1 }
  * ```
  *
- * @see {@link makeKit} — the kit the events given are collected into.
+ * @see {@link EventKit.make} — the kit the events given are collected into.
  * @see {@link EventParts} — the codec the events are read with.
  * @category combinators
  */
 export function encode<const Es extends ReadonlyArray<Any>>(...events: Es): Reader<Es> {
-  const eventkit = makeKit(...events);
+  const eventkit = EventKit.make(...events);
 
   // SAFETY: the kit the events given make names the part of each of them, so it reads
   // an event part of any tag — as the event that kit names for that tag, and as nothing
@@ -509,12 +372,12 @@ export function encode<const Es extends ReadonlyArray<Any>>(...events: Es): Read
       return parts;
     }
 
-    return Object.assign(parts, {
+    return attach({
       stream: stream.stream,
       toolkit: stream.toolkit,
-      eventkit: mergeKit(stream.eventkit, eventkit),
+      eventkit: EventKit.merge(stream.eventkit, eventkit),
       metrickit: stream.metrickit,
       extrakit: stream.extrakit,
-    });
+    })(parts);
   }) as Reader<Es>;
 }

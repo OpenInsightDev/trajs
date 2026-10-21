@@ -8,11 +8,17 @@
 
 export * as Event from "#/Event.ts";
 
+export * as EventKit from "#/EventKit.ts";
+
 export * as Exchange from "#/Exchange.ts";
 
 export * as Extra from "#/Extra.ts";
 
+export * as ExtraKit from "#/ExtraKit.ts";
+
 export * as Metric from "#/Metric.ts";
+
+export * as MetricKit from "#/MetricKit.ts";
 
 export * as Produce from "#/Produce.ts";
 

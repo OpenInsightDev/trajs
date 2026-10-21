@@ -18,7 +18,7 @@
  * the trajectory was read with, which the header of a trajectory names.
  */
 
-import { Extra, VersionedSchema } from "@trajs/core";
+import { Extra, ExtraKit, VersionedSchema } from "@trajs/core";
 import { Schema } from "effect";
 
 import { packageName } from "#/internal/package.ts";
@@ -248,14 +248,14 @@ export type StepFields = Schema.Schema.Type<typeof StepFields>;
  *
  * **Details**
  *
- * The kit is an `Extrakit` of every kind of extra data this package declares, each
+ * The kit is an `ExtraKit.Kit` of every kind of extra data this package declares, each
  * held under the tag it is produced under — {@link documentExtra} for a session part
  * and {@link stepExtra} for a prompt or response part. It is extended rather than
- * replaced when other packages' extra data is produced with the same trajectory, and it
- * is what a reader installs to get those fields back with their types.
+ * replaced when other packages' extra data is produced with the same trajectory, and
+ * it is what a reader installs to get those fields back with their types.
  *
  * @see {@link documentExtra} for the extra data of a session part.
  * @see {@link stepExtra} for the extra data of a prompt or response part.
  * @category constants
  */
-export const extrakit = Extra.makeKit(stepExtra, documentExtra);
+export const extrakit = ExtraKit.make(stepExtra, documentExtra);

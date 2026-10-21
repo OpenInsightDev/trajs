@@ -43,7 +43,7 @@ concrete ATIF form may differ.
 
 ## Status
 
-- Done: `PromptPart.timestamp` in core (with `responsePart` and the produce
+- Done: `PromptPart.timestamp` in core (with the `parts` builders and the produce
   session's `enqueuePrompt`/`enqueueResponse`); the format typed in `Document.ts`
   (`Metrics`, `FinalMetrics`, `ToolDefinition`, `SubagentTrajectoryRef`,
   `SchemaVersion`, `ProducerFields`, recursive `subagent_trajectories`); the extra

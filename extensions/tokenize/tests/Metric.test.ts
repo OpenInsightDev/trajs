@@ -11,7 +11,16 @@
  * would change — apart from the rule of a payload that is not text, which is a
  * number the package publishes.
  */
-import { Event, Extra, Metric, Prompt, Response, Toolkit, Trajectory } from "@trajs/core";
+import {
+  EventKit,
+  ExtraKit,
+  Metric,
+  MetricKit,
+  Prompt,
+  Response,
+  Toolkit,
+  Trajectory,
+} from "@trajs/core";
 import { Effect, Stream } from "effect";
 import { describe, expect, it } from "vite-plus/test";
 
@@ -23,18 +32,20 @@ const asking = "01890a5d-ac96-774b-bcce-b302099a8057";
 
 const answering = "01890a5d-ac96-774b-bcce-b302099a8058";
 
-const extrakit = Extra.makeKit();
+/** What the trajectory is built and read with: no tool, event, metric or extra datum. */
+const config = Trajectory.config({
+  stream: false,
+  toolkit: Toolkit.empty,
+  eventkit: EventKit.empty,
+  metrickit: MetricKit.empty,
+  extrakit: ExtraKit.empty,
+});
+
+/** The builders of the parts below, under that config. */
+const part = Trajectory.parts(config);
 
 /** A prompt part, as a trajectory holds one. */
-const promptPart = (prompt: Prompt.Prompt, sessionId: string) =>
-  Trajectory.promptPart(extrakit)(prompt, { sessionId });
-
-/** A response part that was produced whole, as a trajectory holds one. */
-const responsePart = Trajectory.responsePart({
-  toolkit: Toolkit.empty,
-  extrakit,
-  stream: false,
-});
+const promptPart = (prompt: Prompt.Prompt, sessionId: string) => part.prompt(prompt, { sessionId });
 
 /**
  * A PNG of the given size: the header is all a media rule reads, so the bytes need
@@ -52,15 +63,15 @@ const png = (width: number, height: number): Uint8Array => {
 
 // One turn of a session that called a tool: what the model was given, what it
 // answered, the call it made, the result of that call, and why it stopped.
-const declared = Trajectory.sessionPart(extrakit)(asking);
+const declared = part.session(asking);
 
 const question = promptPart(Prompt.make("what is the weather in SF"), asking);
 
-const answer = responsePart(Response.makePart("text", { text: "let me look that up" }), {
+const answer = part.response(Response.makePart("text", { text: "let me look that up" }), {
   sessionId: asking,
 });
 
-const call = responsePart(
+const call = part.response(
   Response.anyToolCallPart({
     id: "call_1",
     name: "get_weather",
@@ -70,7 +81,7 @@ const call = responsePart(
   { sessionId: asking },
 );
 
-const result = responsePart(
+const result = part.response(
   Response.anyToolResultPart({
     id: "call_1",
     name: "get_weather",
@@ -81,7 +92,7 @@ const result = responsePart(
   { sessionId: asking },
 );
 
-const stopped = responsePart(
+const stopped = part.response(
   Response.makePart("finish", {
     reason: "stop",
     usage: new Response.Usage({ inputTokens: { total: 12 }, outputTokens: { total: 3 } }),
@@ -92,7 +103,7 @@ const stopped = responsePart(
 
 // A session that ran on a tool result alone, and was given a payload that is not
 // text: the kinds of count the other session does not hold.
-const forked = Trajectory.sessionPart(extrakit)(answering);
+const forked = part.session(answering);
 
 const carried = promptPart(
   Prompt.fromMessages([
@@ -111,7 +122,7 @@ const carried = promptPart(
   answering,
 );
 
-const image = responsePart(
+const image = part.response(
   Response.makePart("file", { mediaType: "image/png", data: png(512, 512) }),
   { sessionId: answering },
 );
@@ -126,13 +137,7 @@ const parts = [declared, question, answer, call, result, stopped, forked, carrie
  * trajectory a producer is given: the increments a streamed response arrived in are
  * folded into the parts they complete before a kit counts one.
  */
-const trajectory = Object.assign(Stream.fromIterable(parts), {
-  stream: false as const,
-  toolkit: Toolkit.empty,
-  eventkit: Event.makeKit(),
-  metrickit: Metric.makeKit(),
-  extrakit,
-});
+const trajectory = Trajectory.make(config)(Stream.fromIterable(parts));
 
 /**
  * Runs the metric over the trajectory, as a kit does: the producer the package builds
@@ -147,7 +152,7 @@ const report = async (): Promise<Map<string, Estimate>> => {
       Effect.provide(Tokenizer.layerOpenAi({ model: "gpt-4o" })),
     );
 
-    const runnable = Metric.toProducers(metrickit, { [tokenEstimate.tag]: producer });
+    const runnable = MetricKit.toProducers(metrickit, { [tokenEstimate.tag]: producer });
     const estimates = Metric.produce(runnable)(trajectory);
     const reported = Array.from(yield* estimates.pipe(Stream.runCollect));
     const byPart = new Map<string, Estimate>();

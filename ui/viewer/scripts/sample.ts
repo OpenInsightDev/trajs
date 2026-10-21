@@ -16,7 +16,7 @@
 import { fileURLToPath } from "node:url";
 
 import { NodeServices as PlatformNode } from "@effect/platform-node";
-import { Event, Extra, Metric, Prompt, Response, Toolkit, Trajectory } from "@trajs/core";
+import { EventKit, ExtraKit, MetricKit, Prompt, Response, Toolkit, Trajectory } from "@trajs/core";
 import { Exchange } from "@trajs/core/Exchange";
 import { NodeServices } from "@trajs/platform-node";
 import { layerFileSystem } from "@trajs/utils/Storage";
@@ -36,17 +36,17 @@ const clarify = "clarify";
 
 const review = "review";
 
-const streamed = Trajectory.ResponsePart({
-  toolkit: Toolkit.empty,
-  extrakit: Extra.makeKit(),
+/** What the sample is built and written with: response parts of either kind, and no other kit. */
+const config = Trajectory.config({
   stream: true,
+  toolkit: Toolkit.empty,
+  eventkit: EventKit.empty,
+  metrickit: MetricKit.empty,
+  extrakit: ExtraKit.empty,
 });
 
-const whole = Trajectory.ResponsePart({
-  toolkit: Toolkit.empty,
-  extrakit: Extra.makeKit(),
-  stream: false,
-});
+/** The builders of the parts below, under that config. */
+const part = Trajectory.parts(config);
 
 /**
  * The `uuid` a part is written with, counted from the parts written before it: a
@@ -60,21 +60,15 @@ let counted = 0;
 const nextUuid = (): string => `01890000-0000-7000-8000-${String(++counted).padStart(12, "0")}`;
 
 /**
- * A prompt, as the trajectory holds it: the part schema a trajectory reads its parts
- * by, written with a `uuid` of this script's own rather than one the schema
- * generates, since a fork is named by the `uuid` of the part it continues from.
+ * A prompt, as the trajectory holds it, written with a `uuid` of this script's own
+ * rather than one the builder generates: a fork is named by the `uuid` of the part it
+ * continues from.
  */
 const promptPart = (prompt: Prompt.Prompt, sessionId: string) =>
-  Trajectory.PromptPart(Extra.makeKit()).make({
-    messages: prompt.content,
-    sessionId,
-    extra: {},
-    uuid: nextUuid(),
-  });
+  part.prompt(prompt, { sessionId, uuid: nextUuid() });
 
 /** A session, as the trajectory declares it, written the same way. */
-const sessionPart = (id: string, fork?: string) =>
-  Trajectory.SessionPart(Extra.makeKit()).make({ id, fork, extra: {}, uuid: nextUuid() });
+const sessionPart = (id: string, fork?: string) => part.session(id, { fork, uuid: nextUuid() });
 
 /**
  * The moment a part is written at, one second after the part before it: a response
@@ -87,11 +81,11 @@ const nextMoment = (): DateTime.Utc => DateTime.makeUnsafe(new Date((clock += 1_
 
 /** One increment of a response that was streamed, as the trajectory holds it. */
 const increment = (sessionId: string, response: Streamed) =>
-  streamed.make({ response, sessionId, extra: {}, uuid: nextUuid(), timestamp: nextMoment() });
+  part.response(response, { sessionId, uuid: nextUuid(), timestamp: nextMoment() });
 
 /** One part of a response that was produced whole, as the trajectory holds it. */
 const produced = (sessionId: string, response: Answered) =>
-  whole.make({ response, sessionId, extra: {}, uuid: nextUuid(), timestamp: nextMoment() });
+  part.response(response, { sessionId, uuid: nextUuid(), timestamp: nextMoment() });
 
 type ProducedIncrement = ReturnType<typeof increment>;
 
@@ -321,13 +315,7 @@ const parts = [
   ...answeredAnswer,
 ];
 
-const trajectory = Object.assign(Stream.fromIterable(parts), {
-  stream: true as const,
-  toolkit: Toolkit.empty,
-  eventkit: Event.makeKit(),
-  metrickit: Metric.makeKit(),
-  extrakit: Extra.makeKit(),
-});
+const trajectory = Trajectory.make(Stream.fromIterable(parts), config);
 
 const program = Effect.gen(function* () {
   const exchange = yield* Exchange;

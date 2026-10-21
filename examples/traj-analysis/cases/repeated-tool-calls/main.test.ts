@@ -9,11 +9,26 @@
  */
 
 import { expect, it } from "@effect/vitest";
-import { Extra, Prompt, Response, Toolkit, Trajectory, View } from "@trajs/core";
+import {
+  EventKit,
+  ExtraKit,
+  MetricKit,
+  Prompt,
+  Response,
+  Toolkit,
+  Trajectory,
+  View,
+} from "@trajs/core";
 import { Effect, Stream } from "effect";
 
-const toolkit = Toolkit.empty;
-const extrakit = Extra.emptyKit;
+/** What the parts are built and read with: no tool, event, metric or extra datum. */
+const config = Trajectory.config({
+  stream: false,
+  toolkit: Toolkit.empty,
+  eventkit: EventKit.empty,
+  metrickit: MetricKit.empty,
+  extrakit: ExtraKit.empty,
+});
 
 /** A call reported as repeated: its input, and the ids of the calls made with it. */
 interface RepeatedToolCall {
@@ -28,12 +43,13 @@ interface Report {
   readonly repeated: ReadonlyArray<RepeatedToolCall>;
 }
 
-const prompt = (text: string) => Trajectory.promptPart(extrakit)(Prompt.make(text));
-const makeResponse = Trajectory.responsePart({ toolkit, extrakit, stream: false });
+const part = Trajectory.parts(config);
+
+const prompt = (text: string) => part.prompt(Prompt.make(text));
 
 const toolTurn = (id: string, name: string, params: Record<string, string>, answer: string) => [
-  makeResponse(Response.anyToolCallPart({ id, name, params, providerExecuted: false })),
-  makeResponse(
+  part.response(Response.anyToolCallPart({ id, name, params, providerExecuted: false })),
+  part.response(
     Response.anyToolResultPart({
       id,
       name,
@@ -56,7 +72,7 @@ const trajStream = Stream.fromArray([
   ...toolTurn("call_6", "bash", { command: "bun test" }, "3 tests passed"),
   ...toolTurn("call_7", "bash", { command: "bun test" }, "3 tests passed"),
   ...toolTurn("call_8", "bash", { command: "bun test" }, "3 tests passed"),
-]) satisfies Trajectory.TrajectoryStream<Trajectory.AnyConfig>;
+]) satisfies Trajectory.TrajectoryStream<typeof config>;
 
 const main = (threshold: number) =>
   trajStream.pipe(

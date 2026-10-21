@@ -187,6 +187,10 @@ export type EncodingServices<C extends Trajectory.AnyConfig> = Schema.Union<
  *   reading — an event part of an event the config does not name, say — since a
  *   trajectory is read as far as the kits in hand state it ({@link Part}). The extra
  *   data of a part is held the same way, and a reading with no config names no kit.
+ *   A config whose response parts are whole — one that states `stream` off
+ *   ({@link Trajectory.NonStreamConfig}) — reads it folded: the bytes carry the
+ *   increments a streamed answer arrived in as well as the whole parts they complete,
+ *   so what such a reading yields is the whole parts.
  * - `readCached(config)` reads it the same way, over the bytes a store keeps for it
  *   rather than the storage ({@link Loaded.readCached}).
  *
@@ -228,6 +232,10 @@ export interface Loaded {
    * The trajectory the trajectory holds, read as the config given states it — with no
    * config, as the trajectory the most general reading makes — and the parts it is made
    * of as the bytes they are read from.
+   *
+   * A config whose response parts are whole reads it folded, as {@link Loaded} states:
+   * the increments a streamed answer arrived in are read as the whole parts they
+   * complete, since a trajectory is carried as the most general one ({@link Part}).
    */
   readonly read: <C extends Trajectory.AnyConfig = Trajectory.AnyConfig>(
     config?: C & Readable<C>,

@@ -190,7 +190,9 @@ const foldPart = <Config extends Trajectory.AnyConfig>(
  * are therefore the increments of a streamed response as well as the whole parts
  * those increments complete — see {@link Trajectory.AnyConfig}. The producers of a
  * metric are the readers this is for: a producer measures the parts a model was
- * given and returned, which are whole.
+ * given and returned, which are whole. So is a reading of the bytes a trajectory is
+ * kept in under a config whose response parts are whole: `internal/exchange.ts`
+ * folds them where the config it is given states `stream` off.
  *
  * **Details**
  *

@@ -80,10 +80,10 @@ type Props<
  *
  * ```ts import.meta.vitest
  * import { Effect, Schema, Sink, Stream } from "effect"
- * import { Extra, Trajectory } from "@trajs/core"
+ * import { Trajectory } from "@trajs/core"
  * import * as Indexing from "@trajs/core/unstable/Indexing"
  *
- * const extrakit = Extra.makeKit()
+ * const part = Trajectory.parts(Trajectory.anyConfig)
  *
  * const ids = new Indexing.Index({
  *   package: "trajs/core",
@@ -103,10 +103,7 @@ type Props<
  *   )
  * })
  *
- * const trajectory = Stream.make(
- *   Trajectory.sessionPart(extrakit)("asking"),
- *   Trajectory.sessionPart(extrakit)("replying")
- * )
+ * const trajectory = Stream.make(part.session("asking"), part.session("replying"))
  *
  * const read = Effect.gen(function*() {
  *   return yield* Stream.run(trajectory, yield* ids)

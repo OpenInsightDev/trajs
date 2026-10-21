@@ -11,8 +11,11 @@
 import { Cause, DateTime, Effect, Exit, Queue, Stream } from "effect";
 
 import * as Event from "#/Event.ts";
+import * as EventKit from "#/EventKit.ts";
 import * as Extra from "#/Extra.ts";
+import * as ExtraKit from "#/ExtraKit.ts";
 import * as Metric from "#/Metric.ts";
+import * as MetricKit from "#/MetricKit.ts";
 import * as Prompt from "#/Prompt.ts";
 import * as Response from "#/Response.ts";
 import * as Tool from "#/Tool.ts";
@@ -34,6 +37,10 @@ import { TrajectoryError } from "#/TrajectoryError.ts";
  * themselves rather than the messages they were built from. A session declaration is
  * not among them: a part names its session, and a trajectory is read by the sessions
  * its parts name whether or not one is declared.
+ * - A response part is of either variant: a program that streams produces the
+ *   increments an answer arrives in, and one that answers whole produces the parts a
+ *   model returned, and the trajectory those parts make holds both
+ *   ({@link Trajectory.Part}).
  *
  * @see {@link fromSession} for the function that produces them.
  * @see {@link SessionStreams} for the streams of the sessions a trajectory holds one of
@@ -42,7 +49,7 @@ import { TrajectoryError } from "#/TrajectoryError.ts";
  */
 export type PartStream<Config extends Trajectory.AnyConfig, E = never, R = never> = Stream.Stream<
   | Trajectory.PromptPart<Config["extrakit"]>
-  | Trajectory.ResponsePart<Config["toolkit"], Config["extrakit"], true>
+  | Trajectory.ResponsePart<Config["toolkit"], Config["extrakit"], boolean>
   | Trajectory.EventPart<Config["eventkit"]>,
   E,
   R
@@ -68,48 +75,90 @@ export type SessionStreams<Config extends Trajectory.AnyConfig, E = never, R = n
   Record<string, PartStream<Config, E, R>>
 >;
 
-type Kits<
+/**
+ * What a trajectory is produced with: the config it is read with, whose metric kit states
+ * the producer of each of its metrics.
+ *
+ * **When to use**
+ *
+ * Use to type what {@link fromSession}, {@link fromSessions} and {@link produce} are
+ * given, or to state one config a trajectory is both produced and read with.
+ *
+ * **Details**
+ *
+ * - It is a {@link Trajectory.Config}, so what a program produces carries it: the
+ *   trajectory produced is read with the very config it was produced with, rather than
+ *   with a record of its own stating the same kits.
+ * - `metrickit` is a kit provided with its producers
+ *   ({@link MetricKit.WithProducers}), since what a kit derives of a trajectory is
+ *   produced among the parts it is about; every other field is the config's own.
+ * - `stream` states nothing of what is produced: the parts a program produces are the
+ *   ones that arrive, the increments of a streamed answer among them, so a trajectory
+ *   produced is read with streams whatever the config given states
+ *   ({@link fromSession}).
+ *
+ * @see {@link MetricKit.toProducers} for providing a kit with the producers of its
+ * metrics.
+ * @see {@link Trajectory.Config} for the config it is.
+ * @category models
+ */
+export type ProducingConfig<
   Toolkit extends Toolkit.Any,
-  Eventkit extends Event.AnyKit,
-  Metrickit extends Metric.AnyKit,
-  Extrakit extends Extra.AnyKit,
-> = {
-  toolkit: Toolkit;
-  eventkit: Eventkit;
-  metrickit: Metric.WithProducers<Metrickit>;
-  extrakit: Extrakit;
-};
+  Events extends EventKit.Any,
+  Metrics extends MetricKit.Any,
+  Extras extends ExtraKit.Any,
+> = Trajectory.Config<boolean, Toolkit, Events, MetricKit.WithProducers<Metrics>, Extras>;
+
+/**
+ * The config a trajectory produced here is read with: the kits given, and response parts
+ * of the increments they arrive in.
+ */
+type ProducedConfig<
+  Toolkit extends Toolkit.Any,
+  Events extends EventKit.Any,
+  Metrics extends MetricKit.Any,
+  Extras extends ExtraKit.Any,
+> = Trajectory.Config<true, Toolkit, Events, MetricKit.WithProducers<Metrics>, Extras>;
+
+/**
+ * The config a trajectory is produced and read with: what it was given, with the variant
+ * turned on — the parts a program produces are the increments an answer arrives in.
+ */
+const produced = <
+  Toolkit extends Toolkit.Any,
+  Events extends EventKit.Any,
+  Metrics extends MetricKit.Any,
+  Extras extends ExtraKit.Any,
+>(
+  config: ProducingConfig<Toolkit, Events, Metrics, Extras>,
+): ProducedConfig<Toolkit, Events, Metrics, Extras> =>
+  Trajectory.config({ ...config, stream: true });
 
 /**
  * Every trajectory this module makes is of parts that were already read — the parts of
  * one session that is a stream, of several such sessions, and the parts a run
- * enqueued — so what a trajectory is of the kits given, and how what a kit derives of
+ * enqueued — so what a trajectory is of the config given, and how what a kit derives of
  * it is produced among its parts, is stated here once.
  */
 const produceWith =
   <
     Toolkit extends Toolkit.Any,
-    Eventkit extends Event.AnyKit,
-    Metrickit extends Metric.AnyKit,
-    Extrakit extends Extra.AnyKit,
-  >({
-    toolkit,
-    eventkit,
-    metrickit,
-    extrakit,
-  }: Kits<Toolkit, Eventkit, Metrickit, Extrakit>) =>
+    Events extends EventKit.Any,
+    Metrics extends MetricKit.Any,
+    Extras extends ExtraKit.Any,
+  >(
+    config: ProducedConfig<Toolkit, Events, Metrics, Extras>,
+  ) =>
   <E, R>(
-    stream: Trajectory.TrajectoryStream<
-      Trajectory.Config<true, Toolkit, Eventkit, Metrickit, Extrakit>,
-      E,
-      R
-    >,
+    stream: Trajectory.TrajectoryStream<ProducedConfig<Toolkit, Events, Metrics, Extras>, E, R>,
   ): Trajectory.Trajectory<
-    Trajectory.Config<true, Toolkit, Eventkit, Metrickit, Extrakit>,
+    ProducedConfig<Toolkit, Events, Metrics, Extras>,
     E | TrajectoryError,
     R
-  > =>
-    stream.pipe(
+  > => {
+    const parts = Trajectory.parts(config);
+
+    return stream.pipe(
       // The trajectory is read twice — as the parts of the trajectory, and by the
       // producers the metric kit runs over it — so one subscription is shared
       // between the two readings rather than the producer behind them, which may drive a
@@ -121,21 +170,17 @@ const produceWith =
           producing.pipe(
             // The config here streams, and a producer reads whole parts:
             // `Metric.produce` folds the increments before a producer reads them.
-            Metric.produce(metrickit),
-            Stream.map((metric) => ({ _tag: "Metric" as const, metric })),
+            Metric.produce(config.metrickit),
+            // What a kit derived is produced as the part of an event-less kind it is,
+            // built the way every part of the trajectory is.
+            Stream.map((metric) => parts.metric(metric)),
           ),
         ),
       ),
       Stream.unwrap,
-      (parts) =>
-        Object.assign(parts, {
-          stream: true as const,
-          toolkit,
-          eventkit,
-          metrickit,
-          extrakit,
-        }),
+      Trajectory.make(config),
     );
+  };
 
 /**
  * Produces the parts of a session as a trajectory, with the metric parts a kit
@@ -149,7 +194,11 @@ const produceWith =
  * **Details**
  *
  * - Each part is produced as it arrives, in the order the stream gives it, and the
- *   trajectory carries the kits given.
+ *   trajectory carries the config given: the kits it names are the ones its parts are
+ *   read with, and the producers it states are the ones run.
+ * - The response parts of the config given state nothing of what is produced: the
+ *   trajectory produced is read with streams, since the parts a program produces are
+ *   the increments an answer arrives in ({@link ProducingConfig}).
  * - The producers the metric kit was provided with are run over the same parts as
  *   they arrive, exactly as {@link Metric.produce} runs them, and the metric parts
  *   they derive are produced among the parts they are about. The stream is read once,
@@ -162,7 +211,7 @@ const produceWith =
  *
  * ```ts import.meta.vitest
  * import { Effect, Schema, Stream } from "effect"
- * import { Event, Extra, Metric, Produce, Prompt, Toolkit, Trajectory, VersionedSchema } from "@trajs/core"
+ * import { EventKit, ExtraKit, Metric, MetricKit, Produce, Prompt, Toolkit, Trajectory, VersionedSchema } from "@trajs/core"
  *
  * const count = new Metric.Metric({
  *   package: "tokenize",
@@ -188,20 +237,25 @@ const produceWith =
  *     })
  *   ))
  *
- * const metrickit = Metric.toProducers(Metric.makeKit(count), {
+ * const metrickit = MetricKit.toProducers(MetricKit.make(count), {
  *   "tokenize/count": counting
  * })
  *
- * const extrakit = Extra.makeKit()
+ * const extrakit = ExtraKit.empty
  * const sessionId = "01890a5d-ac96-774b-bcce-b302099a8057"
  *
- * const produced = Produce.fromSession({
+ * // What the session is produced with: the config the trajectory is read with, whose
+ * // metric kit states the producer of its metric.
+ * const config = Trajectory.config({
+ *   stream: true,
  *   toolkit: Toolkit.empty,
- *   eventkit: Event.makeKit(),
+ *   eventkit: EventKit.empty,
  *   metrickit,
  *   extrakit
- * })(Stream.make(
- *   Trajectory.promptPart(extrakit)(Prompt.make("What is 2 + 2?"), { sessionId })
+ * })
+ *
+ * const produced = Produce.fromSession(config)(Stream.make(
+ *   Trajectory.parts(config).prompt(Prompt.make("What is 2 + 2?"), { sessionId })
  * ))
  *
  * const parts = Array.from(await Effect.runPromise(Stream.runCollect(produced)))
@@ -217,23 +271,20 @@ const produceWith =
 export const fromSession =
   <
     Toolkit extends Toolkit.Any,
-    Eventkit extends Event.AnyKit,
-    Metrickit extends Metric.AnyKit,
-    Extrakit extends Extra.AnyKit,
-  >({
-    toolkit,
-    eventkit,
-    metrickit,
-    extrakit,
-  }: Kits<Toolkit, Eventkit, Metrickit, Extrakit>) =>
+    Events extends EventKit.Any,
+    Metrics extends MetricKit.Any,
+    Extras extends ExtraKit.Any,
+  >(
+    config: ProducingConfig<Toolkit, Events, Metrics, Extras>,
+  ) =>
   <E, R>(
-    stream: PartStream<Trajectory.Config<true, Toolkit, Eventkit, Metrickit, Extrakit>, E, R>,
+    stream: PartStream<ProducedConfig<Toolkit, Events, Metrics, Extras>, E, R>,
   ): Trajectory.Trajectory<
-    Trajectory.Config<true, Toolkit, Eventkit, Metrickit, Extrakit>,
+    ProducedConfig<Toolkit, Events, Metrics, Extras>,
     E | TrajectoryError,
     R
   > =>
-    produceWith({ toolkit, eventkit, metrickit, extrakit })(stream);
+    produceWith(produced(config))(stream);
 
 /**
  * Produces the parts of several sessions as one trajectory, with the metric parts a
@@ -267,38 +318,37 @@ export const fromSession =
  *
  * ```ts import.meta.vitest
  * import { Effect, Stream } from "effect"
- * import { Event, Extra, Metric, Produce, Prompt, Trajectory, Toolkit } from "@trajs/core"
+ * import { EventKit, ExtraKit, MetricKit, Produce, Prompt, Trajectory, Toolkit } from "@trajs/core"
  *
  * // A kit that names no metric derives nothing of a trajectory, so the trajectory
  * // holds the parts the sessions gave and no metric part.
- * const metrickit = Metric.toProducers(Metric.makeKit(), {})
- * const extrakit = Extra.makeKit()
+ * const metrickit = MetricKit.toProducers(MetricKit.make(), {})
+ * const extrakit = ExtraKit.empty
  *
- * const trajectory = Produce.fromSessions({
+ * const config = Trajectory.config({
+ *   stream: true,
  *   toolkit: Toolkit.empty,
- *   eventkit: Event.makeKit(),
+ *   eventkit: EventKit.empty,
  *   metrickit,
  *   extrakit
- * })({
+ * })
+ *
+ * const part = Trajectory.parts(config)
+ *
+ * const trajectory = Produce.fromSessions(config)({
  *   asking: Stream.make(
- *     Trajectory.promptPart(extrakit)(
- *       Prompt.make("What is 2 + 2?"),
- *       { sessionId: "asking" }
- *     )
+ *     part.prompt(Prompt.make("What is 2 + 2?"), { sessionId: "asking" })
  *   ),
  *   answering: Stream.make(
- *     Trajectory.promptPart(extrakit)(
- *       Prompt.make("What is 4 + 4?"),
- *       { sessionId: "answering" }
- *     )
+ *     part.prompt(Prompt.make("What is 4 + 4?"), { sessionId: "answering" })
  *   )
  * })
  *
  * // Both sessions are declared and both prompts are produced, each in the session
  * // that gave it: the parts of a session are read apart from the one order the
  * // parts of the trajectory arrive in.
- * const parts = Array.from(await Effect.runPromise(Stream.runCollect(trajectory)))
- * parts.map((part) => (part._tag === "Session" ? part.id : part.sessionId)).sort()
+ * const produced = Array.from(await Effect.runPromise(Stream.runCollect(trajectory)))
+ * produced.map((held) => (held._tag === "Session" ? held.id : held.sessionId)).sort()
  * // => ["answering", "answering", "asking", "asking"]
  * ```
  *
@@ -311,36 +361,34 @@ export const fromSession =
 export const fromSessions =
   <
     Toolkit extends Toolkit.Any,
-    Eventkit extends Event.AnyKit,
-    Metrickit extends Metric.AnyKit,
-    Extrakit extends Extra.AnyKit,
-  >({
-    toolkit,
-    eventkit,
-    metrickit,
-    extrakit,
-  }: Kits<Toolkit, Eventkit, Metrickit, Extrakit>) =>
+    Events extends EventKit.Any,
+    Metrics extends MetricKit.Any,
+    Extras extends ExtraKit.Any,
+  >(
+    config: ProducingConfig<Toolkit, Events, Metrics, Extras>,
+  ) =>
   <E, R>(
-    sessions: SessionStreams<Trajectory.Config<true, Toolkit, Eventkit, Metrickit, Extrakit>, E, R>,
+    sessions: SessionStreams<ProducedConfig<Toolkit, Events, Metrics, Extras>, E, R>,
   ): Trajectory.Trajectory<
-    Trajectory.Config<true, Toolkit, Eventkit, Metrickit, Extrakit>,
+    ProducedConfig<Toolkit, Events, Metrics, Extras>,
     E | TrajectoryError,
     R
   > => {
-    const sessionPart = Trajectory.sessionPart(extrakit);
+    const read = produced(config);
+    const part = Trajectory.parts(read);
 
-    const parts = Stream.mergeAll(
+    const streams = Stream.mergeAll(
       Object.entries(sessions).map(([id, stream]) =>
         stream.pipe(
           // A stream of a session names it rather than declaring it, so the session
           // is declared here: a session is read before the parts of it arrive.
-          Stream.prepend([sessionPart(id)]),
+          Stream.prepend([part.session(id)]),
         ),
       ),
       { concurrency: "unbounded" },
     );
 
-    return produceWith({ toolkit, eventkit, metrickit, extrakit })(parts);
+    return produceWith(read)(streams);
   };
 
 /**
@@ -379,15 +427,15 @@ export type ProduceSession<
     message: Prompt.Prompt,
     options?: Extra.ExtraRecord<Extras, "prompt">,
     timestamp?: DateTime.Utc,
-  ) => Effect.Effect<Trajectory.PromptPart<Extra.Extrakit<Extras>>>;
+  ) => Effect.Effect<Trajectory.PromptPart<ExtraKit.Kit<Extras>>>;
   enqueueResponse: (
     response: Response.AllPartsView<Tools>,
     options?: Extra.ExtraRecord<Extras, "response">,
     timestamp?: DateTime.Utc,
-  ) => Effect.Effect<Trajectory.ResponsePart<Toolkit.Toolkit<Tools>, Extra.Extrakit<Extras>, true>>;
+  ) => Effect.Effect<Trajectory.ResponsePart<Toolkit.Toolkit<Tools>, ExtraKit.Kit<Extras>, true>>;
   enqueueEvent: (
     event: Event.EventParts<Events>,
-  ) => Effect.Effect<Trajectory.EventPart<Event.Eventkit<Events>>>;
+  ) => Effect.Effect<Trajectory.EventPart<EventKit.Kit<Events>>>;
 }>;
 
 /**
@@ -461,18 +509,19 @@ type ProduceFn<
  *
  * ```ts import.meta.vitest
  * import { Effect, Stream } from "effect"
- * import { Event, Extra, Metric, Produce, Prompt, Response, Toolkit, Trajectory } from "@trajs/core"
+ * import { EventKit, ExtraKit, MetricKit, Produce, Prompt, Response, Toolkit, Trajectory } from "@trajs/core"
  *
  * // A kit that names no metric derives nothing of a trajectory, so what the run
  * // produces is the parts it writes and no metric part.
- * const metrickit = Metric.toProducers(Metric.makeKit(), {})
+ * const metrickit = MetricKit.toProducers(MetricKit.make(), {})
  *
- * const trajectory = Produce.produce({
+ * const trajectory = Produce.produce(Trajectory.config({
+ *   stream: true,
  *   toolkit: Toolkit.empty,
- *   eventkit: Event.makeKit(),
+ *   eventkit: EventKit.empty,
  *   metrickit,
- *   extrakit: Extra.makeKit()
- * })((producer) =>
+ *   extrakit: ExtraKit.empty
+ * }))((producer) =>
  *   Effect.gen(function* () {
  *     const session = yield* producer.createSession({
  *       id: "01890a5d-ac96-774b-bcce-b302099a8057"
@@ -495,28 +544,23 @@ type ProduceFn<
 export const produce =
   <
     Toolkit extends Toolkit.Any,
-    Eventkit extends Event.AnyKit,
-    Metrickit extends Metric.AnyKit,
-    Extrakit extends Extra.AnyKit,
-  >({
-    toolkit,
-    eventkit,
-    metrickit,
-    extrakit,
-  }: Kits<Toolkit, Eventkit, Metrickit, Extrakit>) =>
+    Events extends EventKit.Any,
+    Metrics extends MetricKit.Any,
+    Extras extends ExtraKit.Any,
+  >(
+    config: ProducingConfig<Toolkit, Events, Metrics, Extras>,
+  ) =>
   <E, R>(
-    fn: ProduceFn<Toolkit["tools"], Eventkit["events"], Extrakit["extra"], E, R>,
+    fn: ProduceFn<Toolkit["tools"], Events["events"], Extras["extra"], E, R>,
   ): Trajectory.Trajectory<
-    Trajectory.Config<true, Toolkit, Eventkit, Metrickit, Extrakit>,
+    ProducedConfig<Toolkit, Events, Metrics, Extras>,
     E | TrajectoryError,
     R
   > => {
-    type Config = Trajectory.Config<true, Toolkit, Eventkit, Metrickit, Extrakit>;
+    type Config = ProducedConfig<Toolkit, Events, Metrics, Extras>;
 
-    const promptPart = Trajectory.promptPart(extrakit);
-    const sessionPart = Trajectory.sessionPart(extrakit);
-    const responsePart = Trajectory.responsePart({ toolkit, extrakit, stream: true });
-    const eventPart = Trajectory.EventPart(eventkit);
+    const read: Config = produced(config);
+    const part = Trajectory.parts(read);
 
     // The queue only ever ends rather than fails — a run that fails fails the
     // trajectory through the fork — so its failure type is the end alone.
@@ -528,32 +572,32 @@ export const produce =
       const forkable = new Set<string>();
 
       const enqueue = <P extends Trajectory.Part<Config> & { readonly uuid: string }>(
-        part: P,
+        written: P,
       ): Effect.Effect<P> =>
         Effect.gen(function* () {
-          yield* Queue.offer(parts, part);
+          yield* Queue.offer(parts, written);
 
           // A `fork` names a part a session continues from, so an event is written
           // without being remembered to fork from.
-          if (part._tag !== "Event") {
-            forkable.add(part.uuid);
+          if (written._tag !== "Event") {
+            forkable.add(written.uuid);
           }
 
-          return part;
+          return written;
         });
 
       const session = (
         id: string,
-      ): ProduceSession<Toolkit["tools"], Eventkit["events"], Extrakit["extra"]> => ({
+      ): ProduceSession<Toolkit["tools"], Events["events"], Extras["extra"]> => ({
         id,
         enqueuePrompt: (prompt, extra = {}, timestamp) =>
-          enqueue(promptPart(prompt, { sessionId: id, extra, timestamp })),
+          enqueue(part.prompt(prompt, { sessionId: id, extra, timestamp })),
         enqueueResponse: (response, extra = {}, timestamp) =>
-          enqueue(responsePart(response, { sessionId: id, extra, timestamp })),
-        enqueueEvent: (event) => enqueue(eventPart.make({ event, sessionId: id })),
+          enqueue(part.response(response, { sessionId: id, extra, timestamp })),
+        enqueueEvent: (event) => enqueue(part.event(event, { sessionId: id })),
       });
 
-      const producer: Producer<Toolkit["tools"], Eventkit["events"], Extrakit["extra"]> = {
+      const producer: Producer<Toolkit["tools"], Events["events"], Extras["extra"]> = {
         createSession: ({ id, fork, ...extra }) =>
           Effect.gen(function* () {
             // A session is declared before the parts it produces, so a declaration of
@@ -571,9 +615,9 @@ export const produce =
 
             declared.add(id);
 
-            const extraData = Extra.stated(extrakit, "session")(extra);
+            const extraData = Extra.stated(config.extrakit, "session")(extra);
 
-            yield* enqueue(sessionPart(id, { fork, extra: extraData }));
+            yield* enqueue(part.session(id, { fork, extra: extraData }));
 
             return session(id);
           }),
@@ -589,5 +633,5 @@ export const produce =
       return Stream.fromQueue(parts).pipe(Stream.drainFork(program));
     });
 
-    return produceWith({ toolkit, eventkit, metrickit, extrakit })(trajectory.pipe(Stream.unwrap));
+    return produceWith(read)(trajectory.pipe(Stream.unwrap));
   };

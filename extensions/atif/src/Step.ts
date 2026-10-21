@@ -232,18 +232,17 @@ const stepsOf = <Config extends Trajectory.AnyConfig>(
  *
  * ```ts import.meta.vitest
  * import { Effect, Stream } from "effect"
- * import { Extra, Prompt, Response, Toolkit, Trajectory } from "@trajs/core"
+ * import { Prompt, Response, Trajectory } from "@trajs/core"
  * import { Step } from "@trajs/extension-atif"
  *
  * const sessionId = "01890a5d-ac96-774b-bcce-b302099a8057"
- * const extrakit = Extra.makeKit()
- * const response = Trajectory.ResponsePart({ toolkit: Toolkit.empty, extrakit, stream: false })
+ * const part = Trajectory.parts(Trajectory.anyConfig)
  *
  * // A trajectory of one exchange: what a model was given, and what it returned for
  * // it as one whole part.
  * const trajectory = Stream.make(
- *   Trajectory.promptPart(extrakit)(Prompt.make("What is 2 + 2?"), { sessionId }),
- *   response.make({ response: Response.makePart("text", { text: "4" }), sessionId, extra: {} })
+ *   part.prompt(Prompt.make("What is 2 + 2?"), { sessionId }),
+ *   part.response(Response.makePart("text", { text: "4" }), { sessionId })
  * )
  *
  * const steps = await Effect.runPromise(Stream.runCollect(Step.steps(trajectory)))

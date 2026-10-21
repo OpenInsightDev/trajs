@@ -10,11 +10,26 @@
  */
 
 import { expect, it } from "@effect/vitest";
-import { Extra, Prompt, Response, Toolkit, Trajectory, View } from "@trajs/core";
+import {
+  EventKit,
+  ExtraKit,
+  MetricKit,
+  Prompt,
+  Response,
+  Toolkit,
+  Trajectory,
+  View,
+} from "@trajs/core";
 import { Effect, Stream } from "effect";
 
-const toolkit = Toolkit.empty;
-const extrakit = Extra.emptyKit;
+/** What the parts are built and read with: no tool, event, metric or extra datum. */
+const config = Trajectory.config({
+  stream: false,
+  toolkit: Toolkit.empty,
+  eventkit: EventKit.empty,
+  metrickit: MetricKit.empty,
+  extrakit: ExtraKit.empty,
+});
 
 /** The conversation counted: messages of both sides, text characters, and tools called. */
 interface Summary {
@@ -24,11 +39,10 @@ interface Summary {
   readonly toolCalls: Readonly<Record<string, number>>;
 }
 
-const makePrompt = Trajectory.promptPart(extrakit);
-const makeResponse = Trajectory.responsePart({ toolkit, extrakit, stream: false });
+const part = Trajectory.parts(config);
 
 const makeTurn = (id: string, { city, answer }: { city: string; answer: string }) => [
-  makeResponse(
+  part.response(
     Response.anyToolCallPart({
       id,
       name: "get_weather",
@@ -36,15 +50,15 @@ const makeTurn = (id: string, { city, answer }: { city: string; answer: string }
       providerExecuted: false,
     }),
   ),
-  makeResponse(Response.makePart("text", { text: answer })),
+  part.response(Response.makePart("text", { text: answer })),
 ];
 
 const trajStream = Stream.fromArray([
-  makePrompt(Prompt.make("What is the weather in Paris?")),
+  part.prompt(Prompt.make("What is the weather in Paris?")),
   ...makeTurn("call_1", { city: "Paris", answer: "It is sunny." }),
-  makePrompt(Prompt.make("And in Berlin?")),
+  part.prompt(Prompt.make("And in Berlin?")),
   ...makeTurn("call_2", { city: "Berlin", answer: "It is raining." }),
-]) satisfies Trajectory.TrajectoryStream<Trajectory.AnyConfig>;
+]) satisfies Trajectory.TrajectoryStream<typeof config>;
 
 const main = Effect.fn(function* () {
   const turns = yield* View.promptTurns(trajStream).pipe(Stream.runCollect);

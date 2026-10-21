@@ -382,7 +382,7 @@ type AnyToolResultParams = Omit<
  * What a result is encoded as is derived from the result, the way decoding a part
  * derives it: the two fields the decoded part holds beyond what a caller states are
  * filled in here, so the part built is the part a trajectory reads back — which is
- * what `Trajectory.responsePart` refuses a part built without them to be.
+ * what {@link Trajectory.parts} refuses a part built without them to be.
  *
  * @see {@link AnyToolResultPart} for the schema the part is read by.
  * @category constructors

@@ -13,10 +13,10 @@ import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import {
-  Event,
+  EventKit,
   Exchange,
-  Extra,
-  Metric,
+  ExtraKit,
+  MetricKit,
   Produce,
   Prompt,
   Response,
@@ -27,10 +27,13 @@ import { makeProducer, metrickit, tokenEstimate, Tokenizer } from "@trajs/extens
 import { Effect, FileSystem, Stream } from "effect";
 
 const toolkit = Toolkit.empty;
-const extrakit = Extra.emptyKit;
-const eventkit = Event.emptyKit;
+const extrakit = ExtraKit.empty;
+const eventkit = EventKit.empty;
 
-/** Where the fixture is kept: the `fixtures/` of this case, which a run generates and no commit holds. */
+/**
+ * Where the fixture is kept: the `fixtures/` of this case, which a run generates and no commit
+ * holds.
+ */
 export const Fixture = fileURLToPath(new URL("fixtures/session.trajs", import.meta.url));
 
 const session = "01890a5d-ac96-774b-bcce-b302099a80a0";
@@ -113,20 +116,33 @@ const replayed = Prompt.fromMessages([
   }),
 ]);
 
-const makePrompt = Trajectory.promptPart(extrakit);
-const makeResponse = Trajectory.responsePart({ toolkit, extrakit, stream: true });
+/**
+ * What the fixture is built and read with: whole response parts, and the metric kit the
+ * counts of its parts are of.
+ */
+export const config = Trajectory.config({
+  stream: false,
+  toolkit,
+  eventkit,
+  metrickit,
+  extrakit,
+});
+
+/** The builders of the parts the fixture holds: the parts state the config above rather than
+ * naming its kits again. */
+const part = Trajectory.parts(config);
 
 const inSession = { sessionId: session };
 
 /** The parts of the session, in the order it produced them. */
 const parts = [
-  makePrompt(askedPrompt, inSession),
-  makeResponse(Response.makePart("reasoning", { text: thought }), inSession),
-  makeResponse(
+  part.prompt(askedPrompt, inSession),
+  part.response(Response.makePart("reasoning", { text: thought }), inSession),
+  part.response(
     Response.anyToolCallPart({ id: call, name: "grep", params: pattern, providerExecuted: false }),
     inSession,
   ),
-  makeResponse(
+  part.response(
     Response.anyToolResultPart({
       id: call,
       name: "grep",
@@ -136,11 +152,11 @@ const parts = [
     }),
     inSession,
   ),
-  makePrompt(replayed, inSession),
-  makeResponse(Response.makePart("text", { text: answered }), inSession),
+  part.prompt(replayed, inSession),
+  part.response(Response.makePart("text", { text: answered }), inSession),
   // What the provider reported the request cost, which is the exact figure a count is only an
   // estimate of — and a part no count is taken from, since a tokenizer answers for no usage.
-  makeResponse(
+  part.response(
     Response.makePart("finish", {
       reason: "stop",
       usage: new Response.Usage({
@@ -169,11 +185,13 @@ export const writeFixture = () =>
     // `"openai"` rule, since a payload that is not text is the one thing a tokenizer does not
     // count.
     const counted = yield* makeProducer({ media: "openai" }).pipe(
-      Effect.map((producer) => Metric.toProducers(metrickit, { [tokenEstimate.tag]: producer })),
+      Effect.map((producer) => MetricKit.toProducers(metrickit, { [tokenEstimate.tag]: producer })),
       Effect.provide(Tokenizer.layerOpenAi({ model: "gpt-4o" })),
     );
 
-    const fixture = Produce.fromSessions({ toolkit, eventkit, metrickit: counted, extrakit })({
+    // The fixture is produced with the config it is read with, and with the metric kit
+    // provided with the producer its counts are taken by.
+    const fixture = Produce.fromSessions({ ...config, metrickit: counted })({
       [session]: Stream.fromArray(parts),
     });
 
@@ -181,12 +199,3 @@ export const writeFixture = () =>
 
     yield* exchange.save(fixture)(Fixture);
   });
-
-/** What the fixture is read with: whole response parts, and the metric kit its counts are of. */
-export const config = {
-  stream: false as const,
-  toolkit,
-  eventkit,
-  metrickit,
-  extrakit,
-};

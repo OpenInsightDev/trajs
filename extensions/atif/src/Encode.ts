@@ -18,7 +18,7 @@
  * {@link encode} says of each field of the document what becomes of it.
  */
 
-import { Event, Metric, Produce, type Toolkit, Trajectory } from "@trajs/core";
+import { EventKit, MetricKit, Produce, type Toolkit, Trajectory } from "@trajs/core";
 import { TrajectoryError } from "@trajs/core/TrajectoryError";
 import { Effect, FileSystem, Path, Schema } from "effect";
 import type { PlatformError } from "effect";
@@ -255,7 +255,13 @@ export const encode = (
   document: Document,
   options?: Options,
 ): Trajectory.Trajectory<
-  Trajectory.Config<true, Toolkit.Any, Event.EmptyKit, Metric.EmptyKit, typeof extrakit>,
+  Trajectory.Config<
+    true,
+    Toolkit.Any,
+    EventKit.Empty,
+    MetricKit.WithProducers<MetricKit.Empty>,
+    typeof extrakit
+  >,
   TrajectoryError | PlatformError.PlatformError,
   FileSystem.FileSystem | Path.Path
 > => kits(document)((producer) => produce(producer, document, options?.cwd));
@@ -297,7 +303,7 @@ export const fromFile = (
   path: string,
 ): Effect.Effect<
   Trajectory.Trajectory<
-    Trajectory.Config<true, Toolkit.Any, Event.EmptyKit, Metric.EmptyKit, typeof extrakit>,
+    Trajectory.Config<true, Toolkit.Any, EventKit.Empty, MetricKit.Empty, typeof extrakit>,
     TrajectoryError | PlatformError.PlatformError,
     FileSystem.FileSystem | Path.Path
   >,
@@ -316,7 +322,7 @@ export const fromFile = (
   });
 
 /**
- * The kits a document is read with: the toolkit it says its agent was given, and the
+ * The config a document is produced with: the toolkit it says its agent was given, and the
  * extra data this package carries.
  *
  * Nothing else is derived of the parts a document is read as — no event is produced and
@@ -324,14 +330,17 @@ export const fromFile = (
  * read as, the toolkit they were run with, and what the document states of them.
  */
 const kits = (document: Document) =>
-  Produce.produce({
-    toolkit: toolkitOf(document),
-    eventkit: Event.makeKit(),
-    // A kit that names no metric derives nothing, so the trajectory holds the parts
-    // its steps were read as and no metric part.
-    metrickit: Metric.toProducers(Metric.makeKit(), {}),
-    // The extra data of this package, so what a document states of a run and of its
-    // steps reads back as the fields they are rather than as the JSON they were written
-    // as.
-    extrakit,
-  });
+  Produce.produce(
+    Trajectory.config({
+      stream: true,
+      toolkit: toolkitOf(document),
+      eventkit: EventKit.empty,
+      // A kit that names no metric derives nothing, so the trajectory holds the parts
+      // its steps were read as and no metric part.
+      metrickit: MetricKit.toProducers(MetricKit.empty, {}),
+      // The extra data of this package, so what a document states of a run and of its
+      // steps reads back as the fields they are rather than as the JSON they were written
+      // as.
+      extrakit,
+    }),
+  );

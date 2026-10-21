@@ -16,9 +16,9 @@
 
 import { expect, it } from "@effect/vitest";
 import {
-  Event,
-  Extra,
-  Metric,
+  EventKit,
+  ExtraKit,
+  MetricKit,
   Prompt,
   Response,
   Tool,
@@ -47,16 +47,14 @@ const toolkit = Toolkit.make(
   }),
 );
 
-const extrakit = Extra.emptyKit;
-
-/** What the trajectory is read with: the toolkit its responses were returned by, and no other kit. */
-type Config = Trajectory.Config<
-  false,
-  typeof toolkit,
-  Event.EmptyKit,
-  Metric.EmptyKit,
-  typeof extrakit
->;
+/** What the trajectory is built and read with: the toolkit its responses were returned by, and no other kit. */
+const config = Trajectory.config({
+  stream: false,
+  toolkit,
+  eventkit: EventKit.empty,
+  metrickit: MetricKit.empty,
+  extrakit: ExtraKit.empty,
+});
 
 /** What the run asked of its tools, each tool counted in the terms its parameters state. */
 interface Report {
@@ -72,14 +70,13 @@ interface Report {
   readonly undescribed: number;
 }
 
-const makePrompt = Trajectory.promptPart(extrakit);
-const makeResponse = Trajectory.responsePart({ toolkit, extrakit, stream: false });
+const part = Trajectory.parts(config);
 
 // Typed with the config rather than only checked against it: what `View` reads out of the
 // trajectory is the toolkit's own where the stream it is read from is typed by it.
-const trajStream: Trajectory.TrajectoryStream<Config> = Stream.fromArray([
-  makePrompt(Prompt.make("What is the weather in Paris, and in Berlin?")),
-  makeResponse(
+const trajStream: Trajectory.TrajectoryStream<typeof config> = Stream.fromArray([
+  part.prompt(Prompt.make("What is the weather in Paris, and in Berlin?")),
+  part.response(
     Response.makePart("tool-call", {
       id: "call_1",
       name: "get_weather",
@@ -87,7 +84,7 @@ const trajStream: Trajectory.TrajectoryStream<Config> = Stream.fromArray([
       providerExecuted: false,
     }),
   ),
-  makeResponse(
+  part.response(
     Response.makePart("tool-call", {
       id: "call_2",
       name: "get_weather",
@@ -95,8 +92,8 @@ const trajStream: Trajectory.TrajectoryStream<Config> = Stream.fromArray([
       providerExecuted: false,
     }),
   ),
-  makePrompt(Prompt.make("Search for the retry policy, and read what it names.")),
-  makeResponse(
+  part.prompt(Prompt.make("Search for the retry policy, and read what it names.")),
+  part.response(
     Response.makePart("tool-call", {
       id: "call_3",
       name: "search_docs",
@@ -104,7 +101,7 @@ const trajStream: Trajectory.TrajectoryStream<Config> = Stream.fromArray([
       providerExecuted: false,
     }),
   ),
-  makeResponse(
+  part.response(
     Response.makePart("tool-call", {
       id: "call_4",
       name: "read_file",
@@ -112,7 +109,7 @@ const trajStream: Trajectory.TrajectoryStream<Config> = Stream.fromArray([
       providerExecuted: false,
     }),
   ),
-  makeResponse(
+  part.response(
     Response.makePart("tool-call", {
       id: "call_5",
       name: "read_file",
@@ -122,7 +119,7 @@ const trajStream: Trajectory.TrajectoryStream<Config> = Stream.fromArray([
   ),
   // A tool the toolkit says nothing about: the run fetched a page, and no tool of the
   // toolkit describes a fetch, so the call reads as it was stated rather than being dropped.
-  makeResponse(
+  part.response(
     Response.anyToolCallPart({
       id: "call_6",
       name: "web_fetch",
@@ -130,8 +127,8 @@ const trajStream: Trajectory.TrajectoryStream<Config> = Stream.fromArray([
       providerExecuted: false,
     }),
   ),
-  makePrompt(Prompt.make("Search again, wider — and for backoff too.")),
-  makeResponse(
+  part.prompt(Prompt.make("Search again, wider — and for backoff too.")),
+  part.response(
     Response.makePart("tool-call", {
       id: "call_7",
       name: "search_docs",
@@ -139,7 +136,7 @@ const trajStream: Trajectory.TrajectoryStream<Config> = Stream.fromArray([
       providerExecuted: false,
     }),
   ),
-  makeResponse(
+  part.response(
     Response.makePart("tool-call", {
       id: "call_8",
       name: "search_docs",

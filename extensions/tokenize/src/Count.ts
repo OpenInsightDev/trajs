@@ -142,10 +142,10 @@ export interface CountOptions {
  * ```ts import.meta.vitest
  * import { Effect } from "effect"
  * import { Prompt } from "effect/ai"
- * import { Extra, Trajectory } from "@trajs/core"
+ * import { Trajectory } from "@trajs/core"
  * import { Count, Tokenizer } from "@trajs/extension-tokenize"
  *
- * const part = Trajectory.promptPart(Extra.makeKit())(
+ * const part = Trajectory.parts(Trajectory.anyConfig).prompt(
  *   Prompt.make("Hello"),
  *   { sessionId: "01890a5d-ac96-774b-bcce-b302099a8057" }
  * )
@@ -199,16 +199,22 @@ export const promptPart = (
  *
  * ```ts import.meta.vitest
  * import { Effect, Option } from "effect"
- * import { Extra, Response, Toolkit, Trajectory } from "@trajs/core"
+ * import { EventKit, ExtraKit, MetricKit, Response, Toolkit, Trajectory } from "@trajs/core"
  * import { Count, Tokenizer } from "@trajs/extension-tokenize"
  *
  * const sessionId = "01890a5d-ac96-774b-bcce-b302099a8057"
- * const responsePart = Trajectory.ResponsePart({
+ * const config = Trajectory.config({
+ *   stream: false,
  *   toolkit: Toolkit.empty,
- *   extrakit: Extra.makeKit(),
- *   stream: false
+ *   eventkit: EventKit.empty,
+ *   metrickit: MetricKit.empty,
+ *   extrakit: ExtraKit.empty
  * })
- * const part = responsePart.make({ response: Response.makePart("text", { text: "Hi there" }), sessionId, extra: {} })
+ *
+ * const part = Trajectory.parts(config).response(
+ *   Response.makePart("text", { text: "Hi there" }),
+ *   { sessionId }
+ * )
  *
  * const count = await Effect.runPromise(
  *   Count.responsePart(part).pipe(Effect.provide(Tokenizer.layerOpenAi({ model: "gpt-4o" })))

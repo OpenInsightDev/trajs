@@ -11,7 +11,8 @@
 import { Effect, Predicate, Stream } from "effect";
 
 import { foldParts } from "#/internal/folding.ts";
-import type { Any, MetricParts, Producer, ProducerFailure, Producers } from "#/Metric.ts";
+import type { Any, MetricParts, Producer, ProducerFailure } from "#/Metric.ts";
+import type { Producers } from "#/MetricKit.ts";
 import type * as Trajectory from "#/Trajectory.ts";
 import type { TrajectoryError } from "#/TrajectoryError.ts";
 

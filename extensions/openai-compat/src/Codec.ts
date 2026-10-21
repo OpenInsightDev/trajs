@@ -85,32 +85,38 @@ export type OpenAiCompatSessions = Record<string, OpenAiCompatMessage[]>;
  *
  * ```ts import.meta.vitest
  * import { Codec } from "@trajs/extension-openai-compat"
- * import { Event, Extra, Metric, Prompt, Response, Toolkit, Trajectory } from "@trajs/core"
+ * import { EventKit, ExtraKit, MetricKit, Prompt, Response, Toolkit, Trajectory } from "@trajs/core"
  * import { Effect, Stream } from "effect"
  *
  * const sessionId = "01890a5d-ac96-774b-bcce-b302099a8057"
- * const extrakit = Extra.makeKit()
- * const response = Trajectory.ResponsePart({ toolkit: Toolkit.empty, extrakit, stream: false })
+ * const config = Trajectory.config({
+ *   stream: false,
+ *   toolkit: Toolkit.empty,
+ *   eventkit: EventKit.empty,
+ *   metrickit: MetricKit.empty,
+ *   extrakit: ExtraKit.empty
+ * })
+ *
+ * const part = Trajectory.parts(config)
  *
  * // An exchange a trajectory holds: what a model was given, the tool it called for it, the
  * // result that call was answered with, and what it answered of that result.
  * const parts = [
- *   Trajectory.sessionPart(extrakit)(sessionId),
- *   Trajectory.promptPart(extrakit)(
+ *   part.session(sessionId),
+ *   part.prompt(
  *     Prompt.make("What is the weather in Paris?"),
  *     { sessionId }
  *   ),
- *   response.make({
- *     response: Response.anyToolCallPart({
+ *   part.response(
+ *     Response.anyToolCallPart({
  *       id: "call_1",
  *       name: "weather",
  *       params: { city: "Paris" },
  *       providerExecuted: false
  *     }),
- *     sessionId,
- *     extra: {}
- *   }),
- *   Trajectory.promptPart(extrakit)(
+ *     { sessionId }
+ *   ),
+ *   part.prompt(
  *     Prompt.fromMessages([
  *       Prompt.makeMessage("tool", {
  *         content: [
@@ -126,20 +132,13 @@ export type OpenAiCompatSessions = Record<string, OpenAiCompatMessage[]>;
  *     ]),
  *     { sessionId }
  *   ),
- *   response.make({
- *     response: Response.makePart("text", { text: "It is 18°C." }),
- *     sessionId,
- *     extra: {}
- *   })
+ *   part.response(
+ *     Response.makePart("text", { text: "It is 18°C." }),
+ *     { sessionId }
+ *   )
  * ]
  *
- * const trajectory = Object.assign(Stream.fromIterable(parts), {
- *   stream: false as const,
- *   toolkit: Toolkit.empty,
- *   eventkit: Event.makeKit(),
- *   metrickit: Metric.makeKit(),
- *   extrakit
- * })
+ * const trajectory = Trajectory.make(Stream.fromIterable(parts), config)
  *
  * const sessions = await Effect.runPromise(Codec.makeOpenAiCompat(trajectory))
  *

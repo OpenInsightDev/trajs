@@ -65,8 +65,7 @@ export type PromptTurn<Config extends Trajectory.AnyConfig> = Readonly<{
  *   streamed response are folded into the parts they complete, and a response part
  *   that is whole already is produced as itself.
  * - A response part the open turn is not the prompt of — one no prompt precedes, or
- *   one of another session — belongs to no turn and is dropped, so a trajectory that
- *   interleaves several sessions reads one session at a time.
+ *   one of another session — belongs to no turn and is dropped.
  * - A prompt part with no response reads as its messages alone: it opens a turn
  *   whether or not a model answered it.
  * - The turn a trajectory ends in is emitted when the trajectory ends, since no
@@ -74,21 +73,27 @@ export type PromptTurn<Config extends Trajectory.AnyConfig> = Readonly<{
  * - Only prompt and response parts open, extend or close a turn: a session
  *   declaration, an event or a metric part is read past.
  *
+ * FIXME: the response dropped is not carried anywhere, and interleaved sessions are what
+ * {@link Produce.fromSessions} produces, so a trajectory of several sessions loses every
+ * response that arrives while another session's prompt is open rather than reading one
+ * session at a time. A turn belongs to the session that produced it, which is what
+ * {@link conversations} reads of the messages alone: this reader should read the turns of
+ * each session, or refuse a trajectory that holds several.
+ *
  * **Example** (Reading a trajectory as its turns)
  *
  * ```ts import.meta.vitest
  * import { Effect, Stream } from "effect"
- * import { Extra, Prompt, Response, Toolkit, Trajectory, View } from "@trajs/core"
+ * import { Prompt, Response, Trajectory, View } from "@trajs/core"
  *
  * const sessionId = "01890a5d-ac96-774b-bcce-b302099a8057"
- * const extrakit = Extra.makeKit()
- * const response = Trajectory.ResponsePart({ toolkit: Toolkit.empty, extrakit, stream: false })
+ * const part = Trajectory.parts(Trajectory.anyConfig)
  *
  * // A trajectory of one exchange: what a model was given, and what it returned for
  * // it as one whole part.
  * const trajectory = Stream.make(
- *   Trajectory.promptPart(extrakit)(Prompt.make("What is 2 + 2?"), { sessionId }),
- *   response.make({ response: Response.makePart("text", { text: "4" }), sessionId, extra: {} })
+ *   part.prompt(Prompt.make("What is 2 + 2?"), { sessionId }),
+ *   part.response(Response.makePart("text", { text: "4" }), { sessionId })
  * )
  *
  * const turns = await Effect.runPromise(Stream.runCollect(View.promptTurns(trajectory)))
@@ -135,17 +140,16 @@ export const promptTurns = <Config extends Trajectory.AnyConfig, E, R>(
  *
  * ```ts import.meta.vitest
  * import { Effect, Stream } from "effect"
- * import { Extra, Prompt, Response, Toolkit, Trajectory, View } from "@trajs/core"
+ * import { Prompt, Response, Trajectory, View } from "@trajs/core"
  *
  * const sessionId = "01890a5d-ac96-774b-bcce-b302099a8057"
- * const extrakit = Extra.makeKit()
- * const response = Trajectory.ResponsePart({ toolkit: Toolkit.empty, extrakit, stream: false })
+ * const part = Trajectory.parts(Trajectory.anyConfig)
  *
  * // A trajectory of one session: what a model was given, and what it answered.
  * const trajectory = Stream.make(
- *   Trajectory.sessionPart(extrakit)(sessionId),
- *   Trajectory.promptPart(extrakit)(Prompt.make("What is 2 + 2?"), { sessionId }),
- *   response.make({ response: Response.makePart("text", { text: "4" }), sessionId, extra: {} })
+ *   part.session(sessionId),
+ *   part.prompt(Prompt.make("What is 2 + 2?"), { sessionId }),
+ *   part.response(Response.makePart("text", { text: "4" }), { sessionId })
  * )
  *
  * const folded = await Effect.runPromise(View.prompt(trajectory))
@@ -207,29 +211,24 @@ export type Conversation = ReadonlyArray<Prompt.Message>;
  *
  * ```ts import.meta.vitest
  * import { Effect, Stream } from "effect"
- * import { Extra, Prompt, Response, Toolkit, Trajectory, View } from "@trajs/core"
+ * import { Prompt, Response, Trajectory, View } from "@trajs/core"
  *
- * const extrakit = Extra.makeKit()
- * const response = Trajectory.ResponsePart({ toolkit: Toolkit.empty, extrakit, stream: false })
+ * const part = Trajectory.parts(Trajectory.anyConfig)
  *
- * const asked = Trajectory.promptPart(extrakit)(
- *   Prompt.make("What is a fork?"),
+ * const asked = part.prompt(Prompt.make("What is a fork?"), { sessionId: "asking" })
+ * const answered = part.response(
+ *   Response.makePart("text", { text: "It is a session that continues another." }),
  *   { sessionId: "asking" }
  * )
- * const answered = response.make({
- *   response: Response.makePart("text", { text: "It is a session that continues another." }),
- *   sessionId: "asking",
- *   extra: {}
- * })
  *
  * // One session asks and is answered, and a session forked off the answer asks again:
  * // its conversation is the answer that was given, then its own question.
  * const trajectory = Stream.make(
- *   Trajectory.sessionPart(extrakit)("asking"),
+ *   part.session("asking"),
  *   asked,
  *   answered,
- *   Trajectory.sessionPart(extrakit)("reply", { fork: answered.uuid }),
- *   Trajectory.promptPart(extrakit)(Prompt.make("And what does it hold?"), { sessionId: "reply" })
+ *   part.session("reply", { fork: answered.uuid }),
+ *   part.prompt(Prompt.make("And what does it hold?"), { sessionId: "reply" })
  * )
  *
  * const conversations = await Effect.runPromise(View.conversations(trajectory))
@@ -307,35 +306,32 @@ export type ToolTurn<Config extends Trajectory.AnyConfig> = Readonly<{
  *
  * ```ts import.meta.vitest
  * import { Effect, Stream } from "effect"
- * import { Extra, Response, Toolkit, Trajectory, View } from "@trajs/core"
+ * import { Response, Trajectory, View } from "@trajs/core"
  *
  * const sessionId = "01890a5d-ac96-774b-bcce-b302099a8057"
- * const extrakit = Extra.makeKit()
- * const response = Trajectory.ResponsePart({ toolkit: Toolkit.empty, extrakit, stream: false })
+ * const part = Trajectory.parts(Trajectory.anyConfig)
  *
  * // A trajectory of one call: the tool a model called, and the result it was answered with.
  * const trajectory = Stream.make(
- *   response.make({
- *     response: Response.anyToolCallPart({
+ *   part.response(
+ *     Response.anyToolCallPart({
  *       id: "call_1",
  *       name: "get_weather",
  *       params: { city: "Paris" },
  *       providerExecuted: false
  *     }),
- *     sessionId,
- *     extra: {}
- *   }),
- *   response.make({
- *     response: Response.anyToolResultPart({
+ *     { sessionId }
+ *   ),
+ *   part.response(
+ *     Response.anyToolResultPart({
  *       id: "call_1",
  *       name: "get_weather",
  *       isFailure: false,
  *       result: "sunny",
  *       providerExecuted: false
  *     }),
- *     sessionId,
- *     extra: {}
- *   })
+ *     { sessionId }
+ *   )
  * )
  *
  * const turns = await Effect.runPromise(Stream.runCollect(View.toolTurns(trajectory)))

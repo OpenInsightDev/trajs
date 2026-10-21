@@ -5,14 +5,14 @@
  * An {@link Extra} names one kind of extra data, with a schema for each of the
  * prompt, response and session parts it states; what it states of one part need not
  * be what it states of another, so it declares a schema for whichever parts it
- * states. {@link makeKit} and {@link mergeKit} collect extra data into kits, and
- * {@link ExtraRecord} reads a part's extra data as one kit declares it: the kinds
- * the kit declares a schema for on that part, keyed by tag, and nothing else.
+ * states. {@link ExtraKit.make} and {@link ExtraKit.merge} collect extra data into
+ * kits, and {@link ExtraRecord} reads a part's extra data as one kit declares it: the
+ * kinds the kit declares a schema for on that part, keyed by tag, and nothing else.
  */
 
 import { Data, Schema } from "effect";
 
-import type { IndexByKey } from "#/internal/types.ts";
+import type * as ExtraKit from "#/ExtraKit.ts";
 import * as VersionedSchema from "#/VersionedSchema.ts";
 
 /**
@@ -38,9 +38,9 @@ export type Part = "prompt" | "response" | "session";
  * describe it. `prompt`, `response` and `session` are the schemas it declares for those
  * parts, each at every version it was written at
  * ({@link VersionedSchema.VersionedSchema}); a kind need declare only the parts it
- * states. Collect extra data into a kit with {@link makeKit}.
+ * states. Collect extra data into a kit with {@link ExtraKit.make}.
  *
- * @see {@link makeKit} for collecting extra data into a kit.
+ * @see {@link ExtraKit.make} for collecting extra data into a kit.
  * @see {@link ExtraRecord} for reading a part's extra data.
  * @category models
  */
@@ -73,142 +73,7 @@ export type Any = Extra<
   VersionedSchema.Any
 >;
 
-type ExtrasByTag<Xs> = IndexByKey<Xs, "tag">;
-
-/**
- * A kit of extra data, keyed by the tag each kind names.
- *
- * @see {@link makeKit} for building one, {@link ExtraRecord} for reading it.
- * @category models
- */
-export type Extrakit<Extras extends Record<string, Any>> = Readonly<{
-  extra: Extras;
-}>;
-
-/**
- * Collects extra data into a kit, keyed by the tag each kind names.
- *
- * **When to use**
- *
- * Use to gather the extra data an extension states into the kit a trajectory is read
- * with.
- *
- * **Details**
- *
- * Each kind is keyed by its own `tag`, so a kit names one kind per tag. A kit names
- * the kinds it was given and no others; {@link emptyKit} names none.
- *
- * @see {@link mergeKit} for adding the extra data of one kit to another's.
- * @see {@link ExtraRecord} for reading a part's extra data under a kit.
- * @category constructors
- */
-export const makeKit = <Xs extends ReadonlyArray<Any>>(...extra: Xs) => {
-  // SAFETY: every kind of extra data given is inserted under its own tag below, so
-  // what the record holds is one kind per tag the kit names.
-  const output = {} as Record<string, Any>;
-
-  for (const item of extra) {
-    output[item.tag] = item;
-  }
-
-  // SAFETY: `output` holds the extra data of every tag in `Xs`, which is what
-  // `ExtrasByTag` reads the extra data given as.
-  return { extra: output } as Extrakit<ExtrasByTag<Xs>>;
-};
-
-/** A kit whose extra data is not known. */
-export type AnyKit = Extrakit<Record<string, Any>>;
-
-/** A kit that declares no extra data. */
-export const emptyKit = makeKit();
-
-/** The type of {@link emptyKit}. */
-export type EmptyKit = typeof emptyKit;
-
-/**
- * The extra data of the kits given as one, a shared tag holding the extra data of
- * the latest kit that names it.
- *
- * **When to use**
- *
- * Use to type the kit {@link mergeKit} returns.
- *
- * **Details**
- *
- * Every kit's extra data is named; where two kits name the same tag, the extra data
- * of the later kit wins.
- *
- * @see {@link mergeKit} for the kit those extra data make.
- * @category models
- */
-export type ExtrasMerged<Ks extends ReadonlyArray<AnyKit>> = Ks extends readonly [
-  infer Head extends AnyKit,
-  ...infer Tail extends ReadonlyArray<AnyKit>,
-]
-  ? Omit<Head["extra"], keyof ExtrasMerged<Tail>> & ExtrasMerged<Tail>
-  : {};
-
-/**
- * Adds the extra data of each kit given to the ones of the kits before it.
- *
- * **When to use**
- *
- * Use when the extra data of several extensions are read together, or when a reader
- * that knows some of a trajectory's extra data reads it under the ones it knows
- * without forgetting the rest.
- *
- * **Details**
- *
- * A shared tag holds the extra data of the latest kit that names it, so a kit of a
- * version an extension states now states over the one a trajectory was read with.
- *
- * **Example** (Adding the extra data of one kit to another's)
- *
- * ```ts import.meta.vitest
- * import { Schema } from "effect"
- * import { Extra, VersionedSchema } from "@trajs/core"
- *
- * const estimate = new Extra.Extra({
- *   package: "tokenize",
- *   id: "estimate",
- *   prompt: Schema.Struct({
- *     version: Schema.Literal("0.1.0"),
- *     tokens: Schema.Number
- *   }).pipe(VersionedSchema.make)
- * })
- *
- * const step = new Extra.Extra({
- *   package: "atif",
- *   id: "step",
- *   session: Schema.Struct({
- *     version: Schema.Literal("0.1.0"),
- *     index: Schema.Number
- *   }).pipe(VersionedSchema.make)
- * })
- *
- * const merged = Extra.mergeKit(Extra.makeKit(estimate), Extra.makeKit(step))
- * Object.keys(merged.extra) // => ["tokenize/estimate", "atif/step"]
- * ```
- *
- * @see {@link makeKit} for a kit of the extra data given alone.
- * @category constructors
- */
-export const mergeKit = <Ks extends ReadonlyArray<AnyKit>>(
-  ...kits: Ks
-): Extrakit<ExtrasMerged<Ks>> => {
-  // SAFETY: every datum of every kit is inserted under its own tag below, so what the
-  // record holds is one datum per tag the kits name.
-  const extra = {} as Record<string, Any>;
-
-  for (const kit of kits) {
-    Object.assign(extra, kit.extra);
-  }
-
-  // SAFETY: `extra` holds the datum of every tag in `Ks`, the one of the kit latest
-  // among those that names it, which is what `ExtrasMerged` reads the kits as.
-  return { extra } as Extrakit<ExtrasMerged<Ks>>;
-};
-
+/** What one tag of a kit holds on one part of a trajectory: the data of the schema the
 /** The schema an extra declares for one part of a trajectory, and `never` where it declares none. */
 type Declared<X extends Any, P extends Part> = Exclude<X[P], undefined>;
 
@@ -310,7 +175,7 @@ export type ExtraRecordEncoded<Extras extends Record<string, Any>, P extends Par
  *
  * ```ts import.meta.vitest
  * import { Schema } from "effect"
- * import { Extra, VersionedSchema } from "@trajs/core"
+ * import { Extra, ExtraKit, VersionedSchema } from "@trajs/core"
  *
  * const estimate = new Extra.Extra({
  *   package: "tokenize",
@@ -327,7 +192,7 @@ export type ExtraRecordEncoded<Extras extends Record<string, Any>, P extends Par
  *   }).pipe(VersionedSchema.make)
  * })
  *
- * const kit = Extra.makeKit(estimate)
+ * const kit = ExtraKit.make(estimate)
  *
  * // A response part states how much of the count a payload that is not text priced
  * // as well, which a prompt part does not.
@@ -349,7 +214,7 @@ export type ExtraRecordEncoded<Extras extends Record<string, Any>, P extends Par
  * @see {@link Part} for the parts it reads one at a time.
  * @category schemas
  */
-export const ExtraRecord = <K extends AnyKit, P extends Part>(
+export const ExtraRecord = <K extends ExtraKit.Any, P extends Part>(
   kit: K,
   part: P,
 ): Schema.Codec<ExtraRecord<K["extra"], P>, ExtraRecordEncoded<K["extra"], P>> => {
@@ -390,7 +255,7 @@ export const ExtraRecord = <K extends AnyKit, P extends Part>(
  * @category constructors
  */
 export const stated =
-  <K extends AnyKit, P extends Part>(kit: K, part: P) =>
+  <K extends ExtraKit.Any, P extends Part>(kit: K, part: P) =>
   (held: Held): ExtraRecord<K["extra"], P> => {
     const declared: Array<[string, Held[string]]> = [];
 

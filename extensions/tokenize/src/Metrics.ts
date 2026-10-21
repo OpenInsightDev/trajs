@@ -45,7 +45,7 @@
  * moves them — and {@link metrickit} is the kit it is an entry of.
  */
 
-import { Metric, VersionedSchema } from "@trajs/core";
+import { Metric, MetricKit, VersionedSchema } from "@trajs/core";
 import { Effect, Schema, Stream } from "effect";
 import { AiError, Tokenizer } from "effect/ai";
 
@@ -309,7 +309,7 @@ export type Uncounted = Schema.Schema.Type<typeof Uncounted>;
  *   makeProducer().pipe(Effect.provide(Tokenizer.layerOpenAi({ model: "gpt-4o" })))
  * )
  *
- * const runnable = Metric.toProducers(metrickit, {
+ * const runnable = MetricKit.toProducers(metrickit, {
  *   [tokenEstimate.tag]: producer
  * })
  *
@@ -358,17 +358,17 @@ export const makeProducer = (
  *
  * **Details**
  *
- * The kit is a `Metrickit` of every metric this package declares, each held under
+ * The kit is a `MetricKit.Kit` of every metric this package declares, each held under
  * the tag it is produced under — here {@link tokenEstimate}, the one metric the
- * package reports. It is extended rather than replaced when other packages'
- * metrics are produced with the same trajectory, and it is what a reader installs
- * to get the estimates back with their types.
+ * package reports. It is extended rather than replaced when other packages' metrics
+ * are produced with the same trajectory, and it is what a reader installs to get the
+ * estimates back with their types.
  *
  * @see {@link tokenEstimate} for the metric it holds.
  * @see {@link makeProducer} for the producer a kit is provided with.
  * @category constants
  */
-export const metrickit = Metric.makeKit(tokenEstimate);
+export const metrickit = MetricKit.make(tokenEstimate);
 
 /**
  * The output the metric produces for one part, as the producer reports it.

@@ -21,7 +21,7 @@
  * events are collected into, {@link eventkit}.
  */
 
-import { Event, VersionedSchema } from "@trajs/core";
+import { Event, EventKit, VersionedSchema } from "@trajs/core";
 import { Schema } from "effect";
 
 import { packageName } from "#/internal/package.ts";
@@ -230,13 +230,13 @@ export const contextManagement = (
  *
  * **Details**
  *
- * The kit is an `Eventkit` of every event this package declares, each held under
- * the tag it is produced under — here {@link contextManagementEvent}, the one
- * event the package declares so far. It is extended rather than replaced when
- * other packages' events are produced with the same trajectory, and it is what a
- * reader installs to get the events back with their types.
+ * The kit is an `EventKit.Kit` of every event this package declares, each held under
+ * the tag it is produced under — here {@link contextManagementEvent}, the one event
+ * the package declares so far. It is extended rather than replaced when other
+ * packages' events are produced with the same trajectory, and it is what a reader
+ * installs to get the events back with their types.
  *
  * @see {@link contextManagementEvent} for the event it holds.
  * @category constants
  */
-export const eventkit = Event.makeKit(contextManagementEvent);
+export const eventkit = EventKit.make(contextManagementEvent);

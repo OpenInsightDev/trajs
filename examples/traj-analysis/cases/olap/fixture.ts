@@ -10,20 +10,32 @@
  * or the range the analysis at the end has to recover.
  */
 
-import { Event, Exchange, Extra, Metric, Prompt, Response, Toolkit, Trajectory } from "@trajs/core";
+import {
+  EventKit,
+  Exchange,
+  ExtraKit,
+  MetricKit,
+  Prompt,
+  Response,
+  Toolkit,
+  Trajectory,
+} from "@trajs/core";
 import { DateTime, Effect, FileSystem, Stream } from "effect";
 
 const toolkit = Toolkit.empty;
-const extrakit = Extra.emptyKit;
+const extrakit = ExtraKit.empty;
 
 /** The kits the fixtures are built and read with: no events, no metrics, and whole response parts. */
-export const config = {
-  stream: false as const,
+export const config = Trajectory.config({
+  stream: false,
   toolkit,
   extrakit,
-  eventkit: Event.makeKit(),
-  metrickit: Metric.makeKit(),
-};
+  eventkit: EventKit.empty,
+  metrickit: MetricKit.empty,
+});
+
+/** The builders of a fixture's parts, under the config the fixture is read with. */
+const part = Trajectory.parts(config);
 
 /** The parts of one fixture, as the builders below produce them and the exchange keeps them. */
 type Produced = ReadonlyArray<Trajectory.Part<typeof config>>;
@@ -105,9 +117,7 @@ const produced = (index: number): DateTime.Utc =>
 
 /** The prompt a model was given, as a part of the trajectory it was given in. */
 const prompt = (sessionId: string, text: string, timestamp: DateTime.Utc) =>
-  Trajectory.promptPart(extrakit)(Prompt.make(text), { sessionId, timestamp });
-
-const makeResponse = Trajectory.responsePart({ toolkit, extrakit, stream: false });
+  part.prompt(Prompt.make(text), { sessionId, timestamp });
 
 /** The parts one turn produced: the model that answered, the tool it called, and what it used to answer. */
 const turn = (
@@ -116,11 +126,14 @@ const turn = (
   timestamp: DateTime.Utc,
   draw: () => number,
 ): Produced => [
-  makeResponse(Response.makePart("response-metadata", { modelId: pick(draw, generation.models) }), {
-    sessionId,
-    timestamp,
-  }),
-  makeResponse(
+  part.response(
+    Response.makePart("response-metadata", { modelId: pick(draw, generation.models) }),
+    {
+      sessionId,
+      timestamp,
+    },
+  ),
+  part.response(
     Response.anyToolCallPart({
       id,
       name: pick(draw, generation.tools),
@@ -129,7 +142,7 @@ const turn = (
     }),
     { sessionId, timestamp },
   ),
-  makeResponse(
+  part.response(
     Response.makePart("finish", {
       reason: "tool-calls",
       usage: new Response.Usage({
@@ -170,19 +183,16 @@ const partsOf = (index: number): Produced => {
   const turns = (): number => between(draw, generation.turns.low, generation.turns.high);
 
   return [
-    Trajectory.sessionPart(extrakit)(root),
+    part.session(root),
     ...conversation(root, `${index}/root`, turns(), timestamp, draw),
     ...(draw() < generation.subAgents
-      ? [
-          Trajectory.sessionPart(extrakit)(sub),
-          ...conversation(sub, `${index}/sub`, turns(), timestamp, draw),
-        ]
+      ? [part.session(sub), ...conversation(sub, `${index}/sub`, turns(), timestamp, draw)]
       : []),
   ];
 };
 
 /** The trajectory those parts make, carrying the kits they are read and written with. */
-const trajectory = (parts: Produced) => Object.assign(Stream.fromArray(parts), config);
+const trajectory = (parts: Produced) => Trajectory.make(config)(Stream.fromArray(parts));
 
 /**
  * Writes a trajectory per run into {@link Fixtures}, saying how many rows the set is.

@@ -27,6 +27,7 @@ import { Effect, Fiber, Schema, SchemaTransformation, Stream } from "effect";
 import { SchemaBinary } from "effect/encoding";
 
 import * as Event from "#/Event.ts";
+import type * as EventKit from "#/EventKit.ts";
 import {
   Magic,
   Version,
@@ -35,9 +36,11 @@ import {
   type Metadata,
   type Service,
 } from "#/Exchange.ts";
-import type * as Extra from "#/Extra.ts";
+import type * as ExtraKit from "#/ExtraKit.ts";
+import { foldParts } from "#/internal/folding.ts";
 import { readFrames } from "#/internal/frames.ts";
 import * as Metric from "#/Metric.ts";
+import type * as MetricKit from "#/MetricKit.ts";
 import * as Prompt from "#/Prompt.ts";
 import * as Toolkit from "#/Toolkit.ts";
 import * as Trajectory from "#/Trajectory.ts";
@@ -69,9 +72,9 @@ const encodeHeader = ({
   metrickit,
   toolkit,
 }: {
-  extrakit: Extra.AnyKit;
-  eventkit: Event.AnyKit;
-  metrickit: Metric.AnyKit;
+  extrakit: ExtraKit.Any;
+  eventkit: EventKit.Any;
+  metrickit: MetricKit.Any;
   toolkit: Toolkit.Any;
 }): string =>
   JSON.stringify({
@@ -392,7 +395,7 @@ const Messages = Schema.Array(
  * The tag is what a binary layout can carry where the data as it is is a union it
  * cannot, and every other part of the prompt part keeps its own layout.
  */
-const PromptPartTagged = <K extends Extra.AnyKit>(extrakit: K) =>
+const PromptPartTagged = <K extends ExtraKit.Any>(extrakit: K) =>
   Trajectory.PromptPart(extrakit).mapFields((fields) => ({ ...fields, messages: Messages }));
 
 /**
@@ -411,18 +414,6 @@ const configOf = <C extends Trajectory.AnyConfig, E, R>(
   metrickit: trajectory.metrickit,
   extrakit: trajectory.extrakit,
 });
-
-/**
- * The trajectory a stream of parts makes, carrying the config its parts are read
- * with.
- *
- * A trajectory is its parts and what they were produced with, so what a trajectory
- * was read as is stated on the stream the bytes decode to.
- */
-const trajectoryOf = <C extends Trajectory.AnyConfig, E, R>(
-  parts: Stream.Stream<Trajectory.Part<C>, E, R>,
-  config: C,
-): Trajectory.Trajectory<C, E, R> => Object.assign(parts, config);
 
 /**
  * What a trajectory ends with: the metadata it states of its own bytes, and where
@@ -532,11 +523,24 @@ const reading =
   ): Trajectory.Trajectory<C, E | TrajectoryError, R> => {
     const parts = asReadable(part(config));
     const frames = readFrames(parts);
+    // SAFETY: what a body reads as is the parts of the config it is read with, which is
+    // what the trajectory those parts make holds.
+    const read = bytes.pipe(frames) as Stream.Stream<Trajectory.Part<C>, E | TrajectoryError, R>;
 
-    return trajectoryOf(
-      // SAFETY: what a body reads as is the parts of the config it is read with,
-      // which is what the trajectory those parts make holds.
-      bytes.pipe(frames) as Stream.Stream<Trajectory.Part<C>, E | TrajectoryError, R>,
+    // A config whose response parts are whole asks for the parts a model returned, and
+    // the bytes carry the increments they arrived in as well as those parts, since a
+    // trajectory is stated as the most general one whatever the config says of itself
+    // ({@link part}). So what such a reading yields is those increments folded into the
+    // parts they complete, which is what `folding.ts`'s `foldParts` does.
+    return Trajectory.make(
+      // SAFETY: a folded part is a whole one — `foldParts` states that of its own result
+      // — and the whole parts are what a config that states `stream` off holds, which is
+      // the config read with here.
+      (config.stream ? read : foldParts(read)) as Stream.Stream<
+        Trajectory.Part<C>,
+        E | TrajectoryError,
+        R
+      >,
       config,
     );
   };

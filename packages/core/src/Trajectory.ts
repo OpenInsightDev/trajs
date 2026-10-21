@@ -12,17 +12,22 @@
  * and the extra data of a prompt, response or session part through the extra kit
  * ({@link Extra.ExtraRecord}). Each part schema is therefore created for the kit it
  * is read with ({@link PromptPart}, {@link SessionPart}, {@link ResponsePart},
- * {@link EventPart}, {@link MetricPart}), and each part is built with that kit and
- * its fields ({@link promptPart}, {@link sessionPart}, {@link responsePart}).
+ * {@link EventPart}, {@link MetricPart}), and the parts of one trajectory are built
+ * from its config ({@link parts}), so that a part states the kits its trajectory is
+ * read with rather than naming them beside it.
  */
 
-import { DateTime, Effect, Schema, Stream } from "effect";
+import { DateTime, Effect, Function, Schema, Stream } from "effect";
 
 import * as Event from "#/Event.ts";
+import * as EventKit from "#/EventKit.ts";
 import * as Extra from "#/Extra.ts";
+import * as ExtraKit from "#/ExtraKit.ts";
 import { Timestamp, Uuid } from "#/internal/schema.ts";
+import { attach } from "#/internal/trajectory.ts";
 import type { Select } from "#/internal/types.ts";
 import * as Metric from "#/Metric.ts";
+import * as MetricKit from "#/MetricKit.ts";
 import * as Prompt from "#/Prompt.ts";
 import * as Response from "#/Response.ts";
 import * as Toolkit from "#/Toolkit.ts";
@@ -31,7 +36,7 @@ import * as Toolkit from "#/Toolkit.ts";
  * The extra data a part holds, read as the kit declares it of the part it is: a part a
  * trajectory states no extra data of holds none.
  */
-const extraField = <K extends Extra.AnyKit, P extends Extra.Part>(extrakit: K, part: P) =>
+const extraField = <K extends ExtraKit.Any, P extends Extra.Part>(extrakit: K, part: P) =>
   Extra.ExtraRecord(extrakit, part).pipe(Schema.withDecodingDefault(Effect.succeed({})));
 
 /**
@@ -55,11 +60,11 @@ const extraField = <K extends Extra.AnyKit, P extends Extra.Part>(extrakit: K, p
  *   ({@link Extra.ExtraRecord}). A part produced stating none holds none, so a
  *   trajectory written before an extension declared its data still reads.
  *
- * @see {@link promptPart} for building a part of this schema.
+ * @see {@link parts} for building the part under the config of its trajectory.
  * @see {@link Extra.ExtraRecord} for the extra data a part holds.
  * @category schemas
  */
-export const PromptPart = <K extends Extra.AnyKit>(extrakit: K) =>
+export const PromptPart = <K extends ExtraKit.Any>(extrakit: K) =>
   Schema.TaggedStruct("Prompt", {
     messages: Schema.Array(Prompt.Message),
     extra: extraField(extrakit, "prompt"),
@@ -74,7 +79,7 @@ export const PromptPart = <K extends Extra.AnyKit>(extrakit: K) =>
  * @see {@link PromptPart} for the schema it is read by.
  * @category models
  */
-export type PromptPart<K extends Extra.AnyKit> = Schema.Schema.Type<
+export type PromptPart<K extends ExtraKit.Any> = Schema.Schema.Type<
   ReturnType<typeof PromptPart<K>>
 >;
 
@@ -85,88 +90,20 @@ export type PromptPart<K extends Extra.AnyKit> = Schema.Schema.Type<
  * @see {@link PromptPart} for the part itself.
  * @category models
  */
-export type PromptPartEncoded = Schema.Codec.Encoded<ReturnType<typeof PromptPart<Extra.AnyKit>>>;
+export type PromptPartEncoded = Schema.Codec.Encoded<ReturnType<typeof PromptPart<ExtraKit.Any>>>;
 
 /**
  * The session a part built without one belongs to: `"root"`.
  *
  * **When to use**
  *
- * Use to name the session a part built by {@link promptPart} or {@link responsePart}
- * without one belongs to, rather than repeating the id.
+ * Use to name the session a part built by {@link parts} without one belongs to,
+ * rather than repeating the id.
  *
- * @see {@link promptPart} for a builder that states it as the default.
- * @see {@link responsePart} for the other one.
+ * @see {@link parts} for the builders that state it as the default.
  * @category constants
  */
 export const rootSession = "root";
-
-/**
- * Builds a prompt part from the prompt a model was given.
- *
- * **When to use**
- *
- * Use where what a model was given is produced, so that the prompt stands among the
- * parts of its trajectory rather than beside them.
- *
- * **Details**
- *
- * - The kit is asked for first ({@link PromptPart}) and the prompt second, with the
- *   fields the part is built with: the kit says how the part's extra data is read, so
- *   the part states the extra data of that kit.
- * - `messages` are the content of the prompt given, and `sessionId` the session the
- *   part is produced in; a part built without one belongs to {@link rootSession}.
- * - `timestamp` is when the part was produced, where what produces it states a moment.
- *   A part that states no moment had none to state; see {@link PromptPart}.
- * - `extra` may be left out, and the part then states none of it. A datum the kit
- *   does not declare of a prompt part is refused where the part is built.
- *
- * **Example** (Producing what a model was given, with what it was estimated to cost)
- *
- * ```ts import.meta.vitest
- * import { Schema } from "effect"
- * import { Extra, Prompt, Trajectory, VersionedSchema } from "@trajs/core"
- *
- * const estimate = new Extra.Extra({
- *   package: "tokenize",
- *   id: "estimate",
- *   prompt: Schema.Struct({
- *     version: Schema.Literal("0.1.0"),
- *     tokens: Schema.Number
- *   }).pipe(VersionedSchema.make)
- * })
- *
- * const part = Trajectory.promptPart(Extra.makeKit(estimate))(
- *   Prompt.make("What is 2 + 2?"),
- *   {
- *     sessionId: "01890a5d-ac96-774b-bcce-b302099a8057",
- *     extra: { "tokenize/estimate": { version: "0.1.0", tokens: 7 } }
- *   }
- * )
- *
- * part.messages.map((message) => message.role) // => ["user"]
- * part.extra["tokenize/estimate"]?.tokens // => 7
- * ```
- *
- * @see {@link PromptPart} for the schema the part is built of.
- * @see {@link Extra.ExtraRecord} for the extra data a part holds.
- * @category constructors
- */
-export const promptPart =
-  <K extends Extra.AnyKit>(extrakit: K) =>
-  (
-    prompt: Prompt.Prompt,
-    {
-      timestamp,
-      sessionId = rootSession,
-      extra = {},
-    }: {
-      sessionId?: string;
-      extra?: Extra.ExtraRecord<K["extra"], "prompt">;
-      timestamp?: DateTime.Utc;
-    } = {},
-  ) =>
-    PromptPart(extrakit).make({ messages: prompt.content, sessionId, extra, timestamp });
 
 /**
  * Creates the schema of a session part, as the extra kit given reads its extra
@@ -190,11 +127,11 @@ export const promptPart =
  * - `extra` is the extra data the kit declares of a session part
  *   ({@link Extra.ExtraRecord}).
  *
- * @see {@link sessionPart} for building a part of this schema.
+ * @see {@link parts} for building a part under the config of its trajectory.
  * @see {@link Session.toSessions} for reading a trajectory as its sessions.
  * @category schemas
  */
-export const SessionPart = <K extends Extra.AnyKit>(extrakit: K) =>
+export const SessionPart = <K extends ExtraKit.Any>(extrakit: K) =>
   Schema.TaggedStruct("Session", {
     id: Schema.String,
     fork: Schema.optional(Uuid),
@@ -208,7 +145,7 @@ export const SessionPart = <K extends Extra.AnyKit>(extrakit: K) =>
  * @see {@link SessionPart} for the schema it is read by.
  * @category models
  */
-export type SessionPart<K extends Extra.AnyKit> = Schema.Schema.Type<
+export type SessionPart<K extends ExtraKit.Any> = Schema.Schema.Type<
   ReturnType<typeof SessionPart<K>>
 >;
 
@@ -219,57 +156,7 @@ export type SessionPart<K extends Extra.AnyKit> = Schema.Schema.Type<
  * @see {@link SessionPart} for the part itself.
  * @category models
  */
-export type SessionPartEncoded = Schema.Codec.Encoded<ReturnType<typeof SessionPart<Extra.AnyKit>>>;
-
-/**
- * Builds a session part: the declaration of a session a trajectory produces in.
- *
- * **When to use**
- *
- * Use where a trajectory declares the session its parts belong to, or the fork a
- * session continues from.
- *
- * **Details**
- *
- * - The kit is asked for first ({@link SessionPart}) and the session second, with the
- *   fields it is declared with: the part states the extra data of that kit.
- * - `fork` is the `uuid` of the {@link Session.ForkPart} the session continues from —
- *   a part of another session, not the session itself — and `extra` may be left out,
- *   the part then stating none of it.
- *
- * **Example** (Continuing a session from the part a fork left off at)
- *
- * ```ts import.meta.vitest
- * import { Extra, Trajectory } from "@trajs/core"
- *
- * const extrakit = Extra.makeKit()
- *
- * const root = Trajectory.sessionPart(extrakit)("01890a5d-ac96-774b-bcce-b302099a8057")
- *
- * const forked = Trajectory.sessionPart(extrakit)("01890a5d-ac96-774b-bcce-b302099a8058", {
- *   fork: root.uuid
- * })
- *
- * forked.fork === root.uuid // => true
- * ```
- *
- * @see {@link SessionPart} for the schema the part is built of.
- * @see {@link Session.toSessions} for reading a trajectory as its sessions.
- * @category constructors
- */
-export const sessionPart =
-  <K extends Extra.AnyKit>(extrakit: K) =>
-  (
-    id: string,
-    {
-      fork,
-      extra = {},
-    }: {
-      fork?: string;
-      extra?: Extra.ExtraRecord<K["extra"], "session">;
-    } = {},
-  ) =>
-    SessionPart(extrakit).make({ id, fork, extra });
+export type SessionPartEncoded = Schema.Codec.Encoded<ReturnType<typeof SessionPart<ExtraKit.Any>>>;
 
 const responseFields = {
   timestamp: Timestamp,
@@ -278,7 +165,7 @@ const responseFields = {
 };
 
 /** The response part schema that reads the whole parts a model returned. */
-const NonStreamResponsePart = <T extends Toolkit.Any, K extends Extra.AnyKit>(
+const NonStreamResponsePart = <T extends Toolkit.Any, K extends ExtraKit.Any>(
   toolkit: T,
   extrakit: K,
 ) =>
@@ -289,7 +176,7 @@ const NonStreamResponsePart = <T extends Toolkit.Any, K extends Extra.AnyKit>(
   });
 
 /** The response part schema that reads every part a response may hold. */
-const StreamResponsePart = <T extends Toolkit.Any, K extends Extra.AnyKit>(
+const StreamResponsePart = <T extends Toolkit.Any, K extends ExtraKit.Any>(
   toolkit: T,
   extrakit: K,
 ) =>
@@ -301,12 +188,12 @@ const StreamResponsePart = <T extends Toolkit.Any, K extends Extra.AnyKit>(
 
 type AllResponseParts<
   Toolkit extends Toolkit.Any,
-  Extrakit extends Extra.AnyKit,
+  Extras extends ExtraKit.Any,
   Stream extends boolean,
 > = Select<
   Stream,
-  ReturnType<typeof StreamResponsePart<Toolkit, Extrakit>>,
-  ReturnType<typeof NonStreamResponsePart<Toolkit, Extrakit>>
+  ReturnType<typeof StreamResponsePart<Toolkit, Extras>>,
+  ReturnType<typeof NonStreamResponsePart<Toolkit, Extras>>
 >;
 
 /**
@@ -335,12 +222,12 @@ type AllResponseParts<
  * **Example** (Writing a response as the increments a model returned it in)
  *
  * ```ts import.meta.vitest
- * import { Extra, Response, Toolkit, Trajectory } from "@trajs/core"
+ * import { ExtraKit, Response, Toolkit, Trajectory } from "@trajs/core"
  *
  * const sessionId = "01890a5d-ac96-774b-bcce-b302099a8057"
  * const schema = Trajectory.ResponsePart({
  *   toolkit: Toolkit.empty,
- *   extrakit: Extra.makeKit(),
+ *   extrakit: ExtraKit.empty,
  *   stream: true
  * })
  *
@@ -353,14 +240,14 @@ type AllResponseParts<
  * part.response.type // => "text-start"
  * ```
  *
- * @see {@link responsePart} for building a part of this schema.
+ * @see {@link parts} for building a part under the config of its trajectory.
  * @see {@link ResponsePartEncoded} for the encoded form of a part.
  * @see {@link Response.AllPartsView} for what the response of a part is read as.
  * @category schemas
  */
 export const ResponsePart = <
   Toolkit extends Toolkit.Any,
-  Extrakit extends Extra.AnyKit,
+  Extras extends ExtraKit.Any,
   Stream extends boolean,
 >({
   toolkit,
@@ -368,14 +255,14 @@ export const ResponsePart = <
   stream,
 }: {
   toolkit: Toolkit;
-  extrakit: Extrakit;
+  extrakit: Extras;
   stream: Stream;
-}): AllResponseParts<Toolkit, Extrakit, Stream> =>
+}): AllResponseParts<Toolkit, Extras, Stream> =>
   // SAFETY: `AllResponseParts` selects the codec pair by `Stream`, so the branch
   // taken is the pair the return type names.
   (stream
     ? StreamResponsePart(toolkit, extrakit)
-    : NonStreamResponsePart(toolkit, extrakit)) as AllResponseParts<Toolkit, Extrakit, Stream>;
+    : NonStreamResponsePart(toolkit, extrakit)) as AllResponseParts<Toolkit, Extras, Stream>;
 
 /**
  * A response part as the toolkit and the extra kit given read it, in the variant
@@ -386,9 +273,9 @@ export const ResponsePart = <
  */
 export type ResponsePart<
   Toolkit extends Toolkit.Any,
-  Extrakit extends Extra.AnyKit,
+  Extras extends ExtraKit.Any,
   Stream extends boolean,
-> = Schema.Schema.Type<AllResponseParts<Toolkit, Extrakit, Stream>>;
+> = Schema.Schema.Type<AllResponseParts<Toolkit, Extras, Stream>>;
 
 /**
  * A {@link ResponsePart} as it is encoded, in the variant a trajectory states.
@@ -409,100 +296,8 @@ export type ResponsePart<
  * @category models
  */
 export type ResponsePartEncoded = Schema.Codec.Encoded<
-  ReturnType<typeof ResponsePart<Toolkit.Any, Extra.AnyKit, true>>
+  ReturnType<typeof ResponsePart<Toolkit.Any, ExtraKit.Any, true>>
 >;
-
-/**
- * Builds a response part from one part of what a model returned.
- *
- * **When to use**
- *
- * Use where what a model returned is produced, so that the response stands among
- * the parts of its trajectory rather than beside them.
- *
- * **Details**
- *
- * - The kit is asked for first ({@link ResponsePart}) and the response second, with
- *   the fields the part is built with: the toolkit says how the part's response is
- *   read and the extra kit how its extra data is, so the part states the extra data
- *   of that kit.
- * - `response` is one part of what the model returned, as {@link Response.makePart}
- *   builds one: an increment the response arrived in where the config streams, and a
- *   part the response is whole in where it does not.
- * - `sessionId` names the session the part is produced in, a part built without one
- *   belonging to {@link rootSession}; `timestamp` and `uuid` are supplied where
- *   the part is built, as for every other part, and a caller that knows when the
- *   response happened states it rather than leaving the part to be timed as it is
- *   built.
- * - `extra` may be left out, and the part then states none of it.
- *
- * **Example** (Producing what a model returned, with what it was estimated to cost)
- *
- * ```ts import.meta.vitest
- * import { Schema } from "effect"
- * import { Extra, Response, Toolkit, Trajectory, VersionedSchema } from "@trajs/core"
- *
- * const estimate = new Extra.Extra({
- *   package: "tokenize",
- *   id: "estimate",
- *   response: Schema.Struct({
- *     version: Schema.Literal("0.1.0"),
- *     tokens: Schema.Number
- *   }).pipe(VersionedSchema.make)
- * })
- *
- * const part = Trajectory.responsePart({
- *   toolkit: Toolkit.empty,
- *   extrakit: Extra.makeKit(estimate),
- *   stream: false
- * })(
- *   Response.makePart("text", { text: "4" }),
- *   {
- *     sessionId: "01890a5d-ac96-774b-bcce-b302099a8057",
- *     extra: { "tokenize/estimate": { version: "0.1.0", tokens: 3 } }
- *   }
- * )
- *
- * part.response.type // => "text"
- * part.extra["tokenize/estimate"]?.tokens // => 3
- * ```
- *
- * @see {@link ResponsePart} for the schema the part is built of.
- * @see {@link Response.makePart} for building the response of a part.
- * @category constructors
- */
-export const responsePart =
-  <Toolkit extends Toolkit.Any, Extrakit extends Extra.AnyKit, Stream extends boolean>({
-    toolkit,
-    extrakit,
-    stream,
-  }: {
-    toolkit: Toolkit;
-    extrakit: Extrakit;
-    stream: Stream;
-  }) =>
-  (
-    response: ResponsePart<Toolkit, Extrakit, Stream>["response"],
-    {
-      sessionId = rootSession,
-      extra = {},
-      timestamp,
-    }: {
-      sessionId?: string;
-      extra?: Extra.ExtraRecord<Extrakit["extra"], "response">;
-      timestamp?: DateTime.Utc;
-    } = {},
-  ): ResponsePart<Toolkit, Extrakit, Stream> =>
-    // SAFETY: `ResponsePart` selects its variant by `stream`, which the fields were
-    // read under, so what it makes is the part they state; TypeScript leaves that
-    // selection unevaluated where `stream` is a type parameter and reads the part it
-    // makes as the streaming one alone.
-    ResponsePart({ toolkit, extrakit, stream }).make({
-      response,
-      sessionId,
-      extra,
-      timestamp,
-    }) as ResponsePart<Toolkit, Extrakit, Stream>;
 
 /**
  * Creates the schema of an event part, as the event kit given reads the event it
@@ -529,7 +324,7 @@ export const responsePart =
  * @see {@link Extra.Part} for the parts extra data is declared of.
  * @category schemas
  */
-export const EventPart = <K extends Event.AnyKit>(kit: K) =>
+export const EventPart = <K extends EventKit.Any>(kit: K) =>
   Schema.TaggedStruct("Event", {
     event: Event.EventParts(kit),
     timestamp: Timestamp,
@@ -543,7 +338,7 @@ export const EventPart = <K extends Event.AnyKit>(kit: K) =>
  * @see {@link EventPart} for the schema it is read by.
  * @category models
  */
-export type EventPart<K extends Event.AnyKit> = Schema.Schema.Type<ReturnType<typeof EventPart<K>>>;
+export type EventPart<K extends EventKit.Any> = Schema.Schema.Type<ReturnType<typeof EventPart<K>>>;
 
 /**
  * An {@link EventPart} as it is encoded: the tag of the event it names and the data
@@ -552,7 +347,7 @@ export type EventPart<K extends Event.AnyKit> = Schema.Schema.Type<ReturnType<ty
  * @see {@link EventPart} for the part itself.
  * @category models
  */
-export type EventPartEncoded = Schema.Codec.Encoded<ReturnType<typeof EventPart<Event.AnyKit>>>;
+export type EventPartEncoded = Schema.Codec.Encoded<ReturnType<typeof EventPart<EventKit.Any>>>;
 
 /**
  * Creates the schema of a metric part, as the metric kit given reads what the metric
@@ -576,7 +371,7 @@ export type EventPartEncoded = Schema.Codec.Encoded<ReturnType<typeof EventPart<
  * @see {@link Metric.produce} for deriving the parts of a kit from a trajectory.
  * @category schemas
  */
-export const MetricPart = <K extends Metric.AnyKit>(kit: K) =>
+export const MetricPart = <K extends MetricKit.Any>(kit: K) =>
   Schema.TaggedStruct("Metric", {
     metric: Metric.MetricParts(kit),
     timestamp: Schema.optional(Schema.DateTimeUtcFromString),
@@ -588,7 +383,7 @@ export const MetricPart = <K extends Metric.AnyKit>(kit: K) =>
  * @see {@link MetricPart} for the schema it is read by.
  * @category models
  */
-export type MetricPart<K extends Metric.AnyKit> = Schema.Schema.Type<
+export type MetricPart<K extends MetricKit.Any> = Schema.Schema.Type<
   ReturnType<typeof MetricPart<K>>
 >;
 
@@ -599,7 +394,206 @@ export type MetricPart<K extends Metric.AnyKit> = Schema.Schema.Type<
  * @see {@link MetricPart} for the part itself.
  * @category models
  */
-export type MetricPartEncoded = Schema.Codec.Encoded<ReturnType<typeof MetricPart<Metric.AnyKit>>>;
+export type MetricPartEncoded = Schema.Codec.Encoded<ReturnType<typeof MetricPart<MetricKit.Any>>>;
+
+/**
+ * The parts a trajectory of the config given is built with: one builder per kind of
+ * part, each stating the config's own kits.
+ *
+ * **When to use**
+ *
+ * Use to build the parts of one trajectory — what a model was given and returned, the
+ * session they were produced in, and what a kit contributed of it — so that every part
+ * is stated for the trajectory it is written into rather than for kits named beside
+ * it.
+ *
+ * **Details**
+ *
+ * - `prompt`, `session` and `response` state the extra data the config's extra kit
+ *   declares of the kind of part they build ({@link Extra.ExtraRecord}); a part built
+ *   stating none of it holds none.
+ * - `response` builds the variant the config states: the increments a streamed answer
+ *   arrives in where `stream` is on, and the whole parts a model returned where it is
+ *   off — see {@link ResponsePart}.
+ * - `event` builds an event of the config's event kit in the session given, and
+ *   `metric` a report of its metric kit ({@link EventPart}, {@link MetricPart}).
+ * - A prompt or response part is timed where it is built, and a caller that knows when
+ *   it happened states it as the part's `timestamp` rather than leaving the part to be
+ *   timed as it is built.
+ * - A part is given a fresh `uuid` where none is stated: the identity of a part is what a
+ *   `fork` names, so a caller that replays a part states the one it had ({@link Session.Fork}).
+ * - The schema each builder builds from is the module's own ({@link PromptPart},
+ *   {@link SessionPart}, {@link ResponsePart}, {@link EventPart}, {@link MetricPart}),
+ *   which takes the one kit it reads; a builder takes the config, which is what the
+ *   parts of a trajectory are stated with.
+ *
+ * @see {@link parts} for building one.
+ * @see {@link Config} for what the parts are read with.
+ * @category models
+ */
+export interface Parts<Config extends AnyConfig> {
+  /**
+   * The prompt part of what a model was given: the messages of the prompt asked, in the
+   * session given — {@link rootSession} where none is.
+   */
+  readonly prompt: (
+    prompt: Prompt.Prompt,
+    options?: {
+      readonly sessionId?: string;
+      readonly extra?: Extra.ExtraRecord<Config["extrakit"]["extra"], "prompt">;
+      readonly timestamp?: DateTime.Utc;
+      readonly uuid?: string;
+    },
+  ) => PromptPart<Config["extrakit"]>;
+
+  /**
+   * The declaration of a session the trajectory produces in, and of the part it
+   * continues from where `fork` names one: the `uuid` of a part of the session forked
+   * from rather than that session's id — see {@link Session.Fork}.
+   */
+  readonly session: (
+    id: string,
+    options?: {
+      readonly fork?: string;
+      readonly extra?: Extra.ExtraRecord<Config["extrakit"]["extra"], "session">;
+      readonly uuid?: string;
+    },
+  ) => SessionPart<Config["extrakit"]>;
+
+  /**
+   * One part of what a model returned, in the session given — {@link rootSession} where
+   * none is — and in the variant the config states.
+   */
+  readonly response: (
+    response: ResponsePart<Config["toolkit"], Config["extrakit"], Config["stream"]>["response"],
+    options?: {
+      readonly sessionId?: string;
+      readonly extra?: Extra.ExtraRecord<Config["extrakit"]["extra"], "response">;
+      readonly timestamp?: DateTime.Utc;
+      readonly uuid?: string;
+    },
+  ) => ResponsePart<Config["toolkit"], Config["extrakit"], Config["stream"]>;
+
+  /**
+   * An event of the config's event kit, produced in the session given —
+   * {@link rootSession} where none is.
+   */
+  readonly event: (
+    event: Event.EventParts<Config["eventkit"]["events"]>,
+    options?: {
+      readonly sessionId?: string;
+      readonly timestamp?: DateTime.Utc;
+      readonly uuid?: string;
+    },
+  ) => EventPart<Config["eventkit"]>;
+
+  /** A report of one metric of the config's metric kit. */
+  readonly metric: (
+    metric: Metric.MetricParts<Config["metrickit"]["metrics"]>,
+    options?: { readonly timestamp?: DateTime.Utc },
+  ) => MetricPart<Config["metrickit"]>;
+}
+
+/**
+ * Builds the parts of a trajectory of the config given.
+ *
+ * **When to use**
+ *
+ * Use where the parts of a trajectory are written in a program — a fixture, a codec
+ * that reads another format, or a run that writes its own parts — so that each part is
+ * stated for the config its trajectory is read with, rather than for kits named beside
+ * it.
+ *
+ * **Details**
+ *
+ * - The config is read once, when the builders are made: whether a response part is
+ *   built as an increment of a streamed answer or as a whole part is the config's
+ *   `stream`, and the extra data a part may state is its extra kit's — so no builder
+ *   can state a kit the trajectory is not read with.
+ * - A part built with no session belongs to {@link rootSession}, and one built with no
+ *   `timestamp` is timed as it is built; both may still be stated.
+ * - The parts a caller replays are written as the parts they were: a `uuid` stated is the
+ *   identity the part is written with, so a trajectory written twice from stated
+ *   identities — the parts of a fixture, say — is the same bytes ({@link Parts}).
+ * - Building a part validates it against the schema of its kind: an extra datum the kit
+ *   does not declare of that kind of part, or a response the toolkit does not state, is
+ *   refused where the part is built.
+ *
+ * **Example** (Writing the parts of one trajectory)
+ *
+ * ```ts import.meta.vitest
+ * import { Schema } from "effect"
+ * import { EventKit, Extra, ExtraKit, MetricKit, Prompt, Response, Toolkit, Trajectory, VersionedSchema } from "@trajs/core"
+ *
+ * const estimate = new Extra.Extra({
+ *   package: "tokenize",
+ *   id: "estimate",
+ *   prompt: Schema.Struct({
+ *     version: Schema.Literal("0.1.0"),
+ *     tokens: Schema.Number
+ *   }).pipe(VersionedSchema.make)
+ * })
+ *
+ * const config = Trajectory.config({
+ *   stream: false,
+ *   toolkit: Toolkit.empty,
+ *   eventkit: EventKit.empty,
+ *   metrickit: MetricKit.empty,
+ *   extrakit: ExtraKit.make(estimate)
+ * })
+ *
+ * const sessionId = "01890a5d-ac96-774b-bcce-b302099a8057"
+ * const parts = Trajectory.parts(config)
+ *
+ * // What the model was asked, with what the extra kit declares of a prompt part, and
+ * // what it answered: the config says a response part is whole, so it is.
+ * const asked = parts.prompt(Prompt.make("What is 2 + 2?"), {
+ *   sessionId,
+ *   extra: { "tokenize/estimate": { version: "0.1.0", tokens: 7 } }
+ * })
+ * const answered = parts.response(Response.makePart("text", { text: "4" }), { sessionId })
+ *
+ * asked.extra["tokenize/estimate"]?.tokens // => 7
+ * answered.response.type // => "text"
+ * ```
+ *
+ * @see {@link Parts} for what it builds with.
+ * @see {@link Trajectory} for the parts it builds.
+ * @see {@link Config} for what they are read with.
+ * @category constructors
+ */
+export const parts = <Config extends AnyConfig>(config: Config): Parts<Config> => {
+  const prompt = PromptPart(config.extrakit);
+  const session = SessionPart(config.extrakit);
+
+  const response = ResponsePart({
+    toolkit: config.toolkit,
+    extrakit: config.extrakit,
+    stream: config.stream,
+  });
+
+  const event = EventPart(config.eventkit);
+  const metric = MetricPart(config.metrickit);
+
+  return {
+    prompt: (asked, { sessionId = rootSession, extra = {}, timestamp, uuid } = {}) =>
+      prompt.make({ messages: asked.content, sessionId, extra, timestamp, uuid }),
+    session: (id, { fork, extra = {}, uuid } = {}) => session.make({ id, fork, extra, uuid }),
+    // SAFETY: the schema was made for the variant the config states, and what it makes
+    // is the part the fields given state; TypeScript leaves that selection unevaluated
+    // where the config is a type parameter and reads the part it makes as the streaming
+    // one alone.
+    response: (answered, { sessionId = rootSession, extra = {}, timestamp, uuid } = {}) =>
+      response.make({ response: answered, sessionId, extra, timestamp, uuid }) as ResponsePart<
+        Config["toolkit"],
+        Config["extrakit"],
+        Config["stream"]
+      >,
+    event: (given, { sessionId = rootSession, timestamp, uuid } = {}) =>
+      event.make({ event: given, sessionId, timestamp, uuid }),
+    metric: (given, { timestamp } = {}) => metric.make({ metric: given, timestamp }),
+  };
+};
 
 /**
  * What a trajectory is read with: the variant its response parts are in, and the
@@ -615,28 +609,33 @@ export type MetricPartEncoded = Schema.Codec.Encoded<ReturnType<typeof MetricPar
  * - `stream` says what a response part is: `true` reads one as every part a response
  *   may hold, and `false` as the whole parts alone — see {@link ResponsePart}.
  * - `toolkit` is what the responses were returned by, `eventkit` the events a
- *   trajectory may name, `metrickit` the metrics derived of it, and `extrakit` the
- *   extra data of its prompt, response and session parts.
+ *   trajectory may name ({@link EventKit.Kit}), `metrickit` the metrics derived of it
+ *   ({@link MetricKit.Kit}), and `extrakit` the extra data of its prompt, response
+ *   and session parts ({@link ExtraKit.Kit}).
  *
  * Every type parameter defaults to `never`, so a config names what it holds; the
  * config of a trajectory read without knowing its kits is {@link AnyConfig}.
  *
  * @see {@link AnyConfig} for the config that holds anything.
+ * @see {@link config} for stating one.
  * @see {@link Part} for the parts a config reads.
+ * @see {@link EventKit.Kit} for the events a config names.
+ * @see {@link MetricKit.Kit} for the metrics a config names.
+ * @see {@link ExtraKit.Kit} for the extra data a config names.
  * @category models
  */
 export interface Config<
   Stream extends boolean = never,
   Toolkit extends Toolkit.Any = never,
-  Eventkit extends Event.AnyKit = never,
-  Metrickit extends Metric.AnyKit = never,
-  Extrakit extends Extra.AnyKit = never,
+  Events extends EventKit.Any = never,
+  Metrics extends MetricKit.Any = never,
+  Extras extends ExtraKit.Any = never,
 > {
   stream: Stream;
   toolkit: Toolkit;
-  eventkit: Eventkit;
-  metrickit: Metrickit;
-  extrakit: Extrakit;
+  eventkit: Events;
+  metrickit: Metrics;
+  extrakit: Extras;
 }
 
 /**
@@ -652,7 +651,7 @@ export interface Config<
  * @see {@link Config} for a config that names what a trajectory holds.
  * @category models
  */
-export type AnyConfig = Config<boolean, Toolkit.Any, Event.AnyKit, Metric.AnyKit, Extra.AnyKit>;
+export type AnyConfig = Config<boolean, Toolkit.Any, EventKit.Any, MetricKit.Any, ExtraKit.Any>;
 
 /**
  * The config of a reading whose response parts are the whole parts a model
@@ -668,13 +667,14 @@ export type AnyConfig = Config<boolean, Toolkit.Any, Event.AnyKit, Metric.AnyKit
  *
  * It is {@link AnyConfig} with `stream` off, so the increments a streamed answer
  * arrived in are not members of its response parts. An answer that arrived in
- * increments is folded into the whole parts they complete before such a reading
- * sees it — see {@link Metric.produce}.
+ * increments is folded into the whole parts they complete before such a reading sees
+ * it — by {@link Metric.produce}, and by a {@link Exchange.Loaded.read} given a config
+ * of this kind.
  *
  * @see {@link AnyConfig} for the config that holds anything.
  * @category models
  */
-export type NonStreamConfig = Config<false, Toolkit.Any, Event.AnyKit, Metric.AnyKit, Extra.AnyKit>;
+export type NonStreamConfig = Config<false, Toolkit.Any, EventKit.Any, MetricKit.Any, ExtraKit.Any>;
 
 /**
  * The config of a reading that names no kits: it holds no tool, event, metric or
@@ -692,9 +692,9 @@ export type NonStreamConfig = Config<false, Toolkit.Any, Event.AnyKit, Metric.An
 export type UnknownConfig = Config<
   true,
   Toolkit.Empty,
-  Event.EmptyKit,
-  Metric.EmptyKit,
-  Extra.EmptyKit
+  EventKit.Empty,
+  MetricKit.Empty,
+  ExtraKit.Empty
 >;
 
 /**
@@ -720,16 +720,71 @@ export type UnknownConfig = Config<
  * of the streaming schema: one reading carries the response parts of either kind.
  *
  * @see {@link AnyConfig} for the type this is the value of.
+ * @see {@link config} for the config a trajectory of its own kits is read with.
  * @see {@link Config} for what a config names.
  * @category constants
  */
 export const anyConfig: AnyConfig = {
   stream: true,
   toolkit: Toolkit.empty,
-  eventkit: Event.makeKit(),
-  metrickit: Metric.makeKit(),
-  extrakit: Extra.makeKit(),
+  eventkit: EventKit.empty,
+  metrickit: MetricKit.empty,
+  extrakit: ExtraKit.empty,
 };
+
+/**
+ * States what a trajectory is read with: the kits its parts are read by and the variant
+ * they are in, as one config.
+ *
+ * **When to use**
+ *
+ * Use to state the kits a trajectory is read with once, rather than as a record written
+ * out at each place a part is built of it, a trajectory is made of it, or bytes are read
+ * with it.
+ *
+ * **Details**
+ *
+ * - The record is the {@link Config} itself, so what this returns is what every function
+ *   taking a config takes: nothing is added to it and no field is defaulted, so a config
+ *   states every kit it reads and how it reads them.
+ * - `stream` is read as the literal it is stated as, so a config stating `false` is one
+ *   whose response parts are whole alone, without `as const` — see {@link Config}.
+ * - It is a statement rather than a check: a kit that does not read the parts a
+ *   trajectory holds is refused where a part or a trajectory is built of it
+ *   ({@link Part}, {@link PromptPart}), rather than here.
+ *
+ * **Example** (Stating what a trajectory is read with)
+ *
+ * ```ts import.meta.vitest
+ * import { EventKit, ExtraKit, MetricKit, Toolkit, Trajectory } from "@trajs/core"
+ *
+ * // A trajectory of no kit of its own whose response parts are whole, as a program
+ * // reading its own trajectories states it.
+ * const config = Trajectory.config({
+ *   stream: false,
+ *   toolkit: Toolkit.empty,
+ *   eventkit: EventKit.empty,
+ *   metrickit: MetricKit.empty,
+ *   extrakit: ExtraKit.empty
+ * })
+ *
+ * config.stream // => false
+ * ```
+ *
+ * @see {@link Config} for what the record states.
+ * @see {@link Trajectory} for the trajectory it reads.
+ * @see {@link anyConfig} for the config that names no kit.
+ * @category constructors
+ */
+export const config = <
+  const Stream extends boolean,
+  Toolkit extends Toolkit.Any,
+  Events extends EventKit.Any,
+  Metrics extends MetricKit.Any,
+  Extras extends ExtraKit.Any,
+>(
+  config: Config<Stream, Toolkit, Events, Metrics, Extras>,
+): Config<Stream, Toolkit, Events, Metrics, Extras> => config;
 
 /**
  * A part of a trajectory of the config given.
@@ -816,6 +871,82 @@ export type Trajectory<Config extends AnyConfig, E, R> = TrajectoryStream<Config
   Readonly<Config>;
 
 /**
+ * Makes a trajectory of the parts a stream gives, carrying what they are read with.
+ *
+ * **When to use**
+ *
+ * Use when the parts of a trajectory are written in a program rather than read from
+ * an exchange — a fixture, a test, or the parts a codec of another format decoded —
+ * and they are to read as a trajectory rather than as the parts they hold.
+ *
+ * **Details**
+ *
+ * - It is stated in both call styles, as the `dual` APIs of `effect` are: given the
+ *   two at once the stream comes first, as the data an operation is of, and bound one
+ *   at a time the config is bound first, so a stream of parts is piped into what is
+ *   left — `Trajectory.make(stream, config)` and `stream.pipe(Trajectory.make(config))`
+ *   are the same call.
+ * - What a part reads as is the config's, so the parts a stream gives are judged
+ *   against the config given ({@link Part}).
+ * - The stream is not read here: it is the trajectory's parts as given, with the
+ *   config stated on it rather than read off it, so a trajectory made this way is
+ *   read as often as it is subscribed to.
+ * - It is the other direction of what an {@link Exchange.Service} does: a trajectory
+ *   read from bytes carries the config it was decoded with, and one assembled in a
+ *   program carries the config it is to be written with.
+ *
+ * **Example** (Reading parts written in a program as a trajectory)
+ *
+ * ```ts import.meta.vitest
+ * import { Effect, Stream } from "effect"
+ * import { EventKit, ExtraKit, MetricKit, Prompt, Toolkit, Trajectory } from "@trajs/core"
+ *
+ * const extrakit = ExtraKit.empty
+ * const sessionId = "01890a5d-ac96-774b-bcce-b302099a8057"
+ *
+ * // What the parts are read with: the config says how a part reads, so it is stated
+ * // beside the parts rather than on each of them.
+ * const config = Trajectory.config({
+ *   stream: true,
+ *   toolkit: Toolkit.empty,
+ *   eventkit: EventKit.empty,
+ *   metrickit: MetricKit.empty,
+ *   extrakit
+ * })
+ *
+ * const stream = Stream.make(
+ *   Trajectory.parts(config).prompt(Prompt.make("What is 2 + 2?"), { sessionId })
+ * )
+ *
+ * // The config bound alone is a function of the stream, which is what a stream of
+ * // parts is piped into — and given the two at once, the stream comes first.
+ * const piped = stream.pipe(Trajectory.make(config))
+ * const made = Trajectory.make(stream, config)
+ *
+ * const read = Array.from(await Effect.runPromise(Stream.runCollect(piped)))
+ * read.map((part) => part._tag) // => ["Prompt"]
+ * made.stream // => true
+ * made.extrakit === extrakit // => true
+ * ```
+ *
+ * @see {@link Trajectory} for what a trajectory is.
+ * @see {@link Config} for what it is read with.
+ * @see {@link Exchange.Service.save} for writing the trajectory made.
+ * @category constructors
+ */
+export const make = Function.dual<
+  <Config extends AnyConfig>(
+    config: Config,
+  ) => <E, R>(stream: TrajectoryStream<Config, E, R>) => Trajectory<Config, E, R>,
+  <Config extends AnyConfig, E, R>(
+    stream: TrajectoryStream<Config, E, R>,
+    config: Config,
+  ) => Trajectory<Config, E, R>
+>(2, <Config extends AnyConfig, E, R>(stream: TrajectoryStream<Config, E, R>, config: Config) =>
+  attach(config)(stream),
+);
+
+/**
  * The config of the trajectory two trajectories merge into: the response parts of
  * either variant, and the kits of both.
  *
@@ -831,9 +962,9 @@ export type Trajectory<Config extends AnyConfig, E, R> = TrajectoryStream<Config
  *   arrived in, and the whole parts those increments complete, which a trajectory
  *   read as streaming holds either of.
  * - A kit is the kit of both, each by the rule that kit's own merge states: the
- *   events of the two as {@link Event.EventsMerged} reads them, the tools of the two
- *   as `Toolkit.merge` reads them, the metrics as {@link Metric.MetrickitMerged} reads
- *   them, and the extra data as {@link Extra.ExtrasMerged} reads them — a
+ *   events of the two as {@link EventKit.Merged} reads them, the tools of the two
+ *   as `Toolkit.merge` reads them, the metrics as {@link MetricKit.Merged} reads
+ *   them, and the extra data as {@link ExtraKit.Merged} reads them — a
  *   contribution both name being the one of the trajectory merged second, so a kit
  *   one of them states a newer version of states over the one the other was read
  *   with.
@@ -844,9 +975,9 @@ export type Trajectory<Config extends AnyConfig, E, R> = TrajectoryStream<Config
 export type MergedConfig<Left extends AnyConfig, Right extends AnyConfig> = Config<
   Left["stream"] | Right["stream"],
   Toolkit.Toolkit<Toolkit.MergedTools<readonly [Left["toolkit"], Right["toolkit"]]>>,
-  Event.Eventkit<Event.EventsMerged<readonly [Left["eventkit"], Right["eventkit"]]>>,
-  Metric.MetrickitMerged<readonly [Left["metrickit"], Right["metrickit"]]>,
-  Extra.Extrakit<Extra.ExtrasMerged<readonly [Left["extrakit"], Right["extrakit"]]>>
+  EventKit.Merged<readonly [Left["eventkit"], Right["eventkit"]]>,
+  MetricKit.Merged<readonly [Left["metrickit"], Right["metrickit"]]>,
+  ExtraKit.Merged<readonly [Left["extrakit"], Right["extrakit"]]>
 >;
 
 /**
@@ -872,7 +1003,7 @@ export type MergedConfig<Left extends AnyConfig, Right extends AnyConfig> = Conf
  *   of both belong to. What a fork names is read against the parts of the merged
  *   trajectory, which hold every part of either.
  * - The metric kit of the merged trajectory states the producers of the two where
- *   both state theirs, and none where one does not, as {@link Metric.MetrickitMerged}
+ *   both state theirs, and none where one does not, as {@link MetricKit.Merged}
  *   reads the two: a kit that states the producer of some of its metrics alone is not
  *   one {@link Metric.produce} can run.
  *
@@ -880,21 +1011,25 @@ export type MergedConfig<Left extends AnyConfig, Right extends AnyConfig> = Conf
  *
  * ```ts import.meta.vitest
  * import { Effect, Stream } from "effect"
- * import { Event, Extra, Metric, Produce, Prompt, Toolkit, Trajectory } from "@trajs/core"
+ * import { EventKit, ExtraKit, MetricKit, Produce, Prompt, Toolkit, Trajectory } from "@trajs/core"
  *
- * const extrakit = Extra.makeKit()
- * const metrickit = Metric.toProducers(Metric.makeKit(), {})
+ * const extrakit = ExtraKit.empty
+ * const metrickit = MetricKit.toProducers(MetricKit.empty, {})
  * const sessionId = "01890a5d-ac96-774b-bcce-b302099a8057"
+ *
+ * // What a half of the session is produced and read with.
+ * const config = Trajectory.config({
+ *   stream: true,
+ *   toolkit: Toolkit.empty,
+ *   eventkit: EventKit.empty,
+ *   metrickit,
+ *   extrakit
+ * })
  *
  * // A half of the session: what was asked, produced as a trajectory of its own.
  * const half = (content: string) =>
- *   Produce.fromSession({
- *     toolkit: Toolkit.empty,
- *     eventkit: Event.makeKit(),
- *     metrickit,
- *     extrakit
- *   })(Stream.make(
- *     Trajectory.promptPart(extrakit)(Prompt.make(content), { sessionId })
+ *   Produce.fromSession(config)(Stream.make(
+ *     Trajectory.parts(config).prompt(Prompt.make(content), { sessionId })
  *   ))
  *
  * const merged = Trajectory.merge(
@@ -908,27 +1043,30 @@ export type MergedConfig<Left extends AnyConfig, Right extends AnyConfig> = Conf
  * ```
  *
  * @see {@link MergedConfig} for what the merged trajectory is read with.
- * @see {@link Event.mergeKit} for how the kits of the two are added to each other.
+ * @see {@link EventKit.merge} for how the kits of the two are added to each other.
  * @category combinators
  */
 export const merge = <Left extends AnyConfig, Right extends AnyConfig, E, R, E2, R2>(
   left: Trajectory<Left, E, R>,
   right: Trajectory<Right, E2, R2>,
 ): Trajectory<MergedConfig<Left, Right>, E | E2, R | R2> => {
-  const parts = Stream.concat(left, right);
-
-  // SAFETY: the config stated here is the one `MergedConfig` reads off the two
-  // trajectories — a kit is each kit's own merge of the two, and the variant is the
-  // one either of them streams in — so what is merged is a trajectory of that
-  // config. The parts are those of both, which `Part` reads as such: the parts of a
-  // trajectory whose response parts are whole are members of the streaming schema
-  // too, and a merged trajectory that streams states nothing of the parts of one
-  // that does not.
-  return Object.assign(parts, {
+  // The config is the one `MergedConfig` reads off the two trajectories — a kit is each
+  // kit's own merge of the two, and the variant is the one either of them streams in —
+  // so what is merged is a trajectory of that config, and the parts of the two are
+  // what a trajectory of it holds.
+  const merged = config({
     stream: left.stream || right.stream,
     toolkit: Toolkit.merge(left.toolkit, right.toolkit),
-    eventkit: Event.mergeKit(left.eventkit, right.eventkit),
-    metrickit: Metric.mergeKit(left.metrickit, right.metrickit),
-    extrakit: Extra.mergeKit(left.extrakit, right.extrakit),
-  }) as Trajectory<MergedConfig<Left, Right>, E | E2, R | R2>;
+    eventkit: EventKit.merge(left.eventkit, right.eventkit),
+    metrickit: MetricKit.merge(left.metrickit, right.metrickit),
+    extrakit: ExtraKit.merge(left.extrakit, right.extrakit),
+  });
+
+  // SAFETY: the parts merged are those of both, which `merged` reads as such: the parts of
+  // a trajectory whose response parts are whole are members of the streaming schema too,
+  // and a merged trajectory that streams states nothing of the parts of one that does not.
+  return make(
+    Stream.concat(left, right) as TrajectoryStream<MergedConfig<Left, Right>, E | E2, R | R2>,
+    merged,
+  );
 };

@@ -152,7 +152,7 @@ metric and the producer a kit derives its data with.
 
 ```ts
 import { Tokenizer, makeProducer, metrickit, tokenEstimate } from "@trajs/extension-tokenize";
-import { Metric } from "@trajs/core";
+import { Metric, MetricKit } from "@trajs/core";
 import { Effect } from "effect";
 
 // The tokenizer is the producer's own dependency, so it is provided around the
@@ -163,7 +163,7 @@ const producer = await Effect.runPromise(
   makeProducer().pipe(Effect.provide(Tokenizer.layerOpenAi({ model: "gpt-4o" }))),
 );
 
-const runnable = Metric.toProducers(metrickit, {
+const runnable = MetricKit.toProducers(metrickit, {
   [tokenEstimate.tag]: producer,
 });
 

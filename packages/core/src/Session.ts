@@ -213,21 +213,14 @@ export type AnySessions = Sessions<Trajectory.AnyConfig, any, any>;
  *
  * ```ts import.meta.vitest
  * import { Effect, Option, Stream } from "effect"
- * import { Extra, Prompt, Session, Trajectory } from "@trajs/core"
+ * import { Prompt, Session, Trajectory } from "@trajs/core"
  *
- * const extrakit = Extra.makeKit()
+ * const part = Trajectory.parts(Trajectory.anyConfig)
  *
- * const asked = Trajectory.promptPart(extrakit)(
- *   Prompt.make("What is a fork?"),
- *   { sessionId: "asking" }
- * )
- * const forking = Trajectory.sessionPart(extrakit)("reply", { fork: asked.uuid })
+ * const asked = part.prompt(Prompt.make("What is a fork?"), { sessionId: "asking" })
+ * const forking = part.session("reply", { fork: asked.uuid })
  *
- * const trajectory = Stream.make(
- *   Trajectory.sessionPart(extrakit)("asking"),
- *   asked,
- *   forking
- * )
+ * const trajectory = Stream.make(part.session("asking"), asked, forking)
  *
  * const roots = Array.from(await Effect.runPromise(Stream.runCollect(Session.toSessions(trajectory))))
  * roots.map((session) => session.id) // => ["asking"]

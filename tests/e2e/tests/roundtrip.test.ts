@@ -7,7 +7,7 @@
  * the packages over a file a program would keep, rather than any one of them.
  */
 import { NodeServices as PlatformNodeServices } from "@effect/platform-node";
-import { Event, Extra, Metric, Prompt, Response, Toolkit, Trajectory } from "@trajs/core";
+import { EventKit, ExtraKit, MetricKit, Prompt, Response, Toolkit, Trajectory } from "@trajs/core";
 import { Exchange } from "@trajs/core/Exchange";
 import core from "@trajs/core/package.json" with { type: "json" };
 import { NodeServices } from "@trajs/platform-node";
@@ -23,35 +23,35 @@ const session = "01890a5d-ac96-774b-bcce-b302099a8057";
 const question = "what is the weather in SF";
 
 /** No extra data is declared, since none of it is stated of the parts below. */
-const extrakit = Extra.makeKit();
+const extrakit = ExtraKit.empty;
 
 /**
  * The kits the trajectory is built and read with: no tools, no events, no metrics,
  * and a response part stated whole rather than as the increments of a stream.
  */
-const config = {
-  stream: false as const,
+const config = Trajectory.config({
+  stream: false,
   toolkit: Toolkit.empty,
-  eventkit: Event.makeKit(),
-  metrickit: Metric.makeKit(),
+  eventkit: EventKit.empty,
+  metrickit: MetricKit.empty,
   extrakit,
-};
+});
+
+/** The builders of those parts, under the config they are read with. */
+const part = Trajectory.parts(config);
 
 /** The parts of the trajectory, in the one order a trajectory carries them in. */
 const parts = [
-  Trajectory.sessionPart(extrakit)(session),
-  Trajectory.promptPart(extrakit)(Prompt.make(question), { sessionId: session }),
-  Trajectory.responsePart({ toolkit: Toolkit.empty, extrakit, stream: false })(
-    Response.makePart("text", { text: "let me look that up" }),
-    { sessionId: session },
-  ),
+  part.session(session),
+  part.prompt(Prompt.make(question), { sessionId: session }),
+  part.response(Response.makePart("text", { text: "let me look that up" }), { sessionId: session }),
 ];
 
 /**
  * The trajectory the parts make, as an exchange is given one: the parts as a
  * stream, carrying the kits they are read under.
  */
-const trajectory = Object.assign(Stream.fromIterable(parts), config);
+const trajectory = Trajectory.make(config)(Stream.fromIterable(parts));
 
 /** The file system a Node program reads and writes through, under the layer that states it. */
 const nodeFileSystem = Layer.merge(NodeServices.layer(), layerFileSystem);

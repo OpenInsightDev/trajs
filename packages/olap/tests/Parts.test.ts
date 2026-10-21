@@ -9,8 +9,10 @@
 
 import {
   Event,
-  Extra,
+  EventKit,
+  ExtraKit,
   Metric,
+  MetricKit,
   Prompt,
   Response,
   Toolkit,
@@ -27,31 +29,31 @@ import * as Parts from "#/Parts.ts";
 const session = "01890a5d-ac96-774b-bcce-b302099a8057";
 
 /** No extra data is declared, since none of it is stated of the parts below. */
-const extrakit = Extra.makeKit();
+const extrakit = ExtraKit.empty;
 
 /** The kits the trajectory is built with: no tools, no events, and whole response parts. */
-const config = {
-  stream: false as const,
+const config = Trajectory.config({
+  stream: false,
   toolkit: Toolkit.empty,
-  eventkit: Event.makeKit(),
-  metrickit: Metric.makeKit(),
+  eventkit: EventKit.empty,
+  metrickit: MetricKit.empty,
   extrakit,
-};
+});
 
-/** The one response part builder the parts below are built with. */
-const responsePart = Trajectory.responsePart({ toolkit: Toolkit.empty, extrakit, stream: false });
+/** The builders of the parts below, under the config they are read with. */
+const part = Trajectory.parts(config);
 
 /** When the conversation was produced, so the moment a row states is one a test can state. */
 const at = DateTime.makeUnsafe("2026-01-01T00:00:00.000Z");
 
 /** The parts of a short conversation, in the one order a trajectory carries them in. */
 const parts = [
-  Trajectory.sessionPart(extrakit)(session),
-  Trajectory.promptPart(extrakit)(Prompt.make("what is the weather in SF"), {
+  part.session(session),
+  part.prompt(Prompt.make("what is the weather in SF"), {
     sessionId: session,
     timestamp: at,
   }),
-  responsePart(
+  part.response(
     Response.anyToolCallPart({
       id: "call_1",
       name: "get_weather",
@@ -60,7 +62,7 @@ const parts = [
     }),
     { sessionId: session, timestamp: at },
   ),
-  responsePart(
+  part.response(
     Response.makePart("finish", {
       reason: "tool-calls",
       usage: new Response.Usage({
@@ -73,7 +75,7 @@ const parts = [
 ];
 
 /** The trajectory those parts make, as an ingest is given one. */
-const trajectory = Object.assign(Stream.fromIterable(parts), config);
+const trajectory = Trajectory.make(config)(Stream.fromIterable(parts));
 
 /** What a program on Node runs the embedded engine and the exchange through. */
 const Embedded = layerEmbedded();
@@ -123,20 +125,23 @@ it("states what an event and a metric name, and the session a metric does not st
     failure: Schema.Struct({ version: Schema.Literal("0.1.0") }).pipe(VersionedSchema.make),
   });
 
-  const eventkit = Event.makeKit(step);
-  const metrickit = Metric.makeKit(measured);
+  const eventkit = EventKit.make(step);
+  const metrickit = MetricKit.make(measured);
 
-  const eventPart = Trajectory.EventPart(eventkit).make({
-    event: Event.EventPart(step.tag, step.schema).make({ data: { version: "0.1.0", index: 1 } }),
-    sessionId: session,
-    timestamp: at,
-  });
+  // What the trajectory that holds them is read with, and the parts of it built under it.
+  const kitted = Trajectory.config({ ...config, eventkit, metrickit });
+  const described = Trajectory.parts(kitted);
+
+  const eventPart = described.event(
+    Event.EventPart(step.tag, step.schema).make({ data: { version: "0.1.0", index: 1 } }),
+    { sessionId: session, timestamp: at },
+  );
 
   // A metric part is what a producer of its metric reported, read through the kit
   // that names the metric — so the part is produced rather than written out.
   const reports = Array.from(
     await Metric.produce(
-      Metric.toProducers(metrickit, {
+      MetricKit.toProducers(metrickit, {
         "test/tokens": () =>
           Stream.make(
             Metric.makeOutput<typeof measured>(
@@ -145,19 +150,12 @@ it("states what an event and a metric name, and the session a metric does not st
             ),
           ),
       }),
-    )(Object.assign(Stream.empty, config)).pipe(Stream.runCollect, Effect.runPromise),
+    )(Trajectory.make(config)(Stream.empty)).pipe(Stream.runCollect, Effect.runPromise),
   );
 
-  const metricPart = Trajectory.MetricPart(metrickit).make({
-    metric: reports[0]!,
-    timestamp: at,
-  });
+  const metricPart = described.metric(reports[0]!, { timestamp: at });
 
-  const trajectory = Object.assign(Stream.fromIterable([eventPart, metricPart]), {
-    ...config,
-    eventkit,
-    metrickit,
-  });
+  const trajectory = Trajectory.make(kitted)(Stream.fromIterable([eventPart, metricPart]));
 
   const rows = Array.from(
     await Parts.rows("digest")(trajectory).pipe(Stream.runCollect, Effect.runPromise),
