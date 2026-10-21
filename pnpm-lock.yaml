@@ -363,9 +363,6 @@ importers:
       '@trajs/platform-node':
         specifier: workspace:*
         version: link:../../packages/platform-node
-      '@trajs/utils':
-        specifier: workspace:*
-        version: link:../../packages/utils
       effect:
         specifier: 'catalog:'
         version: 4.0.2

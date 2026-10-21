@@ -25,3 +25,7 @@ services are read through, and [`@trajs/core`](../core)'s `Exchange.layer` is bu
 over them. A `ByteStore` is provided by a program instead — in memory with
 `ByteStore.layer`, or in the key/value store it keeps its bytes in with
 `ByteStore.layerKVStore` — and a trajectory read with its bytes kept requires one.
+
+Every module here is re-exported by [`@trajs/core`](../core): a program reads the
+services a trajectory is carried through from the core package rather than from this
+one.

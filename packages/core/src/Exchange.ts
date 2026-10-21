@@ -6,10 +6,10 @@
  * trajectory into its bytes, and {@link Service.load} reads back what a trajectory
  * states of itself, the metadata it ends with, and the trajectory its parts make. An
  * exchange performs no IO of its own — what writes and reads the bytes is a storage, a
- * compression and a hash from `@trajs/utils`, provided with a layer such as
- * {@link Exchange.layer} or one a platform package states — and a reading that keeps the
- * bytes of a frame between its readings requires a store of sequences beside them
- * ({@link Loaded.readCached}).
+ * compression and a hash ({@link Storage}, {@link Compression}, {@link StreamHash}),
+ * provided with a layer such as {@link Exchange.layer} or one a platform package states —
+ * and a reading that keeps the bytes of a frame between its readings requires a store of
+ * sequences beside them ({@link Loaded.readCached}).
  */
 
 import type { ByteStore, ByteStoreError } from "@trajs/utils/ByteStore";
@@ -256,7 +256,7 @@ export interface Loaded {
    * with them: the bytes are the frame a trajectory is carried in, so they are read as
    * the kits any reading of it states.
    *
-   * The store is a store of byte sequences (`@trajs/utils`'s `ByteStore`), which a
+   * The store is a store of byte sequences ({@link ByteStore}), which a
    * reading of a trajectory this way requires and one through {@link Loaded.read} does
    * not: a store's layers are their own — memory, a file system, a database — so where
    * the bytes live is the program's to say, and one that reads a trajectory again
@@ -391,12 +391,12 @@ export class Exchange extends Context.Service<Exchange, Service>()("trajs/core/E
    * What writes and reads that frame is the compression the layer is provided with,
    * what hashes the parts is the hash it is provided with, and what holds the bytes of a
    * trajectory is the storage — so the layer requires all three rather than holding any.
-   * These are `@trajs/utils`'s services: a program provides the layer a platform package
-   * states them with, such as `@trajs/platform-node` or `@trajs/platform-browser`. A
-   * reading that keeps the bytes of a frame requires a store of sequences beside them
-   * ({@link Loaded.readCached}), which this layer holds no more than it holds a storage:
-   * a program provides one (`@trajs/utils`'s `ByteStore.layer`) where it reads
-   * trajectories again.
+   * These are `@trajs/utils`'s services, re-exported here: a program provides the layer a
+   * platform package states them with, such as `@trajs/platform-node` or
+   * `@trajs/platform-browser`. A reading that keeps the bytes of a frame requires a store
+   * of sequences beside them ({@link Loaded.readCached}), which this layer holds no more
+   * than it holds a storage: a program provides one ({@link ByteStore.layer}) where it
+   * reads trajectories again.
    *
    * @see {@link Service} for the exchange the layer provides.
    * @category constructors

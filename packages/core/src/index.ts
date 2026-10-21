@@ -1,9 +1,13 @@
 /**
  * The core package: what a trajectory is, the kits that describe what extensions
- * contribute to one, and the {@link Exchange} that carries a trajectory as bytes.
+ * contribute to one, and the {@link Exchange} that carries a trajectory as bytes —
+ * beside the services a trajectory is carried through, which `@trajs/utils` states
+ * and this package re-exports, so that a program reads a trajectory and provides what
+ * reads it from `@trajs/core` alone.
  *
- * Every module is re-exported as a namespace — `Metric.Metric`, `Trajectory.Part`
- * — and each is also available as a subpath import such as `@trajs/core/Metric`.
+ * Every module is re-exported as a namespace — `Metric.Metric`,
+ * `Storage.layerFileSystem` — and each of this package's own modules is also
+ * available as a subpath import such as `@trajs/core/Metric`.
  */
 
 export * as Event from "#/Event.ts";
@@ -39,3 +43,7 @@ export * as TrajectoryError from "#/TrajectoryError.ts";
 export * as VersionedSchema from "#/VersionedSchema.ts";
 
 export * as View from "#/View.ts";
+
+// The services a trajectory is carried through, which `@trajs/utils` states: re-exported
+// so that a program reads and writes a trajectory through `@trajs/core` alone.
+export * from "@trajs/utils";

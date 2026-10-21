@@ -3,6 +3,10 @@
 `README.md` states what the example is and lists its cases; this file is how a case is
 written.
 
+A case is written against `@trajs/core` alone — the services a trajectory is carried
+through, a storage, a compression and a hash, are re-exported there — so no case imports
+`@trajs/utils`, which this package does not depend on.
+
 A case's `main` is an `Effect`, so its assertion is registered with `it.effect` from
 [`@effect/vitest`](https://github.com/Effect-TS/effect/tree/main/packages/vitest): the
 Effect runs as the test, and failing or dying is what fails it.
