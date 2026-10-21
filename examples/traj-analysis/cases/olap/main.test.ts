@@ -18,10 +18,9 @@
 
 import { NodeServices as PlatformNodeServices } from "@effect/platform-node";
 import { expect, it } from "@effect/vitest";
-import { Exchange } from "@trajs/core";
+import { Exchange, Storage } from "@trajs/core";
 import { Clickhouse } from "@trajs/olap";
 import { NodeServices } from "@trajs/platform-node";
-import { layerFileSystem } from "@trajs/utils/Storage";
 import { Effect, Layer } from "effect";
 
 import { generation, meanOf, writeFixtures } from "./fixture.ts";
@@ -74,7 +73,7 @@ interface Report {
 }
 
 /** The file system the fixtures are kept in, and the codecs that carry and name a trajectory. */
-const storage = Layer.merge(NodeServices.layer(), layerFileSystem);
+const storage = Layer.merge(NodeServices.layer(), Storage.layerFileSystem);
 
 /**
  * What the program is made of: the file system of a Node program, the exchange

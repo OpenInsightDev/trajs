@@ -14,10 +14,9 @@
 
 import { NodeServices as PlatformNodeServices } from "@effect/platform-node";
 import { expect, it } from "@effect/vitest";
-import { Exchange } from "@trajs/core";
+import { Exchange, Storage } from "@trajs/core";
 import type { Tokens } from "@trajs/extension-tokenize";
 import { NodeServices } from "@trajs/platform-node";
-import { layerFileSystem } from "@trajs/utils/Storage";
 import { Effect, Layer, Result, Stream } from "effect";
 
 import { config, Fixture, writeFixture } from "./produce.ts";
@@ -79,7 +78,7 @@ interface Reading {
 }
 
 /** The file storage a Node program keeps its trajectories in, beside the codecs that carry and name them. */
-const nodeFileSystem = Layer.merge(NodeServices.layer(), layerFileSystem);
+const nodeFileSystem = Layer.merge(NodeServices.layer(), Storage.layerFileSystem);
 
 /**
  * What the program is made of: the file system of a Node program, and the exchange reading and
