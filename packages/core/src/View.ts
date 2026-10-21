@@ -1,16 +1,16 @@
 /**
- * Ways of reading a trajectory as what it holds rather than as the parts it arrived
- * in: {@link promptTurns} groups the parts of one into the turns a model was given
- * and answered, folding the increments of a streamed response into the parts they
- * complete, {@link prompt} folds those turns back into the one prompt a model was
- * given, {@link conversations} reads a trajectory session by session, as the
- * messages each of them ran on — which is what a provider's API is handed — and
- * {@link toolTurns} reads it as the calls it made with its tools, each with the
- * result it was answered with.
+ * Ways of reading the parts of a session as what they say rather than as the parts they were
+ * produced as: {@link promptTurns} groups them into the turns a model was given and answered,
+ * folding the increments of a streamed response into the parts they complete, {@link prompt}
+ * folds those turns back into the one prompt a model was given, {@link conversations} reads
+ * the sessions of a trajectory as the messages each of them ran on — which is what a
+ * provider's API is handed — and {@link toolTurns} reads them as the calls a model made with
+ * its tools, each with the result it was answered with.
  *
- * A trajectory is one stream of parts in total order — see {@link Trajectory} — so
- * what a model was given and what it returned are read by grouping the parts that
- * follow one another: no part names the turn it belongs to.
+ * What each of them reads is the parts of one session ({@link Trajectory.SessionStream}),
+ * which {@link Trajectory.toSessions} reads apart from the one stream a trajectory holds
+ * them in. {@link conversations} reads every session a trajectory holds at once; the others
+ * read one of them — `View.promptTurns(session.stream)`, say.
  */
 
 import type { Effect, Stream } from "effect";
@@ -25,21 +25,21 @@ import type { TrajectoryError } from "#/TrajectoryError.ts";
 type Tools<Config extends Trajectory.AnyConfig> = Config["toolkit"]["tools"];
 
 /**
- * One turn of a trajectory: the prompt part a model was given, and the parts it
- * answered that prompt with.
+ * One turn of a session: the prompt part a model was given, and the parts it answered that
+ * prompt with.
  *
  * **When to use**
  *
- * Use to type a turn read from a trajectory — what {@link promptTurns} emits — such
- * as to read a conversation one turn at a time.
+ * Use to type a turn read from a session — what {@link promptTurns} emits — such as to read
+ * a conversation one turn at a time.
  *
  * **Details**
  *
- * The response is what the model returned for that prompt alone, as whole parts: a
- * response part produced as the increments of a streamed one reads as the part they
- * complete, and a trajectory whose response parts are whole already reads as itself.
- * Nothing else of a trajectory is part of a turn — a session declaration, an event
- * or a metric part a trajectory holds between a prompt and its responses is read past.
+ * The response is what the model returned for that prompt alone, as whole parts: a response
+ * part produced as the increments of a streamed one reads as the part they complete, and
+ * parts whose response parts are whole already read as themselves. Nothing else of a session
+ * is part of a turn — an event or a metric part the parts hold between a prompt and its
+ * responses is read past.
  *
  * @see {@link promptTurns} for the reader that emits one turn per prompt given.
  * @category models
@@ -50,37 +50,31 @@ export type PromptTurn<Config extends Trajectory.AnyConfig> = Readonly<{
 }>;
 
 /**
- * Reads a trajectory as the turns its conversation was produced in.
+ * Reads the parts of a session as the turns its conversation was produced in.
  *
  * **When to use**
  *
- * Use to read a trajectory as what a model was given and what it answered, one turn
- * at a time, rather than as the parts it arrived in: to display a conversation, to
- * score it, or to hand it to a format that states a run as its turns.
+ * Use to read what a model was given and what it answered one turn at a time, rather than as
+ * the parts they were produced as: to display a conversation, to score it, or to hand it to a
+ * format that states a run as its turns.
  *
  * **Details**
  *
- * - A prompt part opens a turn, and every response part that follows it is produced
- *   on that turn, whichever form the trajectory was written in: the increments of a
- *   streamed response are folded into the parts they complete, and a response part
- *   that is whole already is produced as itself.
- * - A response part the open turn is not the prompt of — one no prompt precedes, or
- *   one of another session — belongs to no turn and is dropped.
- * - A prompt part with no response reads as its messages alone: it opens a turn
- *   whether or not a model answered it.
- * - The turn a trajectory ends in is emitted when the trajectory ends, since no
- *   prompt part follows it to close it.
- * - Only prompt and response parts open, extend or close a turn: a session
- *   declaration, an event or a metric part is read past.
+ * - A prompt part opens a turn, and every response part that follows it is produced on that
+ *   turn, whichever form the parts were written in: the increments of a streamed response are
+ *   folded into the parts they complete, and a response part that is whole already is produced
+ *   as itself.
+ * - The parts are of one session ({@link Trajectory.SessionStream}), so a response part is on
+ *   the turn the prompt before it opened: one no prompt precedes is on no turn, and is dropped
+ *   rather than carried.
+ * - A prompt part with no response reads as its messages alone: it opens a turn whether or not
+ *   a model answered it.
+ * - The turn the parts end in is emitted when they end, since no prompt part follows it to
+ *   close it.
+ * - Only prompt and response parts open, extend or close a turn: an event or a metric part the
+ *   parts hold between them is read past.
  *
- * FIXME: the response dropped is not carried anywhere, and interleaved sessions are what
- * {@link Produce.fromSessions} produces, so a trajectory of several sessions loses every
- * response that arrives while another session's prompt is open rather than reading one
- * session at a time. A turn belongs to the session that produced it, which is what
- * {@link conversations} reads of the messages alone: this reader should read the turns of
- * each session, or refuse a trajectory that holds several.
- *
- * **Example** (Reading a trajectory as its turns)
+ * **Example** (Reading the parts of a session as their turns)
  *
  * ```ts import.meta.vitest
  * import { Effect, Stream } from "effect"
@@ -89,54 +83,44 @@ export type PromptTurn<Config extends Trajectory.AnyConfig> = Readonly<{
  * const sessionId = "01890a5d-ac96-774b-bcce-b302099a8057"
  * const part = Trajectory.parts(Trajectory.anyConfig)
  *
- * // A trajectory of one exchange: what a model was given, and what it returned for
- * // it as one whole part.
- * const trajectory = Stream.make(
+ * // What one session's model was given, and what it returned for it as one whole part.
+ * const stream = Stream.make(
  *   part.prompt(Prompt.make("What is 2 + 2?"), { sessionId }),
  *   part.response(Response.makePart("text", { text: "4" }), { sessionId })
  * )
  *
- * const turns = await Effect.runPromise(Stream.runCollect(View.promptTurns(trajectory)))
+ * const turns = await Effect.runPromise(Stream.runCollect(View.promptTurns(stream)))
  *
  * Array.from(turns).map((turn) => turn.response.map((part) => part.type)) // => [["text"]]
  * ```
  *
  * @see {@link PromptTurn} for the turn it emits.
- * @see {@link Trajectory.Part} for the parts it reads.
+ * @see {@link Trajectory.Session.stream} for the parts a session is read by.
  * @category combinators
  */
 export const promptTurns = <Config extends Trajectory.AnyConfig, E, R>(
-  trajectory: Trajectory.TrajectoryStream<Config, E, R>,
-): Stream.Stream<PromptTurn<Config>, E, R> => readTurns(trajectory);
+  stream: Trajectory.SessionStream<Config, E, R>,
+): Stream.Stream<PromptTurn<Config>, E, R> => readTurns(stream);
 
 /**
- * Folds a trajectory back into the prompt its model was given.
+ * Folds the parts of a session back into the prompt its model was given.
  *
  * **When to use**
  *
- * Use when the conversation a trajectory ran on is to be continued, evaluated or
- * inspected as one prompt rather than turn by turn.
+ * Use when the conversation a session ran on is to be continued, evaluated or inspected as
+ * one prompt rather than turn by turn.
  *
  * **Details**
  *
- * The turns of {@link promptTurns} are concatenated in the order they were produced
- * — each prompt part followed by the responses folded for it — so the result holds
- * the messages of the whole trajectory rather than of one turn.
+ * The turns of {@link promptTurns} are concatenated in the order they were produced — each
+ * prompt part followed by the responses folded for it — so the result holds the messages of
+ * the whole session rather than of one turn: what it inherited from the sessions it continues
+ * from, and what it produced itself.
  *
- * The prompt folded is that of one session alone, since a prompt that mixes the
- * turns of several is one no model was ever given. A session declaration is read
- * past where it opens the trajectory — a session is declared before the parts it
- * produced — but a declaration read after those parts declares another session, and
- * the reading fails with the {@link TrajectoryError} that names it: a
- * {@link TrajectoryError.SessionError} whose reason is `"several-sessions"`. Read
- * one session of a trajectory that holds several with {@link Session.of}, whose
- * parts begin with the declaration of that session.
+ * The effect fails with what reading the parts fails with — `E` — and requires the services
+ * `R` names.
  *
- * The effect fails with the trajectory's failure — `E` on top of the
- * {@link TrajectoryError} a produced trajectory fails with — and requires the
- * services `R` names.
- *
- * **Example** (Folding a trajectory back into the prompt a model was given)
+ * **Example** (Folding the parts of a session back into the prompt its model was given)
  *
  * ```ts import.meta.vitest
  * import { Effect, Stream } from "effect"
@@ -145,67 +129,63 @@ export const promptTurns = <Config extends Trajectory.AnyConfig, E, R>(
  * const sessionId = "01890a5d-ac96-774b-bcce-b302099a8057"
  * const part = Trajectory.parts(Trajectory.anyConfig)
  *
- * // A trajectory of one session: what a model was given, and what it answered.
- * const trajectory = Stream.make(
- *   part.session(sessionId),
+ * // What one session's model was given, and what it answered.
+ * const stream = Stream.make(
  *   part.prompt(Prompt.make("What is 2 + 2?"), { sessionId }),
  *   part.response(Response.makePart("text", { text: "4" }), { sessionId })
  * )
  *
- * const folded = await Effect.runPromise(View.prompt(trajectory))
+ * const folded = await Effect.runPromise(View.prompt(stream))
  * folded.content.map((message) => message.role) // => ["user", "assistant"]
  * ```
  *
  * @see {@link promptTurns} for the turns it is folded from.
  * @see {@link PromptTurn} for a turn of the conversation on its own.
- * @see {@link Session.of} for reading one session of a trajectory that holds several.
+ * @see {@link Trajectory.Session.stream} for the parts a session is read by.
  * @category combinators
  */
 export const prompt = <Config extends Trajectory.AnyConfig, E, R>(
-  trajectory: Trajectory.TrajectoryStream<Config, E, R>,
-): Effect.Effect<Prompt.Prompt, E | TrajectoryError, R> => readPrompt(trajectory);
+  stream: Trajectory.SessionStream<Config, E, R>,
+): Effect.Effect<Prompt.Prompt, E, R> => readPrompt(stream);
 
 /**
- * The messages of one session of a trajectory, as the conversation it ran in: the
- * messages the session produced, and the ones it inherited from the sessions it
- * continues from.
+ * The messages of one session, as the conversation it ran in: the ones it inherited from the
+ * sessions it continues from, and the ones it produced itself.
  *
  * **When to use**
  *
- * Use to type a conversation read from a trajectory — what {@link conversations}
- * returns — such as to write one as a provider's API states it.
+ * Use to type a conversation read from a session — what {@link conversations} returns — such
+ * as to write one as a provider's API states it.
  *
- * @see {@link conversations} for the operation that reads a trajectory as them.
+ * @see {@link conversations} for the operation that reads sessions as them.
  * @category models
  */
 export type Conversation = ReadonlyArray<Prompt.Message>;
 
 /**
- * Reads a trajectory as the conversations its sessions ran in, one conversation per
+ * Reads the sessions of a trajectory as the conversations they ran in, one conversation per
  * session, keyed by the id of the session.
  *
  * **When to use**
  *
- * Use to read a trajectory as the messages each of its sessions was given and
- * answered — to write them as a provider's API states them, or to inspect what one
- * session's model saw — rather than as the single stream its parts arrived in.
+ * Use to read a trajectory as the messages each of its sessions was given and answered — to
+ * write them as a provider's API states them, or to inspect what one session's model saw —
+ * rather than as the single stream its parts arrived in.
  *
  * **Details**
  *
- * - A session's conversation is the messages the session produced, preceded by the
- *   ones it inherited: what the sessions it continues from produced up to the part
- *   it continues from, from the root of the fork down. A session that continues from
- *   nothing is read as the messages it produced alone.
- * - The messages of a session are its prompts and the responses to them, folded the
- *   way {@link prompt} folds a trajectory: a session declaration is read past, and
- *   the increments of a streamed response into the parts they complete.
- * - A session appears whether or not it produced a conversation: a session whose
- *   parts hold no prompt is one that ran on what it inherited alone, and is read as
- *   that.
+ * - A session's conversation is the messages of what it ran on: what it inherited from the
+ *   sessions it continues from, up to the part each of them is continued from, and what it
+ *   produced itself ({@link Trajectory.Session.stream}).
+ * - The messages of a session are its prompts and the responses to them, folded the way
+ *   {@link prompt} folds a trajectory: the increments of a streamed response into the parts
+ *   they complete, and what a kit produced of the session beside them read past.
+ * - A session appears whether or not it produced a conversation: a session whose parts hold no
+ *   prompt is one that ran on what it inherited alone, and is read as that.
  *
- * The effect fails with what reading the trajectory's sessions fails with — `E` on
- * top of the {@link TrajectoryError} a trajectory whose sessions cannot be read fails
- * with — and requires the services `R` names.
+ * The effect fails with what reading the parts of a session fails with — the {@link TrajectoryError}
+ * a trajectory whose parts cannot be read fails with, on top of what the store they are kept in
+ * fails with — and requires the services `R` names.
  *
  * **Example** (Reading a trajectory as the conversation of each of its sessions)
  *
@@ -223,29 +203,33 @@ export type Conversation = ReadonlyArray<Prompt.Message>;
  *
  * // One session asks and is answered, and a session forked off the answer asks again:
  * // its conversation is the answer that was given, then its own question.
- * const trajectory = Stream.make(
- *   part.session("asking"),
- *   asked,
- *   answered,
- *   part.session("reply", { fork: answered.uuid }),
- *   part.prompt(Prompt.make("And what does it hold?"), { sessionId: "reply" })
+ * const trajectory = Trajectory.make(
+ *   Stream.make(
+ *     part.session("asking"),
+ *     asked,
+ *     answered,
+ *     part.session("reply", { fork: answered.uuid }),
+ *     part.prompt(Prompt.make("And what does it hold?"), { sessionId: "reply" })
+ *   ),
+ *   Trajectory.anyConfig
  * )
  *
- * const conversations = await Effect.runPromise(View.conversations(trajectory))
+ * const sessions = await Effect.runPromise(Trajectory.toSessions(trajectory))
+ * const conversations = await Effect.runPromise(View.conversations(sessions))
  *
  * conversations["asking"]?.map((message) => message.role) // => ["user", "assistant"]
  * conversations["reply"]?.map((message) => message.role) // => ["user", "assistant", "user"]
  * ```
  *
  * @see {@link Conversation} for one session's messages.
- * @see {@link Session.toSessions} for the sessions a trajectory is read as.
- * @see {@link prompt} for the whole trajectory read as one prompt instead.
+ * @see {@link Trajectory.toSessions} for the sessions it is given.
+ * @see {@link prompt} for one session's messages read as one prompt instead.
  * @category combinators
  */
 export const conversations = <Config extends Trajectory.AnyConfig, E, R>(
-  trajectory: Trajectory.TrajectoryStream<Config, E, R>,
+  sessions: Trajectory.Sessions<Config, E, R>,
 ): Effect.Effect<Record<string, Conversation>, E | TrajectoryError, R> =>
-  readConversations(trajectory);
+  readConversations(sessions);
 
 /**
  * One tool turn of a trajectory: a tool a model called, and the result that call was
@@ -272,37 +256,35 @@ export type ToolTurn<Config extends Trajectory.AnyConfig> = Readonly<{
 }>;
 
 /**
- * Reads a trajectory as the tool turns it holds: every tool a model called, with the
+ * Reads the parts of a session as the tool turns it holds: every tool a model called, with the
  * result that call was answered with.
  *
  * **When to use**
  *
- * Use to read a trajectory for what it did with its tools rather than for the
- * conversation it had: to score a run by the tools it used, to find the calls a model
- * made over and over, or to display each call beside what its tool returned. A
- * trajectory read as the conversation instead is what {@link promptTurns} emits.
+ * Use to read a session for what it did with its tools rather than for the conversation it
+ * had: to score a run by the tools it used, to find the calls a model made over and over, or
+ * to display each call beside what its tool returned. A session read as the conversation
+ * instead is what {@link promptTurns} emits.
  *
  * **Details**
  *
- * - A tool turn is emitted where the result that answers a call arrives, which is the
- *   result whose `id` is the call's.
- * - A preliminary result is the progress of a call rather than the answer to it and is
- *   read past, so the result of a tool turn is the final one.
- * - A call a trajectory holds no such result for is not a tool turn, and neither is a
- *   result whose call it does not hold: a trajectory that ends while a tool still runs
- *   holds the call alone, and a result no call of this reading was made for has nothing
- *   to pair it with.
- * - The turns are emitted in the order the calls were answered, which is the order the
- *   calls were made in a trajectory that answers each one as it runs, and a call is held
- *   only until then, so the trajectory is read once rather than held whole.
- * - Only the parts that carry a tool call or a tool result are read: the increments a
- *   streamed response arrived in, and the text and reasoning a model answered with, are
- *   read past.
+ * - A tool turn is emitted where the result that answers a call arrives, which is the result
+ *   whose `id` is the call's.
+ * - A preliminary result is the progress of a call rather than the answer to it and is read
+ *   past, so the result of a tool turn is the final one.
+ * - A call the parts hold no such result for is not a tool turn, and neither is a result whose
+ *   call they do not hold: parts that end while a tool still runs hold the call alone, and a
+ *   result no call of this reading was made for has nothing to pair it with.
+ * - The turns are emitted in the order the calls were answered, which is the order the calls
+ *   were made in parts that answer each one as it runs, and a call is held only until then, so
+ *   the parts are read once rather than held whole.
+ * - Only the parts that carry a tool call or a tool result are read: the increments a streamed
+ *   response arrived in, and the text and reasoning a model answered with, are read past.
  *
- * The stream fails with the trajectory's failure — `E` — and requires the services `R`
- * names.
+ * The stream fails with what reading the parts fails with — `E` — and requires the services
+ * `R` names.
  *
- * **Example** (Reading a trajectory as its tool turns)
+ * **Example** (Reading the parts of a session as their tool turns)
  *
  * ```ts import.meta.vitest
  * import { Effect, Stream } from "effect"
@@ -311,8 +293,8 @@ export type ToolTurn<Config extends Trajectory.AnyConfig> = Readonly<{
  * const sessionId = "01890a5d-ac96-774b-bcce-b302099a8057"
  * const part = Trajectory.parts(Trajectory.anyConfig)
  *
- * // A trajectory of one call: the tool a model called, and the result it was answered with.
- * const trajectory = Stream.make(
+ * // The parts of one call: the tool a model called, and the result it was answered with.
+ * const stream = Stream.make(
  *   part.response(
  *     Response.anyToolCallPart({
  *       id: "call_1",
@@ -334,15 +316,16 @@ export type ToolTurn<Config extends Trajectory.AnyConfig> = Readonly<{
  *   )
  * )
  *
- * const turns = await Effect.runPromise(Stream.runCollect(View.toolTurns(trajectory)))
+ * const turns = await Effect.runPromise(Stream.runCollect(View.toolTurns(stream)))
  *
  * Array.from(turns).map((turn) => [turn.call.name, turn.result.result]) // => [["get_weather", "sunny"]]
  * ```
  *
  * @see {@link ToolTurn} for the turn it emits.
  * @see {@link promptTurns} for the conversation read instead.
+ * @see {@link Trajectory.Session.stream} for the parts a session is read by.
  * @category combinators
  */
 export const toolTurns = <Config extends Trajectory.AnyConfig, E, R>(
-  trajectory: Trajectory.TrajectoryStream<Config, E, R>,
-): Stream.Stream<ToolTurn<Config>, E, R> => readToolTurns(trajectory);
+  stream: Trajectory.SessionStream<Config, E, R>,
+): Stream.Stream<ToolTurn<Config>, E, R> => readToolTurns(stream);

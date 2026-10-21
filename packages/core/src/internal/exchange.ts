@@ -23,27 +23,17 @@ import { ByteStore, type ByteStoreError } from "@trajs/utils/ByteStore";
 import type { Compression, CompressionError } from "@trajs/utils/Compression";
 import type { Storage, StorageError } from "@trajs/utils/Storage";
 import type { StreamHash } from "@trajs/utils/StreamHash";
-import { Effect, Fiber, Schema, SchemaTransformation, Stream } from "effect";
-import { SchemaBinary } from "effect/encoding";
+import { Effect, Fiber, Schema, Stream } from "effect";
 
 import * as Event from "#/Event.ts";
 import type * as EventKit from "#/EventKit.ts";
-import {
-  Magic,
-  Version,
-  type EncodingServices,
-  type Header,
-  type Metadata,
-  type Service,
-} from "#/Exchange.ts";
+import { Magic, Version, type Header, type Metadata, type Service } from "#/Exchange.ts";
 import type * as ExtraKit from "#/ExtraKit.ts";
-import { foldParts } from "#/internal/folding.ts";
-import { readFrames } from "#/internal/frames.ts";
+import { configOf, encodePart, reading } from "#/internal/parts.ts";
 import * as Metric from "#/Metric.ts";
 import type * as MetricKit from "#/MetricKit.ts";
-import * as Prompt from "#/Prompt.ts";
 import * as Toolkit from "#/Toolkit.ts";
-import * as Trajectory from "#/Trajectory.ts";
+import type * as Trajectory from "#/Trajectory.ts";
 import { TrajectoryError } from "#/TrajectoryError.ts";
 
 /**
@@ -223,199 +213,6 @@ const framesOf =
     });
 
 /**
- * Reads the parts of a trajectory as a reading of one has them: the same parts, read with
- * no service of their own ({@link Readable}).
- *
- * A reading of a trajectory takes no service, and what the parts of a config of unknown kits
- * state is not knowable, so they are read as ones that take none rather than shown to be.
- */
-const asReadable = <A, I, E>(parts: Schema.Codec<A, I, unknown, E>): Schema.Codec<A, I, never, E> =>
-  // SAFETY: a trajectory is read from its bytes synchronously rather than run, so a reading
-  // of one takes no service: what a schema states of reading a part is not carried by one,
-  // and what it states of writing one is kept as it is.
-  parts as Schema.Codec<A, I, never, E>;
-
-/** The part schemas {@link part} builds, in the order a trajectory states them. */
-export type PartMembers<C extends Trajectory.AnyConfig> = readonly [
-  ReturnType<typeof PromptPartTagged<C["extrakit"]>>,
-  ReturnType<typeof Trajectory.SessionPart<C["extrakit"]>>,
-  ReturnType<typeof Trajectory.ResponsePart<C["toolkit"], C["extrakit"], true>>,
-  ReturnType<typeof Trajectory.EventPart<C["eventkit"]>>,
-  ReturnType<typeof Trajectory.MetricPart<C["metrickit"]>>,
-];
-
-// HACK: which parts a config states a service for is computed rather than declared, so it
-// cannot be a constraint of the config: a config that states one fails it by a marker it
-// does not state instead. What such a config is refused with is `readable` rather than the
-// part that states the service, which is a message only the doc below explains.
-/**
- * A config a trajectory is read as: one whose parts take no service to read, since a
- * trajectory is read from the bytes it is kept in synchronously rather than run
- * ({@link Loaded.read}).
- *
- * A part is read as the plain schemas a trajectory is rebuilt from, so what a kit states
- * of its contributions is read with no service; a response part is the one part read
- * through the toolkit's own schemas, so a toolkit whose own schemas need a service to read
- * a result of one of its tools is not one a trajectory is read with.
- */
-export type Readable<C extends Trajectory.AnyConfig> = C &
-  (Schema.Union<PartMembers<C>>["DecodingServices"] extends never
-    ? unknown
-    : { readonly readable: never });
-
-/** The part a trajectory holds, as the format reads and writes one. */
-type ProducedPart<C extends Trajectory.AnyConfig> = Schema.Union<PartMembers<C>>["Type"];
-
-/**
- * The parts of a trajectory as the frames of the format carry them.
- *
- * It is {@link Trajectory.Part} with a prompt part's messages carrying their file
- * data tagged — see below for why a binary layout cannot carry the data as it is —
- * and every other part of the trajectory keeping its own layout, and its response
- * parts stated as {@link Trajectory.ResponsePart} states them for a streaming
- * trajectory: a trajectory is read as the most general trajectory, whose response
- * parts are streams, and the response parts of any other kind are the members of
- * that schema too, so one schema carries the response parts of every kind.
- *
- * A part is written through the schemas of the toolkit it was produced with, so
- * encoding one takes what those schemas state; what the other parts state is the
- * services of none, since a trajectory is rebuilt from plain schemas rather than read
- * as the schemas it was produced with.
- */
-export const part = <C extends Trajectory.AnyConfig>(config: C): Schema.Union<PartMembers<C>> => {
-  const members: PartMembers<C> = [
-    // Every member is stated with the kit of the config, since what a part is read as
-    // is what that kit states of it rather than what the call alone infers.
-    PromptPartTagged<C["extrakit"]>(config.extrakit),
-    Trajectory.SessionPart<C["extrakit"]>(config.extrakit),
-    // What a trajectory is read as, whatever it was written as.
-    Trajectory.ResponsePart<C["toolkit"], C["extrakit"], true>({
-      toolkit: config.toolkit,
-      extrakit: config.extrakit,
-      stream: true,
-    }),
-    Trajectory.EventPart<C["eventkit"]>(config.eventkit),
-    Trajectory.MetricPart<C["metrickit"]>(config.metrickit),
-  ];
-
-  return Schema.Union(members);
-};
-
-/**
- * Encodes one part of a trajectory as a SchemaBinary frame.
- *
- * The schema is the one the trajectory's own config describes — {@link part} — so a
- * part produced for a tool the toolkit no longer holds still encodes as the
- * unrestricted part it was produced as.
- */
-const encodePart = <C extends Trajectory.AnyConfig>(config: C) => {
-  const encode = part(config).pipe(SchemaBinary.toCodec, Schema.encodeEffect);
-
-  return (part: ProducedPart<C>): Effect.Effect<Uint8Array, TrajectoryError, EncodingServices<C>> =>
-    encode(part).pipe(
-      Effect.mapError((cause) => TrajectoryError.parse(cause)),
-      // Frames may be views into one arena that the next encode reuses, and the
-      // compressor holds a chunk until it has written it.
-      Effect.map((frame) => frame.slice()),
-    );
-};
-
-// HACK: `effect/ai` types a file part's data as `string | Uint8Array | URL`, and
-// a `URL` encodes as a string the way any other does, so no binary layout of that
-// union exists at all. The prompt schemas are therefore rebuilt below, the file
-// data tagged, rather than taken as `effect/ai` has them: schemas that drift, a
-// file part carried elsewhere or a message kind this side does not name, leave a
-// part that is not the `Prompt.Message` it is declared as.
-/**
- * The data a file part carries, as a file carries it: the data itself, with the
- * URL among it tagged under the URL it names rather than carried as the string
- * a URL encodes to.
- *
- * The three the data may be are `effect/ai`'s and are not this side's to change.
- */
-const FilePartData = Schema.Union([
-  Schema.String,
-  Schema.Uint8Array,
-  Schema.Struct({ url: Schema.URLFromString }).pipe(
-    Schema.decodeTo(
-      Schema.URL,
-      SchemaTransformation.transform({
-        decode: (tagged) => tagged.url,
-        encode: (url) => ({ url }),
-      }),
-    ),
-  ),
-]);
-
-/** A file part as a file carries it: the same part, its data carried as above. */
-const TaggedFilePart = Prompt.FilePart.mapFields((fields) => ({ ...fields, data: FilePartData }));
-
-/** A user message's parts as a file carries them: the file part tagged, the rest as is. */
-const UserParts = Prompt.UserMessagePart.mapMembers((members) =>
-  members.map((member) => (member === Prompt.FilePart ? TaggedFilePart : member)),
-);
-
-/** An assistant message's parts as a file carries them, the same way. */
-const AssistantParts = Prompt.AssistantMessagePart.mapMembers((members) =>
-  members.map((member) => (member === Prompt.FilePart ? TaggedFilePart : member)),
-);
-
-/**
- * The messages a prompt part holds, as a file carries them.
- *
- * A message's content is the string form of the message or the array of the parts
- * it is made of, and a file holds what that array holds — so the array is the
- * member whose parts are carried as above and the string form, which holds no
- * part, keeps the one `effect/ai` gave it: the member carrying parts is the one
- * an element is a field of, the string form being a codec of its own.
- */
-const Messages = Schema.Array(
-  Schema.Union([
-    Prompt.SystemMessage,
-    Prompt.UserMessage.mapFields((fields) => ({
-      ...fields,
-      content: fields.content.mapMembers((members) =>
-        members.map((member) => ("value" in member ? Schema.Array(UserParts) : member)),
-      ),
-    })),
-    Prompt.AssistantMessage.mapFields((fields) => ({
-      ...fields,
-      content: fields.content.mapMembers((members) =>
-        members.map((member) => ("value" in member ? Schema.Array(AssistantParts) : member)),
-      ),
-    })),
-    Prompt.ToolMessage,
-  ]),
-);
-
-/**
- * A prompt part as a file carries it: the same part, its messages carried as
- * above.
- *
- * The tag is what a binary layout can carry where the data as it is is a union it
- * cannot, and every other part of the prompt part keeps its own layout.
- */
-const PromptPartTagged = <K extends ExtraKit.Any>(extrakit: K) =>
-  Trajectory.PromptPart(extrakit).mapFields((fields) => ({ ...fields, messages: Messages }));
-
-/**
- * What a trajectory states of itself, as the config its parts are read and written
- * with.
- *
- * A config is what a trajectory is stated with, so what one holds is read off the
- * trajectory rather than declared beside it.
- */
-const configOf = <C extends Trajectory.AnyConfig, E, R>(
-  trajectory: Trajectory.Trajectory<C, E, R>,
-) => ({
-  stream: trajectory.stream,
-  toolkit: trajectory.toolkit,
-  eventkit: trajectory.eventkit,
-  metrickit: trajectory.metrickit,
-  extrakit: trajectory.extrakit,
-});
-
-/**
  * What a trajectory ends with: the metadata it states of its own bytes, and where
  * the frame those bytes carry the parts in ends.
  *
@@ -510,40 +307,6 @@ const encodeTrailing = <S extends Schema.ConstraintCodec<Metadata, unknown, neve
 };
 
 /**
- * A reading of a trajectory, curried out of the bytes its parts are carried in: the
- * frame the storage serves and the frame a store keeps are the same bytes of the same
- * trajectory ({@link keptBytes}), so `read` and `readCached` differ in those alone.
- */
-const reading =
-  <E, R>(bytes: Stream.Stream<Uint8Array, E, R>) =>
-  // SAFETY: reading with no config is reading with the kits that name nothing, which
-  // is what `Trajectory.anyConfig` is.
-  <C extends Trajectory.AnyConfig = Trajectory.AnyConfig>(
-    config: C = Trajectory.anyConfig as C,
-  ): Trajectory.Trajectory<C, E | TrajectoryError, R> => {
-    const parts = asReadable(part(config));
-    const frames = readFrames(parts);
-    // SAFETY: what a body reads as is the parts of the config it is read with, which is
-    // what the trajectory those parts make holds.
-    const read = bytes.pipe(frames) as Stream.Stream<Trajectory.Part<C>, E | TrajectoryError, R>;
-
-    // A config whose response parts are whole asks for the parts a model returned, and
-    // the bytes carry the increments they arrived in as well as those parts, since a
-    // trajectory is stated as the most general one whatever the config says of itself
-    // ({@link part}). So what such a reading yields is those increments folded into the
-    // parts they complete, which is what `folding.ts`'s `foldParts` does.
-    return Trajectory.make(
-      // SAFETY: a folded part is a whole one — `foldParts` states that of its own result
-      // — and the whole parts are what a config that states `stream` off holds, which is
-      // the config read with here.
-      (config.stream ? read : foldParts(read)) as Stream.Stream<
-        Trajectory.Part<C>,
-        E | TrajectoryError,
-        R
-      >,
-      config,
-    );
-  };
 
 /**
  * The key a trajectory's bytes are kept under: the hash and the digest the trajectory

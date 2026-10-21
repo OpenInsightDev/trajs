@@ -1,12 +1,13 @@
 /**
  * A short conversation, read as the turns it was produced in and summarised.
  *
- * The trajectory is read as the turns it was produced in — every prompt, with the response
- * that answered it — and each turn is counted into the summary: the messages it was asked
- * and answered with, the characters of the text it holds, and the tools it called.
+ * The parts of one session are read as the turns they were produced in — every prompt, with
+ * the response that answered it — and each turn is counted into the summary: the messages it
+ * was asked and answered with, the characters of the text it holds, and the tools it called.
  *
- * The trajectory is built here rather than read from a `.trajs` file so the case stands on
- * its own; a real analysis reads the same parts with `Exchange`.
+ * The parts are built here rather than read from a `.trajs` file so the case stands on its
+ * own; a real analysis reads the same parts as the `stream` of a session
+ * `Trajectory.toSessions` read of a trajectory an `Exchange` loaded.
  */
 
 import { expect, it } from "@effect/vitest";
@@ -20,7 +21,7 @@ import {
   Trajectory,
   View,
 } from "@trajs/core";
-import { Effect, Stream } from "effect";
+import { Effect, Option, Stream } from "effect";
 
 /** What the parts are built and read with: no tool, event, metric or extra datum. */
 const config = Trajectory.config({
@@ -53,17 +54,22 @@ const makeTurn = (id: string, { city, answer }: { city: string; answer: string }
   part.response(Response.makePart("text", { text: answer })),
 ];
 
-const trajectory = Trajectory.make(config)(
+/** What the trajectory holds: what one session's model was given and answered. */
+const trajectory = Trajectory.make(
   Stream.fromArray([
     part.prompt(Prompt.make("What is the weather in Paris?")),
     ...makeTurn("call_1", { city: "Paris", answer: "It is sunny." }),
     part.prompt(Prompt.make("And in Berlin?")),
     ...makeTurn("call_2", { city: "Berlin", answer: "It is raining." }),
   ]),
+  config,
 );
 
 const main = Effect.fn(function* () {
-  const turns = yield* View.promptTurns(trajectory).pipe(Stream.runCollect);
+  const sessions = yield* Trajectory.toSessions(trajectory);
+  const session = Option.getOrThrow(Trajectory.session(Trajectory.rootSession)(sessions));
+
+  const turns = yield* View.promptTurns(session.stream).pipe(Stream.runCollect);
 
   let messages = 0;
   let characters = 0;

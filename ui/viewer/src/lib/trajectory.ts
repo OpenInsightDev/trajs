@@ -2,11 +2,11 @@
  * Reading the bytes of a `.trajs` file as what the viewer shows.
  *
  * A trajectory is one stream of parts, and what a viewer shows of one is not that
- * stream: it is the sessions it declares, the forks that relate them, and the
- * turns each of them ran — `@trajs/core`'s `Session` and `View`. The bytes and the
- * kits to read them with are the exchange's work, and what this adds is the shape
- * the components read: one session at a time, with what it inherited from the
- * session it continues from read as the turns that session had reached by then.
+ * stream: it is the sessions it declares, the forks that relate them, and the turns each
+ * of them ran — `@trajs/core`'s `Trajectory.toSessions` and `View`. The bytes and the
+ * kits to read them with are the exchange's work, and what this adds is the shape the
+ * components read: one session at a time, with what it inherited from the sessions it
+ * continues from read as the turns those sessions had reached by then.
  *
  * A trajectory is read with no tools, no events, no metrics and no extra data: its
  * header names the kits it was written with, and what a kit states of a part is read by
@@ -16,19 +16,20 @@
  * the parts that are its own rather than those a kit made of it.
  */
 
-import { Session, Trajectory, View } from "@trajs/core";
+import { Trajectory, View } from "@trajs/core";
 import { Exchange } from "@trajs/core/Exchange";
 import type { TrajectoryError } from "@trajs/core/TrajectoryError";
 import { BrowserServices } from "@trajs/platform-browser";
 import { makeBytes } from "@trajs/utils/Bytes";
+import { type ByteStoreError } from "@trajs/utils/ByteStore";
 import { Storage, StorageError } from "@trajs/utils/Storage";
 import { Effect, Layer, Option, Sink, type Scope, Stream } from "effect";
 
 /**
- * What reading a trajectory fails with: the trajectory's own failure, or the storage
- * it is read from — the bytes a page was handed may not hold a trajectory.
+ * What reading a trajectory fails with: the trajectory's own failure, or the store its
+ * parts are kept in while its sessions are read.
  */
-type Failure = TrajectoryError | StorageError;
+type Failure = TrajectoryError | StorageError | ByteStoreError;
 
 /** The id a page serves a trajectory it was handed under: a page is handed the bytes, not a name. */
 const Handed = "handed";
@@ -62,8 +63,6 @@ const browserExchange = Layer.provide(Exchange.layer, BrowserServices.layer());
 /** One turn of a session's conversation: what a model was given, and what it answered. */
 export type Turn = View.PromptTurn<Trajectory.AnyConfig>;
 
-type Part = Trajectory.Part<Trajectory.AnyConfig>;
-
 /**
  * One stretch of a conversation: the turns one session produced.
  *
@@ -87,11 +86,11 @@ export interface Continuation {
 
 /**
  * One session of a trajectory, as a viewer reads it: what it produced for itself,
- * what it inherited from the session it continues from, and what was forked off it.
+ * what it inherited from the sessions it continues from, and what was forked off it.
  *
- * A fork holds none of the parts of the session it continues from, so the turns it
- * inherited are read from that session up to the part it continues from rather than
- * held here as its own ({@link Stretch}).
+ * A fork holds none of the parts of the sessions it continues from, so the turns it
+ * inherited are read from those sessions up to the part each of them is continued from
+ * rather than held here as its own ({@link Stretch}).
  */
 export interface TrajectorySession {
   readonly id: string;
@@ -109,68 +108,76 @@ export interface Trajectory {
   readonly roots: ReadonlyArray<TrajectorySession>;
 }
 
-/**
- * The `uuid` a part is identified by, which is what a `fork` names it with. A metric
- * part is the one part of a trajectory that names no session and holds no `uuid`, so
- * it is read as naming none: a `fork` names a part of a session, and is never one.
- */
-const uuidOf = (part: Part): string => (part._tag === "Metric" ? "" : part.uuid);
-
-/** The parts of a session up to and including the one `uuid` names. */
-const partsUpTo = (parts: ReadonlyArray<Part>, uuid: string): ReadonlyArray<Part> => {
-  const at = parts.findIndex((part) => uuidOf(part) === uuid);
-
-  return at === -1 ? parts : parts.slice(0, at + 1);
-};
-
-/** The turns a session's parts were produced in, folded the way a trajectory is read. */
-const turnsOf = (parts: ReadonlyArray<Part>): Effect.Effect<ReadonlyArray<Turn>> =>
-  View.promptTurns(Stream.fromIterable(parts)).pipe(
+/** The parts of one session, as the turns they were produced in. */
+const turnsOf = (
+  stream: Trajectory.SessionStream<Trajectory.AnyConfig, Failure>,
+): Effect.Effect<ReadonlyArray<Turn>, Failure> =>
+  View.promptTurns(stream).pipe(
     Stream.runCollect,
-    Effect.map((turns) => Array.from(turns)),
+    Effect.map((turns): ReadonlyArray<Turn> => Array.from(turns)),
   );
 
 /**
- * One session as the viewer reads it, over the stretches it inherited.
+ * The sessions a session continues from, from the root down.
  *
- * A session is read from the sessions handed out by {@link Session.toSessions}, which
- * route the parts of a trajectory to the session that names them as it is read, so
- * the parts of a session are taken by this one reader rather than read again.
+ * A session's parts are what it ran on — what it inherited, and what it produced — so a stretch
+ * of the conversation is the parts of one session out of them.
+ */
+const ancestorsOf = (
+  sessions: Trajectory.Sessions<Trajectory.AnyConfig, Failure>,
+  session: Trajectory.Session<Trajectory.AnyConfig, Failure>,
+): ReadonlyArray<string> => {
+  const walked: Array<string> = [];
+
+  let fork = session.forkedFrom;
+
+  while (Option.isSome(fork) && !walked.includes(fork.value.session)) {
+    walked.push(fork.value.session);
+    fork = Option.flatMap(
+      Option.fromUndefinedOr(sessions[fork.value.session]),
+      (from) => from.forkedFrom,
+    );
+  }
+
+  return walked.reverse();
+};
+
+/** The parts of the session `id` out of what it ran on, as the turns they were produced in. */
+const turnsOfSession = (
+  session: Trajectory.Session<Trajectory.AnyConfig, Failure>,
+  id: string,
+): Effect.Effect<ReadonlyArray<Turn>, Failure> =>
+  turnsOf(
+    session.stream.pipe(Stream.filter((part) => part._tag !== "Metric" && part.sessionId === id)),
+  );
+
+/**
+ * One session as the viewer reads it, and the sessions forked off it.
+ *
+ * A session is read from the sessions `Trajectory.toSessions` read, which hold what each
+ * of them ran on: the parts of the sessions it continues from, up to the part each of them
+ * is continued from, and the parts of its own ({@link Trajectory.Session.stream}).
  */
 const readSession = (
-  session: Session.AnySession,
-  inherited: ReadonlyArray<Stretch>,
-): Effect.Effect<TrajectorySession, Failure, Scope.Scope> =>
+  sessions: Trajectory.Sessions<Trajectory.AnyConfig, Failure>,
+  session: Trajectory.Session<Trajectory.AnyConfig, Failure>,
+): Effect.Effect<TrajectorySession, Failure> =>
   Effect.gen(function* () {
-    const parts = Array.from(yield* session.parts.pipe(Stream.runCollect));
-    const forks = Array.from(yield* session.forkedBy.pipe(Stream.runCollect));
-
-    const readForks = yield* Effect.forEach(forks, (forked) =>
-      Effect.gen(function* () {
-        // A fork holds none of the parts of the session it continues from, so what
-        // it inherited is that session's conversation as far as the part it
-        // continues from: the stretches already read, and its own up to there.
-        const continues = yield* Option.match(forked.forkedFrom, {
-          onNone: () => Effect.succeed(inherited),
-          onSome: (fork) =>
-            turnsOf(partsUpTo(parts, uuidOf(fork.part))).pipe(
-              Effect.map((turns) => [...inherited, { sessionId: session.id, turns }]),
-            ),
-        });
-
-        return yield* readSession(forked, continues);
-      }),
+    const forks = Object.values(sessions).filter((forked) =>
+      Option.exists(forked.forkedFrom, (from) => from.session === session.id),
     );
 
     return {
       id: session.id,
-      turns: yield* turnsOf(parts),
-      inherited,
-      continuesFrom: Option.map(session.forkedFrom, (fork) => ({
-        sessionId: fork.session.id,
-        partUuid: uuidOf(fork.part),
+      turns: yield* turnsOfSession(session, session.id),
+      inherited: yield* Effect.forEach(ancestorsOf(sessions, session), (from) =>
+        turnsOfSession(session, from).pipe(Effect.map((turns) => ({ sessionId: from, turns }))),
+      ),
+      continuesFrom: Option.map(session.forkedFrom, (from) => ({
+        sessionId: from.session,
+        partUuid: from.part,
       })),
-      forks: readForks,
+      forks: yield* Effect.forEach(forks, (forked) => readSession(sessions, forked)),
     };
   });
 
@@ -180,9 +187,8 @@ const readSession = (
  * **When to use**
  *
  * Use to read a `.trajs` file a page was handed — a dropped file, one fetched
- * from somewhere — as what the components show. It is seen in a scope, since
- * reading a trajectory reads its sessions as it arrives rather than once it has
- * ended.
+ * from somewhere — as what the components show. It is seen in a scope, since reading
+ * the parts of a session reads the store they are kept in.
  *
  * **Details**
  *
@@ -191,8 +197,11 @@ const readSession = (
  * compression and hash `@trajs/platform-browser` states — and with a storage over
  * the bytes themselves. Loading reads the head of them for what the trajectory was
  * made with, and `read` reads the parts, which is what the exchange reads a
- * trajectory into. It takes a `Uint8Array` rather than a stream because a `.trajs`
- * file is what a page reads, and a file is read whole.
+ * trajectory into. What the parts are kept in while the sessions are read is the store
+ * `Trajectory.toSessions` states where a program states none: the parts are kept in
+ * memory for as long as the page runs, which is as long as the sessions are shown. It
+ * takes a `Uint8Array` rather than a stream because a `.trajs` file is what a page
+ * reads, and a file is read whole.
  */
 export const read = (bytes: Uint8Array): Effect.Effect<Trajectory, Failure, Scope.Scope> =>
   Effect.gen(function* () {
@@ -200,9 +209,10 @@ export const read = (bytes: Uint8Array): Effect.Effect<Trajectory, Failure, Scop
 
     const loaded = yield* exchange.load(Handed);
 
-    const roots = yield* Session.toSessions(loaded.read()).pipe(Stream.runCollect);
+    const sessions = yield* Trajectory.toSessions(loaded.read());
+    const roots = Object.values(sessions).filter((session) => Option.isNone(session.forkedFrom));
 
     return {
-      roots: yield* Effect.forEach(roots, (session) => readSession(session, [])),
+      roots: yield* Effect.forEach(roots, (session) => readSession(sessions, session)),
     };
   }).pipe(Effect.provide(Layer.provide(browserExchange, Layer.succeed(Storage, handed(bytes)))));

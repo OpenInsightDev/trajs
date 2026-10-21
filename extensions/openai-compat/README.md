@@ -7,9 +7,10 @@ A trajectory holds every session that ran, in one stream of parts, and what a
 chat completions API is handed is not that stream: it is one conversation per
 session, holding the messages the session's model was given and answered in the
 order they were produced, and what the session inherited from the one it continues
-from. `Codec.makeOpenAiCompat` reads a trajectory as those conversations, stated the
-way that API takes them. It is what the package is for, so it is re-exported as a
-namespace; it is also available as the subpath import
+from. `Codec.makeOpenAiCompat` reads the sessions of a trajectory as those
+conversations, stated the way that API takes them — the sessions
+`Trajectory.toSessions` read of it. It is what the package is for, so it is
+re-exported as a namespace; it is also available as the subpath import
 `@trajs/extension-openai-compat/Codec`.
 
 ## Usage
@@ -18,10 +19,11 @@ namespace; it is also available as the subpath import
 import { Effect } from "effect";
 import { Codec } from "@trajs/extension-openai-compat";
 
-const sessions = await Effect.runPromise(Codec.makeOpenAiCompat(trajectory));
+const sessions = await Effect.runPromise(Trajectory.toSessions(trajectory));
+const conversations = await Effect.runPromise(Codec.makeOpenAiCompat(sessions));
 
 // One conversation per session, keyed by the id of the session.
-sessions[sessionId]?.map((message) => message.role);
+conversations[sessionId]?.map((message) => message.role);
 ```
 
 The conversations are read with `View.conversations` of `@trajs/core` — a session's

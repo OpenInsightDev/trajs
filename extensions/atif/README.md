@@ -41,7 +41,7 @@ session at a time.
 states, and `Encode.encode` reads a document that is decoded already — the same
 reading either way: the steps of the document are produced as the turns of a
 trajectory with `Produce.produce`, so a `trajectory.json` a program that ran
-elsewhere wrote is a trajectory like any other — `View`, `Session`, the codec
+elsewhere wrote is a trajectory like any other — `View`, `Trajectory.toSessions`, the codec
 extensions and the metric kits read it as one, and `Step.steps` reads back the steps
 it was read from. The document is stated as the schemas ATIF states it in, so what a
 file holds is decoded before it is read.

@@ -1,16 +1,17 @@
 /**
  * An agent stuck on a tool: the same call, made with the same input, over and over.
  *
- * The trajectory is read as the tool turns it holds, and the calls made one after another
- * with the same input are reported as one repeat.
+ * The parts of one session are read as the tool turns they were answered in, and the calls
+ * made one after another with the same input are reported as one repeat.
  *
- * The trajectory is built here rather than read from a `.trajs` file so the case stands on
- * its own; a real analysis reads the same parts with `Exchange`.
+ * The parts are built here rather than read from a `.trajs` file so the case stands on its
+ * own; a real analysis reads the same parts as the `stream` of a session
+ * `Trajectory.toSessions` read of a trajectory an `Exchange` loaded.
  */
 
 import { expect, it } from "@effect/vitest";
 import { Prompt, Response, Trajectory, View } from "@trajs/core";
-import { Effect, Stream } from "effect";
+import { Effect, Option, Stream } from "effect";
 
 /** What the parts are built and read with: no tool, event, metric or extra datum. */
 const config = Trajectory.config({ stream: false });
@@ -45,7 +46,8 @@ const toolTurn = (id: string, name: string, params: Record<string, string>, answ
   ),
 ];
 
-const trajectory = Trajectory.make(config)(
+/** What the trajectory holds: what one session's model was given and answered. */
+const trajectory = Trajectory.make(
   Stream.fromArray([
     prompt("Where is `parseConfig` defined?"),
     ...toolTurn("call_1", "grep", { pattern: "parseConfig" }, "src/config.ts:12"),
@@ -59,17 +61,21 @@ const trajectory = Trajectory.make(config)(
     ...toolTurn("call_7", "bash", { command: "bun test" }, "3 tests passed"),
     ...toolTurn("call_8", "bash", { command: "bun test" }, "3 tests passed"),
   ]),
+  config,
 );
 
-const main = (threshold: number) =>
-  trajectory.pipe(
+const main = Effect.fn(function* (threshold: number) {
+  const sessions = yield* Trajectory.toSessions(trajectory);
+  const session = Option.getOrThrow(Trajectory.session(Trajectory.rootSession)(sessions));
+
+  return yield* session.stream.pipe(
     // Parts to turns: a call with the result that answered it
     View.toolTurns,
     // Turns to runs: the calls made one after another with equal inputs, compared with
     // `Equal.equals`, so two calls of one input are one run whatever ids they carry.
     Stream.groupAdjacentBy(({ call: { name, params } }) => ({ name, params })),
-    // Runs to the report: folded as they arrive rather than collected first, so the trajectory
-    // is read in one pass.
+    // Runs to the report: folded as they arrive rather than collected first, so the parts are
+    // read in one pass.
     Stream.runFold(
       (): Report => ({ totalToolTurns: 0, repeated: [] }),
       (report, [input, run]) => ({
@@ -84,6 +90,7 @@ const main = (threshold: number) =>
       }),
     ),
   );
+});
 
 // Three `grep` calls of one pattern in a row and three `bash` calls of one command in a row
 // are repeats; the two `read_file` calls of one path are a run of two, which is not longer

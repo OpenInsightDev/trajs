@@ -64,21 +64,17 @@ export class ToolDecodeError extends Data.TaggedError("ToolDecodeError")<{
  * - `"late-declaration"`: the session was declared after the parts it produced. A
  *   session is declared before the parts it produced, so there is no declaration
  *   left to wait for.
- * - `"several-sessions"`: the trajectory declares a session after the parts of
- *   another one, so it does not hold the parts of one session alone — which is
- *   what {@link View.prompt} reads a trajectory as.
  *
  * @see {@link SessionError} for the error that carries one.
  * @category models
  */
-export type SessionErrorReason = "unproduced-fork" | "late-declaration" | "several-sessions";
+export type SessionErrorReason = "unproduced-fork" | "late-declaration";
 
 /** What each reason says is wrong with the session it names, as {@link SessionError} words it. */
 const sessionFailure: Record<SessionErrorReason, string> = {
   "unproduced-fork":
     "it continues from a part the trajectory does not hold, or one no session continues from",
   "late-declaration": "it was declared after the parts it produced",
-  "several-sessions": "the trajectory declares more than one session",
 };
 
 /**
@@ -88,8 +84,8 @@ const sessionFailure: Record<SessionErrorReason, string> = {
  * **Details**
  *
  * `id` names the session and `reason` what is wrong with it, as
- * {@link SessionErrorReason} reads it: a trajectory that does not hold what reading
- * a session needs, or one that holds more than the session being read.
+ * {@link SessionErrorReason} reads it: a trajectory that does not hold what reading a
+ * session needs.
  *
  * @see {@link TrajectoryError.session} for the error that carries it.
  * @category errors

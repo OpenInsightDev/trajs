@@ -142,7 +142,8 @@ export interface Options {
  * **Example** (Reading the run Harbor produced for the `hello.txt` task)
  *
  * ```ts import.meta.vitest
- * import { Effect, FileSystem, Layer, Path, Schema, Stream } from "effect"
+ * import { Effect, FileSystem, Layer, Option, Path, Schema, Stream } from "effect"
+ * import { Trajectory } from "@trajs/core"
  * import { Document, Encode, Step, stepExtra } from "@trajs/extension-atif"
  *
  * // The `trajectory.json` Harbor's Claude Code adapter writes for the task of
@@ -210,14 +211,17 @@ export interface Options {
  * // names, and the call of the step is read as the call of the tool it names.
  * Object.keys(trajectory.toolkit.tools) // => ["Write"]
  *
- * // The trajectory is a trajectory like any other: its steps read back as the ones
- * // the document holds, since a step's calls and their results are the parts it
- * // answered with, and the turns after the first open with no message of their own.
+ * // The trajectory is a trajectory like any other: the session it names reads back as
+ * // the steps the document holds, since a step's calls and their results are the parts
+ * // it answered with, and the turns after the first open with no message of their own.
  * // The reading needs the file system and the paths of the program it runs in; a
  * // document that names no image and no recording is read with any of them.
+ * const sessions = await Effect.runPromise(Trajectory.toSessions(trajectory))
+ * const session = Option.getOrThrow(Trajectory.session(document.session_id)(sessions))
+ *
  * const steps = Array.from(
  *   await Effect.runPromise(
- *     Stream.runCollect(Step.steps(trajectory)).pipe(
+ *     Stream.runCollect(Step.steps(session.stream)).pipe(
  *       Effect.provide(Layer.merge(FileSystem.layerNoop({}), Path.layer))
  *     )
  *   )

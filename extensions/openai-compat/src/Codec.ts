@@ -10,10 +10,10 @@
  * reads a trajectory as those conversations.
  *
  * The conversations are read with `View.conversations` of `@trajs/core`, one session
- * at a time, and each of their messages is then written as this API states it.
- * Reading a trajectory this way needs the sessions it declares, so a trajectory whose
- * sessions cannot be read fails the way one read by `@trajs/core` does: an
- * unproduced fork, or a late declaration, is what reading one here fails with.
+ * at a time, and each of their messages is then written as this API states it. A
+ * trajectory is read as its sessions with `Trajectory.toSessions`, which is what
+ * reading one here is given: a trajectory whose sessions cannot be read fails that
+ * reading — an unproduced fork, or a late declaration, is what reading one fails with.
  *
  * **What is not carried**
  *
@@ -54,7 +54,7 @@ export type OpenAiCompatMessage = OpenAiClient.ChatCompletionRequestMessage;
 export type OpenAiCompatSessions = Record<string, OpenAiCompatMessage[]>;
 
 /**
- * Reads a trajectory as the conversations a chat completions API of an
+ * Reads the sessions of a trajectory as the conversations a chat completions API of an
  * OpenAI-compatible client takes, one conversation per session.
  *
  * **When to use**
@@ -65,6 +65,9 @@ export type OpenAiCompatSessions = Record<string, OpenAiCompatMessage[]>;
  *
  * **Details**
  *
+ * - What it is given is what `Trajectory.toSessions` read of a trajectory, so a trajectory is
+ *   read as its sessions before it is read as conversations: one reading of it serves every
+ *   session it holds ({@link Trajectory.Sessions}).
  * - The conversation of a session holds the messages the session produced and the
  *   messages it inherited: what the sessions it continues from produced up to the
  *   part it continues from, from the root of the fork down.
@@ -77,9 +80,9 @@ export type OpenAiCompatSessions = Record<string, OpenAiCompatMessage[]>;
  * - The text of a message is carried as the string it is, and the images it was
  *   given as the parts of its content, where any of them is an image.
  *
- * The effect fails with what reading the trajectory's sessions fails with — `E` on
- * top of the {@link TrajectoryError} a trajectory whose sessions cannot be read
- * fails with — and requires the services `R` names.
+ * The effect fails with what reading the parts of a session fails with — the
+ * {@link TrajectoryError} a trajectory whose parts cannot be read fails with, on top of what
+ * the store they are kept in fails with — and requires the services `R` names.
  *
  * **Example** (Reading a trajectory as the messages of a call and its answer)
  *
@@ -140,19 +143,21 @@ export type OpenAiCompatSessions = Record<string, OpenAiCompatMessage[]>;
  *
  * const trajectory = Trajectory.make(Stream.fromIterable(parts), config)
  *
- * const sessions = await Effect.runPromise(Codec.makeOpenAiCompat(trajectory))
+ * const sessions = await Effect.runPromise(Trajectory.toSessions(trajectory))
+ * const conversations = await Effect.runPromise(Codec.makeOpenAiCompat(sessions))
  *
- * sessions[sessionId]?.map((message) => message.role) // => ["user", "assistant", "tool", "assistant"]
+ * conversations[sessionId]?.map((message) => message.role) // => ["user", "assistant", "tool", "assistant"]
  * ```
  *
  * @see {@link OpenAiCompatSessions} for the messages it reads to.
  * @see {@link View.conversations} for the conversations it writes out.
+ * @see {@link Trajectory.toSessions} for the sessions it is given.
  * @category constructors
  */
 export const makeOpenAiCompat = <Config extends Trajectory.AnyConfig, E, R>(
-  trajectory: Trajectory.Trajectory<Config, E, R>,
+  sessions: Trajectory.Sessions<Config, E, R>,
 ): Effect.Effect<OpenAiCompatSessions, E | TrajectoryError, R> =>
-  View.conversations(trajectory).pipe(
+  View.conversations(sessions).pipe(
     Effect.map((sessions) => {
       const encoded: OpenAiCompatSessions = {};
 

@@ -197,38 +197,37 @@ const stepsOf = <Config extends Trajectory.AnyConfig>(
 };
 
 /**
- * Reads a trajectory as the steps it is made of.
+ * Reads the parts of a session as the steps they are made of.
  *
  * **When to use**
  *
- * Use when a trajectory is to be read or carried step by step — one message or one
- * turn at a time — such as to display it, to score it, or to hand it to a program
- * that reads a trajectory as its steps, such as the results viewer of the Harbor
- * framework, which displays the steps of an ATIF document.
+ * Use when a session is to be read or carried step by step — one message or one turn
+ * at a time — such as to display it, to score it, or to hand it to a program that reads
+ * a trajectory as its steps, such as the results viewer of the Harbor framework, which
+ * displays the steps of an ATIF document.
  *
  * **Details**
  *
- * One turn is read as a step for each message of its prompt, followed by one
- * `agent` step for the parts the turn produced — where it produced any — so the
- * steps are in the order the conversation was produced in: the system prompt and
- * the user message a model was given, then the turn that answered them.
- *
- * A step is derived from a turn, so it inherits how a turn is read: the increments
- * of a streamed response are folded into the parts they complete, a prompt part
- * with no response reads as its messages alone, and a response part that no
- * prompt precedes belongs to no turn and is dropped. The turns of a trajectory
- * that interleaves several sessions are likewise read one session at a time.
+ * - What it reads is the parts of one session ({@link Trajectory.SessionStream}), which
+ *   `Trajectory.toSessions` reads of a trajectory: the steps of a document are the steps
+ *   of one run, so a trajectory of several sessions is read one session at a time.
+ * - One turn is read as a step for each message of its prompt, followed by one `agent`
+ *   step for the parts the turn produced — where it produced any — so the steps are in
+ *   the order the conversation was produced in: the system prompt and the user message
+ *   a model was given, then the turn that answered them.
+ * - A step is derived from a turn, so it inherits how a turn is read: the increments of
+ *   a streamed response are folded into the parts they complete, a prompt part with no
+ *   response reads as its messages alone, and a response part that no prompt precedes
+ *   belongs to no turn and is dropped.
  *
  * ATIF numbers the steps of a document from `1` and requires the numbers to stay
- * sequential; a trajectory holds no such number, so the steps here are emitted in
- * order and unnumbered, and whoever writes the document numbers them by their
- * position.
+ * sequential; what is read here holds no such number, so the steps are emitted in order
+ * and unnumbered, and whoever writes the document numbers them by their position.
  *
- * The stream fails with the trajectory's failure — `E` on top of the
- * {@link TrajectoryError} a produced trajectory fails with — and requires the
+ * The stream fails with what reading the parts fails with — `E` — and requires the
  * services `R` names.
  *
- * **Example** (Reading a trajectory as its steps)
+ * **Example** (Reading the parts of a session as its steps)
  *
  * ```ts import.meta.vitest
  * import { Effect, Stream } from "effect"
@@ -238,23 +237,30 @@ const stepsOf = <Config extends Trajectory.AnyConfig>(
  * const sessionId = "01890a5d-ac96-774b-bcce-b302099a8057"
  * const part = Trajectory.parts(Trajectory.anyConfig)
  *
- * // A trajectory of one exchange: what a model was given, and what it returned for
- * // it as one whole part.
- * const trajectory = Stream.make(
- *   part.prompt(Prompt.make("What is 2 + 2?"), { sessionId }),
- *   part.response(Response.makePart("text", { text: "4" }), { sessionId })
+ * // What one session's model was given, and what it returned for it as one whole part.
+ * const trajectory = Trajectory.make(
+ *   Stream.make(
+ *     part.session(sessionId),
+ *     part.prompt(Prompt.make("What is 2 + 2?"), { sessionId }),
+ *     part.response(Response.makePart("text", { text: "4" }), { sessionId })
+ *   ),
+ *   Trajectory.anyConfig
  * )
  *
- * const steps = await Effect.runPromise(Stream.runCollect(Step.steps(trajectory)))
+ * const sessions = await Effect.runPromise(Trajectory.toSessions(trajectory))
+ * const session = Option.getOrThrow(Trajectory.session(sessionId)(sessions))
+ *
+ * const steps = await Effect.runPromise(Stream.runCollect(Step.steps(session.stream)))
  *
  * Array.from(steps).map((step) => step.source) // => ["user", "agent"]
  * ```
  *
  * @see {@link Step} — the steps that are emitted.
  * @see {@link View.promptTurns} — the turns they are read from.
+ * @see {@link Trajectory.Session.stream} — the parts a session is read by.
  * @category combinators
  */
 export const steps = <Config extends Trajectory.AnyConfig, E, R>(
-  trajectory: Trajectory.TrajectoryStream<Config, E, R>,
+  stream: Trajectory.SessionStream<Config, E, R>,
 ): Stream.Stream<Step<Tools<Config>>, E | TrajectoryError, R> =>
-  View.promptTurns(trajectory).pipe(Stream.flatMap((turn) => Stream.fromIterable(stepsOf(turn))));
+  View.promptTurns(stream).pipe(Stream.flatMap((turn) => Stream.fromIterable(stepsOf(turn))));

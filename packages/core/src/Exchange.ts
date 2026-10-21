@@ -18,13 +18,13 @@ import { Storage, type StorageError } from "@trajs/utils/Storage";
 import { Algorithm as HashAlgorithm, StreamHash } from "@trajs/utils/StreamHash";
 import { Context, Effect, Layer, Schema } from "effect";
 
+import { Contribution, service } from "#/internal/exchange.ts";
 import {
-  Contribution,
   part,
-  service,
+  type EncodingServices as Encoding,
   type PartMembers,
   type Readable,
-} from "#/internal/exchange.ts";
+} from "#/internal/parts.ts";
 import * as Trajectory from "#/Trajectory.ts";
 import { TrajectoryError } from "#/TrajectoryError.ts";
 
@@ -160,9 +160,7 @@ export type Metadata = Schema.Schema.Type<typeof Metadata>;
  * @see {@link Service.save} for the operation that requires them.
  * @category utility types
  */
-export type EncodingServices<C extends Trajectory.AnyConfig> = Schema.Union<
-  PartMembers<C>
->["EncodingServices"];
+export type EncodingServices<C extends Trajectory.AnyConfig> = Encoding<C>;
 
 /**
  * A trajectory a storage holds under an id, as the operations that read it: what it
@@ -236,6 +234,15 @@ export interface Loaded {
    * A config whose response parts are whole reads it folded, as {@link Loaded} states:
    * the increments a streamed answer arrived in are read as the whole parts they
    * complete, since a trajectory is carried as the most general one ({@link Part}).
+   *
+   * TODO: what is kept of a trajectory here is kept as the bytes of its frame, whether that is
+   * the storage's ({@link Loaded.readCached}) or memory's, because a trajectory is one stream
+   * and a stream is read once: a second reading of the parts has to be a reading of something
+   * that is held. Held in memory, the parts need no encoding at all — the capability a stream
+   * states for this (`Stream.share` with a `replay` a later subscriber reads, or the pull one is
+   * taken through) serves the same parts to every reader of them without their being written
+   * out and read back. `Trajectory.toSessions` keeps the parts of a session the same way, so
+   * what settles one settles both.
    */
   readonly read: <C extends Trajectory.AnyConfig = Trajectory.AnyConfig>(
     config?: C & Readable<C>,

@@ -3,16 +3,17 @@
  * terms its tool's parameters state, and folded into the report as it arrives rather than
  * collected into turns first.
  *
- * The trajectory is made of the config its responses were returned by — `Config` below names
- * it, and `Trajectory.make` states it on the parts — so a response part is typed by the tool it
- * names: `get_weather` holds a city, `search_docs` a query and a page size, `read_file` a path.
- * That is what a toolkit buys an analysis: the calls are read per tool rather than as payloads
- * of `unknown`, and each tool is counted in the terms it alone states. A call of a tool the
- * toolkit does not describe still reads — as the unconstrained part the tolerant reader admits
- * — and is counted apart rather than dropped.
+ * The parts are built of the config its responses were returned by — `config` below names it,
+ * and `Trajectory.parts` states it on each part — so a response part is typed by the tool it
+ * names: `get_weather` holds a city, `search_docs` a query and a page size, `read_file` a
+ * path. That is what a toolkit buys an analysis: the calls are read per tool rather than as
+ * payloads of `unknown`, and each tool is counted in the terms it alone states. A call of a
+ * tool the toolkit does not describe still reads — as the unconstrained part the tolerant
+ * reader admits — and is counted apart rather than dropped.
  *
- * The trajectory is built here rather than read from a `.trajs` file so the case stands on
- * its own; a real analysis reads the same parts with `Exchange`.
+ * The parts are built here rather than read from a `.trajs` file so the case stands on its
+ * own; a real analysis reads the same parts as the `stream` of a session
+ * `Trajectory.toSessions` read of a trajectory an `Exchange` loaded.
  */
 
 import { expect, it } from "@effect/vitest";
@@ -27,7 +28,7 @@ import {
   Trajectory,
   View,
 } from "@trajs/core";
-import { Effect, Match, Result, Schema, Stream } from "effect";
+import { Effect, Match, Option, Result, Schema, Stream } from "effect";
 
 /** The tools the run had, as the parameters each of them takes. */
 const toolkit = Toolkit.make(
@@ -74,8 +75,8 @@ interface Report {
 const part = Trajectory.parts(config);
 
 // Made a trajectory of the config rather than only checked against it, so what `View` reads
-// out of it is the toolkit's own: each call is typed by the tool it names.
-const trajectory = Trajectory.make(config)(
+// out of the session it holds is the toolkit's own: each call is typed by the tool it names.
+const trajectory = Trajectory.make(
   Stream.fromArray([
     part.prompt(Prompt.make("What is the weather in Paris, and in Berlin?")),
     part.response(
@@ -147,10 +148,14 @@ const trajectory = Trajectory.make(config)(
       }),
     ),
   ]),
+  config,
 );
 
 const main = Effect.fn(function* () {
-  return yield* trajectory.pipe(
+  const sessions = yield* Trajectory.toSessions(trajectory);
+  const session = Option.getOrThrow(Trajectory.session(Trajectory.rootSession)(sessions));
+
+  return yield* session.stream.pipe(
     // Parts to calls: what the run asked of its tools is what the report is of, so a part
     // that is not a call is read past.
     View.promptTurns,
@@ -158,8 +163,8 @@ const main = Effect.fn(function* () {
     Stream.filterMap((part) =>
       part.type === "tool-call" ? Result.succeed(part) : Result.failVoid,
     ),
-    // Calls to the report: folded as they arrive rather than collected first, so the
-    // trajectory is read in one pass.
+    // Calls to the report: folded as they arrive rather than collected first, so the parts
+    // are read in one pass.
     Stream.runFold(
       (): Report => ({ cities: [], queries: [], widestLimit: 0, extensions: {}, undescribed: 0 }),
       (report, call) =>
