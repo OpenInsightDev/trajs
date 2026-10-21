@@ -1,6 +1,7 @@
 /**
  * A run whose tools are the ones the trajectory was written with: each call read in the
- * terms its tool's parameters state, and counted by them.
+ * terms its tool's parameters state, and folded into the report as it arrives rather than
+ * collected into turns first.
  *
  * The trajectory is typed with the toolkit its responses were returned by — `Config` below
  * names it — so a response part is typed by the tool it names: `get_weather` holds a city,
@@ -26,7 +27,7 @@ import {
   Trajectory,
   View,
 } from "@trajs/core";
-import { Effect, Match, Schema, Stream } from "effect";
+import { Effect, Match, Result, Schema, Stream } from "effect";
 
 /** The tools the run had, as the parameters each of them takes. */
 const toolkit = Toolkit.make(
@@ -147,40 +148,46 @@ const trajStream: Trajectory.TrajectoryStream<typeof config> = Stream.fromArray(
 ]);
 
 const main = Effect.fn(function* () {
-  const turns = yield* View.promptTurns(trajStream).pipe(Stream.runCollect);
+  return yield* trajStream.pipe(
+    // Parts to calls: what the run asked of its tools is what the report is of, so a part
+    // that is not a call is read past.
+    View.promptTurns,
+    Stream.flatMap(({ response }) => Stream.fromIterable(response)),
+    Stream.filterMap((part) =>
+      part.type === "tool-call" ? Result.succeed(part) : Result.failVoid,
+    ),
+    // Calls to the report: folded as they arrive rather than collected first, so the
+    // trajectory is read in one pass.
+    Stream.runFold(
+      (): Report => ({ cities: [], queries: [], widestLimit: 0, extensions: {}, undescribed: 0 }),
+      (report, call) =>
+        // Each arm may only name a tool the toolkit describes, and the parameters it is handed
+        // are that tool's own; a call of any other tool is the arm below.
+        Match.value(call).pipe(
+          Match.discriminator("name")("get_weather", ({ params: { city } }) => ({
+            ...report,
+            cities: report.cities.includes(city) ? report.cities : [...report.cities, city],
+          })),
+          Match.discriminator("name")("search_docs", ({ params: { query, limit } }) => ({
+            ...report,
+            queries: report.queries.includes(query) ? report.queries : [...report.queries, query],
+            widestLimit: Math.max(report.widestLimit, limit),
+          })),
+          Match.discriminator("name")("read_file", ({ params: { path } }) => {
+            const extension = path.slice(path.lastIndexOf(".") + 1);
 
-  const cities: string[] = [];
-  const queries: string[] = [];
-  let widestLimit = 0;
-  const extensions: Record<string, number> = {};
-  let undescribed = 0;
-
-  for (const { response } of turns) {
-    for (const part of response) {
-      if (part.type !== "tool-call") continue;
-
-      // Each arm may only name a tool the toolkit describes, and the parameters it is handed
-      // are that tool's own; a call of any other tool is the arm below.
-      Match.value(part).pipe(
-        Match.discriminator("name")("get_weather", ({ params: { city } }) => {
-          if (!cities.includes(city)) cities.push(city);
-        }),
-        Match.discriminator("name")("search_docs", ({ params: { query, limit } }) => {
-          if (!queries.includes(query)) queries.push(query);
-          widestLimit = Math.max(widestLimit, limit);
-        }),
-        Match.discriminator("name")("read_file", ({ params: { path } }) => {
-          const extension = path.slice(path.lastIndexOf(".") + 1);
-          extensions[extension] = (extensions[extension] ?? 0) + 1;
-        }),
-        Match.orElse(() => {
-          undescribed += 1;
-        }),
-      );
-    }
-  }
-
-  return { cities, queries, widestLimit, extensions, undescribed } satisfies Report;
+            return {
+              ...report,
+              extensions: {
+                ...report.extensions,
+                [extension]: (report.extensions[extension] ?? 0) + 1,
+              },
+            };
+          }),
+          Match.orElse(() => ({ ...report, undescribed: report.undescribed + 1 })),
+        ),
+    ),
+  );
 });
 
 it.effect("main", () =>

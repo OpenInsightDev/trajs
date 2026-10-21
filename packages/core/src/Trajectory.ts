@@ -744,11 +744,18 @@ export const anyConfig: AnyConfig = {
  *
  * **Details**
  *
- * - The record is the {@link Config} itself, so what this returns is what every function
- *   taking a config takes: nothing is added to it and no field is defaulted, so a config
- *   states every kit it reads and how it reads them.
+ * - What it takes is a {@link Config} whose every field is optional — a record, or nothing
+ *   at all — and what it returns is the {@link Config} itself, so it is what every function
+ *   taking a config takes: every field it returns is stated, and a field the record leaves
+ *   out is returned as the default of that field — an empty kit of its kind
+ *   (`Toolkit.empty`, `EventKit.empty`, `MetricKit.empty`, `ExtraKit.empty`), and a variant
+ *   of `true`. So a reading that names one kit states the others by naming none, and a
+ *   reading that names nothing is {@link UnknownConfig}.
  * - `stream` is read as the literal it is stated as, so a config stating `false` is one
- *   whose response parts are whole alone, without `as const` — see {@link Config}.
+ *   whose response parts are whole alone, without `as const` — see {@link Config}. It
+ *   defaults to `true`, which reads a response part as every part a response may hold —
+ *   the increments an answer arrived in and the whole parts they complete — so a reading
+ *   that states nothing of the variant carries either.
  * - It is a statement rather than a check: a kit that does not read the parts a
  *   trajectory holds is refused where a part or a trajectory is built of it
  *   ({@link Part}, {@link PromptPart}), rather than here.
@@ -756,35 +763,44 @@ export const anyConfig: AnyConfig = {
  * **Example** (Stating what a trajectory is read with)
  *
  * ```ts import.meta.vitest
- * import { EventKit, ExtraKit, MetricKit, Toolkit, Trajectory } from "@trajs/core"
+ * import { EventKit, Trajectory } from "@trajs/core"
  *
- * // A trajectory of no kit of its own whose response parts are whole, as a program
- * // reading its own trajectories states it.
- * const config = Trajectory.config({
- *   stream: false,
- *   toolkit: Toolkit.empty,
- *   eventkit: EventKit.empty,
- *   metrickit: MetricKit.empty,
- *   extrakit: ExtraKit.empty
- * })
+ * // A reading that states nothing: no kit of its own, and a response part read as the
+ * // parts a response may hold.
+ * const any = Trajectory.config()
  *
- * config.stream // => false
+ * any.stream // => true
+ * any.eventkit === EventKit.empty // => true
+ *
+ * // A reading that states the variant alone: the whole parts a model returned, and no kit.
+ * Trajectory.config({ stream: false }).stream // => false
  * ```
  *
  * @see {@link Config} for what the record states.
+ * @see {@link UnknownConfig} for what a call that states nothing is.
  * @see {@link Trajectory} for the trajectory it reads.
  * @see {@link anyConfig} for the config that names no kit.
  * @category constructors
  */
 export const config = <
-  const Stream extends boolean,
-  Toolkit extends Toolkit.Any,
-  Events extends EventKit.Any,
-  Metrics extends MetricKit.Any,
-  Extras extends ExtraKit.Any,
+  const Stream extends boolean = true,
+  Toolkit extends Toolkit.Any = Toolkit.Empty,
+  Events extends EventKit.Any = EventKit.Empty,
+  Metrics extends MetricKit.Any = MetricKit.Empty,
+  Extras extends ExtraKit.Any = ExtraKit.Empty,
 >(
-  config: Config<Stream, Toolkit, Events, Metrics, Extras>,
-): Config<Stream, Toolkit, Events, Metrics, Extras> => config;
+  config: Partial<Config<Stream, Toolkit, Events, Metrics, Extras>> = {},
+): Config<Stream, Toolkit, Events, Metrics, Extras> =>
+  // SAFETY: each field not stated is the default of its type parameter — the empty kit of
+  // its kind, and `true` for the variant — so what is returned states every field of the
+  // config the signature names.
+  ({
+    stream: config.stream ?? true,
+    toolkit: config.toolkit ?? Toolkit.empty,
+    eventkit: config.eventkit ?? EventKit.empty,
+    metrickit: config.metrickit ?? MetricKit.empty,
+    extrakit: config.extrakit ?? ExtraKit.empty,
+  }) as Config<Stream, Toolkit, Events, Metrics, Extras>;
 
 /**
  * A part of a trajectory of the config given.
