@@ -9,9 +9,9 @@
  * its own; a real analysis reads the same parts with `Exchange`.
  */
 
+import { expect, it } from "@effect/vitest";
 import { Extra, Prompt, Response, Toolkit, Trajectory, View } from "@trajs/core";
 import { Effect, Stream } from "effect";
-import { expect, it } from "vite-plus/test";
 
 const toolkit = Toolkit.empty;
 const extrakit = Extra.emptyKit;
@@ -24,10 +24,10 @@ interface Summary {
   readonly toolCalls: Readonly<Record<string, number>>;
 }
 
-const prompt = (text: string) => Trajectory.promptPart(extrakit)(Prompt.make(text));
+const makePrompt = Trajectory.promptPart(extrakit);
 const makeResponse = Trajectory.responsePart({ toolkit, extrakit, stream: false });
 
-const turn = (id: string, city: string, answer: string) => [
+const makeTurn = (id: string, { city, answer }: { city: string; answer: string }) => [
   makeResponse(
     Response.anyToolCallPart({
       id,
@@ -40,25 +40,23 @@ const turn = (id: string, city: string, answer: string) => [
 ];
 
 const trajStream = Stream.fromArray([
-  prompt("What is the weather in Paris?"),
-  ...turn("call_1", "Paris", "It is sunny."),
-  prompt("And in Berlin?"),
-  ...turn("call_2", "Berlin", "It is raining."),
+  makePrompt(Prompt.make("What is the weather in Paris?")),
+  ...makeTurn("call_1", { city: "Paris", answer: "It is sunny." }),
+  makePrompt(Prompt.make("And in Berlin?")),
+  ...makeTurn("call_2", { city: "Berlin", answer: "It is raining." }),
 ]) satisfies Trajectory.TrajectoryStream<Trajectory.AnyConfig>;
 
-const main = async (): Promise<Summary> => {
-  const turns = Array.from(
-    await View.promptTurns(trajStream).pipe(Stream.runCollect, Effect.runPromise),
-  );
+const main = Effect.fn(function* () {
+  const turns = yield* View.promptTurns(trajStream).pipe(Stream.runCollect);
 
   let messages = 0;
   let characters = 0;
   const toolCalls: Record<string, number> = {};
 
-  for (const promptTurn of turns) {
-    messages += promptTurn.prompt.messages.length;
+  for (const { prompt, response } of turns) {
+    messages += prompt.messages.length;
 
-    for (const part of promptTurn.response) {
+    for (const part of response) {
       messages += 1;
 
       if (part.type === "text") {
@@ -69,13 +67,18 @@ const main = async (): Promise<Summary> => {
     }
   }
 
-  return { turns: turns.length, messages, characters, toolCalls };
-};
+  return { turns: turns.length, messages, characters, toolCalls } satisfies Summary;
+});
 
-it("main", () =>
-  expect(main()).resolves.toEqual({
-    turns: 2,
-    messages: 6,
-    characters: 26,
-    toolCalls: { get_weather: 2 },
-  }));
+it.effect("main", () =>
+  main().pipe(
+    Effect.map((summary) =>
+      expect(summary).toEqual({
+        turns: 2,
+        messages: 6,
+        characters: 26,
+        toolCalls: { get_weather: 2 },
+      } satisfies Summary),
+    ),
+  ),
+);

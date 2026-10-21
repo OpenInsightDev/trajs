@@ -1,0 +1,33 @@
+# examples/traj-analysis
+
+`README.md` states what the example is and lists its cases; this file is how a case is
+written.
+
+A case's `main` is an `Effect`, so its assertion is registered with `it.effect` from
+[`@effect/vitest`](https://github.com/Effect-TS/effect/tree/main/packages/vitest): the
+Effect runs as the test, and failing or dying is what fails it.
+
+## Adding a case
+
+1. Create `cases/<name>/main.test.ts`.
+2. Write the analysis as a `main` in it, and what it is made of in modules beside
+   it — what it reads, what it is of, and the layers it runs with.
+3. Assert what `main` returns, right below it, in `it.effect`.
+4. Write the `README.md` beside it — `# Case: <name>`, then what it shows and when you need it
+   — without describing the file: the reader can open the test.
+
+A case that generates what it reads writes it under its own `fixtures/`, which
+`.gitignore` keeps out of the repository.
+
+A case whose responses name tools a toolkit describes types its trajectory with that
+toolkit (`Trajectory.TrajectoryStream<Config>`), so every call it reads is typed by the
+tool it names.
+
+Cases share this one package: a case is a directory under `cases/`, not a package of its
+own.
+
+## Checks
+
+- `vp test` in `examples/traj-analysis`, or
+  `vp run --filter @trajs/example-traj-analysis test` from the root.
+- `vp check` in `examples/traj-analysis`.

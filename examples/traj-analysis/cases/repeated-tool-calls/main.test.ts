@@ -8,9 +8,9 @@
  * its own; a real analysis reads the same parts with `Exchange`.
  */
 
+import { expect, it } from "@effect/vitest";
 import { Extra, Prompt, Response, Toolkit, Trajectory, View } from "@trajs/core";
 import { Effect, Stream } from "effect";
-import { expect, it } from "vite-plus/test";
 
 const toolkit = Toolkit.empty;
 const extrakit = Extra.emptyKit;
@@ -85,11 +85,16 @@ const main = (threshold: number) =>
 // Three `grep` calls of one pattern in a row and three `bash` calls of one command in a row
 // are repeats; the two `read_file` calls of one path are a run of two, which is not longer
 // than the threshold the analysis is read with, so they are not reported.
-it("main", () =>
-  expect(main(2).pipe(Effect.runPromise)).resolves.toEqual({
-    totalToolTurns: 8,
-    repeated: [
-      { name: "grep", params: { pattern: "parseConfig" }, ids: ["call_1", "call_2", "call_3"] },
-      { name: "bash", params: { command: "bun test" }, ids: ["call_6", "call_7", "call_8"] },
-    ],
-  }));
+it.effect("main", () =>
+  main(2).pipe(
+    Effect.map((report) =>
+      expect(report).toEqual({
+        totalToolTurns: 8,
+        repeated: [
+          { name: "grep", params: { pattern: "parseConfig" }, ids: ["call_1", "call_2", "call_3"] },
+          { name: "bash", params: { command: "bun test" }, ids: ["call_6", "call_7", "call_8"] },
+        ],
+      }),
+    ),
+  ),
+);

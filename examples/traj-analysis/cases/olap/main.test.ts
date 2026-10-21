@@ -17,12 +17,12 @@
  */
 
 import { NodeServices as PlatformNodeServices } from "@effect/platform-node";
+import { expect, it } from "@effect/vitest";
 import { Exchange } from "@trajs/core";
 import { Clickhouse } from "@trajs/olap";
 import { NodeServices } from "@trajs/platform-node";
 import { layerFileSystem } from "@trajs/utils/Storage";
 import { Effect, Layer } from "effect";
-import { expect, it } from "vite-plus/test";
 
 import { generation, meanOf, writeFixtures } from "./fixture.ts";
 import { importFixtures, prepareTable } from "./table.ts";
@@ -88,7 +88,7 @@ const Layers = Layer.mergeAll(
 );
 
 /** Generates the fixture set, imports every trajectory of it, and asks the table what it was drawn from. */
-const main = (): Promise<Report> =>
+const main = () =>
   Effect.gen(function* () {
     yield* prepareTable();
 
@@ -185,8 +185,8 @@ const main = (): Promise<Report> =>
         subAgentShare: subAgents?.share ?? 0,
         days,
       },
-    };
-  }).pipe(Effect.scoped, Effect.provide(Layers), Effect.runPromise);
+    } satisfies Report;
+  }).pipe(Effect.scoped, Effect.provide(Layers));
 
 /** Asserts that `observed` is within `tolerance` of `expected`, which is how a sample is compared with what it was drawn from. */
 const expectNear = (observed: number, expected: number, tolerance: number) =>
@@ -200,44 +200,46 @@ const toolShare = (analysis: Analysis, tool: string): number =>
 const modelShare = (analysis: Analysis, model: string): number =>
   analysis.models.find((row) => row.model === model)?.share ?? 0;
 
-it("main", async () => {
-  const { written, analysis } = await main();
+it.effect("main", () =>
+  Effect.gen(function* () {
+    const { written, analysis } = yield* main();
 
-  // Every part of every fixture is a row of the table, once: what the queries above aggregate over
-  // is the parts the fixtures were written as, which is what makes the answers an analysis of them.
-  expect(analysis.rows).toBe(written);
+    // Every part of every fixture is a row of the table, once: what the queries above aggregate over
+    // is the parts the fixtures were written as, which is what makes the answers an analysis of them.
+    expect(analysis.rows).toBe(written);
 
-  // Every call names its tool in the payload and was drawn from these weights, so the share of the
-  // calls a tool got is the weight it was drawn with, to within the scatter of ~1,300 calls.
-  for (const [tool, weight] of Object.entries(generation.tools)) {
-    expectNear(toolShare(analysis, tool), weight, 0.04);
-  }
+    // Every call names its tool in the payload and was drawn from these weights, so the share of the
+    // calls a tool got is the weight it was drawn with, to within the scatter of ~1,300 calls.
+    for (const [tool, weight] of Object.entries(generation.tools)) {
+      expectNear(toolShare(analysis, tool), weight, 0.04);
+    }
 
-  // Every response states the model that answered it, drawn from these weights, so the share of the
-  // responses a model answered is its weight, to within the scatter of ~1,300 responses.
-  for (const [model, weight] of Object.entries(generation.models)) {
-    expectNear(modelShare(analysis, model), weight, 0.05);
-  }
+    // Every response states the model that answered it, drawn from these weights, so the share of the
+    // responses a model answered is its weight, to within the scatter of ~1,300 responses.
+    for (const [model, weight] of Object.entries(generation.models)) {
+      expectNear(modelShare(analysis, model), weight, 0.05);
+    }
 
-  // A turn's totals are drawn from a range, so the average response used its midpoint — and the
-  // average is of the responses rather than of the rows, so the totals are read off `finish` parts.
-  expectNear(analysis.tokens.input, meanOf(generation.tokens.input), 3);
-  expectNear(analysis.tokens.output, meanOf(generation.tokens.output), 2);
+    // A turn's totals are drawn from a range, so the average response used its midpoint — and the
+    // average is of the responses rather than of the rows, so the totals are read off `finish` parts.
+    expectNear(analysis.tokens.input, meanOf(generation.tokens.input), 3);
+    expectNear(analysis.tokens.output, meanOf(generation.tokens.output), 2);
 
-  // A session produces a number of turns drawn from a range, so the average session was asked the
-  // range's midpoint number of prompts.
-  expectNear(analysis.promptsPerSession, meanOf(generation.turns), 0.1);
+    // A session produces a number of turns drawn from a range, so the average session was asked the
+    // range's midpoint number of prompts.
+    expectNear(analysis.promptsPerSession, meanOf(generation.turns), 0.1);
 
-  // A run starts a sub-agent with this probability, and what a sub-agent is in the table is a second
-  // session declared in the trajectory of the run that started it.
-  expectNear(analysis.subAgentShare, generation.subAgents, 0.05);
+    // A run starts a sub-agent with this probability, and what a sub-agent is in the table is a second
+    // session declared in the trajectory of the run that started it.
+    expectNear(analysis.subAgentShare, generation.subAgents, 0.05);
 
-  // The runs were dealt to the days evenly rather than drawn to them, so every day holds the same
-  // number of trajectories — each of which used some tokens on it.
-  expect(analysis.days).toHaveLength(generation.days);
+    // The runs were dealt to the days evenly rather than drawn to them, so every day holds the same
+    // number of trajectories — each of which used some tokens on it.
+    expect(analysis.days).toHaveLength(generation.days);
 
-  for (const day of analysis.days) {
-    expect(day.trajectories).toBe(generation.trajectories / generation.days);
-    expect(day.tokens).toBeGreaterThan(0);
-  }
-});
+    for (const day of analysis.days) {
+      expect(day.trajectories).toBe(generation.trajectories / generation.days);
+      expect(day.tokens).toBeGreaterThan(0);
+    }
+  }),
+);
