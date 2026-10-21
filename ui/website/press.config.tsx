@@ -11,6 +11,9 @@ import { metaSchema, pageSchema } from "fumapress/adapters/mdx/schema";
 import { createDocsLayoutPage } from "fumapress/layouts/docs";
 import { createHomeLayoutPage } from "fumapress/layouts/home";
 
+import { LandingPage } from "./src/components/landing/landing-page";
+import { LandingLayout } from "./src/layouts/landing";
+
 const docs = defineDocs({
   dir: "content",
   docs: {
@@ -25,47 +28,14 @@ const docs = defineDocs({
 const DocsPage = createDocsLayoutPage<typeof config.$context>();
 
 // The docs layout would put a text title and the page actions above the logo,
-// so the landing page renders under the navbar-only home layout; the copy stays
-// in `content/index.mdx` so the Markdown the site serves to LLMs keeps no JSX.
+// and Fumapress's home layout would put its own navbar there: the landing page is
+// the design's floating header and hero, so it renders under a layout that adds
+// nothing around it. Its copy is the design's, not `content/index.mdx`'s prose —
+// that file stays the page the docs collection hands `/`, and the Markdown the
+// site serves to LLMs.
 const HomePage = createHomeLayoutPage<typeof config.$context>({
-  async render(page) {
-    const body = (await this.getPageBody(page))?.node;
-    const { git } = this.siteConfig;
-
-    return {
-      body: (
-        <div className="mx-auto flex w-full max-w-3xl flex-col gap-16 py-14">
-          <div className="flex flex-col items-center gap-8 text-center">
-            <img
-              src={`${import.meta.env.BASE_URL}Logo-Horizontal.svg`}
-              alt={page.data.title}
-              width={1856}
-              height={1147}
-              className="h-auto w-96 max-w-full dark:invert"
-            />
-            {page.data.description ? (
-              <p className="max-w-2xl text-balance text-xl text-fd-muted-foreground">
-                {page.data.description}
-              </p>
-            ) : null}
-            {/* The repository URL, assembled the way Fumapress assembles its
-                own: its helper is not part of the public API. */}
-            {git ? (
-              <a
-                className="inline-flex items-center rounded-md border bg-fd-secondary px-5 py-2.5 text-sm font-medium text-fd-secondary-foreground transition-colors hover:bg-fd-accent hover:text-fd-accent-foreground"
-                href={`${git.url}/${git.user}/${git.repo}`}
-                rel="noreferrer noopener"
-                target="_blank"
-              >
-                GitHub
-              </a>
-            ) : null}
-          </div>
-          <div className="prose mx-auto w-full max-w-2xl">{body}</div>
-        </div>
-      ),
-    };
-  },
+  layout: LandingLayout,
+  render: () => ({ body: <LandingPage /> }),
 });
 
 const config = defineConfig({

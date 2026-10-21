@@ -6,13 +6,165 @@
 /* The site serves its own type, the way the gallery and the viewer do, instead
    of asking fonts.googleapis.com for a stylesheet: the page then has no
    third-party request standing between it and its first paint, and it fetches
-   only the weights it is read in — Geist's variable axis for the prose, and IBM
-   Plex Mono's Regular and Medium for the code blocks and the labels. */
+   only the weights it is read in — Geist's variable axis for the docs prose,
+   Poppins' ExtraLight, Light and Medium for the landing page, and IBM Plex
+   Mono for the code blocks and the labels. */
 @import "@fontsource-variable/geist";
+@import "@fontsource/poppins/latin-200.css";
+@import "@fontsource/poppins/latin-300.css";
+@import "@fontsource/poppins/latin-500.css";
 @import "@fontsource/ibm-plex-mono/latin-400.css";
 @import "@fontsource/ibm-plex-mono/latin-500.css";
 
+/* The design system the Figma file (`TRAJS`, file `wHC1Hy6AADFOheDz8FFt1e`)
+   holds: its colour variables, its text styles and the boards they are drawn
+   for. A token here is named after the Figma variable or style it comes from,
+   so a value can be carried between the file and the page without translation.
+   A text style the file draws a variant of per board is overridden below at that
+   board's width; `src/components/landing/` is what reads them. */
 @theme {
   --font-mono: "IBM Plex Mono", monospace;
   --default-font-family: "Geist Variable", sans-serif;
+  /* Poppins is the landing page's face; the docs keep Geist. */
+  --font-display: "Poppins", "Geist Variable", sans-serif;
+
+  /* Colour / … — one token per variable in the file, as the file's `Light` mode
+     states it: that mode is the page's base, and `.dark` below restates the
+     variables the file's `Dark` mode redraws. The `Effect / …` variables are not
+     here: they are the pigments the shader fills are drawn from, which a fill
+     takes as numbers rather than through CSS, so they are stated in
+     `src/components/landing/palette.ts`. */
+  --color-surface-canvas: #f2f2ef;
+  --color-surface-glass: rgb(255 255 255 / 20%);
+  --color-surface-control: #000000;
+  --color-surface-control-border: rgb(0 0 0 / 12%);
+  --color-ink-primary: #171717;
+  --color-ink-secondary: #5f5f66;
+  --color-ink-muted: #6b6b70;
+  --color-ink-quiet: #7b7b80;
+  --color-ink-subtle: #5f5f66;
+  --color-ink-command: #353539;
+  --color-ink-on-action: #ffffff;
+  --color-ink-thumb: rgb(255 255 255 / 40%);
+  --color-action-primary: #171717;
+  --color-border-strong: rgb(23 23 23 / 18%);
+  --color-border-hairline: rgb(23 23 23 / 12%);
+  --color-border-icon: rgb(23 23 28 / 90%);
+  --color-control-segment-light: #ffffff;
+  --color-control-segment-dark: rgb(255 255 255 / 0%);
+
+  /* The file's boards, which are the widths its type styles and spacing are
+     drawn for: 390, 834, 1440 and 1920. The small board is the page's base. */
+  --breakpoint-tablet: 834px;
+  --breakpoint-desktop: 1440px;
+  --breakpoint-wide: 1920px;
+
+  /* Type / … at 390, the file's smallest board. Letter spacing is the
+     percentage the file records, as an em, and the line height is the one it
+     records in pixels. */
+  --text-hero: 40px;
+  --text-hero--line-height: 44px;
+  --text-hero--letter-spacing: -0.01em;
+  --text-hero--font-weight: 300;
+
+  --text-eyebrow: 15px;
+  --text-eyebrow--line-height: 1;
+  --text-eyebrow--letter-spacing: 0.16em;
+  --text-eyebrow--font-weight: 300;
+
+  --text-label: 13px;
+  --text-label--line-height: 1;
+  --text-label--letter-spacing: 0.12em;
+  --text-label--font-weight: 400;
+
+  --text-body: 15px;
+  --text-body--line-height: 23px;
+  --text-body--letter-spacing: 0.01em;
+  --text-body--font-weight: 300;
+
+  --text-button: 16px;
+  --text-button--line-height: 1;
+  --text-button--letter-spacing: 0.01em;
+  --text-button--font-weight: 500;
+
+  --text-nav: 15px;
+  --text-nav--line-height: 1;
+  --text-nav--letter-spacing: 0.08em;
+  --text-nav--font-weight: 300;
+
+  --text-wordmark: 20px;
+  --text-wordmark--line-height: 1;
+  --text-wordmark--letter-spacing: 0.11em;
+  --text-wordmark--font-weight: 300;
+
+  --text-prompt: 16px;
+  --text-prompt--line-height: 1;
+  --text-prompt--letter-spacing: 0;
+  --text-prompt--font-weight: 500;
+
+  --text-command: 17px;
+  --text-command--line-height: 1;
+  --text-command--letter-spacing: 0.02em;
+  --text-command--font-weight: 400;
+}
+
+/* The file's `Dark` mode, which its boards are drawn in. The page's theme is the
+   `class` the root layout's script puts on `<html>` (`src/theme.ts` switches it),
+   so a token named here is the same variable the light palette states above, and
+   every surface, ink and effect follows one attribute. */
+.dark {
+  --color-surface-canvas: #0b0b0c;
+  --color-surface-glass: rgb(255 255 255 / 8%);
+  --color-surface-control: rgb(255 255 255 / 12%);
+  --color-surface-control-border: rgb(255 255 255 / 13%);
+  --color-ink-primary: #f2f2ef;
+  --color-ink-secondary: #9c9ca3;
+  --color-ink-muted: #c4c4ca;
+  --color-ink-quiet: #6e6e75;
+  --color-ink-subtle: #8a8a91;
+  --color-ink-command: #e4e4e2;
+  --color-ink-on-action: #0b0b0c;
+  --color-ink-thumb: #171717;
+  --color-action-primary: #f2f2ef;
+  --color-border-strong: rgb(255 255 255 / 22%);
+  --color-border-hairline: rgb(255 255 255 / 12%);
+  --color-border-icon: rgb(255 255 255 / 42%);
+  --color-control-segment-light: rgb(255 255 255 / 0%);
+  --color-control-segment-dark: #ffffff;
+}
+
+/* Type / … at the larger boards. The file states each style per board rather
+   than as a ratio, so the overrides do too: a style keeps its value until a
+   board states a new one. */
+@media (min-width: 834px) {
+  :root {
+    --text-hero: 72px;
+    --text-hero--line-height: 80px;
+    --text-label: 14px;
+    --text-body: 16px;
+    --text-body--line-height: 25px;
+    --text-button: 19px;
+  }
+}
+
+@media (min-width: 1440px) {
+  :root {
+    --text-hero: 112px;
+    --text-hero--line-height: 123px;
+    --text-hero--font-weight: 200;
+    --text-eyebrow: 16px;
+    --text-body: 18px;
+    --text-body--line-height: 29px;
+  }
+}
+
+@media (min-width: 1920px) {
+  :root {
+    --text-hero: 128px;
+    --text-hero--line-height: 141px;
+    --text-eyebrow: 17.5px;
+    --text-label: 16px;
+    --text-body: 20px;
+    --text-body--line-height: 33px;
+  }
 }
