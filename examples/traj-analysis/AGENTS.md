@@ -26,10 +26,6 @@ so a reader never leaves it to finish a thought.
 A case that generates what it reads writes it under its own `fixtures/`, which
 `.gitignore` keeps out of the repository.
 
-A case whose responses name tools a toolkit describes types its trajectory with that
-toolkit (`Trajectory.TrajectoryStream<Config>`), so every call it reads is typed by the
-tool it names.
-
 Cases share this one package: a case is a directory under `cases/`, not a package of its
 own.
 

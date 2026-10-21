@@ -3,13 +3,13 @@
  * terms its tool's parameters state, and folded into the report as it arrives rather than
  * collected into turns first.
  *
- * The trajectory is typed with the toolkit its responses were returned by — `Config` below
- * names it — so a response part is typed by the tool it names: `get_weather` holds a city,
- * `search_docs` a query and a page size, `read_file` a path. That is what a toolkit buys an
- * analysis: the calls are read per tool rather than as payloads of `unknown`, and each tool
- * is counted in the terms it alone states. A call of a tool the toolkit does not describe
- * still reads — as the unconstrained part the tolerant reader admits — and is counted apart
- * rather than dropped.
+ * The trajectory is made of the config its responses were returned by — `Config` below names
+ * it, and `Trajectory.make` states it on the parts — so a response part is typed by the tool it
+ * names: `get_weather` holds a city, `search_docs` a query and a page size, `read_file` a path.
+ * That is what a toolkit buys an analysis: the calls are read per tool rather than as payloads
+ * of `unknown`, and each tool is counted in the terms it alone states. A call of a tool the
+ * toolkit does not describe still reads — as the unconstrained part the tolerant reader admits
+ * — and is counted apart rather than dropped.
  *
  * The trajectory is built here rather than read from a `.trajs` file so the case stands on
  * its own; a real analysis reads the same parts with `Exchange`.
@@ -73,82 +73,84 @@ interface Report {
 
 const part = Trajectory.parts(config);
 
-// Typed with the config rather than only checked against it: what `View` reads out of the
-// trajectory is the toolkit's own where the stream it is read from is typed by it.
-const trajStream: Trajectory.TrajectoryStream<typeof config> = Stream.fromArray([
-  part.prompt(Prompt.make("What is the weather in Paris, and in Berlin?")),
-  part.response(
-    Response.makePart("tool-call", {
-      id: "call_1",
-      name: "get_weather",
-      params: { city: "Paris", unit: "celsius" },
-      providerExecuted: false,
-    }),
-  ),
-  part.response(
-    Response.makePart("tool-call", {
-      id: "call_2",
-      name: "get_weather",
-      params: { city: "Berlin", unit: "celsius" },
-      providerExecuted: false,
-    }),
-  ),
-  part.prompt(Prompt.make("Search for the retry policy, and read what it names.")),
-  part.response(
-    Response.makePart("tool-call", {
-      id: "call_3",
-      name: "search_docs",
-      params: { query: "retry policy", limit: 5 },
-      providerExecuted: false,
-    }),
-  ),
-  part.response(
-    Response.makePart("tool-call", {
-      id: "call_4",
-      name: "read_file",
-      params: { path: "src/retry.ts" },
-      providerExecuted: false,
-    }),
-  ),
-  part.response(
-    Response.makePart("tool-call", {
-      id: "call_5",
-      name: "read_file",
-      params: { path: "docs/retry.md" },
-      providerExecuted: false,
-    }),
-  ),
-  // A tool the toolkit says nothing about: the run fetched a page, and no tool of the
-  // toolkit describes a fetch, so the call reads as it was stated rather than being dropped.
-  part.response(
-    Response.anyToolCallPart({
-      id: "call_6",
-      name: "web_fetch",
-      params: { url: "https://example.com/retry" },
-      providerExecuted: false,
-    }),
-  ),
-  part.prompt(Prompt.make("Search again, wider — and for backoff too.")),
-  part.response(
-    Response.makePart("tool-call", {
-      id: "call_7",
-      name: "search_docs",
-      params: { query: "retry policy", limit: 20 },
-      providerExecuted: false,
-    }),
-  ),
-  part.response(
-    Response.makePart("tool-call", {
-      id: "call_8",
-      name: "search_docs",
-      params: { query: "backoff", limit: 10 },
-      providerExecuted: false,
-    }),
-  ),
-]);
+// Made a trajectory of the config rather than only checked against it, so what `View` reads
+// out of it is the toolkit's own: each call is typed by the tool it names.
+const trajectory = Trajectory.make(config)(
+  Stream.fromArray([
+    part.prompt(Prompt.make("What is the weather in Paris, and in Berlin?")),
+    part.response(
+      Response.makePart("tool-call", {
+        id: "call_1",
+        name: "get_weather",
+        params: { city: "Paris", unit: "celsius" },
+        providerExecuted: false,
+      }),
+    ),
+    part.response(
+      Response.makePart("tool-call", {
+        id: "call_2",
+        name: "get_weather",
+        params: { city: "Berlin", unit: "celsius" },
+        providerExecuted: false,
+      }),
+    ),
+    part.prompt(Prompt.make("Search for the retry policy, and read what it names.")),
+    part.response(
+      Response.makePart("tool-call", {
+        id: "call_3",
+        name: "search_docs",
+        params: { query: "retry policy", limit: 5 },
+        providerExecuted: false,
+      }),
+    ),
+    part.response(
+      Response.makePart("tool-call", {
+        id: "call_4",
+        name: "read_file",
+        params: { path: "src/retry.ts" },
+        providerExecuted: false,
+      }),
+    ),
+    part.response(
+      Response.makePart("tool-call", {
+        id: "call_5",
+        name: "read_file",
+        params: { path: "docs/retry.md" },
+        providerExecuted: false,
+      }),
+    ),
+    // A tool the toolkit says nothing about: the run fetched a page, and no tool of the
+    // toolkit describes a fetch, so the call reads as it was stated rather than being dropped.
+    part.response(
+      Response.anyToolCallPart({
+        id: "call_6",
+        name: "web_fetch",
+        params: { url: "https://example.com/retry" },
+        providerExecuted: false,
+      }),
+    ),
+    part.prompt(Prompt.make("Search again, wider — and for backoff too.")),
+    part.response(
+      Response.makePart("tool-call", {
+        id: "call_7",
+        name: "search_docs",
+        params: { query: "retry policy", limit: 20 },
+        providerExecuted: false,
+      }),
+    ),
+    part.response(
+      Response.makePart("tool-call", {
+        id: "call_8",
+        name: "search_docs",
+        params: { query: "backoff", limit: 10 },
+        providerExecuted: false,
+      }),
+    ),
+  ]),
+);
 
 const main = Effect.fn(function* () {
-  return yield* trajStream.pipe(
+  return yield* trajectory.pipe(
     // Parts to calls: what the run asked of its tools is what the report is of, so a part
     // that is not a call is read past.
     View.promptTurns,

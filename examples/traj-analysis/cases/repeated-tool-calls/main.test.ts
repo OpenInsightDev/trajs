@@ -9,26 +9,11 @@
  */
 
 import { expect, it } from "@effect/vitest";
-import {
-  EventKit,
-  ExtraKit,
-  MetricKit,
-  Prompt,
-  Response,
-  Toolkit,
-  Trajectory,
-  View,
-} from "@trajs/core";
+import { Prompt, Response, Trajectory, View } from "@trajs/core";
 import { Effect, Stream } from "effect";
 
 /** What the parts are built and read with: no tool, event, metric or extra datum. */
-const config = Trajectory.config({
-  stream: false,
-  toolkit: Toolkit.empty,
-  eventkit: EventKit.empty,
-  metrickit: MetricKit.empty,
-  extrakit: ExtraKit.empty,
-});
+const config = Trajectory.config({ stream: false });
 
 /** A call reported as repeated: its input, and the ids of the calls made with it. */
 interface RepeatedToolCall {
@@ -60,22 +45,24 @@ const toolTurn = (id: string, name: string, params: Record<string, string>, answ
   ),
 ];
 
-const trajStream = Stream.fromArray([
-  prompt("Where is `parseConfig` defined?"),
-  ...toolTurn("call_1", "grep", { pattern: "parseConfig" }, "src/config.ts:12"),
-  ...toolTurn("call_2", "grep", { pattern: "parseConfig" }, "src/config.ts:12"),
-  ...toolTurn("call_3", "grep", { pattern: "parseConfig" }, "src/config.ts:12"),
-  prompt("Read the module it is defined in."),
-  ...toolTurn("call_4", "read_file", { path: "src/config.ts" }, "export const parseConfig = 1"),
-  ...toolTurn("call_5", "read_file", { path: "src/config.ts" }, "export const parseConfig = 1"),
-  prompt("Run the tests."),
-  ...toolTurn("call_6", "bash", { command: "bun test" }, "3 tests passed"),
-  ...toolTurn("call_7", "bash", { command: "bun test" }, "3 tests passed"),
-  ...toolTurn("call_8", "bash", { command: "bun test" }, "3 tests passed"),
-]) satisfies Trajectory.TrajectoryStream<typeof config>;
+const trajectory = Trajectory.make(config)(
+  Stream.fromArray([
+    prompt("Where is `parseConfig` defined?"),
+    ...toolTurn("call_1", "grep", { pattern: "parseConfig" }, "src/config.ts:12"),
+    ...toolTurn("call_2", "grep", { pattern: "parseConfig" }, "src/config.ts:12"),
+    ...toolTurn("call_3", "grep", { pattern: "parseConfig" }, "src/config.ts:12"),
+    prompt("Read the module it is defined in."),
+    ...toolTurn("call_4", "read_file", { path: "src/config.ts" }, "export const parseConfig = 1"),
+    ...toolTurn("call_5", "read_file", { path: "src/config.ts" }, "export const parseConfig = 1"),
+    prompt("Run the tests."),
+    ...toolTurn("call_6", "bash", { command: "bun test" }, "3 tests passed"),
+    ...toolTurn("call_7", "bash", { command: "bun test" }, "3 tests passed"),
+    ...toolTurn("call_8", "bash", { command: "bun test" }, "3 tests passed"),
+  ]),
+);
 
 const main = (threshold: number) =>
-  trajStream.pipe(
+  trajectory.pipe(
     // Parts to turns: a call with the result that answered it
     View.toolTurns,
     // Turns to runs: the calls made one after another with equal inputs, compared with

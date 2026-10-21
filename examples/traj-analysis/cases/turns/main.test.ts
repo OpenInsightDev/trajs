@@ -53,15 +53,17 @@ const makeTurn = (id: string, { city, answer }: { city: string; answer: string }
   part.response(Response.makePart("text", { text: answer })),
 ];
 
-const trajStream = Stream.fromArray([
-  part.prompt(Prompt.make("What is the weather in Paris?")),
-  ...makeTurn("call_1", { city: "Paris", answer: "It is sunny." }),
-  part.prompt(Prompt.make("And in Berlin?")),
-  ...makeTurn("call_2", { city: "Berlin", answer: "It is raining." }),
-]) satisfies Trajectory.TrajectoryStream<typeof config>;
+const trajectory = Trajectory.make(config)(
+  Stream.fromArray([
+    part.prompt(Prompt.make("What is the weather in Paris?")),
+    ...makeTurn("call_1", { city: "Paris", answer: "It is sunny." }),
+    part.prompt(Prompt.make("And in Berlin?")),
+    ...makeTurn("call_2", { city: "Berlin", answer: "It is raining." }),
+  ]),
+);
 
 const main = Effect.fn(function* () {
-  const turns = yield* View.promptTurns(trajStream).pipe(Stream.runCollect);
+  const turns = yield* View.promptTurns(trajectory).pipe(Stream.runCollect);
 
   let messages = 0;
   let characters = 0;
