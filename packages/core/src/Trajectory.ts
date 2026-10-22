@@ -1218,8 +1218,9 @@ export const toSessions = <Config extends AnyConfig, E, R>(
  * it — and the difference is where they are kept: in the store a program provides
  * ({@link ByteStore}) rather than in memory. The store is what this reading requires and one
  * through {@link toSessions} does not: `ByteStore.layer` keeps the parts in memory,
- * `ByteStore.layerKVStore` in the key/value store a program states, and a store of a program's
- * own is a layer of its own. Its scope must outlive the sessions read of it, since a session is
+ * `ByteStore.layerKVStore` in the key/value store a program states, `ByteStore.layerFsTemp`
+ * in a temporary directory of the file system, and a store of a program's own is a layer
+ * of its own. Its scope must outlive the sessions read of it, since a session is
  * read out of those parts as often as it is asked for.
  *
  * The parts are kept under a key of their own — a sequence per reading — so a store serves the
@@ -1276,8 +1277,9 @@ export const toSessions = <Config extends AnyConfig, E, R>(
  * it — and the difference is where they are kept: in the store a program provides
  * ({@link ByteStore}) rather than in memory. The store is what this reading requires and one
  * through {@link toSessions} does not: `ByteStore.layer` keeps the parts in memory,
- * `ByteStore.layerKVStore` in the key/value store a program states, and a store of a program's
- * own is a layer of its own. Its scope must outlive the sessions read of it, since a session is
+ * `ByteStore.layerKVStore` in the key/value store a program states, `ByteStore.layerFsTemp`
+ * in a temporary directory of the file system, and a store of a program's own is a layer
+ * of its own. Its scope must outlive the sessions read of it, since a session is
  * read out of those parts as often as it is asked for.
  *
  * The parts are kept under a key of their own — a sequence per reading — so a store serves the

@@ -5,18 +5,21 @@
  * What holds them is the key/value store of `effect/persistence`
  * (`KeyValueStore`) — memory, a file system, a database — so where the bytes live
  * is the store layer's to say rather than this module's, and nothing of how a
- * sequence is kept changes when another store is provided. The store this package
- * ships keeps them in memory ({@link layer}), and one over the key/value store a
- * program holds is stated beside it ({@link layerKVStore}). What is kept of a
+ * sequence is kept changes when another store is provided. The stores this package
+ * ships keep them in memory ({@link layer}), in a temporary directory of the file
+ * system that goes with the scope ({@link layerFsTemp}), or over the key/value
+ * store a program holds ({@link layerKVStore}). What is kept of a
  * sequence is the chunks it is cut into rather than one value, so a sequence too
  * large for a store to hold whole is still written to it and read from it: what a
  * read reaches is read, and the chunks it does not are left where they are.
  */
 
-import { Context, Data, Effect, Formatter, Layer, Schema, Sink } from "effect";
+import { Context, Data, Effect, FileSystem, Formatter, Layer, Path, Sink } from "effect";
 import { KeyValueStore } from "effect/persistence";
+import type { PlatformError } from "effect/PlatformError";
 
-import { type Bytes, makeBytes } from "#/Bytes.ts";
+import { type Bytes } from "#/Bytes.ts";
+import { keyValueStoreBytes } from "#/internal/byte-store.ts";
 
 /**
  * What a sequence is written into a store with.
@@ -238,236 +241,6 @@ export class ByteStoreError extends Data.TaggedError("ByteStoreError")<{
 }
 
 /**
- * What a store keeps of a sequence beside its chunks: how many bytes one chunk
- * holds, and how many bytes the sequence is.
- *
- * The size is kept with the sequence rather than taken from the store that reads it,
- * so a sequence is cut and read the same way whatever store reads it back. The record
- * is kept as the JSON string every `KeyValueStore` layer states, and the length is
- * carried as digits rather than as a JSON number, which cannot hold every length
- * exactly.
- */
-const Meta = Schema.Struct({
-  chunkSize: Schema.Int.check(Schema.isGreaterThan(0)),
-  length: Schema.BigIntFromString,
-});
-
-type Meta = Schema.Schema.Type<typeof Meta>;
-
-const MetaFromJson = Schema.fromJsonString(Meta);
-
-const metaKey = (id: string): string => `${id}/meta`;
-
-const chunkKey = (id: string, index: number): string => `${id}/${index}`;
-
-/** How many chunks an id holds, as its record states, or none where it holds no record. */
-const chunkCount = (meta: Meta | undefined): number =>
-  meta === undefined
-    ? 0
-    : Number((meta.length + BigInt(meta.chunkSize) - 1n) / BigInt(meta.chunkSize));
-
-/** What the key/value store underneath failed with, as this store reports it. */
-const named = <A, R>(
-  id: string,
-  effect: Effect.Effect<A, KeyValueStore.KeyValueStoreError, R>,
-): Effect.Effect<A, ByteStoreError, R> =>
-  effect.pipe(Effect.mapError((cause) => new ByteStoreError({ id, cause })));
-
-/** Reads a sequence's record, or nothing where the id holds no sequence. */
-const getMeta = (
-  store: KeyValueStore.KeyValueStore,
-  id: string,
-): Effect.Effect<Meta | undefined, ByteStoreError> =>
-  named(id, store.get(metaKey(id))).pipe(
-    Effect.flatMap((held) =>
-      held === undefined
-        ? Effect.succeed(undefined)
-        : Schema.decodeUnknownEffect(MetaFromJson)(held).pipe(
-            Effect.mapError((cause) => new ByteStoreError({ id, cause })),
-          ),
-    ),
-  );
-
-/** Keeps a sequence's record, once the chunks it states have all been written. */
-const putMeta = (
-  store: KeyValueStore.KeyValueStore,
-  id: string,
-  meta: Meta,
-): Effect.Effect<void, ByteStoreError> =>
-  named(id, store.set(metaKey(id), Schema.encodeSync(MetaFromJson)(meta)));
-
-/**
- * Drops what an id holds: the chunks its record states, any chunks the store holds
- * beyond them, and the record itself.
- *
- * A write keeps its chunks from the first one on, so what a store holds under an id is
- * a run of chunks from `0` to the last one written: the record states how long that
- * run is for a write that ended, and where one ended before its record was kept, the
- * run is found by probing for the first chunk the store does not hold.
- */
-const drop = (
-  store: KeyValueStore.KeyValueStore,
-  id: string,
-  stated: number,
-): Effect.Effect<void, ByteStoreError> =>
-  Effect.gen(function* () {
-    let index = 0;
-
-    while (index < stated || (yield* named(id, store.has(chunkKey(id, index))))) {
-      yield* named(id, store.remove(chunkKey(id, index)));
-      index += 1;
-    }
-
-    yield* named(id, store.remove(metaKey(id)));
-  });
-
-/**
- * Reads the bytes a sequence holds into `buffer`, from `offset` and up to `size` of
- * them, by taking what each chunk it reaches holds of them.
- *
- * A chunk is read only where the read reaches it, so a read of the head of a
- * sequence never reads the chunks after it.
- */
-const readInto = (
-  store: KeyValueStore.KeyValueStore,
-  id: string,
-  meta: Meta,
-  buffer: Uint8Array,
-  offset: bigint,
-  size: number,
-): Effect.Effect<number, ByteStoreError> =>
-  Effect.gen(function* () {
-    const chunkSize = BigInt(meta.chunkSize);
-    const limit = Math.min(size, buffer.length);
-    let position = 0;
-    let at = offset;
-
-    // An offset before the start of the sequence, or at its end, reaches no chunk:
-    // what is read is what the sequence holds from where the read begins.
-    while (position < limit && at >= 0n && at < meta.length) {
-      const index = Number(at / chunkSize);
-      const within = Number(at % chunkSize);
-      const held = yield* named(id, store.getUint8Array(chunkKey(id, index)));
-
-      if (held === undefined) {
-        return yield* Effect.fail(
-          new ByteStoreError({ id, cause: `the chunk at ${index} is not held` }),
-        );
-      }
-
-      const taken = Math.min(held.length - within, limit - position);
-
-      if (taken <= 0) {
-        return yield* Effect.fail(
-          new ByteStoreError({ id, cause: `the chunk at ${index} is shorter than it states` }),
-        );
-      }
-
-      buffer.set(held.subarray(within, within + taken), position);
-      at += BigInt(taken);
-      position += taken;
-    }
-
-    return position;
-  });
-
-const bytesOf = (
-  store: KeyValueStore.KeyValueStore,
-  id: string,
-  meta: Meta,
-): Bytes<ByteStoreError> =>
-  makeBytes({
-    length: Effect.succeed(meta.length),
-    read: (buffer, { offset = 0n, size = buffer.length } = {}) =>
-      readInto(store, id, meta, buffer, offset, size),
-  });
-
-/** A sequence as it is written: the chunks kept so far, and what is left over. */
-interface Writing {
-  index: number;
-  pending: Uint8Array;
-  length: bigint;
-}
-
-const join = (left: Uint8Array, right: Uint8Array): Uint8Array => {
-  const bytes = new Uint8Array(left.length + right.length);
-
-  bytes.set(left);
-  bytes.set(right, left.length);
-
-  return bytes;
-};
-
-/**
- * The sink a sequence is written into an id through: the bytes that arrive are cut
- * into chunks of `chunkSize`, each kept as soon as it has arrived whole, and the
- * record of the sequence is kept once the bytes have ended.
- *
- * What arrives is held only until a chunk is full, and what is held is a copy, so no
- * chunk of the caller's is read again after it has been given.
- */
-const writer = (
-  store: KeyValueStore.KeyValueStore,
-  id: string,
-  chunkSize: number,
-): Sink.Sink<void, Uint8Array, never, ByteStoreError> =>
-  Sink.foldArray<Writing, Uint8Array, ByteStoreError>(
-    () => ({ index: 0, pending: new Uint8Array(0), length: 0n }),
-    () => true,
-    (state, chunks) =>
-      Effect.gen(function* () {
-        for (const chunk of chunks) {
-          const bytes = state.pending.length === 0 ? chunk : join(state.pending, chunk);
-          let start = 0;
-
-          while (bytes.length - start >= chunkSize) {
-            yield* named(
-              id,
-              store.set(chunkKey(id, state.index), bytes.slice(start, start + chunkSize)),
-            );
-            state.index += 1;
-            start += chunkSize;
-          }
-
-          state.pending = bytes.slice(start);
-          state.length += BigInt(chunk.length);
-        }
-
-        return state;
-      }),
-  ).pipe(
-    Sink.mapEffect((state) =>
-      Effect.gen(function* () {
-        if (state.pending.length > 0) {
-          yield* named(id, store.set(chunkKey(id, state.index), state.pending));
-          state.index += 1;
-        }
-
-        yield* putMeta(store, id, { chunkSize, length: state.length });
-      }),
-    ),
-  );
-
-/**
- * Clears what an id holds before a sequence is written into it, so that nothing of
- * what was there is read beside what is written.
- */
-const prepare = (
-  store: KeyValueStore.KeyValueStore,
-  id: string,
-  options?: WriteOptions,
-): Effect.Effect<void, ByteStoreError> =>
-  Effect.gen(function* () {
-    const meta = yield* getMeta(store, id);
-
-    if (meta !== undefined && options?.overwrite === false) {
-      return yield* Effect.fail(new ByteStoreError({ id, cause: "it already holds a sequence" }));
-    }
-
-    yield* drop(store, id, chunkCount(meta));
-  });
-
-/**
  * A store over a key/value store: the bytes kept in chunks in the store given.
  *
  * **When to use**
@@ -487,31 +260,8 @@ const prepare = (
  * @see {@link layerKVStore} for the same store as a layer over a key/value store.
  * @category constructors
  */
-export const make = (store: KeyValueStore.KeyValueStore, options?: Options): ByteStore => {
-  const chunkSize = options?.chunkSize ?? defaultChunkSize;
-
-  return {
-    read: (id) =>
-      Effect.gen(function* () {
-        const meta = yield* getMeta(store, id);
-
-        if (meta === undefined) {
-          return yield* Effect.fail(new ByteStoreError({ id, cause: "it holds no bytes" }));
-        }
-
-        return bytesOf(store, id, meta);
-      }),
-    write: (id, writeOptions) =>
-      prepare(store, id, writeOptions).pipe(Effect.as(writer(store, id, chunkSize)), Sink.unwrap),
-    remove: (id) =>
-      Effect.gen(function* () {
-        const meta = yield* getMeta(store, id);
-
-        yield* drop(store, id, chunkCount(meta));
-      }),
-    has: (id) => getMeta(store, id).pipe(Effect.map((meta) => meta !== undefined)),
-  };
-};
+export const make = (store: KeyValueStore.KeyValueStore, options?: Options): ByteStore =>
+  keyValueStoreBytes(store, options);
 
 /**
  * The store this package ships: byte sequences kept in chunks in the key/value store
@@ -570,3 +320,42 @@ export const layerKVStore = (
  */
 export const layer = (options?: Options): Layer.Layer<ByteStore> =>
   layerKVStore(options).pipe(Layer.provide(KeyValueStore.layerMemory));
+
+/**
+ * The store this package ships in a temporary directory of the file system: byte
+ * sequences kept in a directory made when the layer is built and removed when the
+ * scope it was built in closes.
+ *
+ * **When to use**
+ *
+ * Use where the bytes a program keeps are too many to hold in memory for as long as it
+ * runs — the frames of the trajectories it reads again and again, say — and are not
+ * to be found after it ends: they are kept on disk, in a place the system clears
+ * rather than one a program states.
+ *
+ * **Details**
+ *
+ * It is {@link layerKVStore} over `KeyValueStore.layerFileSystem` in a directory
+ * made by `FileSystem.makeTempDirectoryScoped`, named after `prefix` and defaulting
+ * to `"trajs-"`. The directory is the store's own — it holds nothing but the
+ * sequences written through the store — and nothing of it is left behind when the
+ * scope closes.
+ *
+ * A sequence is cut into chunks of {@link defaultChunkSize} ({@link Options}); where
+ * another size is to be kept, state the store with {@link layerKVStore} over a
+ * directory of the program's own.
+ *
+ * @see {@link ByteStore} for the store this provides.
+ * @see {@link layer} for the same store held in memory.
+ * @see {@link layerKVStore} for the same store over a key/value store a program states.
+ * @category layers
+ */
+export const layerFsTemp = (
+  prefix = "trajs-",
+): Layer.Layer<ByteStore, PlatformError, FileSystem.FileSystem | Path.Path> =>
+  Effect.gen(function* () {
+    const fs = yield* FileSystem.FileSystem;
+    const directory = yield* fs.makeTempDirectoryScoped({ prefix });
+
+    return layerKVStore().pipe(Layer.provide(KeyValueStore.layerFileSystem(directory)));
+  }).pipe(Layer.unwrap);

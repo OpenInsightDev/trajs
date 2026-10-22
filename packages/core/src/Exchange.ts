@@ -272,8 +272,9 @@ export interface Loaded {
    * not: a store's layers are their own — memory, a file system, a database — so where
    * the bytes live is the program's to say, and one that reads a trajectory again
    * provides a store. `ByteStore.layer` keeps them in memory, which is what a reading
-   * that keeps them no longer than the program runs takes, and `ByteStore.layerKVStore`
-   * keeps them in the key/value store a program states.
+   * that keeps them no longer than the program runs takes, `ByteStore.layerKVStore`
+   * keeps them in the key/value store a program states, and `ByteStore.layerFsTemp`
+   * keeps them in a temporary directory of the file system.
    *
    * The frame is kept in that store as it is read rather than held whole, and is cut
    * into chunks of a size the store states: so a trajectory too large to hold is read
