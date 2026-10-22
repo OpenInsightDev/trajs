@@ -23,9 +23,8 @@
  * read with rather than naming them beside it.
  */
 
-import { type ByteStoreError } from "@trajs/utils/ByteStore";
-import { DateTime, Effect, FileSystem, Path, Schema, Scope, Stream } from "effect";
-import type { PlatformError } from "effect/PlatformError";
+import { type ByteStore, type ByteStoreError } from "@trajs/utils/ByteStore";
+import { DateTime, Effect, Schema, Scope, Stream } from "effect";
 
 import * as Event from "#/Event.ts";
 import * as EventKit from "#/EventKit.ts";
@@ -1013,8 +1012,9 @@ export function make<Config extends AnyConfig>(
  *
  * - `capacity` is how many of the newest parts are kept in memory, and defaults to
  *   `"unbounded"`: every part of the trajectory. The parts a window of that size cannot hold
- *   are kept on disk instead, as the frames a trajectory is carried in, so a trajectory read
- *   this way is held whole whatever its length while only its newest parts are in memory.
+ *   are kept as the frames a trajectory is carried in, in the store of bytes the reading is
+ *   provided with ({@link ByteStore}), so a trajectory read this way is held whole whatever its
+ *   length while only its newest parts are in memory.
  *
  * @see {@link share} for the reading it is given to.
  * @category models
@@ -1029,8 +1029,8 @@ export interface ShareOptions {
  */
 type Shared<Id extends string, Config extends AnyConfig, E, R> = Effect.Effect<
   Trajectory<Id, Config, E | TrajectoryError | ByteStoreError, never>,
-  PlatformError,
-  Scope.Scope | R | EncodingServices<Config> | FileSystem.FileSystem | Path.Path
+  E | TrajectoryError | ByteStoreError,
+  Scope.Scope | R | EncodingServices<Config> | ByteStore
 >;
 
 /**
@@ -1052,19 +1052,19 @@ type Shared<Id extends string, Config extends AnyConfig, E, R> = Effect.Effect<
  *   this differs from `Stream.share`, whose later subscribers read only the parts replayed to
  *   them: no reader misses a part here, whenever it subscribes.
  * - `capacity` states how many of the newest parts are kept in memory, and defaults to every one
- *   of them ({@link ShareOptions}). The parts a window of that size cannot hold are kept as the
- *   frames a trajectory is carried in ({@link Exchange.Part}) — written into a temporary
- *   directory of the file system the reading makes, the store `ByteStore.layerFsTemp` states,
- *   and read back as a reader asks for them — so a trajectory longer than its window is held
- *   on disk rather than in memory.
+ *   of them ({@link ShareOptions}). The parts a window of that size cannot hold are kept in the
+ *   store of bytes the reading is provided with ({@link ByteStore}), under keys of its own, as
+ *   the frames a trajectory is carried in ({@link Exchange.Part}) — and read back as a reader
+ *   asks for them — so a trajectory longer than its window is held by that store rather than in
+ *   memory.
  * - What the trajectory is shared with is stated before the trajectory where it is stated alone,
  *   as every constructor of this module binds its own terms first: `share(options)(trajectory)`
  *   is the same call as `share(trajectory, options)`.
  * - Each reader reads a stream of its own: one that stops early, or is interrupted, disturbs
  *   none of the others, and the shared trajectory reads as often as it is asked for. What is
  *   kept lives as long as the scope the trajectory was shared in, so that scope must outlive
- *   the readings of it: the store is removed with it, and the source is not read further once
- *   it closes.
+ *   the readings of it: the source is not read further once it closes, and the parts kept in the
+ *   store are removed with it.
  * - The trajectory it returns is named by the same id and read with the same config as the one
  *   given, since it is that trajectory read again rather than another one.
  *
@@ -1072,14 +1072,14 @@ type Shared<Id extends string, Config extends AnyConfig, E, R> = Effect.Effect<
  * reaches it — the parts produced before a failure are read, and the failure is reported after
  * them — and with the failure of keeping a part ({@link TrajectoryError}, {@link ByteStoreError}).
  * Keeping a part beyond the window writes it as the bytes a part is carried in, so the services
- * writing one takes are required here as well ({@link EncodingServices}), and so is the file
- * system the temporary directory is made in.
+ * writing one takes are required here as well ({@link EncodingServices}), and so is the store it
+ * is written into ({@link ByteStore}).
  *
  * **Example** (Reading one trajectory twice)
  *
  * ```ts import.meta.vitest
  * import { Effect, Stream } from "effect"
- * import { Prompt, Trajectory } from "@trajs/core"
+ * import { ByteStore, Prompt, Trajectory } from "@trajs/core"
  *
  * const part = Trajectory.parts(Trajectory.anyConfig)
  * const sessionId = "01890a5d-ac96-774b-bcce-b302099a8057"
@@ -1103,7 +1103,7 @@ type Shared<Id extends string, Config extends AnyConfig, E, R> = Effect.Effect<
  *
  *       return [first, second].map((read) => read.map((part) => part._tag))
  *     })
- *   )
+ *   ).pipe(Effect.provide(ByteStore.layer()))
  * )
  *
  * tags // => [["Session", "Prompt"], ["Session", "Prompt"]]
@@ -1112,7 +1112,7 @@ type Shared<Id extends string, Config extends AnyConfig, E, R> = Effect.Effect<
  * @see {@link ShareOptions} for what it is given.
  * @see {@link Session.toSessions} for reading a trajectory as the sessions it names, which
  * keeps its parts for that reading alone.
- * @see `ByteStore.layerFsTemp` for the store the parts beyond the window are kept in.
+ * @see {@link ByteStore} for the store the parts beyond the window are kept in.
  * @category constructors
  */
 export function share<Id extends string, Config extends AnyConfig, E, R>(

@@ -3,28 +3,15 @@
  * arrive so that the trajectory reads again — from its first part, whenever a reader starts.
  *
  * What it keeps is a window of the newest parts in memory, and the parts that window has left as
- * the frames a trajectory is carried in, in a store of bytes: a trajectory longer than the window
- * is held whole without being held in memory.
+ * the frames a trajectory is carried in, in the store of bytes a program provides: a trajectory
+ * longer than the window is held whole without being held in memory.
  *
  * Nothing here is published: a program reaches the reading through `Trajectory.share`.
  */
 
-import { ByteStore, type ByteStoreError, layerFsTemp } from "@trajs/utils/ByteStore";
-import {
-  Cause,
-  Context,
-  Deferred,
-  Effect,
-  FileSystem,
-  HashMap,
-  Layer,
-  Option,
-  Path,
-  Ref,
-  Scope,
-  Stream,
-} from "effect";
-import type { PlatformError } from "effect/PlatformError";
+import { ByteStore, type ByteStoreError } from "@trajs/utils/ByteStore";
+import { Cause, Deferred, Effect, HashMap, Option, Ref, Scope, Stream } from "effect";
+import * as uuid from "uuid";
 
 import {
   configOf,
@@ -72,21 +59,6 @@ const capacityOf = (options?: Trajectory.ShareOptions): number => {
 };
 
 /**
- * The store the parts beyond the window are kept in: a temporary directory of the file system
- * made where the trajectory is shared, and removed with the scope that is made in.
- */
-const temporaryStore = (): Effect.Effect<
-  ByteStore,
-  PlatformError,
-  FileSystem.FileSystem | Path.Path | Scope.Scope
-> =>
-  Effect.gen(function* () {
-    const context = yield* layerFsTemp().pipe(Layer.build);
-
-    return Context.get(context, ByteStore);
-  });
-
-/**
  * Shares the trajectory given: the parts of one reading of it are kept, so that the trajectory
  * reads again — from its first part, whenever a reader starts.
  */
@@ -95,17 +67,28 @@ export const shared = <Id extends string, Config extends Trajectory.AnyConfig, E
   options?: Trajectory.ShareOptions,
 ): Effect.Effect<
   Trajectory.Trajectory<Id, Config, E | TrajectoryError | ByteStoreError, never>,
-  PlatformError,
-  Scope.Scope | R | EncodingServices<Config> | FileSystem.FileSystem | Path.Path
+  E | TrajectoryError | ByteStoreError,
+  Scope.Scope | R | EncodingServices<Config> | ByteStore
 > =>
   Effect.gen(function* () {
     const config = configOf(trajectory);
     const capacity = capacityOf(options);
+    const store = yield* ByteStore;
 
-    // The store is the share's own — a directory made for it — so a part is named by the index
-    // it was produced at, and nothing else of the store is read to find it.
-    const store = yield* temporaryStore();
-    const keyOf = (index: number): string => String(index);
+    // The store is the program's and keeps the bytes of more than this share, so a share writes
+    // under keys of its own: a part is named by the index it was produced at.
+    const prefix = `share/${uuid.v7()}`;
+    const keyOf = (index: number): string => `${prefix}/${index}`;
+
+    /** The keys this share wrote, which are removed with the scope. */
+    const written: Array<string> = [];
+
+    // What a share wrote is its own rather than the program's to keep, so it is removed with the
+    // scope. Finalizers run in reverse order, so this runs after the reading of the source is
+    // stopped, and the last part written is covered as well.
+    yield* Effect.addFinalizer(() =>
+      Effect.forEach(written, (key) => store.remove(key).pipe(Effect.ignore), { discard: true }),
+    );
 
     // The schemas a part is written and read as are built once, since every part that leaves the
     // window goes through them.
@@ -113,20 +96,19 @@ export const shared = <Id extends string, Config extends Trajectory.AnyConfig, E
     const decode = decodePart(config);
 
     const spilled: Spilled<Config> = {
-      write: (index, part) => {
-        const key = keyOf(index);
-
-        return Effect.gen(function* () {
+      write: (index, part) =>
+        Effect.gen(function* () {
+          const key = keyOf(index);
           const frame = yield* encode(part);
 
-          yield* Stream.make(frame).pipe(Stream.run(store.write(key)));
-        });
-      },
-      read: (index) => {
-        const key = keyOf(index);
+          // The key is remembered before its bytes are written, so what a write that failed
+          // halfway left in the store is removed with the scope as well.
+          written.push(key);
 
-        return store.read(key).pipe(Effect.flatMap((bytes) => decode(bytes.stream())));
-      },
+          yield* Stream.make(frame).pipe(Stream.run(store.write(key)));
+        }),
+      read: (index) =>
+        store.read(keyOf(index)).pipe(Effect.flatMap((bytes) => decode(bytes.stream()))),
     };
 
     const cache = yield* Ref.make<Cache<Config>>({ produced: 0, kept: HashMap.empty() });
