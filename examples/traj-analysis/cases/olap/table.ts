@@ -5,7 +5,7 @@
  * The trajectories of a set are imported into one stream rather than one at a time,
  * so that the rows of a whole set are written in blocks rather than in a part of
  * their own per file — which is what makes an import of hundreds of trajectories an
- * import of a few blocks. A single trajectory is `Parts.ingest(digest)(trajectory)`.
+ * import of a few blocks. A single trajectory is `Parts.ingest(trajectory)`.
  */
 
 import { Exchange } from "@trajs/core";
@@ -39,7 +39,7 @@ export const importFixtures = () =>
       ),
     ).pipe(
       Stream.mapEffect((id) => exchange.load(id), { concurrency: 8 }),
-      Stream.flatMap((loaded) => Parts.rows(loaded.metadata.digest)(loaded.read(config))),
+      Stream.flatMap((loaded) => Parts.rows(loaded.read(config))),
       Parts.write,
     );
   });

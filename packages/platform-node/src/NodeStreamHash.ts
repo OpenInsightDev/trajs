@@ -1,14 +1,15 @@
 /**
- * The digest a program on Node hashes a trajectory through: BLAKE3, BLAKE2b or
- * SHA-256, as the Rust binding `@napi-rs/blake-hash` and `node:crypto` compute
+ * The digest a program on Node hashes a trajectory's parts through: BLAKE3, BLAKE2b
+ * or SHA-256, as the Rust binding `@napi-rs/blake-hash` and `node:crypto` compute
  * them.
  *
  * {@link layer} is the {@link StreamHash} this package provides the exchange with,
  * and what it computes for an algorithm agrees with what every other platform
- * package computes for the same one, so a digest it reads is a trajectory the others
- * load. The binding is imported with this module, which only a program that depends
- * on this package imports: what keeps a native addon out of a page is the package
- * it is in rather than an import deferred to when the layer is provided.
+ * package computes for the same one, so the digest it reads off a trajectory's parts
+ * is the one every other package reads off them. The binding is imported with this
+ * module, which only a program that depends on this package imports: what keeps a
+ * native addon out of a page is the package it is in rather than an import deferred to
+ * when the layer is provided.
  */
 
 import { createHash } from "node:crypto";
@@ -92,8 +93,8 @@ const hashing = (algorithm: Algorithm): Sink.Sink<string, Uint8Array, never, nev
  * bytes fed so far.
  *
  * The algorithm is the layer's to state ({@link Options}), and defaults to BLAKE3,
- * the digest a trajectory has always been named by and the faster of the two the
- * binding computes.
+ * the digest a trajectory's parts have always been digested with and the faster of
+ * the two the binding computes.
  *
  * What a program that runs where a native addon cannot be loaded provides instead
  * is `@trajs/platform-browser`'s hash; what each computes for an algorithm is the

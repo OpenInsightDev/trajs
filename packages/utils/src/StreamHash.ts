@@ -1,6 +1,6 @@
 /**
- * The hash a trajectory is named by: the digest of the bytes it carries its parts
- * in.
+ * The hash a trajectory's bytes are digested with: the digest of the bytes it
+ * carries its parts in.
  *
  * What reads a digest off a stream of bytes is a {@link StreamHash}, and the
  * exchange is built over one, so what hashes a trajectory is a layer's to say
@@ -11,8 +11,8 @@
  * `@trajs/platform-bun` are over the Rust binding `@napi-rs/blake-hash` and
  * `node:crypto`, and `@trajs/platform-browser` is over the WebAssembly BLAKE3
  * `blake3-wasm` carries, over WebCrypto and over the hash this package ships. The
- * digest of one algorithm is one every layer agrees with, so a trajectory one
- * platform names is a trajectory another recognises.
+ * digest of one algorithm is one every layer agrees with, so the digest one
+ * platform reads off a trajectory is the one another reads off it.
  */
 
 import { blake2b } from "@noble/hashes/blake2.js";
@@ -22,33 +22,33 @@ import { bytesToHex } from "@noble/hashes/utils.js";
 import { Context, Layer, Schema, Sink } from "effect";
 
 /**
- * The digest a trajectory is named by: the algorithm it is read with.
+ * The algorithm a trajectory's digest is read with.
  *
  * **When to use**
  *
- * Use to name the digest a hash layer is built over, where a program states one
+ * Use to state the digest a hash layer is built over, where a program states one
  * ({@link Options}).
  *
  * **Details**
  *
  * - `Blake3` (0) is BLAKE3, which is what {@link defaultAlgorithm} names: it is the
- *   digest a trajectory has always been named by, and the one every platform package
- *   states a codec for.
+ *   digest a trajectory has always been digested with, and the one every platform
+ *   package states a codec for.
  * - `Blake2b` (1) is BLAKE2b with a digest of 32 bytes — the same length as
  *   BLAKE3's, which is not the 64 bytes an unconfigured BLAKE2b computes — so a
- *   trajectory is named by 64 characters of hex whichever of the two is stated.
+ *   trajectory's digest is 64 characters of hex whichever of the two is stated.
  * - `Sha256` (2) is SHA-256.
  *
  * A digest is read by feeding one run of a hash the bytes of one stream, so what an
- * algorithm names is what two programs agree on: they name a trajectory the same way
- * where they state the same one. Which of them named a trajectory is what the
- * trajectory states of itself — the metadata it ends with states the algorithm its
- * digest was read with as that algorithm's code ({@link StreamHash.algorithm}) — so
- * a program handed a trajectory can tell what named it rather than naming it again by
- * an algorithm of its own. The codes are the format's, as they are for the frame a
- * trajectory is carried in: each digest is stated by one of them, and a code is never
- * restated for another digest, so a trajectory is named the way it was named however
- * long after it was written.
+ * algorithm states is what two programs agree on: they read the same digest off a
+ * trajectory where they state the same one. Which of them read the digest a
+ * trajectory carries is what the trajectory states of itself — the metadata it ends
+ * with states the algorithm its digest was read with as that algorithm's code
+ * ({@link StreamHash.algorithm}) — so a program handed a trajectory can tell how its
+ * digest was read rather than reading it again with an algorithm of its own. The
+ * codes are the format's, as they are for the frame a trajectory is carried in: each
+ * digest is stated by one of them, and a code is never restated for another digest,
+ * so a digest is read the way it was read however long after it was written.
  *
  * @see {@link Options} for where an algorithm is stated.
  * @see {@link StreamHash.algorithm} for what a hash states of itself.
@@ -67,21 +67,21 @@ export type Algorithm = Schema.Schema.Type<typeof Algorithm>;
  *
  * **When to use**
  *
- * Use where a program states what names its trajectories, or to type what a hash
+ * Use where a program states what digests its trajectories, or to type what a hash
  * layer is built with.
  *
  * **Details**
  *
  * - `algorithm` is the digest a stream is hashed to ({@link Algorithm}), and
  *   defaults to {@link defaultAlgorithm} — `Blake3` — so a program that states
- *   nothing names its trajectories the way they have always been named.
+ *   nothing digests its trajectories the way they have always been digested.
  *
  * The option is stated where the layer is built rather than where a digest is read,
  * since reading one takes no choice: what a digest is of is a stream of bytes, and
  * what it is read with is the layer. Which one read the digest of a trajectory is
  * what the trajectory states of itself ({@link StreamHash.algorithm}), so a program
- * that reads one back can tell whether it is naming it the way it was named when
- * it was written.
+ * that reads one back can tell whether it is digesting it the way it was digested
+ * when it was written.
  *
  * @see {@link Algorithm} for the digests a program may state.
  * @category models
@@ -101,9 +101,10 @@ export interface Options {
  *
  * **Details**
  *
- * It is the digest a trajectory has always been named by, so a program that states
- * no algorithm names a trajectory the way a program that stated none named it, and
- * names one written before an algorithm could be stated the way it is named at all.
+ * It is the digest a trajectory has always been digested with, so a program that
+ * states no algorithm digests a trajectory the way a program that stated none did,
+ * and digests one written before an algorithm could be stated the way it has always
+ * been digested.
  *
  * @see {@link Algorithm} for what it names.
  * @category constants
@@ -128,7 +129,7 @@ export const defaultAlgorithm: Algorithm = Algorithm.enums.Blake3;
  * The digest is of the algorithm the hash states of itself
  * ({@link StreamHash.algorithm}), and every algorithm a hash states names a digest
  * of 32 bytes — 64 characters of hex — so what a trajectory ends with is the same
- * length whichever one it was named with, and a digest read through one layer is
+ * length whichever one it was read with, and a digest read through one layer is
  * one another layer reads where the two are built over the same algorithm.
  *
  * A hash is of a stream of bytes rather than of a program: two streams are hashed
@@ -141,7 +142,7 @@ export const defaultAlgorithm: Algorithm = Algorithm.enums.Blake3;
 export interface StreamHash {
   /**
    * Which algorithm this hash reads a digest with, as {@link Algorithm} names it:
-   * what a trajectory that was named through it states of itself.
+   * what a trajectory digested through it states of itself.
    */
   readonly algorithm: Algorithm;
 
@@ -246,10 +247,10 @@ export const make = (options?: Options): StreamHash => {
  *
  * Bytes are fed to one hash as they arrive and the digest is read off it once they
  * have ended, which is how the platform layers read one too: what it computes for an
- * algorithm is what the codecs of the platforms compute for the same one, so a
- * trajectory hashed through it is the trajectory `@trajs/platform-node`,
- * `@trajs/platform-bun` and `@trajs/platform-browser` name — a trajectory one wrote
- * is a trajectory the others load.
+ * algorithm is what the codecs of the platforms compute for the same one, so a digest
+ * it reads off a trajectory is the one `@trajs/platform-node`, `@trajs/platform-bun`
+ * and `@trajs/platform-browser` read off the same bytes — a digest one computes is a
+ * digest the others compute.
  *
  * @see {@link StreamHash} for the hash this provides.
  * @see {@link make} for the same hash as the service rather than as the layer.

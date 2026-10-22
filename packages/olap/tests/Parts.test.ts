@@ -40,6 +40,9 @@ const config = Trajectory.config({
   extrakit,
 });
 
+/** The id the trajectory below carries, which is what its rows are written under. */
+const trajectoryId = "01890a5d-ac96-774b-bcce-b302099a8058";
+
 /** The builders of the parts below, under the config they are read with. */
 const part = Trajectory.parts(config);
 
@@ -74,16 +77,14 @@ const parts = [
   ),
 ];
 
-/** The trajectory those parts make, as an ingest is given one. */
-const trajectory = Trajectory.make(config)(Stream.fromIterable(parts));
+/** The trajectory those parts make, named by {@link trajectoryId}, as an ingest is given one. */
+const trajectory = Trajectory.make(trajectoryId, config)(Stream.fromIterable(parts));
 
 /** What a program on Node runs the embedded engine and the exchange through. */
 const Embedded = layerEmbedded();
 
 it("states a part as the row it is stored as", async () => {
-  const rows = Array.from(
-    await Parts.rows("digest")(trajectory).pipe(Stream.runCollect, Effect.runPromise),
-  );
+  const rows = Array.from(await Parts.rows(trajectory).pipe(Stream.runCollect, Effect.runPromise));
 
   expect(
     rows.map((row) => [
@@ -100,6 +101,9 @@ it("states a part as the row it is stored as", async () => {
     [2, "Response", "tool-call", session, false, "2026-01-01T00:00:00.000Z"],
     [3, "Response", "finish", session, false, "2026-01-01T00:00:00.000Z"],
   ]);
+
+  // Every row of a reading is of the trajectory it was read from, named by its id.
+  expect(new Set(rows.map((row) => row.trajectory_id))).toEqual(new Set([trajectoryId]));
 
   expect(rows[3]?.part._tag).toBe("Response");
   expect(rows[3]?.part).toMatchObject({ response: { type: "finish" } });
@@ -157,9 +161,7 @@ it("states what an event and a metric name, and the session a metric does not st
 
   const trajectory = Trajectory.make(kitted)(Stream.fromIterable([eventPart, metricPart]));
 
-  const rows = Array.from(
-    await Parts.rows("digest")(trajectory).pipe(Stream.runCollect, Effect.runPromise),
-  );
+  const rows = Array.from(await Parts.rows(trajectory).pipe(Stream.runCollect, Effect.runPromise));
 
   expect(
     rows.map((row) => [row.tag, row.variant, row.session_id, row.uuid === null, row.time]),
@@ -174,19 +176,19 @@ it("states what an event and a metric name, and the session a metric does not st
 it("answers a query over the rows a trajectory was written as", async () => {
   const answers = await Effect.gen(function* () {
     yield* Parts.create();
-    const written = yield* Parts.ingest("digest")(trajectory);
+    const written = yield* Parts.ingest(trajectory);
     const ch = yield* Client;
 
     const tokens = yield* ch`
       SELECT sum(part.\`response.usage.inputTokens.total\`) AS input
       FROM parts
-      WHERE digest = 'digest' AND variant = 'finish'
+      WHERE trajectory_id = ${trajectoryId} AND variant = 'finish'
     `;
 
     const tools = yield* ch`
       SELECT part.\`response.name\` AS tool, count() AS calls
       FROM parts
-      WHERE digest = 'digest' AND variant = 'tool-call'
+      WHERE trajectory_id = ${trajectoryId} AND variant = 'tool-call'
       GROUP BY tool
     `;
 

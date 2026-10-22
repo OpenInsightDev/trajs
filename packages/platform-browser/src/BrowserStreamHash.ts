@@ -129,11 +129,11 @@ const digest = (algorithm: Algorithm): Hashing => {
  * SHA-256 is the digest WebCrypto reads, over the bytes of a whole stream rather
  * than as they arrive, and BLAKE2b is the one algorithm a browser states no codec
  * for: it is the JavaScript hash `@trajs/utils` ships, computed where JavaScript
- * runs. The three digests are of 32 bytes each, so a trajectory is named by the same
- * 64 characters of hex whichever one is stated.
+ * runs. The three digests are of 32 bytes each, so a trajectory's parts are named by
+ * the same 64 characters of hex whichever one is stated.
  *
  * The algorithm is the layer's to state ({@link Options}), and defaults to BLAKE3,
- * the digest a trajectory has always been named by.
+ * the digest a trajectory's parts have always been digested with.
  *
  * @see {@link StreamHash} for the hash this provides.
  * @category layers

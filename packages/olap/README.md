@@ -10,8 +10,8 @@ those rows are asked of: a server reached over HTTP, or the engine
   (`Clickhouse.layerEmbedded`).
 - `Parts` — the `parts` table: one row per part, the columns a query groups by,
   and the part itself as the `JSON` payload the rest is read off.
-  `Parts.create` states the table, `Parts.ingest` writes an encoded trajectory
-  under the digest that names it, and `Parts.Row` is a row.
+  `Parts.create` states the table, `Parts.ingest` writes a trajectory under the
+  id it carries, and `Parts.Row` is a row.
 
 ## Importing what a program kept
 
@@ -28,7 +28,7 @@ const importSession = (id: string) =>
     const exchange = yield* Exchange;
     const loaded = yield* exchange.load(id);
 
-    return yield* Parts.ingest(loaded.metadata.digest)(loaded.read(config));
+    return yield* Parts.ingest(loaded.read(config));
   });
 
 Effect.gen(function* () {
@@ -40,6 +40,11 @@ Effect.gen(function* () {
 `config` is what the trajectory is read with: the kits its events, metrics and
 response tools are read under. A trajectory read with no event kit holds no event
 parts, so none of them are written.
+
+The rows of every trajectory are written under the id that trajectory carries, so
+the parts of one are the rows of one `trajectory_id` — and a trajectory read off a
+file is named by the uuid its load generated, since the bytes state no id of their
+own.
 
 ## What the table is read for
 

@@ -8,7 +8,7 @@ opening it in a viewer.
 ### `trajs inspect <file-path>`
 
 Prints what a `.trajs` file states — the toolkit and kits it was written with, or
-with `--metadata` how its parts were carried and what it is named by — as JSON. A
+with `--metadata` how its parts were carried and what they digest to — as JSON. A
 trajectory states each of those algorithms as the code the format carries it as, and
 the metadata is printed with the name instead. The JSON is written on one line
 until `--indent` says otherwise:

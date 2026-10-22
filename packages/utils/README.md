@@ -17,7 +17,7 @@ platform package can say what each is over.
 - `Compression` — what carries a trajectory's parts in a frame: zstd, gzip,
   deflate, or the bytes as they are, stated where the layer is built
   (`Compression.Options`) and written into the metadata a trajectory ends with.
-- `StreamHash` — what reads the digest a trajectory is named by: BLAKE3, BLAKE2b
+- `StreamHash` — what reads the digest of a trajectory's parts: BLAKE3, BLAKE2b
   or SHA-256, stated where the layer is built (`StreamHash.Options`) and written
   into the metadata a trajectory ends with, and the JavaScript hash this package
   ships for all three.
