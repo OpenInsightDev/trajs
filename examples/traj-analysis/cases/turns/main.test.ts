@@ -67,7 +67,7 @@ const trajectory = Trajectory.make(config)(
 
 const main = Effect.fn(function* () {
   const sessions = yield* Session.toSessions(trajectory);
-  const session = Option.getOrThrow(Session.session(Trajectory.rootSession)(sessions));
+  const session = Option.getOrThrow(Session.session(Trajectory.mainSessionId)(sessions));
 
   const turns = yield* View.promptTurns(session.stream).pipe(Stream.runCollect);
 

@@ -113,7 +113,8 @@ export type AnthropicSessions = Record<string, AnthropicConversation>;
  * import { EventKit, ExtraKit, MetricKit, Prompt, Response, Toolkit, Trajectory } from "@trajs/core"
  * import { Effect, Stream } from "effect"
  *
- * const sessionId = "01890a5d-ac96-774b-bcce-b302099a8057"
+ * // The main session, which the parts below belong to.
+ * const sessionId = Trajectory.mainSessionId
  * const config = Trajectory.config({
  *   stream: false,
  *   toolkit: Toolkit.empty,
@@ -127,7 +128,7 @@ export type AnthropicSessions = Record<string, AnthropicConversation>;
  * // An exchange a trajectory holds: what a model was given, the tool it called for it, the
  * // result that call was answered with, and what it answered of that result.
  * const parts = [
- *   part.session(sessionId),
+ *   part.mainSession(),
  *   part.prompt(
  *     Prompt.fromMessages([
  *       Prompt.makeMessage("system", { content: "Answer in one sentence." }),

@@ -65,7 +65,7 @@ const trajectory = Trajectory.make(config)(
 
 const main = Effect.fn(function* (threshold: number) {
   const sessions = yield* Session.toSessions(trajectory);
-  const session = Option.getOrThrow(Session.session(Trajectory.rootSession)(sessions));
+  const session = Option.getOrThrow(Session.session(Trajectory.mainSessionId)(sessions));
 
   return yield* session.stream.pipe(
     // Parts to turns: a call with the result that answered it

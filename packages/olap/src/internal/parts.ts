@@ -11,7 +11,7 @@
  */
 
 import { Part as partSchema, type EncodingServices } from "@trajs/core/Exchange";
-import type * as Trajectory from "@trajs/core/Trajectory";
+import * as Trajectory from "@trajs/core/Trajectory";
 import { TrajectoryError } from "@trajs/core/TrajectoryError";
 import { DateTime, Effect, Match, Schema, Stream } from "effect";
 import { SqlError } from "effect/sql/SqlError";
@@ -61,38 +61,39 @@ const moment = (timestamp: DateTime.Utc | undefined): string | null =>
  * What a part states of itself in the columns beside its payload, as the kind
  * of part it is states it.
  *
- * A session part declares the session, so the session it belongs to is its own
- * id; a metric part states no session, so it belongs to none. Every kind of part
- * is stated, so a kind added to a trajectory is a kind this fails to read rather
- * than one it writes as nothing.
+ * A session part declares the session, so the session it belongs to is the id it
+ * names; a part that states no session of its own belongs to the main session, and
+ * a metric part states no session, so it belongs to none. Every kind of part is
+ * stated, so a kind added to a trajectory is a kind this fails to read rather than
+ * one it writes as nothing.
  */
 const stated = (part: Trajectory.Part<Trajectory.AnyConfig>) =>
   Match.valueTags(part, {
     Prompt: (part) => ({
       tag: "Prompt",
       variant: "",
-      session_id: part.sessionId,
+      session_id: part.sessionId ?? Trajectory.mainSessionId,
       uuid: part.uuid,
       time: moment(part.timestamp),
     }),
     Session: (part) => ({
       tag: "Session",
       variant: "",
-      session_id: part.id,
+      session_id: part.type.id,
       uuid: part.uuid,
       time: null,
     }),
     Response: (part) => ({
       tag: "Response",
       variant: part.response.type,
-      session_id: part.sessionId,
+      session_id: part.sessionId ?? Trajectory.mainSessionId,
       uuid: part.uuid,
       time: moment(part.timestamp),
     }),
     Event: (part) => ({
       tag: "Event",
       variant: part.event._tag,
-      session_id: part.sessionId,
+      session_id: part.sessionId ?? Trajectory.mainSessionId,
       uuid: part.uuid,
       time: moment(part.timestamp),
     }),

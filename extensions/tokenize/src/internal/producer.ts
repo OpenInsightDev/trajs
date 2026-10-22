@@ -8,14 +8,14 @@
  * module is the step it takes of each part: the state it carries, and what one
  * part adds to it.
  *
- * The state is one running count per session, keyed by the `sessionId` the parts
- * of a trajectory carry rather than by the sessions a trajectory declares, because
- * the parts are read in one pass rather than grouped by session. It is made where
- * a stream starts rather than by the producer, so a producer run over two
- * trajectories counts each of them from its own beginning.
+ * The state is one running count per session, keyed by the session a part states — the
+ * main session where it states none of its own — rather than by the sessions a
+ * trajectory declares, because the parts are read in one pass rather than grouped by
+ * session. It is made where a stream starts rather than by the producer, so a producer
+ * run over two trajectories counts each of them from its own beginning.
  */
 
-import type { Trajectory } from "@trajs/core";
+import { Trajectory } from "@trajs/core";
 import { Effect, Option, Predicate } from "effect";
 import { Tokenizer } from "effect/ai";
 import type { AiError } from "effect/ai";
@@ -152,7 +152,10 @@ export const stepOf = Effect.fn("stepOf")(function* (
       if (tags !== undefined && !carriesAnyOf(part, tags)) return [state, []] as const;
 
       const counted = yield* countOfPart(part);
-      const known = state.get(part.sessionId);
+
+      // A part that states no session of its own belongs to the main session.
+      const sessionId = part.sessionId ?? Trajectory.mainSessionId;
+      const known = state.get(sessionId);
       const count = countOf(part, counted, known === undefined ? noCalls : known.calls);
 
       // A part no count is taken from leaves the state as it was, so that a
@@ -160,7 +163,7 @@ export const stepOf = Effect.fn("stepOf")(function* (
       // for.
       if (Option.isNone(count)) return [state, []] as const;
 
-      const session = sessionOf(state, part.sessionId);
+      const session = sessionOf(state, sessionId);
 
       // What the call of a result is worth is known from the call itself, which
       // the result answers by identifier, so every call a part carries is kept

@@ -49,8 +49,8 @@ read; and the approval of a tool call, which is an operation of the program that
 the tools rather than of the conversation.
 
 Reading a trajectory this way needs the sessions it declares, so what a trajectory
-whose sessions cannot be read fails with — an unproduced fork, a late declaration —
-is what reading one here fails with.
+whose sessions cannot be read fails with — an unproduced fork, a late declaration, or
+a session no session part declares — is what reading one here fails with.
 
 ## Development
 

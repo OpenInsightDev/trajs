@@ -40,9 +40,17 @@ const config = Trajectory.config({
 /** The builders of those parts, under the config they are read with. */
 const part = Trajectory.parts(config);
 
-/** The parts of the trajectory, in the one order a trajectory carries them in. */
+/** The declaration of the main session, which the session of the run is forked from. */
+const main = part.mainSession();
+
+/**
+ * The parts of the trajectory, in the one order a trajectory carries them in: the main
+ * session is declared first, and the session the run is in continues from where it was
+ * declared.
+ */
 const parts = [
-  part.session(session),
+  main,
+  part.subSession(session, { fork: main.uuid }),
   part.prompt(Prompt.make(question), { sessionId: session }),
   part.response(Response.makePart("text", { text: "let me look that up" }), { sessionId: session }),
 ];
@@ -94,7 +102,7 @@ describe("a trajectory kept as a file", () => {
 
     expect(read.map((part) => part._tag)).toEqual(parts.map((part) => part._tag));
 
-    const prompt = read[1];
+    const prompt = read[2];
 
     expect(prompt._tag).toBe("Prompt");
 

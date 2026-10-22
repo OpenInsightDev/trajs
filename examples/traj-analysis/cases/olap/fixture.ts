@@ -40,6 +40,16 @@ const part = Trajectory.parts(config);
 /** The parts of one fixture, as the builders below produce them and the exchange keeps them. */
 type Produced = ReadonlyArray<Trajectory.Part<typeof config>>;
 
+/** The parts a conversation produced: the prompts asked and the responses that answered them. */
+type Message = ReadonlyArray<
+  | Trajectory.PromptPart<(typeof config)["extrakit"]>
+  | Trajectory.ResponsePart<
+      (typeof config)["toolkit"],
+      (typeof config)["extrakit"],
+      (typeof config)["stream"]
+    >
+>;
+
 /** Where the set is kept: the `fixtures/` of this case, which the run generates and no commit holds. */
 export const Fixtures = "cases/olap/fixtures/trajs";
 
@@ -116,16 +126,16 @@ const produced = (index: number): DateTime.Utc =>
   DateTime.fromDateUnsafe(new Date(Date.UTC(2026, 0, 1 + (index % generation.days), 9)));
 
 /** The prompt a model was given, as a part of the trajectory it was given in. */
-const prompt = (sessionId: string, text: string, timestamp: DateTime.Utc) =>
+const prompt = (sessionId: string | undefined, text: string, timestamp: DateTime.Utc) =>
   part.prompt(Prompt.make(text), { sessionId, timestamp });
 
 /** The parts one turn produced: the model that answered, the tool it called, and what it used to answer. */
 const turn = (
-  sessionId: string,
+  sessionId: string | undefined,
   id: string,
   timestamp: DateTime.Utc,
   draw: () => number,
-): Produced => [
+): Message => [
   part.response(
     Response.makePart("response-metadata", { modelId: pick(draw, generation.models) }),
     {
@@ -160,33 +170,40 @@ const turn = (
 
 /** The parts a session produced: `turns` turns, each the prompt asked and the response that answered it. */
 const conversation = (
-  sessionId: string,
+  sessionId: string | undefined,
   id: string,
   turns: number,
   timestamp: DateTime.Utc,
   draw: () => number,
-): Produced =>
+): Message =>
   Array.from({ length: turns }, (_, turnIndex) => [
     prompt(sessionId, pick(draw, questions), timestamp),
     ...turn(sessionId, `${id}_${turnIndex}`, timestamp, draw),
   ]).flat();
 
 /**
- * The parts of the `index`th run: a session of its own turns, and — where the draw
- * starts one — the sub-agent session it produced inside the same trajectory.
+ * The parts of the `index`th run: the main session of its own turns, and — where the
+ * draw starts one — the sub-agent session it produced inside the same trajectory.
  */
 const partsOf = (index: number): Produced => {
   const draw = random(generation.seed + index);
   const timestamp = produced(index);
-  const root = sessionId(index * 2);
   const sub = sessionId(index * 2 + 1);
   const turns = (): number => between(draw, generation.turns.low, generation.turns.high);
 
+  // A part of the main session states no session of its own, and a sub-agent session
+  // continues from the part it was delegated at: the last part of the main session
+  // before it started.
+  const answered = conversation(undefined, `${index}/root`, turns(), timestamp, draw);
+
   return [
-    part.session(root),
-    ...conversation(root, `${index}/root`, turns(), timestamp, draw),
+    part.mainSession(),
+    ...answered,
     ...(draw() < generation.subAgents
-      ? [part.session(sub), ...conversation(sub, `${index}/sub`, turns(), timestamp, draw)]
+      ? [
+          part.subSession(sub, { fork: answered.at(-1)!.uuid }),
+          ...conversation(sub, `${index}/sub`, turns(), timestamp, draw),
+        ]
       : []),
   ];
 };

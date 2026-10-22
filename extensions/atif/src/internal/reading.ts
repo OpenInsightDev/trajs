@@ -448,8 +448,10 @@ const turnsOf = (
  *
  * The session is declared before the parts produced in it, since every part of a
  * trajectory names the session that produced it and a document states one run rather
- * than a session per step. What the document states of the run is declared with it, and
- * what it states of a step with the part of that step.
+ * than a session per step. It is forked from the main session where that session was
+ * declared — the point the trajectory starts at, so it continues from nothing — and
+ * what the document states of the run is declared with it, while what it states of a
+ * step is declared with the part of that step.
  *
  * What a step holds beside its text is read as the step is produced — the bytes of an
  * image at the path the document states, under the directory the reading is given — so
@@ -457,7 +459,7 @@ const turnsOf = (
  * fails with what that file system fails with.
  */
 export const produce = (
-  producer: Produce.Producer<
+  main: Produce.ProduceSession<
     Tools,
     Trajectory.UnknownConfig["eventkit"]["events"],
     (typeof extrakit)["extra"]
@@ -466,7 +468,7 @@ export const produce = (
   cwd: string | undefined,
 ): Effect.Effect<void, TrajectoryError | PlatformError.PlatformError, Services> =>
   Effect.gen(function* () {
-    const session = yield* producer.createSession({
+    const session = yield* main.forkSession({
       id: sessionIdOf(document),
       [documentExtra.tag]: documentFields(document),
     });

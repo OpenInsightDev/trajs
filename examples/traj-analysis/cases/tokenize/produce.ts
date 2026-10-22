@@ -36,8 +36,6 @@ const eventkit = EventKit.empty;
  */
 export const Fixture = fileURLToPath(new URL("fixtures/session.trajs", import.meta.url));
 
-const session = "01890a5d-ac96-774b-bcce-b302099a80a0";
-
 /** The one call the model made, which the result it was given answers by the same id. */
 const call = "call_01";
 
@@ -132,15 +130,12 @@ export const config = Trajectory.config({
  * naming its kits again. */
 const part = Trajectory.parts(config);
 
-const inSession = { sessionId: session };
-
 /** The parts of the session, in the order it produced them. */
 const parts = [
-  part.prompt(askedPrompt, inSession),
-  part.response(Response.makePart("reasoning", { text: thought }), inSession),
+  part.prompt(askedPrompt),
+  part.response(Response.makePart("reasoning", { text: thought })),
   part.response(
     Response.anyToolCallPart({ id: call, name: "grep", params: pattern, providerExecuted: false }),
-    inSession,
   ),
   part.response(
     Response.anyToolResultPart({
@@ -150,10 +145,9 @@ const parts = [
       isFailure: false,
       providerExecuted: false,
     }),
-    inSession,
   ),
-  part.prompt(replayed, inSession),
-  part.response(Response.makePart("text", { text: answered }), inSession),
+  part.prompt(replayed),
+  part.response(Response.makePart("text", { text: answered })),
   // What the provider reported the request cost, which is the exact figure a count is only an
   // estimate of — and a part no count is taken from, since a tokenizer answers for no usage.
   part.response(
@@ -164,7 +158,6 @@ const parts = [
         outputTokens: { total: 38 },
       }),
     }),
-    inSession,
   ),
 ];
 
@@ -192,7 +185,7 @@ export const writeFixture = () =>
     // The fixture is produced with the config it is read with, and with the metric kit
     // provided with the producer its counts are taken by.
     const fixture = Produce.fromSessions({ ...config, metrickit: counted })({
-      [session]: Stream.fromArray(parts),
+      main: { messages: Stream.fromArray(parts) },
     });
 
     yield* fs.makeDirectory(dirname(Fixture), { recursive: true });

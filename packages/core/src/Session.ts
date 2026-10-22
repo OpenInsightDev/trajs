@@ -5,7 +5,10 @@
  * stream rather than stated beside it: {@link toSessions} reads a trajectory as the
  * {@link Sessions} it names, {@link session} looks one of them up by the id the trajectory
  * names it by, and a session that continues another does so through a {@link Fork} rather
- * than by repeating the parts it inherited.
+ * than by repeating the parts it inherited. The main session — the one a part belongs to
+ * that states no session of its own ({@link Trajectory.mainSessionId}) — is the one
+ * session a trajectory reads without declaring it; every other session is declared by a
+ * {@link Trajectory.SessionPart} of its own.
  *
  * What parts a trajectory is made of, and what they are read with, is `Trajectory`'s: a part
  * schema is built for the kit it is read with, and what a session runs on is those parts
@@ -15,6 +18,7 @@
 import type { ByteStore, ByteStoreError } from "@trajs/utils/ByteStore";
 import { type Effect, Option, type Scope, type Stream } from "effect";
 
+import type * as Extra from "#/Extra.ts";
 import type { EncodingServices, Readable } from "#/internal/parts.ts";
 import { read, readCached } from "#/internal/sessions.ts";
 import type * as Trajectory from "#/Trajectory.ts";
@@ -106,6 +110,10 @@ export type SessionStream<
  *   ({@link SessionStream}).
  * - `forkedFrom` is the session it continues from and the part of it that it continues from,
  *   and is `None` for a session that continues from nothing ({@link Fork}).
+ * - `extra` is the extra data the kit declares of a session part, as the part that declares
+ *   the session states it ({@link Extra.ExtraRecord}): the main session carries it in its
+ *   declaration as any other session does ({@link Trajectory.Parts.mainSession}), and a main
+ *   session the trajectory does not declare holds none.
  * - The sessions forked off a session are the ones whose `forkedFrom` names it, and a session is
  *   looked up by the id the trajectory names it by ({@link Sessions}, {@link session}).
  * - The parts of a session are read out of what {@link toSessions} kept rather than out of the
@@ -120,6 +128,7 @@ export type SessionStream<
 export interface Session<Config extends Trajectory.AnyConfig, E = never, R = never> {
   readonly id: string;
   readonly forkedFrom: Option.Option<Fork>;
+  readonly extra: Extra.ExtraRecord<Config["extrakit"]["extra"], "session">;
   readonly stream: SessionStream<Config, E, R>;
 }
 
@@ -134,9 +143,11 @@ export interface Session<Config extends Trajectory.AnyConfig, E = never, R = nev
  * **Details**
  *
  * A trajectory names a session by declaring it, or by producing a part in it, so the record
- * holds the sessions the trajectory names in the order it first named them: the ones that
- * continue from nothing, and the ones forked off them. Each is read with what the trajectory
- * is read with ({@link toSessions}).
+ * holds the sessions the trajectory names in the order it first named them: the main session,
+ * and the ones forked off it or off one another. A session of its own is only named by
+ * declaring it, so an id the trajectory holds parts of and no declaration of is not a session
+ * the record holds — the reading fails instead ({@link toSessions}). Each is read with what the
+ * trajectory is read with.
  *
  * @see {@link toSessions} for reading a trajectory as them.
  * @see {@link session} for the session one id names.
@@ -163,13 +174,17 @@ export type Sessions<Config extends Trajectory.AnyConfig, E = never, R = never> 
  *   so a session is read as often as it is asked for, and a session forked off another runs on
  *   what it inherited rather than repeating it. Caching is what makes that possible: a
  *   trajectory is one stream, and one stream is read once.
+ * - The main session is the one a part belongs to that states no session of its own — or
+ *   states `"main"` — and it is the one session read whether or not the trajectory declares
+ *   it ({@link Trajectory.mainSessionId}). Every other session is read from the session part
+ *   that declares it, so a part naming a session the trajectory does not declare fails the
+ *   reading, as does a session declared after the parts it produced ({@link Sessions}).
  * - Two things are taken to hold, neither of which can be waited for: a session is declared
  *   before the parts it produced, and a `fork` names a part the trajectory holds by the time
- *   the declaration reading it is read. A session the trajectory names by a part of it rather
- *   than by a declaration is read as one that continues from nothing. A trajectory that
- *   declares a session after the parts it produced, or reaches a session before the part it
- *   continues from — which is what a cycle of forks is — fails with the
- *   {@link TrajectoryError} that names the session and what is wrong with it.
+ *   the declaration reading it is read. A trajectory that declares a session after the parts it
+ *   produced, or reaches a session before the part it continues from — which is what a cycle of
+ *   forks is — fails with the {@link TrajectoryError} that names the session and what is wrong
+ *   with it.
  * - The parts are kept in memory, for as long as the program runs: a program that reads the
  *   sessions after that — one that keeps the parts of a trajectory somewhere else, a file system
  *   or a database — reads them with {@link toSessionsCached}, whose store it provides.
@@ -189,19 +204,18 @@ export type Sessions<Config extends Trajectory.AnyConfig, E = never, R = never> 
  *
  * const part = Trajectory.parts(Trajectory.anyConfig)
  *
- * // One session asks and is answered, and a session forked off the answer asks again.
- * const asked = part.prompt(Prompt.make("What is a fork?"), { sessionId: "asking" })
+ * // The main session asks and is answered, and a session forked off the answer asks again.
+ * const asked = part.prompt(Prompt.make("What is a fork?"))
  * const answered = part.response(
- *   Response.makePart("text", { text: "It is a session that continues another." }),
- *   { sessionId: "asking" }
+ *   Response.makePart("text", { text: "It is a session that continues another." })
  * )
  *
  * const trajectory = Trajectory.make(Trajectory.anyConfig)(
  *   Stream.make(
- *     part.session("asking"),
+ *     part.mainSession(),
  *     asked,
  *     answered,
- *     part.session("reply", { fork: answered.uuid }),
+ *     part.subSession("reply", { fork: answered.uuid }),
  *     part.prompt(Prompt.make("And what does it hold?"), { sessionId: "reply" })
  *   )
  * )
@@ -215,7 +229,7 @@ export type Sessions<Config extends Trajectory.AnyConfig, E = never, R = never> 
  * stream.map((part) => part._tag) // => ["Prompt", "Response", "Prompt"]
  *
  * // What it continues from is read from the declaration of the session it was forked off.
- * Option.getOrThrow(reply.forkedFrom).session // => "asking"
+ * Option.getOrThrow(reply.forkedFrom).session // => "main"
  * ```
  *
  * @see {@link Session} for one session of a trajectory.
@@ -277,10 +291,8 @@ export const toSessions = <Config extends Trajectory.AnyConfig, E, R>(
  *
  * const trajectory = Trajectory.make(Trajectory.anyConfig)(
  *   Stream.make(
- *     part.prompt(Prompt.make("What is a fork?"), { sessionId: "asking" }),
- *     part.response(Response.makePart("text", { text: "A session that continues another." }), {
- *       sessionId: "asking"
- *     })
+ *     part.prompt(Prompt.make("What is a fork?")),
+ *     part.response(Response.makePart("text", { text: "A session that continues another." }))
  *   )
  * )
  *
@@ -288,10 +300,10 @@ export const toSessions = <Config extends Trajectory.AnyConfig, E, R>(
  *   Effect.scoped(
  *     Effect.gen(function*() {
  *       const sessions = yield* Session.toSessionsCached(trajectory, { capacity: 0 })
- *       const asking = Option.getOrThrow(Session.session("asking")(sessions))
+ *       const main = Option.getOrThrow(Session.session(Trajectory.mainSessionId)(sessions))
  *
  *       // The parts are served from the store, for as long as the scope is open.
- *       return Array.from(yield* Stream.runCollect(asking.stream)).map((part) => part._tag)
+ *       return Array.from(yield* Stream.runCollect(main.stream)).map((part) => part._tag)
  *     })
  *   ).pipe(Effect.provide(ByteStore.layer()))
  * )
@@ -326,7 +338,10 @@ export const toSessionsCached = <Config extends Trajectory.AnyConfig, E, R>(
  * **Details**
  *
  * It is a lookup of what {@link toSessions} read ({@link Sessions}), so it needs nothing and
- * fails for nothing: an id the trajectory names no session by is `None`.
+ * fails for nothing: an id the trajectory names no session by is `None`. A session of its own
+ * is one the trajectory declares, so an id it holds parts of and no declaration of is not a
+ * session {@link toSessions} reads at all ({@link Trajectory.mainSessionId} for the one session
+ * read without a declaration).
  *
  * **Example** (Looking one session up by its id)
  *
@@ -338,14 +353,14 @@ export const toSessionsCached = <Config extends Trajectory.AnyConfig, E, R>(
  *
  * const trajectory = Trajectory.make(Trajectory.anyConfig)(
  *   Stream.make(
- *     part.session("asking"),
- *     part.prompt(Prompt.make("What is a fork?"), { sessionId: "asking" })
+ *     part.mainSession(),
+ *     part.prompt(Prompt.make("What is a fork?"))
  *   )
  * )
  *
  * const sessions = await Effect.runPromise(Session.toSessions(trajectory))
  *
- * Option.isSome(Session.session("asking")(sessions)) // => true
+ * Option.isSome(Session.session(Trajectory.mainSessionId)(sessions)) // => true
  * Option.isSome(Session.session("replying")(sessions)) // => false
  * ```
  *

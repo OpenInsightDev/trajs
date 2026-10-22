@@ -153,7 +153,7 @@ const trajectory = Trajectory.make(config)(
 
 const main = Effect.fn(function* () {
   const sessions = yield* Session.toSessions(trajectory);
-  const session = Option.getOrThrow(Session.session(Trajectory.rootSession)(sessions));
+  const session = Option.getOrThrow(Session.session(Trajectory.mainSessionId)(sessions));
 
   return yield* session.stream.pipe(
     // Parts to calls: what the run asked of its tools is what the report is of, so a part

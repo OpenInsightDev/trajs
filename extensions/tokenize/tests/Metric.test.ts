@@ -27,9 +27,7 @@ import { describe, expect, it } from "vite-plus/test";
 import { makeProducer, metrickit, Tokenizer, tokenEstimate } from "../src/index.ts";
 import type { Estimate } from "../src/index.ts";
 
-/** The session the first half of the trajectory runs in, and the one it forks to. */
-const asking = "01890a5d-ac96-774b-bcce-b302099a8057";
-
+/** The session the second half of the trajectory runs in, which the first forks to. */
 const answering = "01890a5d-ac96-774b-bcce-b302099a8058";
 
 /** What the trajectory is built and read with: no tool, event, metric or extra datum. */
@@ -44,8 +42,9 @@ const config = Trajectory.config({
 /** The builders of the parts below, under that config. */
 const part = Trajectory.parts(config);
 
-/** A prompt part, as a trajectory holds one. */
-const promptPart = (prompt: Prompt.Prompt, sessionId: string) => part.prompt(prompt, { sessionId });
+/** A prompt part, as a trajectory holds one: of the main session where no id is given. */
+const promptPart = (prompt: Prompt.Prompt, sessionId?: string) =>
+  part.prompt(prompt, { sessionId });
 
 /**
  * A PNG of the given size: the header is all a media rule reads, so the bytes need
@@ -61,15 +60,13 @@ const png = (width: number, height: number): Uint8Array => {
   return bytes;
 };
 
-// One turn of a session that called a tool: what the model was given, what it
-// answered, the call it made, the result of that call, and why it stopped.
-const declared = part.session(asking);
+// One turn of the main session, which called a tool: what the model was given, what
+// it answered, the call it made, the result of that call, and why it stopped.
+const declared = part.mainSession();
 
-const question = promptPart(Prompt.make("what is the weather in SF"), asking);
+const question = promptPart(Prompt.make("what is the weather in SF"));
 
-const answer = part.response(Response.makePart("text", { text: "let me look that up" }), {
-  sessionId: asking,
-});
+const answer = part.response(Response.makePart("text", { text: "let me look that up" }));
 
 const call = part.response(
   Response.anyToolCallPart({
@@ -78,7 +75,6 @@ const call = part.response(
     params: { city: "SF" },
     providerExecuted: false,
   }),
-  { sessionId: asking },
 );
 
 const result = part.response(
@@ -89,7 +85,6 @@ const result = part.response(
     isFailure: false,
     providerExecuted: false,
   }),
-  { sessionId: asking },
 );
 
 const stopped = part.response(
@@ -98,12 +93,12 @@ const stopped = part.response(
     usage: new Response.Usage({ inputTokens: { total: 12 }, outputTokens: { total: 3 } }),
     response: undefined,
   }),
-  { sessionId: asking },
 );
 
 // A session that ran on a tool result alone, and was given a payload that is not
-// text: the kinds of count the other session does not hold.
-const forked = part.session(answering);
+// text: the kinds of count the other session does not hold. It continues from where
+// the main session stopped.
+const forked = part.subSession(answering, { fork: stopped.uuid });
 
 const carried = promptPart(
   Prompt.fromMessages([
@@ -275,9 +270,10 @@ describe("the metric over a trajectory", () => {
     const running = new Map<string, number>();
 
     for (const part of [question, answer, call, result, carried, image]) {
-      const total = (running.get(part.sessionId) ?? 0) + of(byPart, part).count.tokens;
+      const sessionId = part.sessionId ?? Trajectory.mainSessionId;
+      const total = (running.get(sessionId) ?? 0) + of(byPart, part).count.tokens;
 
-      running.set(part.sessionId, total);
+      running.set(sessionId, total);
       expect(of(byPart, part).total).toBe(total);
     }
 

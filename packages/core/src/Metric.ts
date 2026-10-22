@@ -425,9 +425,7 @@ export const MetricParts = <K extends MetricKit.Any>(
  * // What the producers are run over: a part of a trajectory, whichever kit wrote
  * // it. A producer reads what a model was given and returned rather than a report
  * // of its own metric, so every producer of the kit reads every part.
- * const produced = Stream.make(
- *   Trajectory.parts(Trajectory.anyConfig).session("01890a5d-ac96-774b-bcce-b302099a8057")
- * )
+ * const produced = Stream.make(Trajectory.parts(Trajectory.anyConfig).mainSession())
  *
  * const parts = await Effect.runPromise(Stream.runCollect(Metric.produce(runnable)(produced)))
  *

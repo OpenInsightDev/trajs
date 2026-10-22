@@ -14,7 +14,7 @@ import { Predicate, Stream } from "effect";
 import type { Tool } from "effect/ai";
 
 import * as Response from "#/Response.ts";
-import type * as Trajectory from "#/Trajectory.ts";
+import * as Trajectory from "#/Trajectory.ts";
 
 interface Chunk {
   text: string;
@@ -174,7 +174,11 @@ const foldPart = <Config extends Trajectory.AnyConfig>(
 ): readonly [State, ReadonlyArray<Trajectory.Part<Config>>] => {
   if (part._tag !== "Response") return [state, [part]];
 
-  const [folding, completed] = collapse(state, part.sessionId, part.response);
+  const [folding, completed] = collapse(
+    state,
+    part.sessionId ?? Trajectory.mainSessionId,
+    part.response,
+  );
 
   return [folding, completed.map((response) => ({ ...part, response }))];
 };

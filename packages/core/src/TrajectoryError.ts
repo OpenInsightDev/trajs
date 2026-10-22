@@ -64,17 +64,22 @@ export class ToolDecodeError extends Data.TaggedError("ToolDecodeError")<{
  * - `"late-declaration"`: the session was declared after the parts it produced. A
  *   session is declared before the parts it produced, so there is no declaration
  *   left to wait for.
+ * - `"undeclared-session"`: the session is named by a part of the trajectory, and no
+ *   session part declares it. A session of its own is read only from the part that
+ *   declares it; the main session is the one session that is read whether or not it is
+ *   declared.
  *
  * @see {@link SessionError} for the error that carries one.
  * @category models
  */
-export type SessionErrorReason = "unproduced-fork" | "late-declaration";
+export type SessionErrorReason = "unproduced-fork" | "late-declaration" | "undeclared-session";
 
 /** What each reason says is wrong with the session it names, as {@link SessionError} words it. */
 const sessionFailure: Record<SessionErrorReason, string> = {
   "unproduced-fork":
     "it continues from a part the trajectory does not hold, or one no session continues from",
   "late-declaration": "it was declared after the parts it produced",
+  "undeclared-session": "it is named by a part, and no session part declares it",
 };
 
 /**

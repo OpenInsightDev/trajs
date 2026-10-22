@@ -61,7 +61,9 @@ const extraField = <K extends ExtraKit.Any, P extends Extra.Part>(extrakit: K, p
  * **Details**
  *
  * - `messages` are the messages a model was given, as `effect/ai` states them, and
- *   `sessionId` the session the part was produced in.
+ *   `sessionId` the session the part was produced in, where the part states one: a part
+ *   stating none belongs to the main session, and so does one stating `"main"`
+ *   ({@link SessionPart}).
  * - `uuid` identifies the part, and is what a {@link SessionPart}'s `fork` names;
  *   `.make` gives a part a fresh one.
  * - `timestamp` is when the part was produced, where what wrote it states a moment.
@@ -78,7 +80,7 @@ export const PromptPart = <K extends ExtraKit.Any>(extrakit: K) =>
   Schema.TaggedStruct("Prompt", {
     messages: Schema.Array(Prompt.Message),
     extra: extraField(extrakit, "prompt"),
-    sessionId: Schema.String,
+    sessionId: Schema.optional(Schema.String),
     uuid: Uuid,
     timestamp: Schema.optional(Schema.DateTimeUtcFromString),
   });
@@ -103,17 +105,28 @@ export type PromptPart<K extends ExtraKit.Any> = Schema.Schema.Type<
 export type PromptPartEncoded = Schema.Codec.Encoded<ReturnType<typeof PromptPart<ExtraKit.Any>>>;
 
 /**
- * The session a part built without one belongs to: `"root"`.
+ * The id the main session is named by: `"main"`.
  *
  * **When to use**
  *
- * Use to name the session a part built by {@link parts} without one belongs to,
- * rather than repeating the id.
+ * Use to name the main session — the one a part belongs to that states no session of its
+ * own — rather than repeating the id.
  *
- * @see {@link parts} for the builders that state it as the default.
+ * **Details**
+ *
+ * It is the id {@link Parts.mainSession} declares the session by. A part that states no
+ * `sessionId` belongs to the same session, since the main session is the one a trajectory
+ * reads without a declaration ({@link SessionPart}).
+ *
+ * @see {@link Parts.mainSession} for declaring it.
+ * @see {@link Session.toSessions} for reading a trajectory as its sessions.
  * @category constants
  */
-export const rootSession = "root";
+export const mainSessionId = "main";
+
+const MainSession = Schema.TaggedStruct("main", { id: Schema.Literal(mainSessionId) });
+
+const SubSession = Schema.TaggedStruct("sub", { id: Schema.String, fork: Uuid });
 
 /**
  * Creates the schema of a session part, as the extra kit given reads its extra
@@ -126,16 +139,18 @@ export const rootSession = "root";
  *
  * **Details**
  *
- * - `id` names the session the parts after the declaration are produced in, and
- *   `uuid` identifies the declaration.
- * - `fork` names the part a session continues from, where it continues from another:
- *   it is the `uuid` of a part of the forked-from session rather than that session's
- *   id, so a fork relates two parts ({@link Session.Fork}). A session is declared before the
+ * - `type` states which of the two kinds of session is declared: `main` the main
+ *   session — the one a part belongs to where it states no session of its own, or states
+ *   `"main"`, and the one whose `id` is `"main"` — and `sub` a session of its own, whose
+ *   `id` is the id it is named by.
+ * - A `sub` declaration's `fork` names the part the session continues from: it is the
+ *   `uuid` of a part of the session it was forked off rather than that session's id, so
+ *   a fork relates two parts ({@link Session.Fork}). A session is declared before the
  *   parts it produces, so a fork names a part the trajectory already reached — see
  *   {@link TrajectoryError.SessionError} for what reading one fails with where it has
  *   not.
- * - `extra` is the extra data the kit declares of a session part
- *   ({@link Extra.ExtraRecord}).
+ * - `uuid` identifies the declaration, and `extra` is the extra data the kit declares of
+ *   a session part ({@link Extra.ExtraRecord}).
  *
  * @see {@link parts} for building a part under the config of its trajectory.
  * @see {@link Session.toSessions} for reading a trajectory as its sessions.
@@ -143,8 +158,7 @@ export const rootSession = "root";
  */
 export const SessionPart = <K extends ExtraKit.Any>(extrakit: K) =>
   Schema.TaggedStruct("Session", {
-    id: Schema.String,
-    fork: Schema.optional(Uuid),
+    type: Schema.Union([MainSession, SubSession]),
     extra: extraField(extrakit, "session"),
     uuid: Uuid,
   });
@@ -160,8 +174,9 @@ export type SessionPart<K extends ExtraKit.Any> = Schema.Schema.Type<
 >;
 
 /**
- * A {@link SessionPart} as it is encoded: the id of the session and the part it
- * forks from as a trajectory states them, and the extra data of the part.
+ * A {@link SessionPart} as it is encoded: the kind of session declared and the id it
+ * is named by, the part a session of its own continues from, and the extra data of the
+ * part.
  *
  * @see {@link SessionPart} for the part itself.
  * @category models
@@ -170,7 +185,7 @@ export type SessionPartEncoded = Schema.Codec.Encoded<ReturnType<typeof SessionP
 
 const responseFields = {
   timestamp: Timestamp,
-  sessionId: Schema.String,
+  sessionId: Schema.optional(Schema.String),
   uuid: Uuid,
 };
 
@@ -224,7 +239,9 @@ type AllResponseParts<
  *   its tools as those tools state them, and a part naming a tool the toolkit no
  *   longer holds as the part it was produced as — see {@link Response.AllPartsView}.
  * - `extrakit` reads the part's extra data ({@link Extra.ExtraRecord}); `timestamp`,
- *   `sessionId` and `uuid` are the fields every response part is produced with.
+ *   `sessionId` and `uuid` are the fields every response part is produced with, and a
+ *   part stating no session belongs to the main session, as one stating `"main"` does
+ *   ({@link SessionPart}).
  *
  * The response is read through the toolkit, so encoding one takes what those tools
  * state — see {@link Exchange.EncodingServices}.
@@ -325,7 +342,8 @@ export type ResponsePartEncoded = Schema.Codec.Encoded<
  *   so a part naming an event the kit does not name is not read at all.
  * - `timestamp` is when the event was produced, which `.make` supplies as the time
  *   the part is built; `sessionId` and `uuid` say where it was produced and which
- *   part it is.
+ *   part it is — an event stating no session belongs to the main session, as one
+ *   stating `"main"` does ({@link SessionPart}).
  *
  * An event part holds no extra data: what an extension declares of a part is an
  * {@link Extra}, declared of the parts in {@link Extra.Part}.
@@ -338,7 +356,7 @@ export const EventPart = <K extends EventKit.Any>(kit: K) =>
   Schema.TaggedStruct("Event", {
     event: Event.EventParts(kit),
     timestamp: Timestamp,
-    sessionId: Schema.String,
+    sessionId: Schema.optional(Schema.String),
     uuid: Uuid,
   });
 
@@ -419,14 +437,15 @@ export type MetricPartEncoded = Schema.Codec.Encoded<ReturnType<typeof MetricPar
  *
  * **Details**
  *
- * - `prompt`, `session` and `response` state the extra data the config's extra kit
- *   declares of the kind of part they build ({@link Extra.ExtraRecord}); a part built
- *   stating none of it holds none.
+ * - `prompt`, `mainSession`, `subSession` and `response` state the extra data the
+ *   config's extra kit declares of the kind of part they build beside the fields of the
+ *   part ({@link Extra.ExtraRecord}); a part built stating none of it holds none.
  * - `response` builds the variant the config states: the increments a streamed answer
  *   arrives in where `stream` is on, and the whole parts a model returned where it is
  *   off — see {@link ResponsePart}.
- * - `event` builds an event of the config's event kit in the session given, and
- *   `metric` a report of its metric kit ({@link EventPart}, {@link MetricPart}).
+ * - `event` builds an event of the config's event kit in the session stated, which is
+ *   the main session where none is, and `metric` a report of its metric kit
+ *   ({@link EventPart}, {@link MetricPart}).
  * - A prompt or response part is timed where it is built, and a caller that knows when
  *   it happened states it as the part's `timestamp` rather than leaving the part to be
  *   timed as it is built.
@@ -445,49 +464,56 @@ export type MetricPartEncoded = Schema.Codec.Encoded<ReturnType<typeof MetricPar
 export interface Parts<Config extends AnyConfig> {
   /**
    * The prompt part of what a model was given: the messages of the prompt asked, in the
-   * session given — {@link rootSession} where none is.
+   * session stated — the main session where none is.
    */
   readonly prompt: (
     prompt: Prompt.Prompt,
     options?: {
       readonly sessionId?: string;
-      readonly extra?: Extra.ExtraRecord<Config["extrakit"]["extra"], "prompt">;
       readonly timestamp?: DateTime.Utc;
       readonly uuid?: string;
-    },
+    } & Extra.ExtraRecord<Config["extrakit"]["extra"], "prompt">,
   ) => PromptPart<Config["extrakit"]>;
 
   /**
-   * The declaration of a session the trajectory produces in, and of the part it
-   * continues from where `fork` names one: the `uuid` of a part of the session forked
-   * from rather than that session's id — see {@link Session.Fork}.
+   * The declaration of the main session: the session a part belongs to where it states
+   * no session of its own, or states `"main"`.
    */
-  readonly session: (
-    id: string,
+  readonly mainSession: (
     options?: {
-      readonly fork?: string;
-      readonly extra?: Extra.ExtraRecord<Config["extrakit"]["extra"], "session">;
       readonly uuid?: string;
-    },
+    } & Extra.ExtraRecord<Config["extrakit"]["extra"], "session">,
   ) => SessionPart<Config["extrakit"]>;
 
   /**
-   * One part of what a model returned, in the session given — {@link rootSession} where
+   * The declaration of a session of its own, named by `id` and continuing from the part
+   * `fork` names — the `uuid` of a part of the session it was forked off rather than that
+   * session's id, so a fork relates two parts ({@link Session.Fork}).
+   */
+  readonly subSession: (
+    id: string,
+    options: {
+      readonly fork: string;
+      readonly uuid?: string;
+    } & Extra.ExtraRecord<Config["extrakit"]["extra"], "session">,
+  ) => SessionPart<Config["extrakit"]>;
+
+  /**
+   * One part of what a model returned, in the session stated — the main session where
    * none is — and in the variant the config states.
    */
   readonly response: (
     response: ResponsePart<Config["toolkit"], Config["extrakit"], Config["stream"]>["response"],
     options?: {
       readonly sessionId?: string;
-      readonly extra?: Extra.ExtraRecord<Config["extrakit"]["extra"], "response">;
       readonly timestamp?: DateTime.Utc;
       readonly uuid?: string;
-    },
+    } & Extra.ExtraRecord<Config["extrakit"]["extra"], "response">,
   ) => ResponsePart<Config["toolkit"], Config["extrakit"], Config["stream"]>;
 
   /**
-   * An event of the config's event kit, produced in the session given —
-   * {@link rootSession} where none is.
+   * An event of the config's event kit, produced in the session stated —
+   * the main session where none is.
    */
   readonly event: (
     event: Event.EventParts<Config["eventkit"]["events"]>,
@@ -521,8 +547,9 @@ export interface Parts<Config extends AnyConfig> {
  *   built as an increment of a streamed answer or as a whole part is the config's
  *   `stream`, and the extra data a part may state is its extra kit's — so no builder
  *   can state a kit the trajectory is not read with.
- * - A part built with no session belongs to {@link rootSession}, and one built with no
- *   `timestamp` is timed as it is built; both may still be stated.
+ * - A part built with no session belongs to the main session — the one
+ *   {@link Parts.mainSession} declares — and one built with no `timestamp` is timed as it
+ *   is built; both may still be stated.
  * - The parts a caller replays are written as the parts they were: a `uuid` stated is the
  *   identity the part is written with, so a trajectory written twice from stated
  *   identities — the parts of a fixture, say — is the same bytes ({@link Parts}).
@@ -560,7 +587,7 @@ export interface Parts<Config extends AnyConfig> {
  * // what it answered: the config says a response part is whole, so it is.
  * const asked = parts.prompt(Prompt.make("What is 2 + 2?"), {
  *   sessionId,
- *   extra: { "tokenize/estimate": { version: "0.1.0", tokens: 7 } }
+ *   "tokenize/estimate": { version: "0.1.0", tokens: 7 }
  * })
  * const answered = parts.response(Response.makePart("text", { text: "4" }), { sessionId })
  *
@@ -587,20 +614,23 @@ export const parts = <Config extends AnyConfig>(config: Config): Parts<Config> =
   const metric = MetricPart(config.metrickit);
 
   return {
-    prompt: (asked, { sessionId = rootSession, extra = {}, timestamp, uuid } = {}) =>
+    prompt: (asked, { sessionId, timestamp, uuid, ...extra } = {}) =>
       prompt.make({ messages: asked.content, sessionId, extra, timestamp, uuid }),
-    session: (id, { fork, extra = {}, uuid } = {}) => session.make({ id, fork, extra, uuid }),
+    mainSession: ({ uuid, ...extra } = {}) =>
+      session.make({ type: MainSession.make({ id: mainSessionId }), extra, uuid }),
+    subSession: (id, { fork, uuid, ...extra }) =>
+      session.make({ type: SubSession.make({ id, fork }), extra, uuid }),
     // SAFETY: the schema was made for the variant the config states, and what it makes
     // is the part the fields given state; TypeScript leaves that selection unevaluated
     // where the config is a type parameter and reads the part it makes as the streaming
     // one alone.
-    response: (answered, { sessionId = rootSession, extra = {}, timestamp, uuid } = {}) =>
+    response: (answered, { sessionId, timestamp, uuid, ...extra } = {}) =>
       response.make({ response: answered, sessionId, extra, timestamp, uuid }) as ResponsePart<
         Config["toolkit"],
         Config["extrakit"],
         Config["stream"]
       >,
-    event: (given, { sessionId = rootSession, timestamp, uuid } = {}) =>
+    event: (given, { sessionId, timestamp, uuid } = {}) =>
       event.make({ event: given, sessionId, timestamp, uuid }),
     metric: (given, { timestamp } = {}) => metric.make({ metric: given, timestamp }),
   };
@@ -1082,12 +1112,11 @@ type Cached<Id extends string, Config extends AnyConfig, E, R> = Effect.Effect<
  * import { ByteStore, Prompt, Trajectory } from "@trajs/core"
  *
  * const part = Trajectory.parts(Trajectory.anyConfig)
- * const sessionId = "01890a5d-ac96-774b-bcce-b302099a8057"
  *
  * const trajectory = Trajectory.make(Trajectory.anyConfig)(
  *   Stream.make(
- *     part.session(sessionId),
- *     part.prompt(Prompt.make("What is 2 + 2?"), { sessionId })
+ *     part.mainSession(),
+ *     part.prompt(Prompt.make("What is 2 + 2?"))
  *   )
  * )
  *

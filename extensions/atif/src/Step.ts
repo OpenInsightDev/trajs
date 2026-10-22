@@ -231,24 +231,24 @@ const stepsOf = <Config extends Trajectory.AnyConfig>(
  * **Example** (Reading the parts of a session as its steps)
  *
  * ```ts import.meta.vitest
- * import { Effect, Stream } from "effect"
- * import { Prompt, Response, Trajectory } from "@trajs/core"
+ * import { Effect, Option, Stream } from "effect"
+ * import { Prompt, Response, Session, Trajectory } from "@trajs/core"
  * import { Step } from "@trajs/extension-atif"
  *
- * const sessionId = "01890a5d-ac96-774b-bcce-b302099a8057"
  * const part = Trajectory.parts(Trajectory.anyConfig)
  *
- * // What one session's model was given, and what it returned for it as one whole part.
+ * // What the main session's model was given, and what it returned for it as one whole
+ * // part: a part that states no session belongs to the main session.
  * const trajectory = Trajectory.make(Trajectory.anyConfig)(
  *   Stream.make(
- *     part.session(sessionId),
- *     part.prompt(Prompt.make("What is 2 + 2?"), { sessionId }),
- *     part.response(Response.makePart("text", { text: "4" }), { sessionId })
+ *     part.mainSession(),
+ *     part.prompt(Prompt.make("What is 2 + 2?")),
+ *     part.response(Response.makePart("text", { text: "4" }))
  *   )
  * )
  *
  * const sessions = await Effect.runPromise(Session.toSessions(trajectory))
- * const session = Option.getOrThrow(Session.session(sessionId)(sessions))
+ * const session = Option.getOrThrow(Session.session(Trajectory.mainSessionId)(sessions))
  *
  * const steps = await Effect.runPromise(Stream.runCollect(Step.steps(session.stream)))
  *

@@ -130,9 +130,10 @@ export interface Options {
  *
  * The session of the trajectory is named by `session_id`, or by `trajectory_id` where
  * the document states no run; a document that states neither is produced in a session
- * of the reading's own. The trajectory names the toolkit of the document and the extra
- * data of this package and no other kit, so it holds no event and no metric part, and
- * derives nothing of the parts it holds.
+ * of the reading's own. It is declared before the parts produced in it, as a session
+ * forked from the main session where that session was declared. The trajectory names
+ * the toolkit of the document and the extra data of this package and no other kit, so
+ * it holds no event and no metric part, and derives nothing of the parts it holds.
  *
  * The trajectory fails with the {@link TrajectoryError} a trajectory whose session
  * cannot be declared fails with, which a document of steps that one session produces
@@ -269,7 +270,7 @@ export const encode = (
   >,
   TrajectoryError | PlatformError.PlatformError,
   FileSystem.FileSystem | Path.Path
-> => kits(document)((producer) => produce(producer, document, options?.cwd));
+> => kits(document)((main) => produce(main, document, options?.cwd));
 
 /**
  * Reads the ATIF document a file holds, as the trajectory it states.

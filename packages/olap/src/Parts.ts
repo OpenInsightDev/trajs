@@ -109,7 +109,8 @@ export type Encoded<C extends Trajectory.AnyConfig = Trajectory.AnyConfig> = Sch
  * The fields are named as the columns are, so a row is written without a column
  * list. `trajectory_id` is the id the trajectory the part was read from carries,
  * `position` is where the part is in the one order a trajectory carries its parts
- * in, and `session_id` is the session's own id for a session part and none for a
+ * in, and `session_id` is the session the part belongs to: the id a session part
+ * declares, the main session for a part that states none of its own, and `""` for a
  * metric part, which states no session.
  *
  * @category models
@@ -131,7 +132,10 @@ export interface Row {
    */
   readonly variant: string;
 
-  /** The session the part belongs to, and `""` for a metric part, which states none. */
+  /**
+   * The session the part belongs to: the main session where it states none of its own,
+   * and `""` for a metric part, which states none.
+   */
   readonly session_id: string;
 
   /** The part's own id, and `null` for a metric part, which states none. */

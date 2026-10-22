@@ -26,30 +26,36 @@ import * as Trajectory from "#/Trajectory.ts";
 import { TrajectoryError } from "#/TrajectoryError.ts";
 
 /**
- * The parts a trajectory is produced from: what a model was given and returned,
- * and the events a kit produced of the session.
+ * The messages a session produces, as one stream: the prompts a model was given, the
+ * responses it returned, and the events a kit produced of the session.
  *
  * **When to use**
  *
- * Use to type what {@link fromSession} produces.
+ * Use to type what {@link fromSession} produces, or the messages {@link SessionSource}
+ * states of a session.
  *
  * **Details**
  *
  * A part is stated as the trajectory produces it, so a stream of them holds the parts
  * themselves rather than the messages they were built from. A session declaration is
- * not among them: a part names its session, and a trajectory is read by the sessions
- * its parts name whether or not one is declared.
+ * not among them: each part states the session it was produced in, and a part of the
+ * main session states none. So what a stream states is read in the session it names,
+ * and that session is read from a declaration of the trajectory it is produced as
+ * ({@link fromSessions} declares one per stream; {@link fromSession} declares none).
  * - A response part is of either variant: a program that streams produces the
  *   increments an answer arrives in, and one that answers whole produces the parts a
  *   model returned, and the trajectory those parts make holds both
  *   ({@link Trajectory.Part}).
  *
  * @see {@link fromSession} for the function that produces them.
- * @see {@link SessionStreams} for the streams of the sessions a trajectory holds one of
- * each.
+ * @see {@link SessionSource} for what one session is produced from.
  * @category models
  */
-export type PartStream<Config extends Trajectory.AnyConfig, E = never, R = never> = Stream.Stream<
+export type MessageStream<
+  Config extends Trajectory.AnyConfig,
+  E = never,
+  R = never,
+> = Stream.Stream<
   | Trajectory.PromptPart<Config["extrakit"]>
   | Trajectory.ResponsePart<Config["toolkit"], Config["extrakit"], boolean>
   | Trajectory.EventPart<Config["eventkit"]>,
@@ -58,24 +64,66 @@ export type PartStream<Config extends Trajectory.AnyConfig, E = never, R = never
 >;
 
 /**
- * The streams the sessions of a trajectory are produced from: the parts of one
- * session under the id the session is named by.
+ * What one session of a trajectory is produced from: the messages the session produces,
+ * and the session it is forked from.
  *
  * **When to use**
  *
- * Use to type what {@link fromSessions} produces.
+ * Use to type one session of what {@link fromSessions} is given, or to state a session
+ * of its own beside the ones a trajectory is produced from.
  *
  * **Details**
  *
- * A stream holds the parts of one session ({@link PartStream}), keyed by the session
- * they were produced in, which every part states as its `sessionId`.
+ * - `messages` are the messages the session produces, as {@link MessageStream} reads
+ *   them: each states the session it was produced in, and a part of the main session
+ *   states none.
+ * - `subTo` is the id of the session the stream is forked from, and is the main session
+ *   where none is stated. The session is declared after the one it names, from that
+ *   session's declaration, so it holds none of its messages
+ *   ({@link Trajectory.SessionPart}).
+ * - What the entry states beside `messages` and `subTo` is the extra data the kit declares
+ *   of a session part, declared with the session it names ({@link Extra.ExtraRecord}).
  *
+ * @see {@link SessionStreams} for the record it is an entry of.
  * @see {@link fromSessions} for the function that produces them.
  * @category models
  */
-export type SessionStreams<Config extends Trajectory.AnyConfig, E = never, R = never> = Readonly<
-  Record<string, PartStream<Config, E, R>>
->;
+export type SessionSource<Config extends Trajectory.AnyConfig, E = never, R = never> = Readonly<{
+  messages: MessageStream<Config, E, R>;
+  subTo?: string;
+}> &
+  Extra.ExtraRecord<Config["extrakit"]["extra"], "session">;
+
+/**
+ * The sessions a trajectory is produced from, and what each of them is produced from.
+ *
+ * **When to use**
+ *
+ * Use to type what {@link fromSessions} is given, or to state the sessions a trajectory
+ * is produced from.
+ *
+ * **Details**
+ *
+ * - The record is keyed by session, and every key is an entry of {@link SessionSource}.
+ *   `main` is the main session, which is stated whether or not it produces a message:
+ *   every trajectory is of a main session, so the record names it — and since it is
+ *   forked from nothing, it states no `subTo`.
+ * - Every other key names a session of its own, which is declared before the messages
+ *   of its stream arrive, however few of them it gives ({@link SessionSource}). The
+ *   extra data an entry states is declared with the session it names, the main session
+ *   among them.
+ * - The declarations are produced in the order `subTo` states: the main session first,
+ *   then each session once the session it is forked from is declared — the sessions
+ *   forked from one session following the order the record states them.
+ *
+ * @see {@link SessionSource} for one session of the record.
+ * @see {@link fromSessions} for the function that produces them.
+ * @category models
+ */
+export type SessionStreams<Config extends Trajectory.AnyConfig, E = never, R = never> = Readonly<{
+  main: SessionSource<Config, E, R> & { readonly subTo?: never };
+}> &
+  Readonly<Record<string, SessionSource<Config, E, R>>>;
 
 /**
  * What a trajectory is produced with: the config it is read with, whose metric kit states
@@ -98,6 +146,11 @@ export type SessionStreams<Config extends Trajectory.AnyConfig, E = never, R = n
  *   ones that arrive, the increments of a streamed answer among them, so a trajectory
  *   produced is read with streams whatever the config given states
  *   ({@link fromSession}).
+ * - {@link produce} writes the declaration of the main session itself, so it is given the
+ *   extra data the kit declares of a session part beside the config: a key of it the kit
+ *   declares for a session part is the data declared with that session
+ *   ({@link Extra.ExtraRecord}), and every other field is the config's. {@link fromSessions}
+ *   declares its sessions from the record, which states each session's extra there.
  *
  * @see {@link MetricKit.toProducers} for providing a kit with the producers of its
  * metrics.
@@ -208,6 +261,11 @@ const produceWith =
  * - The response parts of the config given state nothing of what is produced: the
  *   trajectory produced is read with streams, since the parts a program produces are
  *   the increments an answer arrives in ({@link ProducingConfig}).
+ * - A stream holds no declaration ({@link MessageStream}), so what it produces is read in
+ *   the sessions its parts name: a part that states no session of its own — or states
+ *   `"main"` — is of the main session, which a trajectory reads without a declaration,
+ *   while a part that names a session of its own names one this reading declares
+ *   nowhere ({@link fromSessions} declares the sessions of a record before they arrive).
  * - The producers the metric kit was provided with are run over the same parts as
  *   they arrive, exactly as {@link Metric.produce} runs them, and the metric parts
  *   they derive are produced among the parts they are about. The stream is read once,
@@ -251,7 +309,6 @@ const produceWith =
  * })
  *
  * const extrakit = ExtraKit.empty
- * const sessionId = "01890a5d-ac96-774b-bcce-b302099a8057"
  *
  * // What the session is produced with: the config the trajectory is read with, whose
  * // metric kit states the producer of its metric.
@@ -264,9 +321,7 @@ const produceWith =
  * })
  *
  * const produced = Produce.fromSession("01890a5d-ac96-774b-bcce-b302099a8058", config)(
- *   Stream.make(
- *     Trajectory.parts(config).prompt(Prompt.make("What is 2 + 2?"), { sessionId })
- *   )
+ *   Stream.make(Trajectory.parts(config).prompt(Prompt.make("What is 2 + 2?")))
  * )
  *
  * const parts = Array.from(await Effect.runPromise(Stream.runCollect(produced)))
@@ -274,7 +329,7 @@ const produceWith =
  * produced.id // => "01890a5d-ac96-774b-bcce-b302099a8058"
  * ```
  *
- * @see {@link PartStream} for the parts it produces.
+ * @see {@link MessageStream} for the messages it produces.
  * @see {@link fromSessions} for the streams of several sessions as one.
  * @see {@link produce} for a run as it happens.
  * @see {@link Metric.produce} for what a kit derives of a kind of trajectory.
@@ -290,7 +345,7 @@ export function fromSession<
   id: Id,
   config: ProducingConfig<Toolkit, Events, Metrics, Extras>,
 ): <E, R>(
-  stream: PartStream<ProducedConfig<Toolkit, Events, Metrics, Extras>, E, R>,
+  stream: MessageStream<ProducedConfig<Toolkit, Events, Metrics, Extras>, E, R>,
 ) => Trajectory.Trajectory<
   Id,
   ProducedConfig<Toolkit, Events, Metrics, Extras>,
@@ -305,7 +360,7 @@ export function fromSession<
 >(
   config: ProducingConfig<Toolkit, Events, Metrics, Extras>,
 ): <E, R>(
-  stream: PartStream<ProducedConfig<Toolkit, Events, Metrics, Extras>, E, R>,
+  stream: MessageStream<ProducedConfig<Toolkit, Events, Metrics, Extras>, E, R>,
 ) => Trajectory.Trajectory<
   string,
   ProducedConfig<Toolkit, Events, Metrics, Extras>,
@@ -322,7 +377,7 @@ export function fromSession<
     | [id: string, config: ProducingConfig<Toolkit, Events, Metrics, Extras>]
     | [config: ProducingConfig<Toolkit, Events, Metrics, Extras>]
 ): <E, R>(
-  stream: PartStream<ProducedConfig<Toolkit, Events, Metrics, Extras>, E, R>,
+  stream: MessageStream<ProducedConfig<Toolkit, Events, Metrics, Extras>, E, R>,
 ) => Trajectory.Trajectory<
   string,
   ProducedConfig<Toolkit, Events, Metrics, Extras>,
@@ -350,13 +405,22 @@ export function fromSession<
  *   states them: `fromSessions(id, config)` and `fromSessions(config)` both return the
  *   function the sessions are produced from, so the id given names the trajectory
  *   produced and a call stating none names it by a new uuid ({@link Trajectory}).
- * - The record is keyed by session: each stream's parts were produced in the session
- *   it is keyed by, and that session is declared before the parts of its stream
- *   arrive. Every part states its own session ({@link PartStream}), so a session
- *   whose stream gives no part is still declared.
- * - The streams are read together rather than one after another, so the trajectory
- *   interleaves the sessions: the parts of one session need not be contiguous, though
+ * - The record is keyed by session ({@link SessionStreams}): each entry states the
+ *   messages the session produces, the session it is forked from, and the extra data
+ *   of that session ({@link SessionSource}). The `main` entry is the main session, which
+ *   the record states whether or not it produces a message, and every other key names a
+ *   session of its own — declared before the messages of its stream arrive, however few
+ *   of them it gives.
+ * - The declarations are produced in the order `subTo` states: the main session first,
+ *   with the extra data its entry states, and each session once the session it is forked
+ *   from is declared, from that session's declaration. So a session of the record
+ *   continues from where another was declared, and holds none of its messages.
+ * - The parts of the sessions are read together rather than one after another, so the
+ *   trajectory interleaves them: the parts of one session need not be contiguous, though
  *   each session's parts keep the order its stream gave them.
+ * - A `subTo` naming a session the record does not state — or sessions naming each other
+ *   — fails the trajectory with the {@link TrajectoryError} of a session no declaration
+ *   of can be read before another.
  * - Every part is produced as {@link fromSession} produces one, and the producers the
  *   metric kit was provided with are run over the parts of every session as they
  *   arrive, so what a kit derives of the trajectory is derived of all its sessions.
@@ -388,20 +452,33 @@ export function fromSession<
  * const part = Trajectory.parts(config)
  *
  * const trajectory = Produce.fromSessions(config)({
- *   asking: Stream.make(
- *     part.prompt(Prompt.make("What is 2 + 2?"), { sessionId: "asking" })
- *   ),
- *   answering: Stream.make(
- *     part.prompt(Prompt.make("What is 4 + 4?"), { sessionId: "answering" })
- *   )
+ *   // The main session is always one of the record's sessions, whether or not it
+ *   // produces a message.
+ *   main: {
+ *     messages: Stream.make(part.prompt(Prompt.make("What is 2 + 2?")))
+ *   },
+ *   // A session is forked from the session `subTo` names, and from the main session
+ *   // where it states none.
+ *   asking: {
+ *     messages: Stream.make(
+ *       part.prompt(Prompt.make("What is 4 + 4?"), { sessionId: "asking" })
+ *     )
+ *   },
+ *   // A session may be forked from a session of its own, which is declared before it.
+ *   replying: {
+ *     messages: Stream.make(
+ *       part.prompt(Prompt.make("And 4 + 5?"), { sessionId: "replying" })
+ *     ),
+ *     subTo: "asking"
+ *   }
  * })
  *
- * // Both sessions are declared and both prompts are produced, each in the session
- * // that gave it: the parts of a session are read apart from the one order the
- * // parts of the trajectory arrive in.
+ * // Every session is declared and every prompt is produced, each in the session that
+ * // gave it: the parts of a session are read apart from the one order the parts of the
+ * // trajectory arrive in, and the main session's prompt states none.
  * const produced = Array.from(await Effect.runPromise(Stream.runCollect(trajectory)))
- * produced.map((held) => (held._tag === "Session" ? held.id : held.sessionId)).sort()
- * // => ["answering", "answering", "asking", "asking"]
+ * produced.filter((held) => held._tag === "Session").map((held) => held.type.id).sort()
+ * // => ["asking", "main", "replying"]
  * ```
  *
  * @see {@link SessionStreams} for what it produces.
@@ -463,19 +540,64 @@ export function fromSessions<
   const read = produced(config);
   const part = Trajectory.parts(read);
 
-  return (sessions) => {
+  return <E, R>(
+    sessions: SessionStreams<ProducedConfig<Toolkit, Events, Metrics, Extras>, E, R>,
+  ) => {
+    const extraOf = (
+      source: SessionSource<ProducedConfig<Toolkit, Events, Metrics, Extras>, E, R>,
+    ): Extra.ExtraRecord<Extras["extra"], "session"> =>
+      Extra.stated(read.extrakit, "session")(source);
+
+    const main = part.mainSession(extraOf(sessions.main));
+    const mainId = Trajectory.mainSessionId;
+
+    // A session is declared after the session it is forked from, so the declarations are
+    // produced in the order `subTo` states: the main session first, and each session once
+    // the session it names is declared, forking from that session's declaration.
+    const declarations = [main];
+    const declarationOf = new Map([[mainId, main.uuid]]);
+    const waiting = new Map(Object.entries(sessions));
+    waiting.delete(mainId);
+
+    while (waiting.size > 0) {
+      const ready = [...waiting].flatMap(([sessionId, source]) => {
+        const fork = declarationOf.get(source.subTo ?? mainId);
+
+        return fork === undefined ? [] : [[sessionId, source, fork] as const];
+      });
+
+      // A `subTo` naming a session the record does not state — or sessions naming each
+      // other — is a session no declaration of which can be read before another.
+      if (ready.length === 0) {
+        const [unreachable] = waiting.keys();
+
+        const failed = Stream.fail(
+          TrajectoryError.session(unreachable ?? mainId, "unproduced-fork"),
+        );
+
+        return produceWith(id, read)(failed);
+      }
+
+      for (const [sessionId, source, fork] of ready) {
+        const declaration = part.subSession(sessionId, { fork, ...extraOf(source) });
+
+        declarations.push(declaration);
+        declarationOf.set(sessionId, declaration.uuid);
+        waiting.delete(sessionId);
+      }
+    }
+
     const streams = Stream.mergeAll(
-      Object.entries(sessions).map(([key, stream]) =>
-        stream.pipe(
-          // A stream of a session names it rather than declaring it, so the session
-          // is declared here: a session is read before the parts of it arrive.
-          Stream.prepend([part.session(key)]),
-        ),
-      ),
+      [
+        sessions.main.messages,
+        ...Object.entries(sessions)
+          .filter(([sessionId]) => sessionId !== mainId)
+          .map(([, source]) => source.messages),
+      ],
       { concurrency: "unbounded" },
     );
 
-    return produceWith(id, read)(streams);
+    return produceWith(id, read)(Stream.make(...declarations).pipe(Stream.concat(streams)));
   };
 }
 
@@ -498,10 +620,18 @@ export function fromSessions<
  * - A prompt or response part is timed where it is produced, and a caller that knows
  *   when it happened states it as the last argument of the enqueue rather than
  *   leaving the part to be timed as it is built.
- * - Every part is produced in this session: a part's `sessionId` is the `id` of the
- *   session that wrote it, so the sessions a run opens are read apart.
+ * - Every part is produced in this session: it states the id the session is named by
+ *   as its `sessionId`, and a part of the main session states none, so the sessions a
+ *   run opens are read apart ({@link Trajectory.SessionPart}).
+ * - `forkSession` opens a session that continues from a part of this one and hands back
+ *   the {@link ProduceSession} that produces in it. The `fork` it is given names the
+ *   part continued from, and defaults to the declaration of this session — the point the
+ *   session starts at, so a session opened that way holds none of its parts.
+ * - A session is declared before the parts it produces, so opening one fails with the
+ *   {@link TrajectoryError} of a trajectory whose sessions cannot be read: an `id` a
+ *   session was already opened under would be declared after the parts of that session,
+ *   and a `fork` naming a part the run has not written has nothing to continue from.
  *
- * @see {@link Producer} for what hands one out.
  * @see {@link produce} for a run in one.
  * @category models
  */
@@ -524,36 +654,7 @@ export type ProduceSession<
   enqueueEvent: (
     event: Event.EventParts<Events>,
   ) => Effect.Effect<Trajectory.EventPart<EventKit.Kit<Events>>>;
-}>;
-
-/**
- * The sessions a run produces a trajectory in.
- *
- * **When to use**
- *
- * Use to type what {@link produce} hands a program, or to write a program that
- * produces itself as a trajectory while it runs.
- *
- * **Details**
- *
- * `createSession` declares a session and hands back the {@link ProduceSession}
- * that produces in it, before any of the parts it holds. It fails with the
- * {@link TrajectoryError} of a trajectory whose sessions cannot be read: an `id` a
- * session has already declared would be declared after the parts of that session,
- * and a `fork` naming a part no session continues from has nothing to continue
- * from. What a session is declared with beyond `id` and `fork` is the extra data
- * the kit declares of a session part.
- *
- * @see {@link ProduceSession} for what a session produces with.
- * @see {@link produce} for what a program is handed one by.
- * @category models
- */
-export type Producer<
-  Tools extends Record<string, Tool.Any>,
-  Events extends Record<string, Event.Any>,
-  Extras extends Record<string, Extra.Any>,
-> = Readonly<{
-  createSession: (
+  forkSession: (
     options: { id: string; fork?: string } & Extra.ExtraRecord<Extras, "session">,
   ) => Effect.Effect<ProduceSession<Tools, Events, Extras>, TrajectoryError>;
 }>;
@@ -564,7 +665,7 @@ type ProduceFn<
   Extras extends Record<string, Extra.Any>,
   E = never,
   R = never,
-> = (producer: Producer<Tools, Events, Extras>) => Effect.Effect<void, E, R>;
+> = (main: ProduceSession<Tools, Events, Extras>) => Effect.Effect<void, E, R>;
 
 /**
  * Produces what a program does with a model as a trajectory, while it runs.
@@ -580,10 +681,12 @@ type ProduceFn<
  *   states them: `produce(id, config)` and `produce(config)` both return the function
  *   the run is written by, so the id given names the trajectory produced and a call
  *   stating none names it by a new uuid ({@link Trajectory}).
- * - The program is handed a {@link Producer}, which hands out one
- *   {@link ProduceSession} per session it runs. A session is declared when it is
- *   created, before any of the parts it produces, and every part enqueued is produced
- *   in the session that enqueued it, in the order the program enqueued it.
+ * - The program is handed the {@link ProduceSession} of the main session, which the
+ *   trajectory declares before the program runs — with the extra data the config states
+ *   beside it ({@link ProducingConfig}). A session of its own is opened from one with
+ *   {@link ProduceSession.forkSession}, and is declared before the parts it produces;
+ *   every part enqueued is produced in the session that enqueued it, in the order the
+ *   program enqueued it.
  * - The producers the metric kit was provided with are run over the parts as they
  *   are produced, exactly as {@link Metric.produce} runs them, and the metric parts
  *   they derive are produced among the parts they are about. The parts are read once,
@@ -592,10 +695,10 @@ type ProduceFn<
  *   trajectory is read while the program that writes it runs. The trajectory ends
  *   where the program does, and a program that fails fails the trajectory it left,
  *   since no more of it can arrive.
- * - Creating a session fails rather than producing a trajectory no reader can reach:
- *   an `id` a session has already declared would be declared after the parts of that
- *   session, and a `fork` naming a part no session continues from has nothing to
- *   continue from — see {@link Producer}.
+ * - Opening a session fails rather than producing a trajectory no reader can reach: an
+ *   `id` a session was already opened under would be declared after the parts of that
+ *   session, and a `fork` naming a part the run has not written has nothing to continue
+ *   from — see {@link ProduceSession.forkSession}.
  *
  * **Example** (Producing a run that answers a prompt)
  *
@@ -604,7 +707,8 @@ type ProduceFn<
  * import { EventKit, ExtraKit, MetricKit, Produce, Prompt, Response, Toolkit, Trajectory } from "@trajs/core"
  *
  * // A kit that names no metric derives nothing of a trajectory, so what the run
- * // produces is the parts it writes and no metric part.
+ * // produces is the declaration of the main session and the parts it writes, and no
+ * // metric part.
  * const metrickit = MetricKit.toProducers(MetricKit.make(), {})
  *
  * const trajectory = Produce.produce(Trajectory.config({
@@ -613,14 +717,10 @@ type ProduceFn<
  *   eventkit: EventKit.empty,
  *   metrickit,
  *   extrakit: ExtraKit.empty
- * }))((producer) =>
+ * }))((main) =>
  *   Effect.gen(function* () {
- *     const session = yield* producer.createSession({
- *       id: "01890a5d-ac96-774b-bcce-b302099a8057"
- *     })
- *
- *     yield* session.enqueuePrompt(Prompt.make("What is 2 + 2?"))
- *     yield* session.enqueueResponse(Response.makePart("text", { text: "4" }))
+ *     yield* main.enqueuePrompt(Prompt.make("What is 2 + 2?"))
+ *     yield* main.enqueueResponse(Response.makePart("text", { text: "4" }))
  *   })
  * )
  *
@@ -628,7 +728,7 @@ type ProduceFn<
  * parts.map((part) => part._tag) // => ["Session", "Prompt", "Response"]
  * ```
  *
- * @see {@link Producer} for what the program is handed.
+ * @see {@link ProduceSession} for what the program is handed.
  * @see {@link fromSession} for a stream that already holds the parts.
  * @see {@link Metric.produce} for what a kit derives of a kind of trajectory.
  * @category constructors
@@ -641,7 +741,8 @@ export function produce<
   Extras extends ExtraKit.Any,
 >(
   id: Id,
-  config: ProducingConfig<Toolkit, Events, Metrics, Extras>,
+  config: ProducingConfig<Toolkit, Events, Metrics, Extras> &
+    Extra.ExtraRecord<Extras["extra"], "session">,
 ): <E, R>(
   fn: ProduceFn<Toolkit["tools"], Events["events"], Extras["extra"], E, R>,
 ) => Trajectory.Trajectory<
@@ -656,7 +757,8 @@ export function produce<
   Metrics extends MetricKit.Any,
   Extras extends ExtraKit.Any,
 >(
-  config: ProducingConfig<Toolkit, Events, Metrics, Extras>,
+  config: ProducingConfig<Toolkit, Events, Metrics, Extras> &
+    Extra.ExtraRecord<Extras["extra"], "session">,
 ): <E, R>(
   fn: ProduceFn<Toolkit["tools"], Events["events"], Extras["extra"], E, R>,
 ) => Trajectory.Trajectory<
@@ -672,8 +774,15 @@ export function produce<
   Extras extends ExtraKit.Any,
 >(
   ...args:
-    | [id: string, config: ProducingConfig<Toolkit, Events, Metrics, Extras>]
-    | [config: ProducingConfig<Toolkit, Events, Metrics, Extras>]
+    | [
+        id: string,
+        config: ProducingConfig<Toolkit, Events, Metrics, Extras> &
+          Extra.ExtraRecord<Extras["extra"], "session">,
+      ]
+    | [
+        config: ProducingConfig<Toolkit, Events, Metrics, Extras> &
+          Extra.ExtraRecord<Extras["extra"], "session">,
+      ]
 ): <E, R>(
   fn: ProduceFn<Toolkit["tools"], Events["events"], Extras["extra"], E, R>,
 ) => Trajectory.Trajectory<
@@ -685,6 +794,10 @@ export function produce<
   const [id, config] = args.length === 1 ? [undefined, args[0]] : args;
   const read = produced(config);
   const part = Trajectory.parts(read);
+
+  // The extra data the kit declares of a session part is stated beside the config, and is
+  // declared with the main session: the one the program is handed.
+  const sessionExtra = Extra.stated(read.extrakit, "session")(config);
 
   return (fn) => {
     // The queue only ever ends rather than fails — a run that fails fails the
@@ -718,44 +831,55 @@ export function produce<
           return written;
         });
 
-      const session = (
-        id: string,
-      ): ProduceSession<Toolkit["tools"], Events["events"], Extras["extra"]> => ({
-        id,
-        enqueuePrompt: (prompt, extra = {}, timestamp) =>
-          enqueue(part.prompt(prompt, { sessionId: id, extra, timestamp })),
-        enqueueResponse: (response, extra = {}, timestamp) =>
-          enqueue(part.response(response, { sessionId: id, extra, timestamp })),
-        enqueueEvent: (event) => enqueue(part.event(event, { sessionId: id })),
-      });
+      const mainDeclaration = part.mainSession(sessionExtra);
 
-      const producer: Producer<Toolkit["tools"], Events["events"], Extras["extra"]> = {
-        createSession: ({ id, fork, ...extra }) =>
+      const session = (
+        /** What the parts of the session state: the id it is named by, and none for the main session. */
+        stated: string | undefined,
+        /** The `uuid` of the declaration of the session, which a session opened from it continues from. */
+        declaration: string,
+      ): ProduceSession<Toolkit["tools"], Events["events"], Extras["extra"]> => ({
+        id: stated ?? Trajectory.mainSessionId,
+        enqueuePrompt: (prompt, extra = {}, timestamp) =>
+          enqueue(part.prompt(prompt, { sessionId: stated, timestamp, ...extra })),
+        enqueueResponse: (response, extra = {}, timestamp) =>
+          enqueue(part.response(response, { sessionId: stated, timestamp, ...extra })),
+        enqueueEvent: (event) => enqueue(part.event(event, { sessionId: stated })),
+        forkSession: ({ id: sessionId, fork, ...extra }) =>
           Effect.gen(function* () {
             // A session is declared before the parts it produces, so a declaration of
-            // an id that a session was declared under already is read after the parts
-            // of that session.
-            if (declared.has(id)) {
-              return yield* Effect.fail(TrajectoryError.session(id, "late-declaration"));
+            // an id a session was opened under already is read after the parts of that
+            // session.
+            if (declared.has(sessionId)) {
+              return yield* Effect.fail(TrajectoryError.session(sessionId, "late-declaration"));
             }
 
-            // A `fork` names a part a session continues from, so a part the run did not
-            // write as one has nothing to continue from.
-            if (fork !== undefined && !forkable.has(fork)) {
-              return yield* Effect.fail(TrajectoryError.session(id, "unproduced-fork"));
+            // A `fork` names a part a session continues from: the declaration of this
+            // session where none is stated, and otherwise a part the run wrote as one.
+            const continuing = fork ?? declaration;
+
+            if (!forkable.has(continuing)) {
+              return yield* Effect.fail(TrajectoryError.session(sessionId, "unproduced-fork"));
             }
 
-            declared.add(id);
+            declared.add(sessionId);
 
             const extraData = Extra.stated(read.extrakit, "session")(extra);
 
-            yield* enqueue(part.session(id, { fork, extra: extraData }));
+            const opened = yield* enqueue(
+              part.subSession(sessionId, { fork: continuing, ...extraData }),
+            );
 
-            return session(id);
+            return session(sessionId, opened.uuid);
           }),
-      };
+      });
 
-      const program = fn(producer).pipe(
+      // The main session is declared before the program runs, so every part it writes is
+      // read in a session the trajectory already names.
+      yield* enqueue(mainDeclaration);
+      declared.add(Trajectory.mainSessionId);
+
+      const program = fn(session(undefined, mainDeclaration.uuid)).pipe(
         Effect.onExit((exit) =>
           Exit.isSuccess(exit) ? Queue.end(parts).pipe(Effect.asVoid) : Effect.void,
         ),

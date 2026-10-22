@@ -52,7 +52,8 @@ conversation.
 
 Reading a trajectory this way needs the sessions it declares, so a trajectory whose
 sessions cannot be read fails the way one read by `@trajs/core` does: an unproduced
-fork, or a late declaration, is what reading one here fails with.
+fork, a late declaration, or a session no session part declares, is what reading one
+here fails with.
 
 ## Development
 

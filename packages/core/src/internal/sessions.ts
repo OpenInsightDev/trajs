@@ -14,21 +14,24 @@ import {
 } from "@trajs/utils/ByteStore";
 import { Effect, Option, Scope, Stream } from "effect";
 
+import type * as Extra from "#/Extra.ts";
 import { cached } from "#/internal/cache.ts";
 import type { EncodingServices, Readable } from "#/internal/parts.ts";
 import type * as Session from "#/Session.ts";
-import type * as Trajectory from "#/Trajectory.ts";
+import * as Trajectory from "#/Trajectory.ts";
 import { TrajectoryError } from "#/TrajectoryError.ts";
 
 /**
  * What the pass over a trajectory remembers of one session: where it sits among the others —
- * the declaration that names it, and the fork that places it.
+ * the declaration that names it, the fork that places it, and the extra data it states.
  */
-interface Recorded {
+interface Recorded<Config extends Trajectory.AnyConfig> {
   /** The `uuid` of the part that declared the session, where the trajectory declares it. */
   declaration?: string;
   /** The session it continues from, and the part of it it continues from, where a declaration reads a `fork`. */
   fork?: Session.Fork;
+  /** The extra data the declaration of the session states, where the trajectory declares it. */
+  extra?: Extra.ExtraRecord<Config["extrakit"]["extra"], "session">;
 }
 
 /**
@@ -41,14 +44,14 @@ interface Recorded {
  */
 const recordedIn = <Config extends Trajectory.AnyConfig, E, R>(
   trajectory: Trajectory.Trajectory<string, Config, E, R>,
-): Effect.Effect<ReadonlyMap<string, Recorded>, E | TrajectoryError, R> =>
+): Effect.Effect<ReadonlyMap<string, Recorded<Config>>, E | TrajectoryError, R> =>
   Effect.gen(function* () {
     /** The sessions each part a session continues from was produced in, by the part's `uuid`. */
     const producing = new Map<string, string>();
     /** The sessions a part was read for, by id: what a declaration read after one of them fails with. */
     const named = new Set<string>();
     /** What is remembered of each session the trajectory names, by id, in the order it named them. */
-    const recorded = new Map<string, Recorded>();
+    const recorded = new Map<string, Recorded<Config>>();
 
     /**
      * The session and the part a `fork` continues from: a fork names a part the trajectory holds by
@@ -69,24 +72,27 @@ const recordedIn = <Config extends Trajectory.AnyConfig, E, R>(
     const record = (part: Trajectory.Part<Config>): Effect.Effect<void, TrajectoryError> =>
       Effect.gen(function* () {
         if (part._tag === "Session") {
+          const id = part.type.id;
+
           // A session declared again is read where it first was declared.
-          if (recorded.get(part.id)?.declaration !== undefined) {
+          if (recorded.get(id)?.declaration !== undefined) {
             return;
           }
 
           // A session is declared before the parts it produced, so a declaration read after one of
           // them is a trajectory whose sessions cannot be read.
-          if (named.has(part.id)) {
-            return yield* Effect.fail(TrajectoryError.session(part.id, "late-declaration"));
+          if (named.has(id)) {
+            return yield* Effect.fail(TrajectoryError.session(id, "late-declaration"));
           }
 
-          recorded.set(part.id, {
+          recorded.set(id, {
             declaration: part.uuid,
-            fork: part.fork === undefined ? undefined : yield* continuing(part.id, part.fork),
+            fork: part.type._tag === "sub" ? yield* continuing(id, part.type.fork) : undefined,
+            extra: part.extra,
           });
 
           // A fork names a part a session continues from, and a declaration is one of them.
-          producing.set(part.uuid, part.id);
+          producing.set(part.uuid, id);
 
           return;
         }
@@ -96,21 +102,33 @@ const recordedIn = <Config extends Trajectory.AnyConfig, E, R>(
           return;
         }
 
-        if (!recorded.has(part.sessionId)) {
-          recorded.set(part.sessionId, {});
+        // The main session is the one a part belongs to that states no session of its own.
+        const id = part.sessionId ?? Trajectory.mainSessionId;
+
+        if (!recorded.has(id)) {
+          recorded.set(id, {});
         }
 
-        named.add(part.sessionId);
+        named.add(id);
 
         // A fork names a part it continues from by `uuid` rather than by session, so the session
         // that produced each part is remembered — the prompt, response and session parts, and not
         // the events a kit produces beside them.
         if (part._tag !== "Event") {
-          producing.set(part.uuid, part.sessionId);
+          producing.set(part.uuid, id);
         }
       });
 
     yield* trajectory.pipe(Stream.runForEach(record));
+
+    // A session of its own is read only from the part that declares it, so a part naming one the
+    // trajectory does not declare is a session no reader can place. The main session is the one
+    // session read whether or not it is declared.
+    for (const id of named) {
+      if (id !== Trajectory.mainSessionId && recorded.get(id)?.declaration === undefined) {
+        return yield* Effect.fail(TrajectoryError.session(id, "undeclared-session"));
+      }
+    }
 
     return recorded;
   });
@@ -126,7 +144,7 @@ const recordedIn = <Config extends Trajectory.AnyConfig, E, R>(
  */
 const streamOf = <Config extends Trajectory.AnyConfig, E>(
   trajectory: Trajectory.Trajectory<string, Config, E, never>,
-  recorded: ReadonlyMap<string, Recorded>,
+  recorded: ReadonlyMap<string, Recorded<Config>>,
   id: string,
 ): Session.SessionStream<Config, E> =>
   Stream.suspend(() => {
@@ -175,7 +193,9 @@ const streamOf = <Config extends Trajectory.AnyConfig, E>(
       // A declaration names the session it declares rather than the one it was produced in, and is
       // not a part of that session — only what a metric part may be attached to.
       if (part._tag === "Session") {
-        if (!ends.has(part.id)) {
+        const declared = part.type.id;
+
+        if (!ends.has(declared)) {
           return false;
         }
 
@@ -183,8 +203,8 @@ const streamOf = <Config extends Trajectory.AnyConfig, E>(
 
         // A session continuing from a declaration continues from none of the parts of the session
         // it names, so a session continued from that far contributes nothing.
-        if (ends.get(part.id) === part.uuid) {
-          ended.add(part.id);
+        if (ends.get(declared) === part.uuid) {
+          ended.add(declared);
         }
 
         return false;
@@ -195,14 +215,17 @@ const streamOf = <Config extends Trajectory.AnyConfig, E>(
         return part.metric.data.attach.some((attached) => held.has(attached));
       }
 
-      if (!ends.has(part.sessionId) || ended.has(part.sessionId)) {
+      // The main session is the one a part belongs to that states no session of its own.
+      const produced = part.sessionId ?? Trajectory.mainSessionId;
+
+      if (!ends.has(produced) || ended.has(produced)) {
         return false;
       }
 
       held.add(part.uuid);
 
-      if (ends.get(part.sessionId) === part.uuid) {
-        ended.add(part.sessionId);
+      if (ends.get(produced) === part.uuid) {
+        ended.add(produced);
       }
 
       return true;
@@ -224,10 +247,11 @@ const sessionsOf = <Config extends Trajectory.AnyConfig, E>(
 
     const sessions: Record<string, Session.Session<Config, E | TrajectoryError>> = {};
 
-    for (const id of recorded.keys()) {
+    for (const [id, recordedOf] of recorded) {
       sessions[id] = {
         id,
-        forkedFrom: Option.fromUndefinedOr(recorded.get(id)?.fork),
+        forkedFrom: Option.fromUndefinedOr(recordedOf.fork),
+        extra: recordedOf.extra ?? {},
         stream: streamOf(trajectory, recorded, id),
       };
     }

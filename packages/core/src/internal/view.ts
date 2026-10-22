@@ -16,7 +16,7 @@ import { Prompt } from "effect/ai";
 import { collapse, initial, type State } from "#/internal/folding.ts";
 import type * as Response from "#/Response.ts";
 import type * as Session from "#/Session.ts";
-import type * as Trajectory from "#/Trajectory.ts";
+import * as Trajectory from "#/Trajectory.ts";
 import { TrajectoryError } from "#/TrajectoryError.ts";
 import type { Conversation, PromptTurn, ToolTurn } from "#/View.ts";
 
@@ -54,12 +54,18 @@ const assemble = <Config extends Trajectory.AnyConfig>(
       const open = assembly.turn;
 
       // A response is on the turn the prompt before it opened; one no prompt precedes is on no
-      // turn, and is dropped.
-      if (Option.isNone(open) || open.value.prompt.sessionId !== part.sessionId) {
+      // turn, and is dropped. A part that states no session belongs to the main session, as one
+      // stating `"main"` does.
+      const session = part.sessionId ?? Trajectory.mainSessionId;
+
+      if (
+        Option.isNone(open) ||
+        (open.value.prompt.sessionId ?? Trajectory.mainSessionId) !== session
+      ) {
         return [assembly, []];
       }
 
-      const [folding, folded] = collapse(assembly.folding, part.sessionId, part.response);
+      const [folding, folded] = collapse(assembly.folding, session, part.response);
       const response = [...open.value.response, ...folded];
 
       return [{ turn: Option.some({ prompt: open.value.prompt, response }), folding }, []];

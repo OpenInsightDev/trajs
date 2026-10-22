@@ -95,7 +95,7 @@ type Props<
  *     () => [],
  *     (all, part) => {
  *       if (part._tag === "Session") {
- *         all.push(part.id)
+ *         all.push(part.type.id)
  *       }
  *
  *       return all
@@ -103,13 +103,15 @@ type Props<
  *   )
  * })
  *
- * const trajectory = Stream.make(part.session("asking"), part.session("replying"))
+ * const main = part.mainSession()
+ *
+ * const trajectory = Stream.make(main, part.subSession("replying", { fork: main.uuid }))
  *
  * const read = Effect.gen(function*() {
  *   return yield* Stream.run(trajectory, yield* ids)
  * })
  *
- * await Effect.runPromise(read) // => ["asking", "replying"]
+ * await Effect.runPromise(read) // => ["main", "replying"]
  * ```
  *
  * @see {@link Trajectory.anyConfig} for the config an index of any trajectory is

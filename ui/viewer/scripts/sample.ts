@@ -6,9 +6,9 @@
  * and the viewer is opened without any of them, so the one it opens by default is
  * written here: the parts are built with `@trajs/core`'s own constructors and the
  * exchange turns them into the bytes a `.trajs` file holds. What it holds is what
- * the viewer has to be able to show — two sessions declared as roots, one of them
- * forked mid-conversation, and the turns each of them ran — rather than anything
- * a model said.
+ * the viewer has to be able to show — the main session of a trajectory, the sessions
+ * forked mid-conversation from it, and one forked from where it was declared — rather
+ * than anything a model said.
  *
  * Run it from this directory with `vp run sample`.
  */
@@ -27,8 +27,8 @@ type Streamed = Response.AllPartsView<{}>;
 
 type Answered = Response.PartView<{}>;
 
-/** The ids the trajectory names its sessions by. */
-const planning = "planning";
+/** The ids the trajectory names its sessions by: the main session, and the ones forked. */
+const planning = Trajectory.mainSessionId;
 
 const followUp = "follow-up";
 
@@ -67,8 +67,12 @@ const nextUuid = (): string => `01890000-0000-7000-8000-${String(++counted).padS
 const promptPart = (prompt: Prompt.Prompt, sessionId: string) =>
   part.prompt(prompt, { sessionId, uuid: nextUuid() });
 
-/** A session, as the trajectory declares it, written the same way. */
-const sessionPart = (id: string, fork?: string) => part.session(id, { fork, uuid: nextUuid() });
+/** The declaration of the main session, written the same way. */
+const mainSessionPart = () => part.mainSession({ uuid: nextUuid() });
+
+/** A session of its own, as the trajectory declares it: continuing from the part given. */
+const subSessionPart = (id: string, fork: string) =>
+  part.subSession(id, { fork, uuid: nextUuid() });
 
 /**
  * The moment a part is written at, one second after the part before it: a response
@@ -169,9 +173,12 @@ const openingAnswer = [
   increment(planning, stopped(1_284, 266)),
 ];
 
+// The main session, which the parts of the viewer's first conversation belong to.
+const main = mainSessionPart();
+
 // The session forked off the one above, at the part its first turn ended with: it
 // continues there rather than repeating the turn, which is what a fork is.
-const forked = sessionPart(followUp, openingAnswer[openingAnswer.length - 1].uuid);
+const forked = subSessionPart(followUp, openingAnswer[openingAnswer.length - 1].uuid);
 
 const carriedOn = promptPart(
   Prompt.make("And what does a fork hold of the session it continues from?"),
@@ -198,7 +205,7 @@ const carriedOnAnswer = [
 
 // A fork of the fork: what a session inherited is read through the session it
 // continues from, so a conversation inherited twice over is read back that far.
-const clarifying = sessionPart(clarify, carriedOnAnswer[carriedOnAnswer.length - 1].uuid);
+const clarifying = subSessionPart(clarify, carriedOnAnswer[carriedOnAnswer.length - 1].uuid);
 
 const askedAgain = promptPart(Prompt.make("And a fork of a fork?"), clarify);
 
@@ -234,9 +241,11 @@ const closingAnswer = [
   produced(planning, stopped(1_712, 96)),
 ];
 
-// A second root: a trajectory is not one conversation, and a viewer that shows one
-// session at a time still has to show what else the trajectory holds.
-const asking = sessionPart(review);
+// A conversation of its own: a trajectory is not one session, and a viewer that shows
+// one at a time still has to show what else the trajectory holds — so this one
+// continues from where the main session was declared, which starts it at the
+// beginning rather than part-way through.
+const asking = subSessionPart(review, main.uuid);
 
 const question = promptPart(
   Prompt.make("Does the viewer need the toolkit a trajectory names?"),
@@ -297,7 +306,7 @@ const answeredAnswer = [
 
 /** The trajectory's parts in the one order the exchange carries them in. */
 const parts = [
-  sessionPart(planning),
+  main,
   opening,
   ...openingAnswer,
   forked,

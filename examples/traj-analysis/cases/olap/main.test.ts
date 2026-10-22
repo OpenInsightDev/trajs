@@ -140,13 +140,15 @@ const main = () =>
     `;
 
     // How many turns a session was asked on average: the prompts of a session are counted before they
-    // are averaged, so the answer is prompts a session rather than prompts a row.
+    // are averaged, so the answer is prompts a session rather than prompts a row. A session is one of
+    // a trajectory — the main session every trajectory has is named `main` by each of them — so the
+    // rows of a session are grouped by the trajectory it is of as well.
     const [sessions] = yield* ch<{ prompts: number }>`
       SELECT round(avg(prompts), 3) AS prompts
       FROM (
-        SELECT session_id, countIf(tag = 'Prompt') AS prompts
+        SELECT trajectory_id, session_id, countIf(tag = 'Prompt') AS prompts
         FROM parts
-        GROUP BY session_id
+        GROUP BY trajectory_id, session_id
       )
     `;
 

@@ -25,8 +25,8 @@ import { expect, it } from "vite-plus/test";
 import { Client, layerEmbedded } from "#/Clickhouse.ts";
 import * as Parts from "#/Parts.ts";
 
-/** The session the trajectory runs in. */
-const session = "01890a5d-ac96-774b-bcce-b302099a8057";
+/** The session the trajectory runs in: the main one, which a part that states none belongs to. */
+const session = Trajectory.mainSessionId;
 
 /** No extra data is declared, since none of it is stated of the parts below. */
 const extrakit = ExtraKit.empty;
@@ -51,11 +51,8 @@ const at = DateTime.makeUnsafe("2026-01-01T00:00:00.000Z");
 
 /** The parts of a short conversation, in the one order a trajectory carries them in. */
 const parts = [
-  part.session(session),
-  part.prompt(Prompt.make("what is the weather in SF"), {
-    sessionId: session,
-    timestamp: at,
-  }),
+  part.mainSession(),
+  part.prompt(Prompt.make("what is the weather in SF"), { timestamp: at }),
   part.response(
     Response.anyToolCallPart({
       id: "call_1",
@@ -63,7 +60,7 @@ const parts = [
       params: { city: "SF" },
       providerExecuted: false,
     }),
-    { sessionId: session, timestamp: at },
+    { timestamp: at },
   ),
   part.response(
     Response.makePart("finish", {
@@ -73,7 +70,7 @@ const parts = [
         outputTokens: { total: 7 },
       }),
     }),
-    { sessionId: session, timestamp: at },
+    { timestamp: at },
   ),
 ];
 
