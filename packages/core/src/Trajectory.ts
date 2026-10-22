@@ -3,7 +3,8 @@
  *
  * A trajectory is one stream of parts in total order — the prompts a model was
  * given, the responses it returned, the session each was produced in, and the events
- * and metrics a kit produced of them — with what those parts are read with.
+ * and metrics a kit produced of them — with what those parts are read with and the id
+ * it is named by.
  * {@link Trajectory} is that stream, {@link TrajectoryStream} one stating nothing of
  * itself, {@link Part} a part of a config, and {@link merge} reads two trajectories
  * as one. What the parts of it name is read apart from that order by
@@ -20,7 +21,7 @@
  */
 
 import { type ByteStore, type ByteStoreError } from "@trajs/utils/ByteStore";
-import { DateTime, Effect, Function, Option, Schema, Stream } from "effect";
+import { DateTime, Effect, Option, Schema, Stream } from "effect";
 
 import * as Event from "#/Event.ts";
 import * as EventKit from "#/EventKit.ts";
@@ -29,7 +30,7 @@ import * as ExtraKit from "#/ExtraKit.ts";
 import type { EncodingServices, Readable } from "#/internal/parts.ts";
 import { Timestamp, Uuid } from "#/internal/schema.ts";
 import { read, readCached } from "#/internal/sessions.ts";
-import { attach } from "#/internal/trajectory.ts";
+import { attach, uuid } from "#/internal/trajectory.ts";
 import type { Select } from "#/internal/types.ts";
 import * as Metric from "#/Metric.ts";
 import * as MetricKit from "#/MetricKit.ts";
@@ -867,8 +868,8 @@ export type TrajectoryStream<Config extends AnyConfig, E = never, R = never> = S
 >;
 
 /**
- * A trajectory: the parts of a trajectory as one stream, carrying what they are read
- * with.
+ * A trajectory: the parts of a trajectory as one stream, the id it is named by, and what
+ * they are read with.
  *
  * **When to use**
  *
@@ -877,23 +878,36 @@ export type TrajectoryStream<Config extends AnyConfig, E = never, R = never> = S
  *
  * **Details**
  *
- * The `stream`, `toolkit`, `eventkit`, `metrickit` and `extrakit` a trajectory is
- * read with are the {@link Config} its parts are read with, and it carries that
- * config rather than stating it beside the parts: a function handed a trajectory has
- * the kits its parts were read by, and reads the extra data of a part without the
- * caller naming them again. The parts are read as they arrive rather than held whole,
- * so what a trajectory holds is read once, while the config is readable without
- * reading any of it.
+ * - `id` is the id the trajectory is named by. It is stated where the trajectory is made
+ *   ({@link make}, {@link merge}, and the constructors of `Produce`), and a trajectory
+ *   none is stated for is named by a new uuid — one read out of a storage included, since
+ *   the bytes of a trajectory state no id of their own. `Id` is the type of that id,
+ *   `string` for a trajectory made without a name of its own.
+ * - The `stream`, `toolkit`, `eventkit`, `metrickit` and `extrakit` a trajectory is
+ *   read with are the {@link Config} its parts are read with, and it carries that
+ *   config rather than stating it beside the parts: a function handed a trajectory has
+ *   the kits its parts were read by, and reads the extra data of a part without the
+ *   caller naming them again. The parts are read as they arrive rather than held whole,
+ *   so what a trajectory holds is read once, while the config and the id are readable
+ *   without reading any of it.
  *
  * @see {@link TrajectoryStream} for the parts of a trajectory alone.
  * @see {@link Exchange.Service.read} for reading a trajectory as one.
  * @category models
  */
-export type Trajectory<Config extends AnyConfig, E, R> = TrajectoryStream<Config, E, R> &
-  Readonly<Config>;
+export type Trajectory<
+  Id extends string = string,
+  Config extends AnyConfig = AnyConfig,
+  E = never,
+  R = never,
+> = TrajectoryStream<Config, E, R> &
+  Readonly<Config> & {
+    readonly id: Id;
+  };
 
 /**
- * Makes a trajectory of the parts a stream gives, carrying what they are read with.
+ * Makes a trajectory of the parts a stream gives, named by an id and carrying what they
+ * are read with.
  *
  * **When to use**
  *
@@ -903,11 +917,13 @@ export type Trajectory<Config extends AnyConfig, E, R> = TrajectoryStream<Config
  *
  * **Details**
  *
- * - It is stated in both call styles, as the `dual` APIs of `effect` are: given the
- *   two at once the stream comes first, as the data an operation is of, and bound one
- *   at a time the config is bound first, so a stream of parts is piped into what is
- *   left — `Trajectory.make(stream, config)` and `stream.pipe(Trajectory.make(config))`
- *   are the same call.
+ * - The trajectory's own terms are bound first and what it is made of lies in what is
+ *   left, as every constructor of this module states them: `make(id, config)` and
+ *   `make(config)` both return the function of the stream that a stream of parts is piped
+ *   into.
+ * - A trajectory made without an id is named by a new uuid, generated where the stream is
+ *   bound ({@link Trajectory}); given an id it is named by that one, so a fixture is named
+ *   by what it is of rather than by a name of its own.
  * - What a part reads as is the config's, so the parts a stream gives are judged
  *   against the config given ({@link Part}).
  * - The stream is not read here: it is the trajectory's parts as given, with the
@@ -941,32 +957,43 @@ export type Trajectory<Config extends AnyConfig, E, R> = TrajectoryStream<Config
  * )
  *
  * // The config bound alone is a function of the stream, which is what a stream of
- * // parts is piped into — and given the two at once, the stream comes first.
- * const piped = stream.pipe(Trajectory.make(config))
- * const made = Trajectory.make(stream, config)
+ * // parts is piped into — and a name bound before it is the id the trajectory carries.
+ * const unnamed = Trajectory.make(config)(stream)
+ * const named = stream.pipe(Trajectory.make("01890a5d-ac96-774b-bcce-b302099a8057", config))
  *
- * const read = Array.from(await Effect.runPromise(Stream.runCollect(piped)))
+ * const read = Array.from(await Effect.runPromise(Stream.runCollect(named)))
  * read.map((part) => part._tag) // => ["Prompt"]
- * made.stream // => true
- * made.extrakit === extrakit // => true
+ * named.id // => "01890a5d-ac96-774b-bcce-b302099a8057"
+ * named.stream // => true
+ * named.extrakit === extrakit // => true
+ * unnamed.id.length // => 36
  * ```
  *
- * @see {@link Trajectory} for what a trajectory is.
+ * @see {@link Trajectory} for what a trajectory is, the id among it.
  * @see {@link Config} for what it is read with.
  * @see {@link Exchange.Service.save} for writing the trajectory made.
  * @category constructors
  */
-export const make = Function.dual<
-  <Config extends AnyConfig>(
-    config: Config,
-  ) => <E, R>(stream: TrajectoryStream<Config, E, R>) => Trajectory<Config, E, R>,
-  <Config extends AnyConfig, E, R>(
-    stream: TrajectoryStream<Config, E, R>,
-    config: Config,
-  ) => Trajectory<Config, E, R>
->(2, <Config extends AnyConfig, E, R>(stream: TrajectoryStream<Config, E, R>, config: Config) =>
-  attach(config)(stream),
-);
+export function make<Id extends string, Config extends AnyConfig>(
+  id: Id,
+  config: Config,
+): <E, R>(stream: TrajectoryStream<Config, E, R>) => Trajectory<Id, Config, E, R>;
+export function make<Config extends AnyConfig>(
+  config: Config,
+): <E, R>(stream: TrajectoryStream<Config, E, R>) => Trajectory<string, Config, E, R>;
+export function make<Config extends AnyConfig>(
+  ...args: [id: string, config: Config] | [config: Config]
+): <E, R>(stream: TrajectoryStream<Config, E, R>) => Trajectory<string, Config, E, R> {
+  if (args.length === 1) {
+    const [config] = args;
+
+    return attach(undefined, config);
+  }
+
+  const [id, config] = args;
+
+  return attach(id, config);
+}
 
 /**
  * The session a session continues from, and the part of it that it continues from.
@@ -1139,15 +1166,14 @@ export type Sessions<Config extends AnyConfig, E = never, R = never> = Readonly<
  *   { sessionId: "asking" }
  * )
  *
- * const trajectory = Trajectory.make(
+ * const trajectory = Trajectory.make(Trajectory.anyConfig)(
  *   Stream.make(
  *     part.session("asking"),
  *     asked,
  *     answered,
  *     part.session("reply", { fork: answered.uuid }),
  *     part.prompt(Prompt.make("And what does it hold?"), { sessionId: "reply" })
- *   ),
- *   Trajectory.anyConfig
+ *   )
  * )
  *
  * const sessions = await Effect.runPromise(Trajectory.toSessions(trajectory))
@@ -1169,7 +1195,7 @@ export type Sessions<Config extends AnyConfig, E = never, R = never> = Readonly<
  * @category constructors
  */
 export const toSessions = <Config extends AnyConfig, E, R>(
-  trajectory: Trajectory<Config, E, R> & Readable<Config>,
+  trajectory: Trajectory<string, Config, E, R> & Readable<Config>,
 ): Effect.Effect<
   Sessions<Config, TrajectoryError | ByteStoreError>,
   E | TrajectoryError | ByteStoreError,
@@ -1212,14 +1238,13 @@ export const toSessions = <Config extends AnyConfig, E, R>(
  *
  * const part = Trajectory.parts(Trajectory.anyConfig)
  *
- * const trajectory = Trajectory.make(
+ * const trajectory = Trajectory.make(Trajectory.anyConfig)(
  *   Stream.make(
  *     part.prompt(Prompt.make("What is a fork?"), { sessionId: "asking" }),
  *     part.response(Response.makePart("text", { text: "A session that continues another." }), {
  *       sessionId: "asking"
  *     })
- *   ),
- *   Trajectory.anyConfig
+ *   )
  * )
  *
  * const sessions = await Effect.runPromise(
@@ -1271,14 +1296,13 @@ export const toSessions = <Config extends AnyConfig, E, R>(
  *
  * const part = Trajectory.parts(Trajectory.anyConfig)
  *
- * const trajectory = Trajectory.make(
+ * const trajectory = Trajectory.make(Trajectory.anyConfig)(
  *   Stream.make(
  *     part.prompt(Prompt.make("What is a fork?"), { sessionId: "asking" }),
  *     part.response(Response.makePart("text", { text: "A session that continues another." }), {
  *       sessionId: "asking"
  *     })
- *   ),
- *   Trajectory.anyConfig
+ *   )
  * )
  *
  * const sessions = await Effect.runPromise(
@@ -1294,7 +1318,7 @@ export const toSessions = <Config extends AnyConfig, E, R>(
  * @category constructors
  */
 export const toSessionsCached = <Config extends AnyConfig, E, R>(
-  trajectory: Trajectory<Config, E, R> & Readable<Config>,
+  trajectory: Trajectory<string, Config, E, R> & Readable<Config>,
 ): Effect.Effect<
   Sessions<Config, TrajectoryError | ByteStoreError>,
   E | TrajectoryError | ByteStoreError,
@@ -1322,12 +1346,11 @@ export const toSessionsCached = <Config extends AnyConfig, E, R>(
  *
  * const part = Trajectory.parts(Trajectory.anyConfig)
  *
- * const trajectory = Trajectory.make(
+ * const trajectory = Trajectory.make(Trajectory.anyConfig)(
  *   Stream.make(
  *     part.session("asking"),
  *     part.prompt(Prompt.make("What is a fork?"), { sessionId: "asking" })
- *   ),
- *   Trajectory.anyConfig
+ *   )
  * )
  *
  * const sessions = await Effect.runPromise(Trajectory.toSessions(trajectory))
@@ -1382,8 +1405,8 @@ export type MergedConfig<Left extends AnyConfig, Right extends AnyConfig> = Conf
 >;
 
 /**
- * Merges two trajectories into one: the parts of the left, then the parts of the
- * right, read with the kits of both.
+ * Merges two trajectories into one, named by an id: the parts of the left, then the parts
+ * of the right, read with the kits of both.
  *
  * **When to use**
  *
@@ -1394,6 +1417,9 @@ export type MergedConfig<Left extends AnyConfig, Right extends AnyConfig> = Conf
  *
  * **Details**
  *
+ * - The id is bound before the two trajectories, as the terms of a trajectory are bound
+ *   before what it is made of: `merge(id)` returns the function the two are merged by,
+ *   and `merge(left, right)` is the same call named by a new uuid ({@link Trajectory}).
  * - The parts of the left arrive before the parts of the right, and neither is
  *   rewritten: a part is carried as it is, so what the merged trajectory is read with
  *   is added to rather than chosen between ({@link MergedConfig}), and the reading
@@ -1433,13 +1459,14 @@ export type MergedConfig<Left extends AnyConfig, Right extends AnyConfig> = Conf
  *     Trajectory.parts(config).prompt(Prompt.make(content), { sessionId })
  *   ))
  *
- * const merged = Trajectory.merge(
+ * const merged = Trajectory.merge("01890a5d-ac96-774b-bcce-b302099a8058")(
  *   half("What is 2 + 2?"),
  *   half("And 2 + 3?")
  * )
  *
  * const parts = Array.from(await Effect.runPromise(Stream.runCollect(merged)))
  * parts.map((part) => part._tag) // => ["Prompt", "Prompt"]
+ * merged.id // => "01890a5d-ac96-774b-bcce-b302099a8058"
  * merged.stream // => true
  * ```
  *
@@ -1447,15 +1474,51 @@ export type MergedConfig<Left extends AnyConfig, Right extends AnyConfig> = Conf
  * @see {@link EventKit.merge} for how the kits of the two are added to each other.
  * @category combinators
  */
-export const merge = <Left extends AnyConfig, Right extends AnyConfig, E, R, E2, R2>(
-  left: Trajectory<Left, E, R>,
-  right: Trajectory<Right, E2, R2>,
-): Trajectory<MergedConfig<Left, Right>, E | E2, R | R2> => {
+export function merge<Id extends string>(
+  id: Id,
+): <Left extends AnyConfig, Right extends AnyConfig, E, R, E2, R2>(
+  left: Trajectory<string, Left, E, R>,
+  right: Trajectory<string, Right, E2, R2>,
+) => Trajectory<Id, MergedConfig<Left, Right>, E | E2, R | R2>;
+export function merge<Left extends AnyConfig, Right extends AnyConfig, E, R, E2, R2>(
+  left: Trajectory<string, Left, E, R>,
+  right: Trajectory<string, Right, E2, R2>,
+): Trajectory<string, MergedConfig<Left, Right>, E | E2, R | R2>;
+export function merge<Left extends AnyConfig, Right extends AnyConfig, E, R, E2, R2>(
+  ...args:
+    | [id: string]
+    | [left: Trajectory<string, Left, E, R>, right: Trajectory<string, Right, E2, R2>]
+):
+  | ((
+      left: Trajectory<string, Left, E, R>,
+      right: Trajectory<string, Right, E2, R2>,
+    ) => Trajectory<string, MergedConfig<Left, Right>, E | E2, R | R2>)
+  | Trajectory<string, MergedConfig<Left, Right>, E | E2, R | R2> {
+  if (args.length === 1) {
+    const [id] = args;
+
+    return (left, right) => merged(id, left, right);
+  }
+
+  const [left, right] = args;
+
+  return merged(uuid(), left, right);
+}
+
+/**
+ * The trajectory the two trajectories given merge into, named by `id`: what {@link merge}
+ * states once for both of its call styles.
+ */
+const merged = <Id extends string, Left extends AnyConfig, Right extends AnyConfig, E, R, E2, R2>(
+  id: Id,
+  left: Trajectory<string, Left, E, R>,
+  right: Trajectory<string, Right, E2, R2>,
+): Trajectory<Id, MergedConfig<Left, Right>, E | E2, R | R2> => {
   // The config is the one `MergedConfig` reads off the two trajectories — a kit is each
   // kit's own merge of the two, and the variant is the one either of them streams in —
   // so what is merged is a trajectory of that config, and the parts of the two are
   // what a trajectory of it holds.
-  const merged = config({
+  const stated = config({
     stream: left.stream || right.stream,
     toolkit: Toolkit.merge(left.toolkit, right.toolkit),
     eventkit: EventKit.merge(left.eventkit, right.eventkit),
@@ -1463,11 +1526,11 @@ export const merge = <Left extends AnyConfig, Right extends AnyConfig, E, R, E2,
     extrakit: ExtraKit.merge(left.extrakit, right.extrakit),
   });
 
-  // SAFETY: the parts merged are those of both, which `merged` reads as such: the parts of
-  // a trajectory whose response parts are whole are members of the streaming schema too,
-  // and a merged trajectory that streams states nothing of the parts of one that does not.
+  // SAFETY: the parts merged are those of both, which `stated` reads as such: the parts of a
+  // trajectory whose response parts are whole are members of the streaming schema too, and a
+  // merged trajectory that streams states nothing of the parts of one that does not.
   return make(
-    Stream.concat(left, right) as TrajectoryStream<MergedConfig<Left, Right>, E | E2, R | R2>,
-    merged,
-  );
+    id,
+    stated,
+  )(Stream.concat(left, right) as TrajectoryStream<MergedConfig<Left, Right>, E | E2, R | R2>);
 };

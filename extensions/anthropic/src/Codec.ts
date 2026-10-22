@@ -167,7 +167,7 @@ export type AnthropicSessions = Record<string, AnthropicConversation>;
  *   )
  * ]
  *
- * const trajectory = Trajectory.make(Stream.fromIterable(parts), config)
+ * const trajectory = Trajectory.make(config)(Stream.fromIterable(parts))
  *
  * const sessions = await Effect.runPromise(Trajectory.toSessions(trajectory))
  * const conversations = await Effect.runPromise(Codec.makeAnthropic(sessions))

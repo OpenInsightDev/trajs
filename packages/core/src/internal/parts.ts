@@ -23,6 +23,7 @@ import { SchemaBinary } from "effect/encoding";
 import type * as ExtraKit from "#/ExtraKit.ts";
 import { foldParts } from "#/internal/folding.ts";
 import { readFrames } from "#/internal/frames.ts";
+import { uuid } from "#/internal/trajectory.ts";
 import * as Prompt from "#/Prompt.ts";
 import * as Trajectory from "#/Trajectory.ts";
 import { TrajectoryError } from "#/TrajectoryError.ts";
@@ -222,7 +223,7 @@ const PromptPartTagged = <K extends ExtraKit.Any>(extrakit: K) =>
  * rather than declared beside it.
  */
 export const configOf = <C extends Trajectory.AnyConfig, E, R>(
-  trajectory: Trajectory.Trajectory<C, E, R>,
+  trajectory: Trajectory.Trajectory<string, C, E, R>,
 ) => ({
   stream: trajectory.stream,
   toolkit: trajectory.toolkit,
@@ -235,14 +236,18 @@ export const configOf = <C extends Trajectory.AnyConfig, E, R>(
  * A reading of the parts of a trajectory, curried out of the bytes a body carries them in: the
  * frame a storage serves, the frame a store keeps and the parts a session is read from are the
  * same bytes of the same trajectory, so what reads them differs in those alone.
+ *
+ * The trajectory a reading makes is named by the id given, or by a new uuid where none is: what
+ * a storage keeps a trajectory under is where it is kept ({@link Exchange.Service.load}), not what
+ * the trajectory it holds is named.
  */
 export const reading =
-  <E, R>(bytes: Stream.Stream<Uint8Array, E, R>) =>
+  <E, R>(bytes: Stream.Stream<Uint8Array, E, R>, id: string = uuid()) =>
   // SAFETY: reading with no config is reading with the kits that name nothing, which
   // is what `Trajectory.anyConfig` is.
   <C extends Trajectory.AnyConfig = Trajectory.AnyConfig>(
     config: C = Trajectory.anyConfig as C,
-  ): Trajectory.Trajectory<C, E | TrajectoryError, R> => {
+  ): Trajectory.Trajectory<string, C, E | TrajectoryError, R> => {
     const parts = asReadable(part(config));
     const frames = readFrames(parts);
     // SAFETY: what a body reads as is the parts of the config it is read with, which is
@@ -254,15 +259,18 @@ export const reading =
     // trajectory is stated as the most general one whatever the config says of itself
     // ({@link part}). So what such a reading yields is those increments folded into the
     // parts they complete, which is what `folding.ts`'s `foldParts` does.
+    //
+    // SAFETY: a folded part is a whole one — `foldParts` states that of its own result —
+    // and the whole parts are what a config that states `stream` off holds, which is the
+    // config read with here.
     return Trajectory.make(
-      // SAFETY: a folded part is a whole one — `foldParts` states that of its own result
-      // — and the whole parts are what a config that states `stream` off holds, which is
-      // the config read with here.
+      id,
+      config,
+    )(
       (config.stream ? read : foldParts(read)) as Stream.Stream<
         Trajectory.Part<C>,
         E | TrajectoryError,
         R
       >,
-      config,
     );
   };

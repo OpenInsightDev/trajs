@@ -1,9 +1,10 @@
 /**
- * The trajectory a stream of parts and a config make: the config stated on the stream
- * its parts arrive in.
+ * The trajectory a stream of parts, a config and an id make: the config stated on the
+ * stream its parts arrive in, and the id the trajectory is named by.
  *
- * A trajectory is its parts together with what they are read with ({@link Trajectory}),
- * so a config is carried by the stream rather than stated beside it.
+ * A trajectory is its parts together with what they are read with and the id it is named
+ * by ({@link Trajectory}), so a config and an id are carried by the stream rather than
+ * stated beside it.
  *
  * It is stated here rather than in `Trajectory` alone because a module `Trajectory`
  * reads as it loads attaches one too ({@link Event.encode}): a value read at load
@@ -13,10 +14,21 @@
  * Nothing here is published: a program reaches it through `Trajectory.make`.
  */
 
+import { v7 as uuidv7 } from "uuid";
+
 import type { AnyConfig, Trajectory, TrajectoryStream } from "#/Trajectory.ts";
 
-/** `config` attached to the stream given, as the trajectory its parts make. */
+/**
+ * The id a trajectory made without one is named by: a version 7 uuid, as every part of a
+ * trajectory is identified by one.
+ */
+export const uuid = (): string => uuidv7();
+
+/**
+ * `config` attached to the stream given under the id given — or under a new uuid where no
+ * id is stated — as the trajectory its parts make.
+ */
 export const attach =
-  <Config extends AnyConfig>(config: Config) =>
-  <E, R>(stream: TrajectoryStream<Config, E, R>): Trajectory<Config, E, R> =>
-    Object.assign(stream, config);
+  <Config extends AnyConfig>(id: string | undefined, config: Config) =>
+  <E, R>(stream: TrajectoryStream<Config, E, R>): Trajectory<string, Config, E, R> =>
+    Object.assign(stream, config, { id: id ?? uuid() });

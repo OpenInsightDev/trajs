@@ -188,7 +188,11 @@ export type EncodingServices<C extends Trajectory.AnyConfig> = Encoding<C>;
  *   A config whose response parts are whole — one that states `stream` off
  *   ({@link Trajectory.NonStreamConfig}) — reads it folded: the bytes carry the
  *   increments a streamed answer arrived in as well as the whole parts they complete,
- *   so what such a reading yields is the whole parts.
+ *   so what such a reading yields is the whole parts. The trajectory it yields is
+ *   named by a new uuid, generated once for the load — every reading of one load is a
+ *   reading of the same trajectory ({@link Trajectory}) — since the id a storage
+ *   keeps a trajectory under is where it is kept rather than what the trajectory is
+ *   named by, and the bytes of a trajectory state no id of their own.
  * - `readCached(config)` reads it the same way, over the bytes a store keeps for it
  *   rather than the storage ({@link Loaded.readCached}).
  *
@@ -246,7 +250,7 @@ export interface Loaded {
    */
   readonly read: <C extends Trajectory.AnyConfig = Trajectory.AnyConfig>(
     config?: C & Readable<C>,
-  ) => Trajectory.Trajectory<C, TrajectoryError | StorageError, never>;
+  ) => Trajectory.Trajectory<string, C, TrajectoryError | StorageError, never>;
 
   /**
    * The trajectory the trajectory holds, read as {@link Loaded.read} reads it, except
@@ -279,7 +283,7 @@ export interface Loaded {
    */
   readonly readCached: <C extends Trajectory.AnyConfig = Trajectory.AnyConfig>(
     config?: C & Readable<C>,
-  ) => Trajectory.Trajectory<C, TrajectoryError | StorageError | ByteStoreError, ByteStore>;
+  ) => Trajectory.Trajectory<string, C, TrajectoryError | StorageError | ByteStoreError, ByteStore>;
 }
 
 /**
@@ -336,7 +340,7 @@ export interface Service {
    * trajectory follows them.
    */
   readonly save: <C extends Trajectory.AnyConfig, E, R>(
-    trajectory: Trajectory.Trajectory<C, E, R>,
+    trajectory: Trajectory.Trajectory<string, C, E, R>,
   ) => (
     id: string,
   ) => Effect.Effect<void, E | TrajectoryError | StorageError, R | EncodingServices<C>>;

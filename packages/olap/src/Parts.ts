@@ -249,6 +249,6 @@ export const write = writeRows;
 export const ingest =
   (digest: string) =>
   <C extends Trajectory.AnyConfig, E, R>(
-    trajectory: Trajectory.Trajectory<C, E, R>,
+    trajectory: Trajectory.Trajectory<string, C, E, R>,
   ): Effect.Effect<number, E | TrajectoryError | SqlError, R | EncodingServices<C> | Client> =>
     rows(digest)(trajectory).pipe(write);

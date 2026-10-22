@@ -259,6 +259,7 @@ export const encode = (
   document: Document,
   options?: Options,
 ): Trajectory.Trajectory<
+  string,
   Trajectory.Config<
     true,
     Toolkit.Any,
@@ -307,6 +308,7 @@ export const fromFile = (
   path: string,
 ): Effect.Effect<
   Trajectory.Trajectory<
+    string,
     Trajectory.Config<true, Toolkit.Any, EventKit.Empty, MetricKit.Empty, typeof extrakit>,
     TrajectoryError | PlatformError.PlatformError,
     FileSystem.FileSystem | Path.Path

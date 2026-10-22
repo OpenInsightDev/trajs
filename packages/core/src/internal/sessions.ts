@@ -47,7 +47,7 @@ const inMemory = (): Effect.Effect<ByteStore> => ByteStore.pipe(Effect.provide(b
  * a trajectory is written with — and the sessions built from what that pass records.
  */
 const stored = <Config extends Trajectory.AnyConfig, E, R>(
-  trajectory: Trajectory.Trajectory<Config, E, R> & Readable<Config>,
+  trajectory: Trajectory.Trajectory<string, Config, E, R> & Readable<Config>,
   store: ByteStore,
 ): Effect.Effect<
   Trajectory.Sessions<Config, TrajectoryError | ByteStoreError>,
@@ -260,7 +260,7 @@ const stored = <Config extends Trajectory.AnyConfig, E, R>(
  * program runs: the store this reading states rather than the one a program provides.
  */
 export const read = <Config extends Trajectory.AnyConfig, E, R>(
-  trajectory: Trajectory.Trajectory<Config, E, R> & Readable<Config>,
+  trajectory: Trajectory.Trajectory<string, Config, E, R> & Readable<Config>,
 ): Effect.Effect<
   Trajectory.Sessions<Config, TrajectoryError | ByteStoreError>,
   E | TrajectoryError | ByteStoreError,
@@ -273,7 +273,7 @@ export const read = <Config extends Trajectory.AnyConfig, E, R>(
  * of this one reading.
  */
 export const readCached = <Config extends Trajectory.AnyConfig, E, R>(
-  trajectory: Trajectory.Trajectory<Config, E, R> & Readable<Config>,
+  trajectory: Trajectory.Trajectory<string, Config, E, R> & Readable<Config>,
 ): Effect.Effect<
   Trajectory.Sessions<Config, TrajectoryError | ByteStoreError>,
   E | TrajectoryError | ByteStoreError,

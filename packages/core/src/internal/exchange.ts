@@ -431,7 +431,7 @@ export const service = <
         };
       }),
     save:
-      <C extends Trajectory.AnyConfig, E, R>(trajectory: Trajectory.Trajectory<C, E, R>) =>
+      <C extends Trajectory.AnyConfig, E, R>(trajectory: Trajectory.Trajectory<string, C, E, R>) =>
       (id: string) => {
         const config = configOf(trajectory);
 

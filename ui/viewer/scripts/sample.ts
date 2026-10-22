@@ -315,7 +315,7 @@ const parts = [
   ...answeredAnswer,
 ];
 
-const trajectory = Trajectory.make(Stream.fromIterable(parts), config);
+const trajectory = Trajectory.make(config)(Stream.fromIterable(parts));
 
 const program = Effect.gen(function* () {
   const exchange = yield* Exchange;

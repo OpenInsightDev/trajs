@@ -226,7 +226,7 @@ type EventsWith<
  *
  * **Details**
  *
- * A trajectory is read as a trajectory, so its kit and variant travel with the
+ * A trajectory is read as a trajectory, so its id, kit and variant travel with the
  * returned parts — with the events given added to the kit, as {@link WithEvents}
  * says — while any other stream of parts is read as a stream of parts.
  *
@@ -234,9 +234,9 @@ type EventsWith<
  * @category models
  */
 export type Reader<Es extends ReadonlyArray<Any>> = {
-  <Config extends Trajectory.AnyConfig, E, R>(
-    trajectory: Trajectory.Trajectory<Config, E, R>,
-  ): Trajectory.Trajectory<WithEvents<Config, Es>, E, R>;
+  <Id extends string, Config extends Trajectory.AnyConfig, E, R>(
+    trajectory: Trajectory.Trajectory<Id, Config, E, R>,
+  ): Trajectory.Trajectory<Id, WithEvents<Config, Es>, E, R>;
   <Config extends Trajectory.AnyConfig, E, R>(
     stream: Trajectory.TrajectoryStream<Config, E, R>,
   ): Trajectory.TrajectoryStream<WithEvents<Config, Es>, E, R>;
@@ -262,6 +262,8 @@ export type Reader<Es extends ReadonlyArray<Any>> = {
  *   depend on the schemas it is read with.
  * - The returned trajectory names the events given in addition to the ones it named
  *   already; an event given for a tag it named states over the one it was read with.
+ * - What a trajectory is named by travels with it: the returned trajectory carries the
+ *   id and the other kits of the one given ({@link Trajectory}).
  * - The function is curried: given the events it returns the function that reads a
  *   stream with them.
  *
@@ -342,10 +344,10 @@ export function encode<const Es extends ReadonlyArray<Any>>(...events: Es): Read
   // the implementation reads either of them the same way: TypeScript relates those
   // signatures to this one the other way round alone.
   return (<Config extends Trajectory.AnyConfig, E, R>(
-    stream: Trajectory.TrajectoryStream<Config, E, R> | Trajectory.Trajectory<Config, E, R>,
+    stream: Trajectory.TrajectoryStream<Config, E, R> | Trajectory.Trajectory<string, Config, E, R>,
   ):
     | Trajectory.TrajectoryStream<WithEvents<Config, Es>, E, R>
-    | Trajectory.Trajectory<WithEvents<Config, Es>, E, R> => {
+    | Trajectory.Trajectory<string, WithEvents<Config, Es>, E, R> => {
     const parts = stream.pipe(
       Stream.map((part): Trajectory.Part<WithEvents<Config, Es>> => {
         if (part._tag !== "Event") {
@@ -372,7 +374,7 @@ export function encode<const Es extends ReadonlyArray<Any>>(...events: Es): Read
       return parts;
     }
 
-    return attach({
+    return attach(stream.id, {
       stream: stream.stream,
       toolkit: stream.toolkit,
       eventkit: EventKit.merge(stream.eventkit, eventkit),

@@ -47,7 +47,7 @@ const toolTurn = (id: string, name: string, params: Record<string, string>, answ
 ];
 
 /** What the trajectory holds: what one session's model was given and answered. */
-const trajectory = Trajectory.make(
+const trajectory = Trajectory.make(config)(
   Stream.fromArray([
     prompt("Where is `parseConfig` defined?"),
     ...toolTurn("call_1", "grep", { pattern: "parseConfig" }, "src/config.ts:12"),
@@ -61,7 +61,6 @@ const trajectory = Trajectory.make(
     ...toolTurn("call_7", "bash", { command: "bun test" }, "3 tests passed"),
     ...toolTurn("call_8", "bash", { command: "bun test" }, "3 tests passed"),
   ]),
-  config,
 );
 
 const main = Effect.fn(function* (threshold: number) {

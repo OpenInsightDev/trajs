@@ -55,14 +55,13 @@ const makeTurn = (id: string, { city, answer }: { city: string; answer: string }
 ];
 
 /** What the trajectory holds: what one session's model was given and answered. */
-const trajectory = Trajectory.make(
+const trajectory = Trajectory.make(config)(
   Stream.fromArray([
     part.prompt(Prompt.make("What is the weather in Paris?")),
     ...makeTurn("call_1", { city: "Paris", answer: "It is sunny." }),
     part.prompt(Prompt.make("And in Berlin?")),
     ...makeTurn("call_2", { city: "Berlin", answer: "It is raining." }),
   ]),
-  config,
 );
 
 const main = Effect.fn(function* () {

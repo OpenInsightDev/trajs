@@ -117,7 +117,7 @@ const rowOf = (
 export const rowsOf =
   (digest: string) =>
   <C extends Trajectory.AnyConfig, E, R>(
-    trajectory: Trajectory.Trajectory<C, E, R>,
+    trajectory: Trajectory.Trajectory<string, C, E, R>,
   ): Stream.Stream<Row, E | TrajectoryError, R | EncodingServices<C>> => {
     const encode = partSchema(trajectory).pipe(Schema.encodeEffect);
 

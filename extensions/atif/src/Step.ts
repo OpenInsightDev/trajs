@@ -238,13 +238,12 @@ const stepsOf = <Config extends Trajectory.AnyConfig>(
  * const part = Trajectory.parts(Trajectory.anyConfig)
  *
  * // What one session's model was given, and what it returned for it as one whole part.
- * const trajectory = Trajectory.make(
+ * const trajectory = Trajectory.make(Trajectory.anyConfig)(
  *   Stream.make(
  *     part.session(sessionId),
  *     part.prompt(Prompt.make("What is 2 + 2?"), { sessionId }),
  *     part.response(Response.makePart("text", { text: "4" }), { sessionId })
- *   ),
- *   Trajectory.anyConfig
+ *   )
  * )
  *
  * const sessions = await Effect.runPromise(Trajectory.toSessions(trajectory))

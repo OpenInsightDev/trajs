@@ -76,7 +76,7 @@ const part = Trajectory.parts(config);
 
 // Made a trajectory of the config rather than only checked against it, so what `View` reads
 // out of the session it holds is the toolkit's own: each call is typed by the tool it names.
-const trajectory = Trajectory.make(
+const trajectory = Trajectory.make(config)(
   Stream.fromArray([
     part.prompt(Prompt.make("What is the weather in Paris, and in Berlin?")),
     part.response(
@@ -148,7 +148,6 @@ const trajectory = Trajectory.make(
       }),
     ),
   ]),
-  config,
 );
 
 const main = Effect.fn(function* () {

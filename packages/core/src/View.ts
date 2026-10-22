@@ -203,15 +203,14 @@ export type Conversation = ReadonlyArray<Prompt.Message>;
  *
  * // One session asks and is answered, and a session forked off the answer asks again:
  * // its conversation is the answer that was given, then its own question.
- * const trajectory = Trajectory.make(
+ * const trajectory = Trajectory.make(Trajectory.anyConfig)(
  *   Stream.make(
  *     part.session("asking"),
  *     asked,
  *     answered,
  *     part.session("reply", { fork: answered.uuid }),
  *     part.prompt(Prompt.make("And what does it hold?"), { sessionId: "reply" })
- *   ),
- *   Trajectory.anyConfig
+ *   )
  * )
  *
  * const sessions = await Effect.runPromise(Trajectory.toSessions(trajectory))
