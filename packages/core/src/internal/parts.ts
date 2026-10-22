@@ -17,7 +17,7 @@
  * `Trajectory.toSessions`.
  */
 
-import { Effect, Schema, SchemaTransformation, Stream } from "effect";
+import { Effect, Option, Schema, SchemaTransformation, Stream } from "effect";
 import { SchemaBinary } from "effect/encoding";
 
 import type * as ExtraKit from "#/ExtraKit.ts";
@@ -136,6 +136,35 @@ export const encodePart = <C extends Trajectory.AnyConfig>(config: C) => {
       // compressor holds a chunk until it has written it.
       Effect.map((frame) => frame.slice()),
     );
+};
+
+/**
+ * Reads one part of a trajectory out of the frame {@link encodePart} wrote it as: the direction
+ * a part a share keeps in a store is read back in.
+ *
+ * The bytes are read as the frames they are, so a frame the schema does not read is no part of
+ * a trajectory and the reading fails rather than yielding none: what a store keeps is the one
+ * part it was given, and a reading of it that yields nothing has lost that part.
+ */
+export const decodePart = <C extends Trajectory.AnyConfig>(config: C) => {
+  const parts = asReadable(part(config));
+  const read = readFrames(parts);
+
+  return <E, R>(
+    bytes: Stream.Stream<Uint8Array, E, R>,
+  ): Effect.Effect<Trajectory.Part<C>, E | TrajectoryError, R> =>
+    // SAFETY: a trajectory is carried as the most general one — its response parts are the
+    // streams they arrived in — and the parts of any other variant are members of those, so
+    // what the schema reads is a part of the trajectory it is read with.
+    read(bytes).pipe(
+      Stream.runHead,
+      Effect.flatMap(
+        Option.match({
+          onNone: () => Effect.fail(TrajectoryError.parse("the bytes hold no part")),
+          onSome: (part) => Effect.succeed(part),
+        }),
+      ),
+    ) as Effect.Effect<Trajectory.Part<C>, E | TrajectoryError, R>;
 };
 
 // HACK: `effect/ai` types a file part's data as `string | Uint8Array | URL`, and

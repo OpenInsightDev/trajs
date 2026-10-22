@@ -9,7 +9,10 @@
  * itself, {@link Part} a part of a config, and {@link merge} reads two trajectories
  * as one. What the parts of it name is read apart from that order by
  * {@link toSessions}: the sessions a trajectory holds, each with the parts it produced
- * and the ones it inherited ({@link Session}).
+ * and the ones it inherited ({@link Session}). One stream is read once, so a reading of
+ * a trajectory more than once — its sessions, or a second reader of it — is a reading of
+ * parts kept for it: {@link toSessions} keeps them for the sessions it reads, and
+ * {@link share} so that the trajectory reads again.
  *
  * A part is read as a kit states it: a response part's response through its toolkit,
  * and the extra data of a prompt, response or session part through the extra kit
@@ -21,7 +24,8 @@
  */
 
 import { type ByteStore, type ByteStoreError } from "@trajs/utils/ByteStore";
-import { DateTime, Effect, Option, Schema, Stream } from "effect";
+import { DateTime, Effect, FileSystem, Option, Path, Schema, Scope, Stream } from "effect";
+import type { PlatformError } from "effect/PlatformError";
 
 import * as Event from "#/Event.ts";
 import * as EventKit from "#/EventKit.ts";
@@ -30,6 +34,7 @@ import * as ExtraKit from "#/ExtraKit.ts";
 import type { EncodingServices, Readable } from "#/internal/parts.ts";
 import { Timestamp, Uuid } from "#/internal/schema.ts";
 import { read, readCached } from "#/internal/sessions.ts";
+import { shared } from "#/internal/share.ts";
 import { attach, uuid } from "#/internal/trajectory.ts";
 import type { Select } from "#/internal/types.ts";
 import * as Metric from "#/Metric.ts";
@@ -1326,6 +1331,159 @@ export const toSessionsCached = <Config extends AnyConfig, E, R>(
   E | TrajectoryError | ByteStoreError,
   R | EncodingServices<Config> | ByteStore
 > => readCached(trajectory);
+
+/**
+ * What a trajectory reads as one that reads again with: how many of its newest parts are kept
+ * in memory.
+ *
+ * **When to use**
+ *
+ * Use to type what {@link share} is given, or to state how long a trajectory is held in memory
+ * where more than one reader reads it.
+ *
+ * **Details**
+ *
+ * - `capacity` is how many of the newest parts are kept in memory, and defaults to
+ *   `"unbounded"`: every part of the trajectory. The parts a window of that size cannot hold
+ *   are kept on disk instead, as the frames a trajectory is carried in, so a trajectory read
+ *   this way is held whole whatever its length while only its newest parts are in memory.
+ *
+ * @see {@link share} for the reading it is given to.
+ * @category models
+ */
+export interface ShareOptions {
+  readonly capacity?: number | "unbounded" | undefined;
+}
+
+/**
+ * What sharing a trajectory is: the trajectory read again, once the parts it is read from are
+ * kept.
+ */
+type Shared<Id extends string, Config extends AnyConfig, E, R> = Effect.Effect<
+  Trajectory<Id, Config, E | TrajectoryError | ByteStoreError, never>,
+  PlatformError,
+  Scope.Scope | R | EncodingServices<Config> | FileSystem.FileSystem | Path.Path
+>;
+
+/**
+ * Reads a trajectory as one that reads again: its parts kept from one reading of it, so that
+ * every reader reads it from its first part, whatever moment it starts at.
+ *
+ * **When to use**
+ *
+ * Use when the parts of a trajectory are read more than once — two views of one run, a reader
+ * that starts after the trajectory has been read, an analysis that reads it after its sessions
+ * were — so that every one of them reads the whole trajectory rather than the parts that
+ * happen to arrive while it is reading.
+ *
+ * **Details**
+ *
+ * - The trajectory is read once, as soon as it is shared, and every part is kept as it arrives:
+ *   what a reader reads is the parts the trajectory produced, in the order it produced them, and
+ *   a reader that starts after the trajectory ended reads it whole all the same. That is where
+ *   this differs from `Stream.share`, whose later subscribers read only the parts replayed to
+ *   them: no reader misses a part here, whenever it subscribes.
+ * - `capacity` states how many of the newest parts are kept in memory, and defaults to every one
+ *   of them ({@link ShareOptions}). The parts a window of that size cannot hold are kept as the
+ *   frames a trajectory is carried in ({@link Exchange.Part}) — written into a temporary
+ *   directory of the file system the reading makes, the store `ByteStore.layerFsTemp` states,
+ *   and read back as a reader asks for them — so a trajectory longer than its window is held
+ *   on disk rather than in memory.
+ * - What the trajectory is shared with is stated before the trajectory where it is stated alone,
+ *   as every constructor of this module binds its own terms first: `share(options)(trajectory)`
+ *   is the same call as `share(trajectory, options)`.
+ * - Each reader reads a stream of its own: one that stops early, or is interrupted, disturbs
+ *   none of the others, and the shared trajectory reads as often as it is asked for. What is
+ *   kept lives as long as the scope the trajectory was shared in, so that scope must outlive
+ *   the readings of it: the store is removed with it, and the source is not read further once
+ *   it closes.
+ * - The trajectory it returns is named by the same id and read with the same config as the one
+ *   given, since it is that trajectory read again rather than another one.
+ *
+ * It fails with what the trajectory it reads fails with, as the failure of every reader that
+ * reaches it — the parts produced before a failure are read, and the failure is reported after
+ * them — and with the failure of keeping a part ({@link TrajectoryError}, {@link ByteStoreError}).
+ * Keeping a part beyond the window writes it as the bytes a part is carried in, so the services
+ * writing one takes are required here as well ({@link EncodingServices}), and so is the file
+ * system the temporary directory is made in.
+ *
+ * **Example** (Reading one trajectory twice)
+ *
+ * ```ts import.meta.vitest
+ * import { Effect, Stream } from "effect"
+ * import { Prompt, Trajectory } from "@trajs/core"
+ *
+ * const part = Trajectory.parts(Trajectory.anyConfig)
+ * const sessionId = "01890a5d-ac96-774b-bcce-b302099a8057"
+ *
+ * const trajectory = Trajectory.make(Trajectory.anyConfig)(
+ *   Stream.make(
+ *     part.session(sessionId),
+ *     part.prompt(Prompt.make("What is 2 + 2?"), { sessionId })
+ *   )
+ * )
+ *
+ * const tags = await Effect.runPromise(
+ *   Effect.scoped(
+ *     Effect.gen(function*() {
+ *       const shared = yield* Trajectory.share(trajectory)
+ *
+ *       // A reader reads the trajectory from its first part ...
+ *       const first = yield* Stream.runCollect(shared)
+ *       // ... and one that starts once it has ended reads it whole as well.
+ *       const second = yield* Stream.runCollect(shared)
+ *
+ *       return [first, second].map((read) => read.map((part) => part._tag))
+ *     })
+ *   )
+ * )
+ *
+ * tags // => [["Session", "Prompt"], ["Session", "Prompt"]]
+ * ```
+ *
+ * @see {@link ShareOptions} for what it is given.
+ * @see {@link toSessions} for reading a trajectory as the sessions it names, which keeps its
+ * parts for that reading alone.
+ * @see `ByteStore.layerFsTemp` for the store the parts beyond the window are kept in.
+ * @category constructors
+ */
+export function share<Id extends string, Config extends AnyConfig, E, R>(
+  trajectory: Trajectory<Id, Config, E, R> & Readable<Config>,
+  options?: ShareOptions,
+): Shared<Id, Config, E, R>;
+export function share(
+  options?: ShareOptions,
+): <Id extends string, Config extends AnyConfig, E, R>(
+  trajectory: Trajectory<Id, Config, E, R> & Readable<Config>,
+) => Shared<Id, Config, E, R>;
+export function share<Config extends AnyConfig, E, R>(
+  ...args:
+    | [
+        trajectory: Trajectory<string, Config, E, R> & Readable<Config>,
+        options?: ShareOptions | undefined,
+      ]
+    | [options?: ShareOptions | undefined]
+):
+  | Shared<string, Config, E, R>
+  | ((
+      trajectory: Trajectory<string, Config, E, R> & Readable<Config>,
+    ) => Shared<string, Config, E, R>) {
+  if (args.length === 2) {
+    const [trajectory, options] = args;
+
+    return shared(trajectory, options);
+  }
+
+  const [given] = args;
+
+  // What a trajectory is shared with is a record, and a trajectory is a stream: a call stating
+  // one of them alone states either the trajectory it shares or the options it shares it with.
+  if (given !== undefined && Stream.isStream(given)) {
+    return shared(given);
+  }
+
+  return (trajectory) => shared(trajectory, given);
+}
 
 /**
  * The session of a trajectory that the id given names.
