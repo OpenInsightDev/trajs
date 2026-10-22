@@ -19,7 +19,6 @@
  */
 
 import type { Bytes } from "@trajs/utils/Bytes";
-import { ByteStore, type ByteStoreError } from "@trajs/utils/ByteStore";
 import type { Compression, CompressionError } from "@trajs/utils/Compression";
 import type { Storage, StorageError } from "@trajs/utils/Storage";
 import type { StreamHash } from "@trajs/utils/StreamHash";
@@ -307,60 +306,6 @@ const encodeTrailing = <S extends Schema.ConstraintCodec<Metadata, unknown, neve
 };
 
 /**
-
-/**
- * The key a trajectory's bytes are kept under: the hash and the digest the trajectory
- * states of its parts.
- *
- * The key is read off what the trajectory states of itself rather than given with it,
- * so what a store holds under one is the bytes that digest is of, whatever id they were
- * loaded by, and a trajectory written again is kept under the digest of its own parts.
- */
-const nameOf = (metadata: Metadata): string => `${metadata.hash}:${metadata.digest}`;
-
-/**
- * The bytes of a trajectory's frame as a store keeps them, and from the storage as the
- * store does not hold them: the store is read first, and the frame the storage serves is
- * kept as it arrives, so reading a trajectory again — here, or in a load of it with the
- * same bytes — takes them from the store rather than reading the storage and the frame a
- * second time.
- *
- * What keeps them is a store of byte sequences ({@link ByteStore}), which writes a
- * sequence as it arrives and reads one back at random: the frame is kept in the chunks
- * that store cuts it into rather than held whole, so a trajectory too large to hold is
- * kept this way all the same. Where those chunks are is the store layer's to say —
- * memory, a file system, a database — which is what a trajectory read this way requires
- * and one read through `read` does not: a program provides a store where it reads
- * trajectories again, and an exchange holds none.
- *
- * A store names a sequence by the name of a trajectory alone ({@link nameOf}), and a
- * sequence is served only once it is whole: the record that names one is written once the
- * frame has been read to its end, so a reading that ends before the frame does — a
- * consumer that takes what it came for and stops — keeps nothing another reading is
- * served, and what it wrote before stopping is dropped when the sequence is written again.
- */
-const keptBytes = <E, R>(
-  metadata: Metadata,
-  frame: Stream.Stream<Uint8Array, E, R>,
-): Stream.Stream<Uint8Array, E | ByteStoreError, R | ByteStore> => {
-  const key = nameOf(metadata);
-
-  return Effect.gen(function* () {
-    const store = yield* ByteStore;
-
-    // What the store holds is the frame of a reading before this one, so it is served
-    // from there rather than read from the storage a second time.
-    if (yield* store.has(key)) {
-      return (yield* store.read(key)).stream();
-    }
-
-    // The frame is kept as it is read: the store writes a sequence as it arrives, and the
-    // bytes are passed on to the reading all the same.
-    return frame.pipe(Stream.tapSink(store.write(key)));
-  }).pipe(Stream.unwrap);
-};
-
-/**
  * What a compression failed a frame it was asked to write or read with, as the
  * trajectory that failed: the bytes a frame carries are the format's, so a frame
  * that cannot be written or read is a trajectory that failed rather than a
@@ -427,7 +372,6 @@ export const service = <
           header: stated.header,
           metadata: trailing.metadata,
           read: reading(frame),
-          readCached: reading(keptBytes(trailing.metadata, frame)),
         };
       }),
     save:

@@ -7,12 +7,11 @@
  * states of itself, the metadata it ends with, and the trajectory its parts make. An
  * exchange performs no IO of its own — what writes and reads the bytes is a storage, a
  * compression and a hash ({@link Storage}, {@link Compression}, {@link StreamHash}),
- * provided with a layer such as {@link Exchange.layer} or one a platform package states —
- * and a reading that keeps the bytes of a frame between its readings requires a store of
- * sequences beside them ({@link Loaded.readCached}).
+ * provided with a layer such as {@link Exchange.layer} or one a platform package states — and a
+ * trajectory read from what a load gives more than once is kept by {@link Trajectory.cache},
+ * since a trajectory is one stream and one stream is read once.
  */
 
-import type { ByteStore, ByteStoreError } from "@trajs/utils/ByteStore";
 import { Algorithm as CompressionAlgorithm, Compression } from "@trajs/utils/Compression";
 import { Storage, type StorageError } from "@trajs/utils/Storage";
 import { Algorithm as HashAlgorithm, StreamHash } from "@trajs/utils/StreamHash";
@@ -195,15 +194,12 @@ export type EncodingServices<C extends Trajectory.AnyConfig> = Encoding<C>;
  *   reading of the same trajectory ({@link Trajectory}) — since the id a storage
  *   keeps a trajectory under is where it is kept rather than what the trajectory is
  *   named by, and the bytes of a trajectory state no id of their own.
- * - `readCached(config)` reads it the same way, over the bytes a store keeps for it
- *   rather than the storage ({@link Loaded.readCached}).
  *
  * A load reads what a trajectory states of itself and nothing else — the header at its
  * head and the metadata at its tail — so what a trajectory states of itself is known
  * without reading its parts or the frame they are carried in ({@link Service.load}).
  * `read` is a function rather than a value because a stream is read once: each call
- * gives the parts as they are read, and reads the frame again — or, where those bytes
- * were kept by a reading before it, reads them from there.
+ * gives the parts as they are read, and reads the frame again.
  *
  * A config a trajectory is read as is one whose parts take no service to read: a
  * trajectory is read from its bytes synchronously rather than run, so a part read through
@@ -213,8 +209,7 @@ export type EncodingServices<C extends Trajectory.AnyConfig> = Encoding<C>;
  *
  * Each fails with {@link TrajectoryError} where the trajectory cannot be read — bytes
  * that hold no header, a frame that does not decode, bytes that do not end with the
- * metadata — and with the failure of what served the bytes: the storage's own failure,
- * and the store's where a reading keeps the bytes in one.
+ * metadata — and with the failure of what served the bytes.
  *
  * @see {@link Service.load} for the operation that gives these.
  * @category models
@@ -241,52 +236,14 @@ export interface Loaded {
    * the increments a streamed answer arrived in are read as the whole parts they
    * complete, since a trajectory is carried as the most general one ({@link Part}).
    *
-   * TODO: what is kept of a trajectory here is kept as the bytes of its frame, whether that is
-   * the storage's ({@link Loaded.readCached}) or memory's, because a trajectory is one stream
-   * and a stream is read once: a second reading of the parts has to be a reading of something
-   * that is held. Held in memory, the parts need no encoding at all — the capability a stream
-   * states for this (`Stream.share` with a `replay` a later subscriber reads, or the pull one is
-   * taken through) serves the same parts to every reader of them without their being written
-   * out and read back. `Session.toSessions` keeps the parts of a session the same way, so
-   * what settles one settles both.
+   * A trajectory read more than once — its sessions, a second reader of it, an analysis
+   * that reads it after another has — is kept by {@link Trajectory.cache}, which holds the parts
+   * of one reading of it rather than reading the storage again: a trajectory is one
+   * stream, and a stream is read once.
    */
   readonly read: <C extends Trajectory.AnyConfig = Trajectory.AnyConfig>(
     config?: C & Readable<C>,
   ) => Trajectory.Trajectory<string, C, TrajectoryError | StorageError, never>;
-
-  /**
-   * The trajectory the trajectory holds, read as {@link Loaded.read} reads it, except
-   * that the bytes its parts are carried in are kept in a store rather than read from
-   * the storage again.
-   *
-   * **Details**
-   *
-   * The bytes read from the storage the first time are written to the store under what
-   * the trajectory states of them — the hash and the digest of its parts, which is what
-   * {@link Metadata} states of them — so every reading after that, here and in any other
-   * load of a trajectory whose bytes are the same, takes them from the store rather
-   * than reading the storage and the frame a second time. Nothing of a config travels
-   * with them: the bytes are the frame a trajectory is carried in, so they are read as
-   * the kits any reading of it states.
-   *
-   * The store is a store of byte sequences ({@link ByteStore}), which a
-   * reading of a trajectory this way requires and one through {@link Loaded.read} does
-   * not: a store's layers are their own — memory, a file system, a database — so where
-   * the bytes live is the program's to say, and one that reads a trajectory again
-   * provides a store. `ByteStore.layer` keeps them in memory, which is what a reading
-   * that keeps them no longer than the program runs takes, `ByteStore.layerKVStore`
-   * keeps them in the key/value store a program states, and `ByteStore.layerFsTemp`
-   * keeps them in a temporary directory of the file system.
-   *
-   * The frame is kept in that store as it is read rather than held whole, and is cut
-   * into chunks of a size the store states: so a trajectory too large to hold is read
-   * this way all the same, and a reading that ends before the frame does keeps nothing.
-   *
-   * @see {@link Loaded.read} for reading a trajectory without keeping its bytes.
-   */
-  readonly readCached: <C extends Trajectory.AnyConfig = Trajectory.AnyConfig>(
-    config?: C & Readable<C>,
-  ) => Trajectory.Trajectory<string, C, TrajectoryError | StorageError | ByteStoreError, ByteStore>;
 }
 
 /**
@@ -407,10 +364,9 @@ export class Exchange extends Context.Service<Exchange, Service>()("trajs/core/E
    * trajectory is the storage — so the layer requires all three rather than holding any.
    * These are `@trajs/utils`'s services, re-exported here: a program provides the layer a
    * platform package states them with, such as `@trajs/platform-node` or
-   * `@trajs/platform-browser`. A reading that keeps the bytes of a frame requires a store
-   * of sequences beside them ({@link Loaded.readCached}), which this layer holds no more
-   * than it holds a storage: a program provides one ({@link ByteStore.layer}) where it
-   * reads trajectories again.
+   * `@trajs/platform-browser`. A trajectory read from what a load gives more than once is kept
+   * by {@link Trajectory.cache}, whose store of sequences a program provides (the layer
+   * `ByteStore.layer` states): this layer holds none of those bytes, as it holds no storage.
    *
    * @see {@link Service} for the exchange the layer provides.
    * @category constructors

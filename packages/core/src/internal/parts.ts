@@ -9,12 +9,13 @@
  * follows it before anything else, so a frame the schema does not read is stepped over rather
  * than failing the reading.
  *
- * The bytes are what both readings of what a trajectory holds are of: the exchange format this
- * package ships keeps a trajectory as the frames of its parts, and the sessions of a trajectory
- * are read out of the same frames kept in a store of bytes ({@link Session.toSessions}).
+ * The bytes are what a trajectory is carried in both where it is kept and where it is read more
+ * than once: the exchange format this package ships keeps a trajectory as the frames of its
+ * parts, and the parts `Trajectory.cache` holds beyond the memory of one reading are written as
+ * those very frames and read back from them ({@link encodePart}, {@link decodePart}).
  *
  * Nothing here is published: a program reaches the bytes through `Exchange` and
- * `Session.toSessions`.
+ * `Trajectory.cache`.
  */
 
 import { Effect, Option, Schema, SchemaTransformation, Stream } from "effect";
@@ -140,7 +141,7 @@ export const encodePart = <C extends Trajectory.AnyConfig>(config: C) => {
 
 /**
  * Reads one part of a trajectory out of the frame {@link encodePart} wrote it as: the direction
- * a part a share keeps in a store is read back in.
+ * a part a cache keeps in a store is read back in.
  *
  * The bytes are read as the frames they are, so a frame the schema does not read is no part of
  * a trajectory and the reading fails rather than yielding none: what a store keeps is the one

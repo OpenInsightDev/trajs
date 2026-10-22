@@ -1,12 +1,12 @@
 /**
- * The reading behind `Trajectory.share`: one pass over a trajectory, its parts kept as they
+ * The reading behind `Trajectory.cache`: one pass over a trajectory, its parts kept as they
  * arrive so that the trajectory reads again — from its first part, whenever a reader starts.
  *
  * What it keeps is a window of the newest parts in memory, and the parts that window has left as
  * the frames a trajectory is carried in, in the store of bytes a program provides: a trajectory
  * longer than the window is held whole without being held in memory.
  *
- * Nothing here is published: a program reaches the reading through `Trajectory.share`.
+ * Nothing here is published: a program reaches the reading through `Trajectory.cache`.
  */
 
 import { ByteStore, type ByteStoreError } from "@trajs/utils/ByteStore";
@@ -27,7 +27,7 @@ import type { TrajectoryError } from "#/TrajectoryError.ts";
 const everyPart = Infinity;
 
 /**
- * What a share has of the trajectory it reads: the parts it has produced, and the newest of
+ * What a cache has of the trajectory it reads: the parts it has produced, and the newest of
  * them as they are kept in memory.
  */
 interface Cache<Config extends Trajectory.AnyConfig> {
@@ -38,7 +38,7 @@ interface Cache<Config extends Trajectory.AnyConfig> {
 }
 
 /**
- * What a share does with the parts that leave the window: writes them into the store, and reads
+ * What a cache does with the parts that leave the window: writes them into the store, and reads
  * them back where a reader asks for one that is no longer in memory.
  */
 interface Spilled<Config extends Trajectory.AnyConfig> {
@@ -51,20 +51,20 @@ interface Spilled<Config extends Trajectory.AnyConfig> {
   ) => Effect.Effect<Trajectory.Part<Config>, TrajectoryError | ByteStoreError>;
 }
 
-/** How many parts a share keeps in memory: the capacity stated, as the number an unbounded one is. */
-const capacityOf = (options?: Trajectory.ShareOptions): number => {
+/** How many parts a cache keeps in memory: the capacity stated, as the number an unbounded one is. */
+const capacityOf = (options?: Trajectory.CacheOptions): number => {
   const capacity = options?.capacity ?? "unbounded";
 
   return capacity === "unbounded" ? everyPart : Math.max(0, Math.floor(capacity));
 };
 
 /**
- * Shares the trajectory given: the parts of one reading of it are kept, so that the trajectory
+ * Caches the trajectory given: the parts of one reading of it are kept, so that the trajectory
  * reads again — from its first part, whenever a reader starts.
  */
-export const shared = <Id extends string, Config extends Trajectory.AnyConfig, E, R>(
+export const cached = <Id extends string, Config extends Trajectory.AnyConfig, E, R>(
   trajectory: Trajectory.Trajectory<Id, Config, E, R> & Readable<Config>,
-  options?: Trajectory.ShareOptions,
+  options?: Trajectory.CacheOptions,
 ): Effect.Effect<
   Trajectory.Trajectory<Id, Config, E | TrajectoryError | ByteStoreError, never>,
   E | TrajectoryError | ByteStoreError,
@@ -75,15 +75,15 @@ export const shared = <Id extends string, Config extends Trajectory.AnyConfig, E
     const capacity = capacityOf(options);
     const store = yield* ByteStore;
 
-    // The store is the program's and keeps the bytes of more than this share, so a share writes
+    // The store is the program's and keeps the bytes of more than this cache, so a cache writes
     // under keys of its own: a part is named by the index it was produced at.
-    const prefix = `share/${uuid.v7()}`;
+    const prefix = `cache/${uuid.v7()}`;
     const keyOf = (index: number): string => `${prefix}/${index}`;
 
-    /** The keys this share wrote, which are removed with the scope. */
+    /** The keys this cache wrote, which are removed with the scope. */
     const written: Array<string> = [];
 
-    // What a share wrote is its own rather than the program's to keep, so it is removed with the
+    // What a cache wrote is its own rather than the program's to keep, so it is removed with the
     // scope. Finalizers run in reverse order, so this runs after the reading of the source is
     // stopped, and the last part written is covered as well.
     yield* Effect.addFinalizer(() =>
@@ -165,7 +165,7 @@ export const shared = <Id extends string, Config extends Trajectory.AnyConfig, E
         yield* arrived;
       });
 
-    // The source is read as soon as the trajectory is shared rather than as a reader asks for a
+    // The source is read as soon as the trajectory is cached rather than as a reader asks for a
     // part: what is kept does not depend on a reader being there to ask for it, so a reader that
     // starts at any time — after the trajectory ended, or with none of it read yet — reads it
     // whole.

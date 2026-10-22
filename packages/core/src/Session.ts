@@ -13,7 +13,7 @@
  */
 
 import type { ByteStore, ByteStoreError } from "@trajs/utils/ByteStore";
-import { type Effect, Option, type Stream } from "effect";
+import { type Effect, Option, type Scope, type Stream } from "effect";
 
 import type { EncodingServices, Readable } from "#/internal/parts.ts";
 import { read, readCached } from "#/internal/sessions.ts";
@@ -156,15 +156,13 @@ export type Sessions<Config extends Trajectory.AnyConfig, E = never, R = never> 
  *
  * **Details**
  *
- * - The trajectory is read once, and its parts are kept in a store of bytes as they arrive:
- *   the frames the exchange format carries a part in ({@link Exchange.Part}), without the
- *   header and the metadata a trajectory is written with. A session is then read by filtering
- *   those parts from the head into it — the parts of the sessions it continues from, up to the
- *   part each of them is continued from, the parts it produced itself, and the metric parts
- *   attached to them ({@link SessionStream}) — so a session is read as often as it is asked
- *   for, and a session forked off another runs on what it inherited rather than repeating it.
- *   Keeping them is what makes that possible: a trajectory is one stream, and one stream is
- *   read once.
+ * - The trajectory is read once and cached ({@link Trajectory.cache}), so that its parts read
+ *   again: a session is then read by filtering the parts it holds from the head into it — the
+ *   parts of the sessions it continues from, up to the part each of them is continued from, the
+ *   parts it produced itself, and the metric parts attached to them ({@link SessionStream}) —
+ *   so a session is read as often as it is asked for, and a session forked off another runs on
+ *   what it inherited rather than repeating it. Caching is what makes that possible: a
+ *   trajectory is one stream, and one stream is read once.
  * - Two things are taken to hold, neither of which can be waited for: a session is declared
  *   before the parts it produced, and a `fork` names a part the trajectory holds by the time
  *   the declaration reading it is read. A session the trajectory names by a part of it rather
@@ -176,9 +174,12 @@ export type Sessions<Config extends Trajectory.AnyConfig, E = never, R = never> 
  *   sessions after that — one that keeps the parts of a trajectory somewhere else, a file system
  *   or a database — reads them with {@link toSessionsCached}, whose store it provides.
  *
- * It fails with `E`, on top of the failure of writing or reading the parts ({@link ByteStoreError}
- * and {@link TrajectoryError}), and requires the services `R` names beside the ones the parts
- * of its config are written with ({@link Exchange.EncodingServices}).
+ * It fails with `E`, on top of the failure of keeping a part ({@link ByteStoreError} and
+ * {@link TrajectoryError}), and requires the services `R` names beside the ones the parts
+ * of its config are written with ({@link Exchange.EncodingServices}). The sessions it gives
+ * fail with the same `E`: a session is read out of what the cache kept of the trajectory, so
+ * a trajectory that failed to read fails the reading of its sessions as well
+ * ({@link Sessions}).
  *
  * **Example** (Reading a trajectory as the sessions it names)
  *
@@ -226,13 +227,14 @@ export type Sessions<Config extends Trajectory.AnyConfig, E = never, R = never> 
 export const toSessions = <Config extends Trajectory.AnyConfig, E, R>(
   trajectory: Trajectory.Trajectory<string, Config, E, R> & Readable<Config>,
 ): Effect.Effect<
-  Sessions<Config, TrajectoryError | ByteStoreError>,
+  Sessions<Config, E | TrajectoryError | ByteStoreError>,
   E | TrajectoryError | ByteStoreError,
   R | EncodingServices<Config>
 > => read(trajectory);
 
 /**
- * Reads a trajectory as the sessions it names, keeping its parts in the store a program provides.
+ * Reads a trajectory as the sessions it names, out of a cache of it kept in the store a program
+ * provides.
  *
  * **When to use**
  *
@@ -242,29 +244,34 @@ export const toSessions = <Config extends Trajectory.AnyConfig, E, R>(
  *
  * **Details**
  *
- * What it reads is what {@link toSessions} reads — one pass over the trajectory, its parts kept
- * as the frames the exchange format carries a part in, and a session read by filtering them into
- * it — and the difference is where they are kept: in the store a program provides
- * ({@link ByteStore}) rather than in memory. The store is what this reading requires and one
- * through {@link toSessions} does not: `ByteStore.layer` keeps the parts in memory,
- * `ByteStore.layerKVStore` in the key/value store a program states, `ByteStore.layerFsTemp`
- * in a temporary directory of the file system, and a store of a program's own is a layer
- * of its own. Its scope must outlive the sessions read of it, since a session is
- * read out of those parts as often as it is asked for.
+ * What it reads is what {@link toSessions} reads — the trajectory cached ({@link Trajectory.cache}),
+ * one pass over it for the sessions it names, and a session read by filtering the parts of it
+ * into it — and the difference is where the cache keeps those parts: those its window leaves out
+ * are written into the store a program provides ({@link ByteStore}) rather than into one this
+ * reading states. The store is what this reading requires and one through {@link toSessions} does
+ * not: `ByteStore.layer` keeps the parts in memory, `ByteStore.layerKVStore` in the key/value
+ * store a program states, `ByteStore.layerFsTemp` in a temporary directory of the file system,
+ * and a store of a program's own is a layer of its own. Its scope must outlive the sessions read
+ * of it, since a session is read out of those parts as often as it is asked for, and what the
+ * cache wrote is removed with the scope.
  *
- * The parts are kept under a key of their own — a sequence per reading — so a store serves the
- * readings of more than one trajectory without them meeting.
+ * `options` is what that cache is read with ({@link Trajectory.CacheOptions}), as it is read with
+ * it wherever a trajectory is cached: `capacity` states how many of the newest parts are held in
+ * memory, and defaults to every one of them. A program that keeps nothing of a trajectory in
+ * memory states `{ capacity: 0 }`, and every part becomes one the store is read for.
  *
- * It fails with `E`, on top of the failure of writing or reading the parts ({@link ByteStoreError}
- * and {@link TrajectoryError}), and requires the services `R` names, the store, and the ones the
- * parts of its config are written with ({@link Exchange.EncodingServices}).
+ * The parts are kept under keys of the cache's own — a sequence per part, named after a reading
+ * of its own — so a store serves the readings of more than one trajectory without them meeting.
+ *
+ * It fails with `E`, on top of the failure of keeping or reading a part ({@link ByteStoreError}
+ * and {@link TrajectoryError}), and requires the services `R` names, the store, the scope, and
+ * the ones the parts of its config are written with ({@link Exchange.EncodingServices}).
  *
  * **Example** (Reading a trajectory as the sessions it names, through a store a program holds)
  *
  * ```ts import.meta.vitest
  * import { Effect, Option, Stream } from "effect"
- * import { Prompt, Response, Session, Trajectory } from "@trajs/core"
- * import { ByteStore } from "@trajs/utils/ByteStore"
+ * import { ByteStore, Prompt, Response, Session, Trajectory } from "@trajs/core"
  *
  * const part = Trajectory.parts(Trajectory.anyConfig)
  *
@@ -277,25 +284,36 @@ export const toSessions = <Config extends Trajectory.AnyConfig, E, R>(
  *   )
  * )
  *
- * const sessions = await Effect.runPromise(
- *   Session.toSessionsCached(trajectory).pipe(Effect.provide(ByteStore.layer()))
+ * const tags = await Effect.runPromise(
+ *   Effect.scoped(
+ *     Effect.gen(function*() {
+ *       const sessions = yield* Session.toSessionsCached(trajectory, { capacity: 0 })
+ *       const asking = Option.getOrThrow(Session.session("asking")(sessions))
+ *
+ *       // The parts are served from the store, for as long as the scope is open.
+ *       return Array.from(yield* Stream.runCollect(asking.stream)).map((part) => part._tag)
+ *     })
+ *   ).pipe(Effect.provide(ByteStore.layer()))
  * )
  *
- * Option.isSome(Session.session("asking")(sessions)) // => true
+ * tags // => ["Prompt", "Response"]
  * ```
  *
  * @see {@link toSessions} for reading them into memory instead.
  * @see {@link Session} for one session of a trajectory.
+ * @see {@link Trajectory.cache} for the reading its parts are kept by.
+ * @see {@link Trajectory.CacheOptions} for the window it keeps in memory.
  * @see {@link ByteStore} for the store the parts are kept in.
  * @category constructors
  */
 export const toSessionsCached = <Config extends Trajectory.AnyConfig, E, R>(
   trajectory: Trajectory.Trajectory<string, Config, E, R> & Readable<Config>,
+  options?: Trajectory.CacheOptions,
 ): Effect.Effect<
-  Sessions<Config, TrajectoryError | ByteStoreError>,
+  Sessions<Config, E | TrajectoryError | ByteStoreError>,
   E | TrajectoryError | ByteStoreError,
-  R | EncodingServices<Config> | ByteStore
-> => readCached(trajectory);
+  R | EncodingServices<Config> | ByteStore | Scope.Scope
+> => readCached(trajectory, options);
 
 /**
  * The session of a trajectory that the id given names.

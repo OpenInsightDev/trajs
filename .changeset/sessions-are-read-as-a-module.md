@@ -11,7 +11,7 @@ own: `Trajectory.toSessions` is `Session.toSessions`, `Trajectory.toSessionsCach
 were, of what a trajectory's parts read as sessions.
 
 What a trajectory is made of stays `Trajectory`'s — its parts, the config they are read
-with, and `make`, `merge` and `share` — and so does `Trajectory.rootSession`, the session
+with, and `make`, `merge` and `cache` — and so does `Trajectory.rootSession`, the session
 a part built without one belongs to. A session's parts are `Trajectory.Part`s, and a
 `Trajectory.SessionPart` declares a session that `Session.toSessions` reads rather than
 being a part of one.
