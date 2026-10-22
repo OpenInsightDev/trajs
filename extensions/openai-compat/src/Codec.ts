@@ -11,7 +11,7 @@
  *
  * The conversations are read with `View.conversations` of `@trajs/core`, one session
  * at a time, and each of their messages is then written as this API states it. A
- * trajectory is read as its sessions with `Trajectory.toSessions`, which is what
+ * trajectory is read as its sessions with `Session.toSessions`, which is what
  * reading one here is given: a trajectory whose sessions cannot be read fails that
  * reading — an unproduced fork, or a late declaration, is what reading one fails with.
  *
@@ -32,6 +32,7 @@
 import type { OpenAiClient } from "@effect/ai-openai-compat";
 import type { Trajectory } from "@trajs/core";
 import { View } from "@trajs/core";
+import type * as Session from "@trajs/core/Session";
 import type { TrajectoryError } from "@trajs/core/TrajectoryError";
 import { Effect, Predicate } from "effect";
 import type { Prompt } from "effect/ai";
@@ -65,9 +66,9 @@ export type OpenAiCompatSessions = Record<string, OpenAiCompatMessage[]>;
  *
  * **Details**
  *
- * - What it is given is what `Trajectory.toSessions` read of a trajectory, so a trajectory is
+ * - What it is given is what `Session.toSessions` read of a trajectory, so a trajectory is
  *   read as its sessions before it is read as conversations: one reading of it serves every
- *   session it holds ({@link Trajectory.Sessions}).
+ *   session it holds ({@link Session.Sessions}).
  * - The conversation of a session holds the messages the session produced and the
  *   messages it inherited: what the sessions it continues from produced up to the
  *   part it continues from, from the root of the fork down.
@@ -143,7 +144,7 @@ export type OpenAiCompatSessions = Record<string, OpenAiCompatMessage[]>;
  *
  * const trajectory = Trajectory.make(config)(Stream.fromIterable(parts))
  *
- * const sessions = await Effect.runPromise(Trajectory.toSessions(trajectory))
+ * const sessions = await Effect.runPromise(Session.toSessions(trajectory))
  * const conversations = await Effect.runPromise(Codec.makeOpenAiCompat(sessions))
  *
  * conversations[sessionId]?.map((message) => message.role) // => ["user", "assistant", "tool", "assistant"]
@@ -151,11 +152,11 @@ export type OpenAiCompatSessions = Record<string, OpenAiCompatMessage[]>;
  *
  * @see {@link OpenAiCompatSessions} for the messages it reads to.
  * @see {@link View.conversations} for the conversations it writes out.
- * @see {@link Trajectory.toSessions} for the sessions it is given.
+ * @see {@link Session.toSessions} for the sessions it is given.
  * @category constructors
  */
 export const makeOpenAiCompat = <Config extends Trajectory.AnyConfig, E, R>(
-  sessions: Trajectory.Sessions<Config, E, R>,
+  sessions: Session.Sessions<Config, E, R>,
 ): Effect.Effect<OpenAiCompatSessions, E | TrajectoryError, R> =>
   View.conversations(sessions).pipe(
     Effect.map((sessions) => {

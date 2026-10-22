@@ -30,6 +30,8 @@ export * as Prompt from "#/Prompt.ts";
 
 export * as Response from "#/Response.ts";
 
+export * as Session from "#/Session.ts";
+
 export * as Tool from "#/Tool.ts";
 
 export * as Toolkit from "#/Toolkit.ts";

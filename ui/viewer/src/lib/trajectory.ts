@@ -3,7 +3,7 @@
  *
  * A trajectory is one stream of parts, and what a viewer shows of one is not that
  * stream: it is the sessions it declares, the forks that relate them, and the turns each
- * of them ran — `@trajs/core`'s `Trajectory.toSessions` and `View`. The bytes and the
+ * of them ran — `@trajs/core`'s `Session.toSessions` and `View`. The bytes and the
  * kits to read them with are the exchange's work, and what this adds is the shape the
  * components read: one session at a time, with what it inherited from the sessions it
  * continues from read as the turns those sessions had reached by then.
@@ -16,7 +16,7 @@
  * the parts that are its own rather than those a kit made of it.
  */
 
-import { Trajectory, View } from "@trajs/core";
+import { Session, Trajectory, View } from "@trajs/core";
 import { Exchange } from "@trajs/core/Exchange";
 import type { TrajectoryError } from "@trajs/core/TrajectoryError";
 import { BrowserServices } from "@trajs/platform-browser";
@@ -110,7 +110,7 @@ export interface Trajectory {
 
 /** The parts of one session, as the turns they were produced in. */
 const turnsOf = (
-  stream: Trajectory.SessionStream<Trajectory.AnyConfig, Failure>,
+  stream: Session.SessionStream<Trajectory.AnyConfig, Failure>,
 ): Effect.Effect<ReadonlyArray<Turn>, Failure> =>
   View.promptTurns(stream).pipe(
     Stream.runCollect,
@@ -124,8 +124,8 @@ const turnsOf = (
  * of the conversation is the parts of one session out of them.
  */
 const ancestorsOf = (
-  sessions: Trajectory.Sessions<Trajectory.AnyConfig, Failure>,
-  session: Trajectory.Session<Trajectory.AnyConfig, Failure>,
+  sessions: Session.Sessions<Trajectory.AnyConfig, Failure>,
+  session: Session.Session<Trajectory.AnyConfig, Failure>,
 ): ReadonlyArray<string> => {
   const walked: Array<string> = [];
 
@@ -144,7 +144,7 @@ const ancestorsOf = (
 
 /** The parts of the session `id` out of what it ran on, as the turns they were produced in. */
 const turnsOfSession = (
-  session: Trajectory.Session<Trajectory.AnyConfig, Failure>,
+  session: Session.Session<Trajectory.AnyConfig, Failure>,
   id: string,
 ): Effect.Effect<ReadonlyArray<Turn>, Failure> =>
   turnsOf(
@@ -154,13 +154,13 @@ const turnsOfSession = (
 /**
  * One session as the viewer reads it, and the sessions forked off it.
  *
- * A session is read from the sessions `Trajectory.toSessions` read, which hold what each
+ * A session is read from the sessions `Session.toSessions` read, which hold what each
  * of them ran on: the parts of the sessions it continues from, up to the part each of them
- * is continued from, and the parts of its own ({@link Trajectory.Session.stream}).
+ * is continued from, and the parts of its own ({@link Session.Session.stream}).
  */
 const readSession = (
-  sessions: Trajectory.Sessions<Trajectory.AnyConfig, Failure>,
-  session: Trajectory.Session<Trajectory.AnyConfig, Failure>,
+  sessions: Session.Sessions<Trajectory.AnyConfig, Failure>,
+  session: Session.Session<Trajectory.AnyConfig, Failure>,
 ): Effect.Effect<TrajectorySession, Failure> =>
   Effect.gen(function* () {
     const forks = Object.values(sessions).filter((forked) =>
@@ -198,7 +198,7 @@ const readSession = (
  * the bytes themselves. Loading reads the head of them for what the trajectory was
  * made with, and `read` reads the parts, which is what the exchange reads a
  * trajectory into. What the parts are kept in while the sessions are read is the store
- * `Trajectory.toSessions` states where a program states none: the parts are kept in
+ * `Session.toSessions` states where a program states none: the parts are kept in
  * memory for as long as the page runs, which is as long as the sessions are shown. It
  * takes a `Uint8Array` rather than a stream because a `.trajs` file is what a page
  * reads, and a file is read whole.
@@ -209,7 +209,7 @@ export const read = (bytes: Uint8Array): Effect.Effect<Trajectory, Failure, Scop
 
     const loaded = yield* exchange.load(Handed);
 
-    const sessions = yield* Trajectory.toSessions(loaded.read());
+    const sessions = yield* Session.toSessions(loaded.read());
     const roots = Object.values(sessions).filter((session) => Option.isNone(session.forkedFrom));
 
     return {

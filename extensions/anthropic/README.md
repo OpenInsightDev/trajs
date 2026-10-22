@@ -8,7 +8,7 @@ API is handed is not that stream: it is one conversation per session, holding th
 messages the session's model was given and answered in the order they were produced,
 and what the session inherited from the one it continues from.
 `Codec.makeAnthropic` reads the sessions of a trajectory as those conversations, stated
-the way the API takes them — the sessions `Trajectory.toSessions` read of it. It is
+the way the API takes them — the sessions `Session.toSessions` read of it. It is
 what the package is for, so it is re-exported as a namespace; it is also available as
 the subpath import `@trajs/extension-anthropic/Codec`.
 
@@ -18,7 +18,7 @@ the subpath import `@trajs/extension-anthropic/Codec`.
 import { Effect } from "effect";
 import { Codec } from "@trajs/extension-anthropic";
 
-const sessions = await Effect.runPromise(Trajectory.toSessions(trajectory));
+const sessions = await Effect.runPromise(Session.toSessions(trajectory));
 const conversations = await Effect.runPromise(Codec.makeAnthropic(sessions));
 const conversation = conversations[sessionId];
 

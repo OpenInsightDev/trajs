@@ -15,6 +15,7 @@ import { Prompt } from "effect/ai";
 
 import { collapse, initial, type State } from "#/internal/folding.ts";
 import type * as Response from "#/Response.ts";
+import type * as Session from "#/Session.ts";
 import type * as Trajectory from "#/Trajectory.ts";
 import { TrajectoryError } from "#/TrajectoryError.ts";
 import type { Conversation, PromptTurn, ToolTurn } from "#/View.ts";
@@ -75,7 +76,7 @@ const assemble = <Config extends Trajectory.AnyConfig>(
  * closed by the prompt after it, or by the parts ending.
  */
 export const readTurns = <Config extends Trajectory.AnyConfig, E, R>(
-  stream: Trajectory.SessionStream<Config, E, R>,
+  stream: Session.SessionStream<Config, E, R>,
 ): Stream.Stream<PromptTurn<Config>, E, R> =>
   stream.pipe(
     Stream.mapAccum(closed<Config>, assemble, {
@@ -90,7 +91,7 @@ export const readTurns = <Config extends Trajectory.AnyConfig, E, R>(
  * produced in, concatenated in the order they were produced.
  */
 export const readPrompt = <Config extends Trajectory.AnyConfig, E, R>(
-  stream: Trajectory.SessionStream<Config, E, R>,
+  stream: Session.SessionStream<Config, E, R>,
 ): Effect.Effect<Prompt.Prompt, E, R> =>
   readTurns(stream).pipe(
     Stream.runFold(
@@ -105,7 +106,7 @@ export const readPrompt = <Config extends Trajectory.AnyConfig, E, R>(
 
 /** The conversation of every session, by session id: the messages each of them ran on. */
 export const readConversations = <Config extends Trajectory.AnyConfig, E, R>(
-  sessions: Trajectory.Sessions<Config, E, R>,
+  sessions: Session.Sessions<Config, E, R>,
 ): Effect.Effect<Record<string, Conversation>, E | TrajectoryError, R> =>
   Effect.forEach(Object.values(sessions), (session) =>
     readPrompt(session.stream).pipe(
@@ -121,7 +122,7 @@ export const readConversations = <Config extends Trajectory.AnyConfig, E, R>(
  * one turn there.
  */
 export const readToolTurns = <Config extends Trajectory.AnyConfig, E, R>(
-  stream: Trajectory.SessionStream<Config, E, R>,
+  stream: Session.SessionStream<Config, E, R>,
 ): Stream.Stream<ToolTurn<Config>, E, R> =>
   stream.pipe(
     Stream.mapAccum(

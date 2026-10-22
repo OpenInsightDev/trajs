@@ -2,10 +2,10 @@
 "@trajs/core": minor
 ---
 
-`Session.Fork.part` is a `Session.ForkPart` — a prompt, a response, or a session
-declaration — rather than any `Trajectory.Part`. Those three are the parts a session
-continues from; the events a trajectory holds and the metrics a kit derives are read
-with the parts they are attached to rather than continued from.
+`Session.Fork.part` is the `uuid` of a part a session continues from — a prompt, a
+response, or a session declaration — rather than of any `Trajectory.Part`. Those three are
+the parts a session continues from; the events a trajectory holds and the metrics a kit
+derives are read with the parts they are attached to rather than continued from.
 
 Both readings of a `fork` resolve it against those parts alone, so a `fork` naming an
 event part is not a part a session continues from: `Session.toSessions` fails it as

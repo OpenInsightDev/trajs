@@ -160,7 +160,7 @@ const openingAnswer = [
       "So the sessions of a trajectory are read by filtering its parts into them, once:",
       "",
       "```ts",
-      "const sessions = await Effect.runPromise(Trajectory.toSessions(trajectory))",
+      "const sessions = await Effect.runPromise(Session.toSessions(trajectory))",
       "```",
       "",
       "What tells the filtering apart from a mere partition is the fork: a session that continues from one of the parts of another runs on that session's parts up to there rather than repeating them.",

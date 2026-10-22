@@ -7,7 +7,7 @@
  *
  * The parts are built here rather than read from a `.trajs` file so the case stands on its
  * own; a real analysis reads the same parts as the `stream` of a session
- * `Trajectory.toSessions` read of a trajectory an `Exchange` loaded.
+ * `Session.toSessions` read of a trajectory an `Exchange` loaded.
  */
 
 import { expect, it } from "@effect/vitest";
@@ -17,6 +17,7 @@ import {
   MetricKit,
   Prompt,
   Response,
+  Session,
   Toolkit,
   Trajectory,
   View,
@@ -65,8 +66,8 @@ const trajectory = Trajectory.make(config)(
 );
 
 const main = Effect.fn(function* () {
-  const sessions = yield* Trajectory.toSessions(trajectory);
-  const session = Option.getOrThrow(Trajectory.session(Trajectory.rootSession)(sessions));
+  const sessions = yield* Session.toSessions(trajectory);
+  const session = Option.getOrThrow(Session.session(Trajectory.rootSession)(sessions));
 
   const turns = yield* View.promptTurns(session.stream).pipe(Stream.runCollect);
 

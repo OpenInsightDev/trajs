@@ -247,7 +247,7 @@ export interface Loaded {
    * that is held. Held in memory, the parts need no encoding at all — the capability a stream
    * states for this (`Stream.share` with a `replay` a later subscriber reads, or the pull one is
    * taken through) serves the same parts to every reader of them without their being written
-   * out and read back. `Trajectory.toSessions` keeps the parts of a session the same way, so
+   * out and read back. `Session.toSessions` keeps the parts of a session the same way, so
    * what settles one settles both.
    */
   readonly read: <C extends Trajectory.AnyConfig = Trajectory.AnyConfig>(

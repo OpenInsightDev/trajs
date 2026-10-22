@@ -7,8 +7,8 @@
  * provider's API is handed — and {@link toolTurns} reads them as the calls a model made with
  * its tools, each with the result it was answered with.
  *
- * What each of them reads is the parts of one session ({@link Trajectory.SessionStream}),
- * which {@link Trajectory.toSessions} reads apart from the one stream a trajectory holds
+ * What each of them reads is the parts of one session ({@link Session.SessionStream}),
+ * which {@link Session.toSessions} reads apart from the one stream a trajectory holds
  * them in. {@link conversations} reads every session a trajectory holds at once; the others
  * read one of them — `View.promptTurns(session.stream)`, say.
  */
@@ -18,6 +18,7 @@ import type { Prompt } from "effect/ai";
 
 import { readConversations, readPrompt, readToolTurns, readTurns } from "#/internal/view.ts";
 import type * as Response from "#/Response.ts";
+import type * as Session from "#/Session.ts";
 import type * as Trajectory from "#/Trajectory.ts";
 import type { TrajectoryError } from "#/TrajectoryError.ts";
 
@@ -64,7 +65,7 @@ export type PromptTurn<Config extends Trajectory.AnyConfig> = Readonly<{
  *   turn, whichever form the parts were written in: the increments of a streamed response are
  *   folded into the parts they complete, and a response part that is whole already is produced
  *   as itself.
- * - The parts are of one session ({@link Trajectory.SessionStream}), so a response part is on
+ * - The parts are of one session ({@link Session.SessionStream}), so a response part is on
  *   the turn the prompt before it opened: one no prompt precedes is on no turn, and is dropped
  *   rather than carried.
  * - A prompt part with no response reads as its messages alone: it opens a turn whether or not
@@ -95,11 +96,11 @@ export type PromptTurn<Config extends Trajectory.AnyConfig> = Readonly<{
  * ```
  *
  * @see {@link PromptTurn} for the turn it emits.
- * @see {@link Trajectory.Session.stream} for the parts a session is read by.
+ * @see {@link Session.Session.stream} for the parts a session is read by.
  * @category combinators
  */
 export const promptTurns = <Config extends Trajectory.AnyConfig, E, R>(
-  stream: Trajectory.SessionStream<Config, E, R>,
+  stream: Session.SessionStream<Config, E, R>,
 ): Stream.Stream<PromptTurn<Config>, E, R> => readTurns(stream);
 
 /**
@@ -141,11 +142,11 @@ export const promptTurns = <Config extends Trajectory.AnyConfig, E, R>(
  *
  * @see {@link promptTurns} for the turns it is folded from.
  * @see {@link PromptTurn} for a turn of the conversation on its own.
- * @see {@link Trajectory.Session.stream} for the parts a session is read by.
+ * @see {@link Session.Session.stream} for the parts a session is read by.
  * @category combinators
  */
 export const prompt = <Config extends Trajectory.AnyConfig, E, R>(
-  stream: Trajectory.SessionStream<Config, E, R>,
+  stream: Session.SessionStream<Config, E, R>,
 ): Effect.Effect<Prompt.Prompt, E, R> => readPrompt(stream);
 
 /**
@@ -176,7 +177,7 @@ export type Conversation = ReadonlyArray<Prompt.Message>;
  *
  * - A session's conversation is the messages of what it ran on: what it inherited from the
  *   sessions it continues from, up to the part each of them is continued from, and what it
- *   produced itself ({@link Trajectory.Session.stream}).
+ *   produced itself ({@link Session.Session.stream}).
  * - The messages of a session are its prompts and the responses to them, folded the way
  *   {@link prompt} folds a trajectory: the increments of a streamed response into the parts
  *   they complete, and what a kit produced of the session beside them read past.
@@ -213,7 +214,7 @@ export type Conversation = ReadonlyArray<Prompt.Message>;
  *   )
  * )
  *
- * const sessions = await Effect.runPromise(Trajectory.toSessions(trajectory))
+ * const sessions = await Effect.runPromise(Session.toSessions(trajectory))
  * const conversations = await Effect.runPromise(View.conversations(sessions))
  *
  * conversations["asking"]?.map((message) => message.role) // => ["user", "assistant"]
@@ -221,12 +222,12 @@ export type Conversation = ReadonlyArray<Prompt.Message>;
  * ```
  *
  * @see {@link Conversation} for one session's messages.
- * @see {@link Trajectory.toSessions} for the sessions it is given.
+ * @see {@link Session.toSessions} for the sessions it is given.
  * @see {@link prompt} for one session's messages read as one prompt instead.
  * @category combinators
  */
 export const conversations = <Config extends Trajectory.AnyConfig, E, R>(
-  sessions: Trajectory.Sessions<Config, E, R>,
+  sessions: Session.Sessions<Config, E, R>,
 ): Effect.Effect<Record<string, Conversation>, E | TrajectoryError, R> =>
   readConversations(sessions);
 
@@ -322,9 +323,9 @@ export type ToolTurn<Config extends Trajectory.AnyConfig> = Readonly<{
  *
  * @see {@link ToolTurn} for the turn it emits.
  * @see {@link promptTurns} for the conversation read instead.
- * @see {@link Trajectory.Session.stream} for the parts a session is read by.
+ * @see {@link Session.Session.stream} for the parts a session is read by.
  * @category combinators
  */
 export const toolTurns = <Config extends Trajectory.AnyConfig, E, R>(
-  stream: Trajectory.SessionStream<Config, E, R>,
+  stream: Session.SessionStream<Config, E, R>,
 ): Stream.Stream<ToolTurn<Config>, E, R> => readToolTurns(stream);

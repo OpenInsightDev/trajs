@@ -21,6 +21,7 @@
 
 import { View } from "@trajs/core";
 import type { Response, Trajectory } from "@trajs/core";
+import type * as Session from "@trajs/core/Session";
 import type { TrajectoryError } from "@trajs/core/TrajectoryError";
 import { Option, Stream } from "effect";
 import type { Prompt, Tool } from "effect/ai";
@@ -208,8 +209,8 @@ const stepsOf = <Config extends Trajectory.AnyConfig>(
  *
  * **Details**
  *
- * - What it reads is the parts of one session ({@link Trajectory.SessionStream}), which
- *   `Trajectory.toSessions` reads of a trajectory: the steps of a document are the steps
+ * - What it reads is the parts of one session ({@link Session.SessionStream}), which
+ *   `Session.toSessions` reads of a trajectory: the steps of a document are the steps
  *   of one run, so a trajectory of several sessions is read one session at a time.
  * - One turn is read as a step for each message of its prompt, followed by one `agent`
  *   step for the parts the turn produced — where it produced any — so the steps are in
@@ -246,8 +247,8 @@ const stepsOf = <Config extends Trajectory.AnyConfig>(
  *   )
  * )
  *
- * const sessions = await Effect.runPromise(Trajectory.toSessions(trajectory))
- * const session = Option.getOrThrow(Trajectory.session(sessionId)(sessions))
+ * const sessions = await Effect.runPromise(Session.toSessions(trajectory))
+ * const session = Option.getOrThrow(Session.session(sessionId)(sessions))
  *
  * const steps = await Effect.runPromise(Stream.runCollect(Step.steps(session.stream)))
  *
@@ -256,10 +257,10 @@ const stepsOf = <Config extends Trajectory.AnyConfig>(
  *
  * @see {@link Step} — the steps that are emitted.
  * @see {@link View.promptTurns} — the turns they are read from.
- * @see {@link Trajectory.Session.stream} — the parts a session is read by.
+ * @see {@link Session.Session.stream} — the parts a session is read by.
  * @category combinators
  */
 export const steps = <Config extends Trajectory.AnyConfig, E, R>(
-  stream: Trajectory.SessionStream<Config, E, R>,
+  stream: Session.SessionStream<Config, E, R>,
 ): Stream.Stream<Step<Tools<Config>>, E | TrajectoryError, R> =>
   View.promptTurns(stream).pipe(Stream.flatMap((turn) => Stream.fromIterable(stepsOf(turn))));

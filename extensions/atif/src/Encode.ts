@@ -143,7 +143,7 @@ export interface Options {
  *
  * ```ts import.meta.vitest
  * import { Effect, FileSystem, Layer, Option, Path, Schema, Stream } from "effect"
- * import { Trajectory } from "@trajs/core"
+ * import { Session, Trajectory } from "@trajs/core"
  * import { Document, Encode, Step, stepExtra } from "@trajs/extension-atif"
  *
  * // The `trajectory.json` Harbor's Claude Code adapter writes for the task of
@@ -216,8 +216,8 @@ export interface Options {
  * // it answered with, and the turns after the first open with no message of their own.
  * // The reading needs the file system and the paths of the program it runs in; a
  * // document that names no image and no recording is read with any of them.
- * const sessions = await Effect.runPromise(Trajectory.toSessions(trajectory))
- * const session = Option.getOrThrow(Trajectory.session(document.session_id)(sessions))
+ * const sessions = await Effect.runPromise(Session.toSessions(trajectory))
+ * const session = Option.getOrThrow(Session.session(document.session_id)(sessions))
  *
  * const steps = Array.from(
  *   await Effect.runPromise(

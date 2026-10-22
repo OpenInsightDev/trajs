@@ -11,10 +11,10 @@
  *
  * The bytes are what both readings of what a trajectory holds are of: the exchange format this
  * package ships keeps a trajectory as the frames of its parts, and the sessions of a trajectory
- * are read out of the same frames kept in a store of bytes ({@link Trajectory.toSessions}).
+ * are read out of the same frames kept in a store of bytes ({@link Session.toSessions}).
  *
  * Nothing here is published: a program reaches the bytes through `Exchange` and
- * `Trajectory.toSessions`.
+ * `Session.toSessions`.
  */
 
 import { Effect, Option, Schema, SchemaTransformation, Stream } from "effect";
@@ -57,7 +57,7 @@ export type PartMembers<C extends Trajectory.AnyConfig> = readonly [
 /**
  * A config a trajectory's parts are read as: one whose parts take no service to read, since
  * they are read from bytes synchronously rather than run ({@link Exchange.Loaded.read},
- * {@link Trajectory.toSessions}).
+ * {@link Session.toSessions}).
  *
  * A part is read as the plain schemas a trajectory is rebuilt from, so what a kit states
  * of its contributions is read with no service; a response part is the one part read

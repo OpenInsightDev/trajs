@@ -1,10 +1,10 @@
 /**
- * The reading behind {@link Trajectory.toSessions}: one pass over a trajectory keeps its parts
+ * The reading behind {@link Session.toSessions}: one pass over a trajectory keeps its parts
  * in a store of bytes, so that one session of it is read by filtering those parts from the
  * head — as often as it is read, and without reading the trajectory again.
  *
  * Nothing here is published: a program reaches the reading through
- * `Trajectory.toSessions`.
+ * `Session.toSessions`.
  */
 
 import { ByteStore, layer as byteStoreLayer, type ByteStoreError } from "@trajs/utils/ByteStore";
@@ -18,6 +18,7 @@ import {
   type EncodingServices,
   type Readable,
 } from "#/internal/parts.ts";
+import type * as Session from "#/Session.ts";
 import type * as Trajectory from "#/Trajectory.ts";
 import { TrajectoryError } from "#/TrajectoryError.ts";
 
@@ -29,7 +30,7 @@ interface Recorded {
   /** The `uuid` of the part that declared the session, where the trajectory declares it. */
   declaration?: string;
   /** The session it continues from, and the part of it it continues from, where a declaration reads a `fork`. */
-  fork?: Trajectory.Fork;
+  fork?: Session.Fork;
 }
 
 /**
@@ -50,7 +51,7 @@ const stored = <Config extends Trajectory.AnyConfig, E, R>(
   trajectory: Trajectory.Trajectory<string, Config, E, R> & Readable<Config>,
   store: ByteStore,
 ): Effect.Effect<
-  Trajectory.Sessions<Config, TrajectoryError | ByteStoreError>,
+  Session.Sessions<Config, TrajectoryError | ByteStoreError>,
   E | TrajectoryError | ByteStoreError,
   R | EncodingServices<Config>
 > =>
@@ -70,10 +71,7 @@ const stored = <Config extends Trajectory.AnyConfig, E, R>(
      * the time the declaration reading it is read, so one that names a part it has not reached — or
      * one no session continues from — is a session the trajectory cannot be read as.
      */
-    const continuing = (
-      id: string,
-      fork: string,
-    ): Effect.Effect<Trajectory.Fork, TrajectoryError> =>
+    const continuing = (id: string, fork: string): Effect.Effect<Session.Fork, TrajectoryError> =>
       Effect.gen(function* () {
         const session = producing.get(fork);
 
@@ -152,7 +150,7 @@ const stored = <Config extends Trajectory.AnyConfig, E, R>(
      */
     const lineage = (id: string): ReadonlyMap<string, string | undefined> => {
       /** The forks from the one `id` is nearest to up to the one at its root. */
-      const forks: Array<Trajectory.Fork> = [];
+      const forks: Array<Session.Fork> = [];
       const walked = new Set([id]);
 
       let fork = recorded.get(id)?.fork;
@@ -181,7 +179,7 @@ const stored = <Config extends Trajectory.AnyConfig, E, R>(
      */
     const streamOf = (
       id: string,
-    ): Trajectory.SessionStream<Config, TrajectoryError | ByteStoreError> =>
+    ): Session.SessionStream<Config, TrajectoryError | ByteStoreError> =>
       Stream.suspend(() => {
         /** The parts kept so far, by `uuid`: what a metric part is attached to. */
         const held = new Set<string>();
@@ -236,13 +234,10 @@ const stored = <Config extends Trajectory.AnyConfig, E, R>(
         // SAFETY: what `keep` drops is the declaration of every session — the one kind of part that
         // names a session rather than being one of its parts — so what is kept is a reading of the
         // parts of one session, which is what a `SessionStream` is.
-        return stream as Trajectory.SessionStream<Config, TrajectoryError | ByteStoreError>;
+        return stream as Session.SessionStream<Config, TrajectoryError | ByteStoreError>;
       });
 
-    const sessions: Record<
-      string,
-      Trajectory.Session<Config, TrajectoryError | ByteStoreError>
-    > = {};
+    const sessions: Record<string, Session.Session<Config, TrajectoryError | ByteStoreError>> = {};
 
     for (const id of recorded.keys()) {
       sessions[id] = {
@@ -262,7 +257,7 @@ const stored = <Config extends Trajectory.AnyConfig, E, R>(
 export const read = <Config extends Trajectory.AnyConfig, E, R>(
   trajectory: Trajectory.Trajectory<string, Config, E, R> & Readable<Config>,
 ): Effect.Effect<
-  Trajectory.Sessions<Config, TrajectoryError | ByteStoreError>,
+  Session.Sessions<Config, TrajectoryError | ByteStoreError>,
   E | TrajectoryError | ByteStoreError,
   R | EncodingServices<Config>
 > => Effect.flatMap(inMemory(), (store) => stored(trajectory, store));
@@ -275,7 +270,7 @@ export const read = <Config extends Trajectory.AnyConfig, E, R>(
 export const readCached = <Config extends Trajectory.AnyConfig, E, R>(
   trajectory: Trajectory.Trajectory<string, Config, E, R> & Readable<Config>,
 ): Effect.Effect<
-  Trajectory.Sessions<Config, TrajectoryError | ByteStoreError>,
+  Session.Sessions<Config, TrajectoryError | ByteStoreError>,
   E | TrajectoryError | ByteStoreError,
   R | EncodingServices<Config> | ByteStore
 > => Effect.flatMap(ByteStore, (store) => stored(trajectory, store));
