@@ -12,14 +12,13 @@
  * **Details**
  *
  * A trajectory is a stream of parts in one total order, so a row is one part in
- * that order, and the trajectory it was read from is the digest its metadata
- * names its bytes by. What every part states of itself is a column of its own —
- * the kind of part and what it is of that kind, the session it belongs to, the
- * part's own id and the moment it was produced — so a query groups and filters
- * without reaching into a payload. A session is not the trajectory that declares
- * it: one trajectory can hold several sessions — the session of the run itself,
- * and the sessions of the agents it starts — so `digest` and `session_id` group
- * the same rows two ways.
+ * that order, and the trajectory it was read from is the id it carries. What every
+ * part states of itself is a column of its own — the kind of part and what it is
+ * of that kind, the session it belongs to, the part's own id and the moment it was
+ * produced — so a query groups and filters without reaching into a payload. A
+ * session is not the trajectory that declares it: one trajectory can hold several
+ * sessions — the session of the run itself, and the sessions of the agents it
+ * starts — so `trajectory_id` and `session_id` group the same rows two ways.
  *
  * What a part is of its kind is the payload the rest is read off
  * ({@link Row.part}): the part exactly as {@link Exchange.Service.save} encodes
@@ -31,10 +30,9 @@
  * typed separately from the ones that are not, so reading one is reading a
  * subcolumn rather than parsing a document.
  *
- * The rows of a trajectory are replaced rather than duplicated when the same
- * trajectory is written twice — it is the same bytes, so it names the same
- * digest — and no row is written for a part a reading did not name: a
- * trajectory read without an event kit holds no event parts.
+ * The rows of a trajectory are replaced rather than duplicated when the trajectory
+ * of the same id is written twice, and no row is written for a part a reading did
+ * not name: a trajectory read without an event kit holds no event parts.
  */
 
 import { Part as partSchema, type EncodingServices } from "@trajs/core/Exchange";
@@ -64,11 +62,11 @@ export const name = table;
  * **Details**
  *
  * It creates the table only where it is not there, so it is safe to state on
- * every run. The engine is a `ReplacingMergeTree` keyed by the trajectory and
- * the part's position in it, so writing the same trajectory twice keeps one row
- * per part rather than two: replacing happens when ClickHouse merges the parts
- * of the table, so a count is deduplicated by `FINAL` or by a query that
- * aggregates by the key.
+ * every run. The engine is a `ReplacingMergeTree` keyed by the trajectory and the
+ * part's position in it, so writing a trajectory twice keeps one row per part
+ * rather than two: replacing happens when ClickHouse merges the parts of the
+ * table, so a count is deduplicated by `FINAL` or by a query that aggregates by
+ * the key.
  *
  * The payload states up to 64 paths as subcolumns of their own, which is what a
  * query over one reads; a path past that limit is kept in the column's shared
@@ -109,15 +107,16 @@ export type Encoded<C extends Trajectory.AnyConfig = Trajectory.AnyConfig> = Sch
  * **Details**
  *
  * The fields are named as the columns are, so a row is written without a column
- * list. `position` is where the part is in the one order a trajectory carries
- * its parts in, and `session_id` is the session's own id for a session part and
- * none for a metric part, which states no session.
+ * list. `trajectory_id` is the id the trajectory the part was read from carries,
+ * `position` is where the part is in the one order a trajectory carries its parts
+ * in, and `session_id` is the session's own id for a session part and none for a
+ * metric part, which states no session.
  *
  * @category models
  */
 export interface Row {
-  /** The trajectory the part was read from, as the digest its metadata names it by. */
-  readonly digest: string;
+  /** The trajectory the part was read from, as the id that trajectory carries. */
+  readonly trajectory_id: string;
 
   /** Where the part is in the one order that trajectory carries its parts in, counting from zero. */
   readonly position: number;
@@ -177,6 +176,9 @@ export const create = (): Effect.Effect<void, SqlError, Client> =>
  *
  * **Details**
  *
+ * Every row states the id `trajectory` carries ({@link Row.trajectory_id}), so a
+ * whole trajectory is the rows of one `trajectory_id`.
+ *
  * Each part is encoded as the exchange encodes it before it is a row, so what
  * the payload column carries is the part as a trajectory states it rather than
  * as the toolkit it was produced with does: a tool result travels as its
@@ -201,8 +203,8 @@ export const rows = rowsOf;
  *
  * A batch is one insert of up to 4096 rows, and two batches are inserted at a
  * time. The count is what was sent rather than what the server kept: rows of the
- * same digest and position are replaced by the next write of them rather than
- * added to them ({@link ddl}).
+ * same `trajectory_id` and `position` are replaced by the next write of them
+ * rather than added to them ({@link ddl}).
  *
  * @see {@link create} for the table it writes into.
  * @category destructors
@@ -210,8 +212,7 @@ export const rows = rowsOf;
 export const write = writeRows;
 
 /**
- * Writes `trajectory` into {@link name} under `digest`, saying how many rows it
- * became.
+ * Writes `trajectory` into {@link name}, saying how many rows it became.
  *
  * **When to use**
  *
@@ -221,11 +222,15 @@ export const write = writeRows;
  *
  * **Details**
  *
- * `digest` names the trajectory the rows are of, and is what a query joins the
- * parts of one trajectory on; a trajectory read off the bytes of a `.trajs`
- * file is named by `metadata.digest` of what was loaded. What is written is
- * {@link rows} batched by {@link write}, so the table must be there already
- * ({@link create}).
+ * The rows are written under the id `trajectory` carries, and that id is what a
+ * query joins the parts of one trajectory on: a trajectory a program builds is
+ * named by the id it was made with ({@link Trajectory.make}), and one read off a
+ * `.trajs` file is named by the uuid the load generated, since the bytes state no
+ * id of their own. Two trajectories of the same id are one trajectory to the
+ * table, so importing the same id twice replaces its rows rather than adding to
+ * them ({@link ddl}); importing the same file twice is two ids, and so two
+ * trajectories. What is written is {@link rows} batched by {@link write}, so the
+ * table must be there already ({@link create}).
  *
  * **Example** (Importing a trajectory a program kept)
  *
@@ -239,16 +244,14 @@ export const write = writeRows;
  *     const exchange = yield* Exchange
  *     const loaded = yield* exchange.load(id)
  *
- *     return yield* Parts.ingest(loaded.metadata.digest)(loaded.read(config))
+ *     return yield* Parts.ingest(loaded.read(config))
  *   })
  * ```
  *
  * @see {@link create} for the table it writes into.
  * @category destructors
  */
-export const ingest =
-  (digest: string) =>
-  <C extends Trajectory.AnyConfig, E, R>(
-    trajectory: Trajectory.Trajectory<string, C, E, R>,
-  ): Effect.Effect<number, E | TrajectoryError | SqlError, R | EncodingServices<C> | Client> =>
-    rows(digest)(trajectory).pipe(write);
+export const ingest = <C extends Trajectory.AnyConfig, E, R>(
+  trajectory: Trajectory.Trajectory<string, C, E, R>,
+): Effect.Effect<number, E | TrajectoryError | SqlError, R | EncodingServices<C> | Client> =>
+  rows(trajectory).pipe(write);

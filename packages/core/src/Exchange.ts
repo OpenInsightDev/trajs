@@ -104,12 +104,12 @@ export type Header = Schema.Schema.Type<typeof Header>;
 
 /**
  * What a trajectory states at its end about the bytes it is made of: how that frame
- * was written, and what the trajectory is named by.
+ * was written, and what its parts digest to.
  *
  * **When to use**
  *
- * Use to read what a trajectory was written with and what names it without reading
- * the parts it carries, or to state the metadata of a trajectory of your own.
+ * Use to read what a trajectory was written with and what its parts digest to without
+ * reading the parts it carries, or to state the metadata of a trajectory of your own.
  *
  * **Details**
  *
@@ -117,8 +117,10 @@ export type Header = Schema.Schema.Type<typeof Header>;
  *   ({@link Compression.Algorithm}) and `hash` the algorithm their digest was read
  *   with ({@link StreamHash.Algorithm}), each as the code it goes by, so a trajectory
  *   states what wrote it rather than leaving the reader to assume.
- * - `digest` is the digest of those parts, which is what names the trajectory — the
- *   lowercase hex a {@link StreamHash} reads one off with.
+ * - `digest` is the digest of those parts — the lowercase hex a {@link StreamHash}
+ *   reads one off with — so two trajectories made of the same parts state the same
+ *   digest. It names the bytes rather than the trajectory: a trajectory is named by
+ *   the id it carries ({@link Trajectory.Trajectory}).
  * - `version` is the version of this package that wrote the trajectory
  *   ({@link Version}).
  *
@@ -179,7 +181,7 @@ export type EncodingServices<C extends Trajectory.AnyConfig> = Encoding<C>;
  *   without reading the frame.
  * - `metadata` is what the metadata a trajectory ends with states ({@link Metadata}),
  *   read off its tail while the trajectory is loaded — so how its parts were written
- *   and what it is named by are known without reading that frame either.
+ *   and what they digest to are known without reading that frame either.
  * - `read(config)` reads the whole trajectory as its parts make it, under the kits
  *   the config names: a part none of them reads is stepped over rather than ending the
  *   reading — an event part of an event the config does not name, say — since a
@@ -225,8 +227,8 @@ export interface Loaded {
 
   /**
    * What the trajectory states at its end about its own bytes, as the metadata read
-   * off the tail of them — how the frame was written and what the trajectory is named
-   * by ({@link Metadata}).
+   * off the tail of them — how the frame was written and what its parts digest to
+   * ({@link Metadata}).
    */
   readonly metadata: Metadata;
 
@@ -261,7 +263,7 @@ export interface Loaded {
    *
    * The bytes read from the storage the first time are written to the store under what
    * the trajectory states of them — the hash and the digest of its parts, which is what
-   * {@link Metadata} names it by — so every reading after that, here and in any other
+   * {@link Metadata} states of them — so every reading after that, here and in any other
    * load of a trajectory whose bytes are the same, takes them from the store rather
    * than reading the storage and the frame a second time. Nothing of a config travels
    * with them: the bytes are the frame a trajectory is carried in, so they are read as

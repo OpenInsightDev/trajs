@@ -85,7 +85,7 @@ export const inspect = Command.make(
     ),
     metadata: Flag.Boolean("metadata").pipe(
       Flag.withDescription(
-        "Print what the trajectory states at its end instead of at its head: how its parts were written and what it is named by, with each algorithm named rather than coded.",
+        "Print what the trajectory states at its end instead of at its head: how its parts were written and what they digest to, with each algorithm named rather than coded.",
       ),
       Flag.withDefault(false),
     ),

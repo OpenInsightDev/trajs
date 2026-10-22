@@ -6,8 +6,8 @@
  * {@link Parts}, which states what the columns are and what writes and reads
  * them. What the table is states the column list, since a `JSON` column's paths
  * are hints of that statement rather than of the row, and what a part states of
- * itself is read to make a row — the kind of part it is, the session it belongs
- * to, its own id and the moment it was produced.
+ * itself is read to make a row — the trajectory it is of, the kind of part it is,
+ * the session it belongs to, its own id and the moment it was produced.
  */
 
 import { Part as partSchema, type EncodingServices } from "@trajs/core/Exchange";
@@ -41,7 +41,7 @@ const hinted = [
 
 /** The statement that creates {@link name}, as ClickHouse is asked for it. */
 export const ddl = `CREATE TABLE IF NOT EXISTS ${name} (
-    digest String,
+    trajectory_id String,
     position UInt32,
     tag LowCardinality(String),
     variant LowCardinality(String),
@@ -51,7 +51,7 @@ export const ddl = `CREATE TABLE IF NOT EXISTS ${name} (
     part JSON(max_dynamic_paths = 64, ${hinted})
   )
   ENGINE = ReplacingMergeTree
-  ORDER BY (digest, position)`;
+  ORDER BY (trajectory_id, position)`;
 
 /** The moment `timestamp` states, as ClickHouse reads one, and `null` where it states none. */
 const moment = (timestamp: DateTime.Utc | undefined): string | null =>
@@ -105,32 +105,37 @@ const stated = (part: Trajectory.Part<Trajectory.AnyConfig>) =>
     }),
   });
 
-/** The row `part` makes at `position` of the trajectory `digest` names, carrying the payload it was encoded to. */
+/**
+ * The row `part` makes at `position` of `trajectoryId`, carrying the payload it
+ * was encoded to.
+ */
 const rowOf = (
-  digest: string,
+  trajectoryId: string,
   position: number,
   part: Trajectory.Part<Trajectory.AnyConfig>,
   encoded: Encoded,
-): Row => ({ digest, position, ...stated(part), part: encoded });
+): Row => ({ trajectory_id: trajectoryId, position, ...stated(part), part: encoded });
 
-/** The parts of a trajectory as the rows of {@link name}, in the order they arrive. */
-export const rowsOf =
-  (digest: string) =>
-  <C extends Trajectory.AnyConfig, E, R>(
-    trajectory: Trajectory.Trajectory<string, C, E, R>,
-  ): Stream.Stream<Row, E | TrajectoryError, R | EncodingServices<C>> => {
-    const encode = partSchema(trajectory).pipe(Schema.encodeEffect);
+/** The parts of `trajectory` as the rows of {@link name}, in the order they arrive. */
+export const rowsOf = <C extends Trajectory.AnyConfig, E, R>(
+  trajectory: Trajectory.Trajectory<string, C, E, R>,
+): Stream.Stream<Row, E | TrajectoryError, R | EncodingServices<C>> => {
+  const encode = partSchema(trajectory).pipe(Schema.encodeEffect);
 
-    return trajectory.pipe(
-      Stream.zipWithIndex,
-      Stream.mapEffect(([part, position]) =>
-        encode(part).pipe(
-          Effect.mapError(TrajectoryError.parse),
-          Effect.map((encoded) => rowOf(digest, position, part, encoded)),
-        ),
+  // Every row of one reading is of the trajectory it is read from, named by the id
+  // that trajectory carries.
+  const { id } = trajectory;
+
+  return trajectory.pipe(
+    Stream.zipWithIndex,
+    Stream.mapEffect(([part, position]) =>
+      encode(part).pipe(
+        Effect.mapError(TrajectoryError.parse),
+        Effect.map((encoded) => rowOf(id, position, part, encoded)),
       ),
-    );
-  };
+    ),
+  );
+};
 
 /**
  * How many rows are written in one insert.

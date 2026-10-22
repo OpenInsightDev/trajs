@@ -154,9 +154,9 @@ const main = () =>
     const [subAgents] = yield* ch<{ share: number }>`
       SELECT round(countIf(sessions > 1) / count(), 4) AS share
       FROM (
-        SELECT digest, uniqExact(session_id) AS sessions
+        SELECT trajectory_id, uniqExact(session_id) AS sessions
         FROM parts
-        GROUP BY digest
+        GROUP BY trajectory_id
       )
     `;
 
@@ -165,7 +165,7 @@ const main = () =>
     const days = yield* ch<Day>`
       SELECT
         toString(toDate(time)) AS day,
-        toUInt32(uniqExact(digest)) AS trajectories,
+        toUInt32(uniqExact(trajectory_id)) AS trajectories,
         toUInt32(sum(part.\`response.usage.inputTokens.total\` + part.\`response.usage.outputTokens.total\`)) AS tokens
       FROM parts
       WHERE variant = 'finish' AND time IS NOT NULL
