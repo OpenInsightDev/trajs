@@ -5,12 +5,6 @@ import { Context, Effect, Layer, Schema } from "effect";
 
 import * as Config from "#/Config.ts";
 import { Contribution, service } from "#/internal/exchange.ts";
-import {
-  part,
-  type EncodingServices as Encoding,
-  type PartMembers,
-  type Readable,
-} from "#/internal/parts.ts";
 import * as Trajectory from "#/Trajectory.ts";
 import { TrajectoryError } from "#/TrajectoryError.ts";
 

@@ -1,14 +1,3 @@
-/**
- * The frames a body is carried in: where one ends in a stream of bytes, and reading a body
- * as the values of one schema they carry.
- *
- * A frame states the length of everything after it before it states anything else of it
- * ({@link SchemaBinary}), so a body is cut into frames by their own lengths rather than
- * handed to one parser: a frame the schema does not read — a metric part of a metric a kit
- * names none of, say — is stepped over, and the frames after it are read as if it were not
- * there. That is what lets a trajectory one kit wrote be read under another.
- */
-
 import { Schema, Stream } from "effect";
 import { SchemaBinary } from "effect/encoding";
 

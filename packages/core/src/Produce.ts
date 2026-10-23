@@ -27,7 +27,7 @@ export type SessionSource<Config extends Config.AnyConfig, E = never, R = never>
   messages: MessageStream<Config, E, R>;
   subTo?: string;
 }> &
-  Extra.ExtraRecord<Config["extrakit"]["extra"], "session">;
+  Extra.ExtraRecord<Config.ExtrasOf<Config>, "session">;
 
 export type SessionStreams<Config extends Config.AnyConfig, E = never, R = never> = Readonly<{
   main: SessionSource<Config, E, R> & { readonly subTo?: never };
@@ -142,14 +142,7 @@ export function fromSession<
   ...args:
     | [id: string, config: ProducingConfig<Toolkit, Events, Metrics, Extras>]
     | [config: ProducingConfig<Toolkit, Events, Metrics, Extras>]
-): <E, R>(
-  stream: MessageStream<ProducedConfig<Toolkit, Events, Metrics, Extras>, E, R>,
-) => Trajectory.Trajectory<
-  string,
-  ProducedConfig<Toolkit, Events, Metrics, Extras>,
-  E | TrajectoryError,
-  R
-> {
+) {
   const [id, config] = args.length === 1 ? [undefined, args[0]] : args;
 
   return produceWith(id, produced(config));
@@ -196,14 +189,7 @@ export function fromSessions<
   ...args:
     | [id: string, config: ProducingConfig<Toolkit, Events, Metrics, Extras>]
     | [config: ProducingConfig<Toolkit, Events, Metrics, Extras>]
-): <E, R>(
-  sessions: SessionStreams<ProducedConfig<Toolkit, Events, Metrics, Extras>, E, R>,
-) => Trajectory.Trajectory<
-  string,
-  ProducedConfig<Toolkit, Events, Metrics, Extras>,
-  E | TrajectoryError,
-  R
-> {
+) {
   const [id, config] = args.length === 1 ? [undefined, args[0]] : args;
   const read = produced(config);
   const part = Trajectory.parts(read);
@@ -287,7 +273,7 @@ export type ProduceSession<
   ) => Effect.Effect<Trajectory.ResponsePart<Toolkit.Toolkit<Tools>, ExtraKit.Kit<Extras>, true>>;
   enqueueEvent: (
     event: Event.EventParts<Events>,
-  ) => Effect.Effect<Trajectory.EventPart<EventKit.Kit<Events>>>;
+  ) => Effect.Effect<Trajectory.EventPart<EventKit.Eventkit<Events>>>;
   forkSession: (
     options: { id: string; fork?: string } & Extra.ExtraRecord<Extras, "session">,
   ) => Effect.Effect<ProduceSession<Tools, Events, Extras>, TrajectoryError>;

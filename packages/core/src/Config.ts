@@ -9,7 +9,7 @@ import * as Toolkit from "#/Toolkit.ts";
  * **Details**
  *
  * - `toolkit` supplies schemas for tool calls and results through {@link Toolkit.Toolkit}.
- * - `eventkit` declares application events through {@link EventKit.Kit}.
+ * - `eventkit` declares application events through {@link EventKit.Eventkit}.
  * - `metrickit` supplies schemas for metric outputs and producer failures through {@link MetricKit.Kit}.
  * - `extrakit` declares prompt, response, and session extra data through {@link ExtraKit.Kit}.
  * - `stream: true` permits both streaming and non-streaming response parts.

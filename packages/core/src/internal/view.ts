@@ -18,8 +18,7 @@ import { collapse, initial, type State } from "#/internal/folding.ts";
 import type * as Response from "#/Response.ts";
 import type * as Session from "#/Session.ts";
 import * as Trajectory from "#/Trajectory.ts";
-import { TrajectoryError } from "#/TrajectoryError.ts";
-import type { Conversation, PromptTurn, ToolTurn } from "#/View.ts";
+import type { PromptTurn, ToolTurn } from "#/View.ts";
 
 /** The turn being assembled from the parts of a session read so far, and the folding of its responses. */
 interface Assembly<Config extends Config.AnyConfig> {
@@ -109,18 +108,6 @@ export const readPrompt = <Config extends Config.AnyConfig, E, R>(
           Prompt.concat(Prompt.fromResponseParts(turn.response)),
         ),
     ),
-  );
-
-/** The conversation of every session, by session id: the messages each of them ran on. */
-export const readConversations = <Config extends Config.AnyConfig, E, R>(
-  sessions: Session.Sessions<Config, E, R>,
-): Effect.Effect<Record<string, Conversation>, E | TrajectoryError, R> =>
-  Effect.forEach(sessions, (session) =>
-    readPrompt(session.stream).pipe(
-      Effect.map((prompt) => ({ id: session.id, conversation: prompt.content })),
-    ),
-  ).pipe(
-    Effect.map((read) => Object.fromEntries(read.map((entry) => [entry.id, entry.conversation]))),
   );
 
 /**

@@ -7,7 +7,7 @@
  * stated beside it.
  *
  * It is stated here rather than in `Trajectory` alone because a module `Trajectory`
- * reads as it loads attaches one too ({@link Event.encode}): a value read at load
+ * reads as it loads attaches one too ({@link EventKit.encode}): a value read at load
  * cannot be handed back to the module that reads it without the two waiting on each
  * other, so the attach both of them state lives in neither.
  *
@@ -16,7 +16,7 @@
 
 import { v7 as uuidv7 } from "uuid";
 
-import * as Config from "#/Config.ts";
+import type * as Config from "#/Config.ts";
 import type { Trajectory, TrajectoryStream } from "#/Trajectory.ts";
 
 /**

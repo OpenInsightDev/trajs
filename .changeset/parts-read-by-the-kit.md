@@ -16,9 +16,9 @@ as far as those empty kits read it.
 
 `Produce.ProduceSession.enqueueEvent` takes an `Event.EventParts` — an event at the tag
 of an event of the kit, rather than any pair of a tag and some data — and
-`Event.encode` reads an event part from the pair the trajectory holds, the tag it is at
+`EventKit.encode` reads an event part from the pair the trajectory holds, the tag it is at
 and the data stated at it, carrying one over where its tag or its data is not one the
-events given state.
+kit given states.
 
 The extra data of a part is held the same way: the kinds a kit declares of the part the
 record is of and no others, so a kind it declares none of there — one it does not name,
