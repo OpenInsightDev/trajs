@@ -35,6 +35,7 @@
  * not name: a trajectory read without an event kit holds no event parts.
  */
 
+import * as Config from "@trajs/core/Config";
 import { Part as partSchema, type EncodingServices } from "@trajs/core/Exchange";
 import type * as Trajectory from "@trajs/core/Trajectory";
 import { TrajectoryError } from "@trajs/core/TrajectoryError";
@@ -93,7 +94,7 @@ export const ddl = statement;
  *
  * @category models
  */
-export type Encoded<C extends Trajectory.AnyConfig = Trajectory.AnyConfig> = Schema.Codec.Encoded<
+export type Encoded<C extends Config.AnyConfig = Config.AnyConfig> = Schema.Codec.Encoded<
   ReturnType<typeof partSchema<C>>
 >;
 
@@ -243,7 +244,7 @@ export const write = writeRows;
  * import { Parts } from "@trajs/olap"
  * import { Effect } from "effect"
  *
- * const importTrajectory = (id: string, config: Trajectory.AnyConfig) =>
+ * const importTrajectory = (id: string, config: Config.AnyConfig) =>
  *   Effect.gen(function*() {
  *     const exchange = yield* Exchange
  *     const loaded = yield* exchange.load(id)
@@ -255,7 +256,7 @@ export const write = writeRows;
  * @see {@link create} for the table it writes into.
  * @category destructors
  */
-export const ingest = <C extends Trajectory.AnyConfig, E, R>(
+export const ingest = <C extends Config.AnyConfig, E, R>(
   trajectory: Trajectory.Trajectory<string, C, E, R>,
 ): Effect.Effect<number, E | TrajectoryError | SqlError, R | EncodingServices<C> | Client> =>
   rows(trajectory).pipe(write);

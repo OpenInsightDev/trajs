@@ -16,7 +16,8 @@
 
 import { v7 as uuidv7 } from "uuid";
 
-import type { AnyConfig, Trajectory, TrajectoryStream } from "#/Trajectory.ts";
+import * as Config from "#/Config.ts";
+import type { Trajectory, TrajectoryStream } from "#/Trajectory.ts";
 
 /**
  * The id a trajectory made without one is named by: a version 7 uuid, as every part of a
@@ -29,6 +30,6 @@ export const uuid = (): string => uuidv7();
  * id is stated — as the trajectory its parts make.
  */
 export const attach =
-  <Config extends AnyConfig>(id: string | undefined, config: Config) =>
+  <Config extends Config.AnyConfig>(id: string | undefined, config: Config) =>
   <E, R>(stream: TrajectoryStream<Config, E, R>): Trajectory<string, Config, E, R> =>
     Object.assign(stream, config, { id: id ?? uuid() });

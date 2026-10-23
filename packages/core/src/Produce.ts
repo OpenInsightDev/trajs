@@ -1,5 +1,6 @@
 import { Cause, DateTime, Effect, Exit, Queue, Stream } from "effect";
 
+import * as Config from "#/Config.ts";
 import * as Event from "#/Event.ts";
 import * as EventKit from "#/EventKit.ts";
 import * as Extra from "#/Extra.ts";
@@ -14,11 +15,7 @@ import * as Toolkit from "#/Toolkit.ts";
 import * as Trajectory from "#/Trajectory.ts";
 import { TrajectoryError } from "#/TrajectoryError.ts";
 
-export type MessageStream<
-  Config extends Trajectory.AnyConfig,
-  E = never,
-  R = never,
-> = Stream.Stream<
+export type MessageStream<Config extends Config.AnyConfig, E = never, R = never> = Stream.Stream<
   | Trajectory.PromptPart<Config["extrakit"]>
   | Trajectory.ResponsePart<Config["toolkit"], Config["extrakit"], boolean>
   | Trajectory.EventPart<Config["eventkit"]>,
@@ -26,13 +23,13 @@ export type MessageStream<
   R
 >;
 
-export type SessionSource<Config extends Trajectory.AnyConfig, E = never, R = never> = Readonly<{
+export type SessionSource<Config extends Config.AnyConfig, E = never, R = never> = Readonly<{
   messages: MessageStream<Config, E, R>;
   subTo?: string;
 }> &
   Extra.ExtraRecord<Config["extrakit"]["extra"], "session">;
 
-export type SessionStreams<Config extends Trajectory.AnyConfig, E = never, R = never> = Readonly<{
+export type SessionStreams<Config extends Config.AnyConfig, E = never, R = never> = Readonly<{
   main: SessionSource<Config, E, R> & { readonly subTo?: never };
 }> &
   Readonly<Record<string, SessionSource<Config, E, R>>>;
@@ -42,14 +39,14 @@ export type ProducingConfig<
   Events extends EventKit.Any,
   Metrics extends MetricKit.Any,
   Extras extends ExtraKit.Any,
-> = Trajectory.Config<boolean, Toolkit, Events, MetricKit.WithProducers<Metrics>, Extras>;
+> = Config.Config<boolean, Toolkit, Events, MetricKit.WithProducers<Metrics>, Extras>;
 
 type ProducedConfig<
   Toolkit extends Toolkit.Any,
   Events extends EventKit.Any,
   Metrics extends MetricKit.Any,
   Extras extends ExtraKit.Any,
-> = Trajectory.Config<true, Toolkit, Events, MetricKit.WithProducers<Metrics>, Extras>;
+> = Config.Config<true, Toolkit, Events, MetricKit.WithProducers<Metrics>, Extras>;
 
 const produced = <
   Toolkit extends Toolkit.Any,
@@ -58,8 +55,7 @@ const produced = <
   Extras extends ExtraKit.Any,
 >(
   config: ProducingConfig<Toolkit, Events, Metrics, Extras>,
-): ProducedConfig<Toolkit, Events, Metrics, Extras> =>
-  Trajectory.config({ ...config, stream: true });
+): ProducedConfig<Toolkit, Events, Metrics, Extras> => Config.config({ ...config, stream: true });
 
 const produceWith =
   <

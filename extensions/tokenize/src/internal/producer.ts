@@ -16,6 +16,7 @@
  */
 
 import { Trajectory } from "@trajs/core";
+import * as Config from "@trajs/core/Config";
 import { Effect, Option, Predicate } from "effect";
 import { Tokenizer } from "effect/ai";
 import type { AiError } from "effect/ai";
@@ -88,7 +89,7 @@ const sessionOf = (state: Sessions, id: string): SessionCount => {
  * declaration, an event, a count already derived — holds nothing a tokenizer
  * answers for.
  */
-const isCounted = (part: Trajectory.Part<Trajectory.AnyConfig>): part is CountedPart =>
+const isCounted = (part: Trajectory.Part<Config.AnyConfig>): part is CountedPart =>
   Predicate.isTagged("Prompt")(part) || Predicate.isTagged("Response")(part);
 
 /**
@@ -104,7 +105,7 @@ const isCounted = (part: Trajectory.Part<Trajectory.AnyConfig>): part is Counted
  */
 export type Step = (
   state: Sessions,
-  part: Trajectory.Part<Trajectory.AnyConfig>,
+  part: Trajectory.Part<Config.AnyConfig>,
 ) => Effect.Effect<readonly [Sessions, ReadonlyArray<Measured>], UncountedFailure>;
 
 /**

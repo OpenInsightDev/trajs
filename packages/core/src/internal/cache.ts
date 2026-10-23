@@ -13,6 +13,7 @@ import { ByteStore, type ByteStoreError } from "@trajs/utils/ByteStore";
 import { Cause, Deferred, Effect, HashMap, Option, Ref, Scope, Stream } from "effect";
 import * as uuid from "uuid";
 
+import * as Config from "#/Config.ts";
 import {
   configOf,
   decodePart,
@@ -30,7 +31,7 @@ const everyPart = Infinity;
  * What a cache has of the trajectory it reads: the parts it has produced, and the newest of
  * them as they are kept in memory.
  */
-interface Cache<Config extends Trajectory.AnyConfig> {
+interface Cache<Config extends Config.AnyConfig> {
   /** How many parts the reading has produced: the index the part after them is produced at. */
   readonly produced: number;
   /** The parts kept in memory, by the index each was produced at. */
@@ -41,7 +42,7 @@ interface Cache<Config extends Trajectory.AnyConfig> {
  * What a cache does with the parts that leave the window: writes them into the store, and reads
  * them back where a reader asks for one that is no longer in memory.
  */
-interface Spilled<Config extends Trajectory.AnyConfig> {
+interface Spilled<Config extends Config.AnyConfig> {
   readonly write: (
     index: number,
     part: Trajectory.Part<Config>,
@@ -62,7 +63,7 @@ const capacityOf = (options?: Trajectory.CacheOptions): number => {
  * Caches the trajectory given: the parts of one reading of it are kept, so that the trajectory
  * reads again — from its first part, whenever a reader starts.
  */
-export const cached = <Id extends string, Config extends Trajectory.AnyConfig, E, R>(
+export const cached = <Id extends string, Config extends Config.AnyConfig, E, R>(
   trajectory: Trajectory.Trajectory<Id, Config, E, R> & Readable<Config>,
   options?: Trajectory.CacheOptions,
 ): Effect.Effect<

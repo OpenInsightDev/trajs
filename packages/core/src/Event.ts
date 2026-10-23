@@ -1,5 +1,6 @@
 import { Data, Option, Predicate, Schema, Stream } from "effect";
 
+import * as Config from "#/Config.ts";
 import * as EventKit from "#/EventKit.ts";
 import { attach } from "#/internal/trajectory.ts";
 import type * as Trajectory from "#/Trajectory.ts";
@@ -61,9 +62,9 @@ export const EventParts = <K extends EventKit.Any>(
 };
 
 export type WithEvents<
-  Config extends Trajectory.AnyConfig,
+  Config extends Config.AnyConfig,
   Es extends ReadonlyArray<Any>,
-> = Trajectory.Config<
+> = Config.Config<
   Config["stream"],
   Config["toolkit"],
   EventsWith<Config, Es>,
@@ -71,16 +72,15 @@ export type WithEvents<
   Config["extrakit"]
 >;
 
-type EventsWith<
-  Config extends Trajectory.AnyConfig,
-  Es extends ReadonlyArray<Any>,
-> = EventKit.Merged<readonly [Config["eventkit"], ReturnType<typeof EventKit.make<Es>>]>;
+type EventsWith<Config extends Config.AnyConfig, Es extends ReadonlyArray<Any>> = EventKit.Merged<
+  readonly [Config["eventkit"], ReturnType<typeof EventKit.make<Es>>]
+>;
 
 export type Reader<Es extends ReadonlyArray<Any>> = {
-  <Id extends string, Config extends Trajectory.AnyConfig, E, R>(
+  <Id extends string, Config extends Config.AnyConfig, E, R>(
     trajectory: Trajectory.Trajectory<Id, Config, E, R>,
   ): Trajectory.Trajectory<Id, WithEvents<Config, Es>, E, R>;
-  <Config extends Trajectory.AnyConfig, E, R>(
+  <Config extends Config.AnyConfig, E, R>(
     stream: Trajectory.TrajectoryStream<Config, E, R>,
   ): Trajectory.TrajectoryStream<WithEvents<Config, Es>, E, R>;
 };
@@ -101,7 +101,7 @@ export function encode<const Es extends ReadonlyArray<Any>>(...events: Es): Read
   // SAFETY: the overloads of `Reader` say which of the two a caller gets, while
   // the implementation reads either of them the same way: TypeScript relates those
   // signatures to this one the other way round alone.
-  return (<Config extends Trajectory.AnyConfig, E, R>(
+  return (<Config extends Config.AnyConfig, E, R>(
     stream: Trajectory.TrajectoryStream<Config, E, R> | Trajectory.Trajectory<string, Config, E, R>,
   ):
     | Trajectory.TrajectoryStream<WithEvents<Config, Es>, E, R>
@@ -126,8 +126,6 @@ export function encode<const Es extends ReadonlyArray<Any>>(...events: Es): Read
       }),
     );
 
-    // A trajectory is a stream that carries the config its parts were produced
-    // with, so one that carries an event kit is one this names the events of.
     if (!Predicate.hasProperty(stream, "eventkit")) {
       return parts;
     }

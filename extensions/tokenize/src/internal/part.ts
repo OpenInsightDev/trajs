@@ -4,7 +4,7 @@
  * A count is taken from what a model was given — the messages a prompt part holds
  * — and from what it returned — the one content part a response part carries.
  * Both are read as the parts of the most general trajectory,
- * `Trajectory.AnyConfig`: a trajectory is counted without knowing the toolkit, the
+ * `Config.AnyConfig`: a trajectory is counted without knowing the toolkit, the
  * kits or the variant it was produced with, so a part is read for the content it
  * carries and for nothing else.
  *
@@ -14,10 +14,11 @@
  */
 
 import type { Trajectory } from "@trajs/core";
+import * as Config from "@trajs/core/Config";
 
 /** A part a count is taken from: what a model was given, or what it returned. */
 export type CountedPart = Extract<
-  Trajectory.Part<Trajectory.AnyConfig>,
+  Trajectory.Part<Config.AnyConfig>,
   { readonly _tag: "Prompt" | "Response" }
 >;
 

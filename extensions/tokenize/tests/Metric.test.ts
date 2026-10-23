@@ -21,6 +21,7 @@ import {
   Toolkit,
   Trajectory,
 } from "@trajs/core";
+import * as Config from "@trajs/core/Config";
 import { Effect, Stream } from "effect";
 import { describe, expect, it } from "vite-plus/test";
 
@@ -31,7 +32,7 @@ import type { Estimate } from "../src/index.ts";
 const answering = "01890a5d-ac96-774b-bcce-b302099a8058";
 
 /** What the trajectory is built and read with: no tool, event, metric or extra datum. */
-const config = Trajectory.config({
+const config = Config.config({
   stream: false,
   toolkit: Toolkit.empty,
   eventkit: EventKit.empty,
@@ -128,7 +129,7 @@ const parts = [declared, question, answer, call, result, stopped, forked, carrie
 /**
  * What the metric is run over: the parts above, as the trajectory they make.
  *
- * Its response parts are whole — `Trajectory.NonStreamConfig` — because that is the
+ * Its response parts are whole — `Config.NonStreamConfig` — because that is the
  * trajectory a producer is given: the increments a streamed response arrived in are
  * folded into the parts they complete before a kit counts one.
  */

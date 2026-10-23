@@ -11,10 +11,11 @@
 
 import { expect, it } from "@effect/vitest";
 import { Prompt, Response, Session, Trajectory, View } from "@trajs/core";
+import * as Config from "@trajs/core/Config";
 import { Effect, Stream } from "effect";
 
 /** What the parts are built and read with: no tool, event, metric or extra datum. */
-const config = Trajectory.config({ stream: false });
+const config = Config.config({ stream: false });
 
 /** A call reported as repeated: its input, and the ids of the calls made with it. */
 interface RepeatedToolCall {

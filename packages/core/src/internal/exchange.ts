@@ -24,6 +24,7 @@ import type { Storage, StorageError } from "@trajs/utils/Storage";
 import type { StreamHash } from "@trajs/utils/StreamHash";
 import { Effect, Fiber, Schema, Stream } from "effect";
 
+import * as Config from "#/Config.ts";
 import * as Event from "#/Event.ts";
 import type * as EventKit from "#/EventKit.ts";
 import { Magic, Version, type Header, type Metadata, type Service } from "#/Exchange.ts";
@@ -375,7 +376,7 @@ export const service = <
         };
       }),
     save:
-      <C extends Trajectory.AnyConfig, E, R>(trajectory: Trajectory.Trajectory<string, C, E, R>) =>
+      <C extends Config.AnyConfig, E, R>(trajectory: Trajectory.Trajectory<string, C, E, R>) =>
       (id: string) => {
         const config = configOf(trajectory);
 

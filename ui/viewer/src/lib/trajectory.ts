@@ -17,6 +17,7 @@
  */
 
 import { Session, SessionTree, Trajectory, View } from "@trajs/core";
+import * as Config from "@trajs/core/Config";
 import { Exchange } from "@trajs/core/Exchange";
 import type { TrajectoryError } from "@trajs/core/TrajectoryError";
 import { BrowserServices } from "@trajs/platform-browser";
@@ -61,7 +62,7 @@ const handed = (bytes: Uint8Array): Storage => ({
 const browserExchange = Layer.provide(Exchange.layer, BrowserServices.layer());
 
 /** One turn of a session's conversation: what a model was given, and what it answered. */
-export type Turn = View.PromptTurn<Trajectory.AnyConfig>;
+export type Turn = View.PromptTurn<Config.AnyConfig>;
 
 /**
  * One stretch of a conversation: the turns one session produced.
@@ -110,7 +111,7 @@ export interface Trajectory {
 
 /** The parts of one session, as the turns they were produced in. */
 const turnsOf = (
-  stream: Session.SessionStream<Trajectory.AnyConfig, Failure>,
+  stream: Session.SessionStream<Config.AnyConfig, Failure>,
 ): Effect.Effect<ReadonlyArray<Turn>, Failure> =>
   View.promptTurns(stream).pipe(
     Stream.runCollect,
@@ -124,7 +125,7 @@ const turnsOf = (
  * read off the session that produced them rather than looked up by an id.
  */
 const readSession = (
-  tree: SessionTree.SessionTree<Trajectory.AnyConfig, Failure>,
+  tree: SessionTree.SessionTree<Config.AnyConfig, Failure>,
 ): Effect.Effect<TrajectorySession, Failure> =>
   Effect.gen(function* () {
     const { session } = tree;

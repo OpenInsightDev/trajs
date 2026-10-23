@@ -23,6 +23,7 @@ import {
   Toolkit,
   Trajectory,
 } from "@trajs/core";
+import * as Config from "@trajs/core/Config";
 import { makeProducer, metrickit, tokenEstimate, Tokenizer } from "@trajs/extension-tokenize";
 import { Effect, FileSystem, Stream } from "effect";
 
@@ -118,7 +119,7 @@ const replayed = Prompt.fromMessages([
  * What the fixture is built and read with: whole response parts, and the metric kit the
  * counts of its parts are of.
  */
-export const config = Trajectory.config({
+export const config = Config.config({
   stream: false,
   toolkit,
   eventkit,

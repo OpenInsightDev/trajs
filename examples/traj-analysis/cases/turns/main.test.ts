@@ -22,10 +22,11 @@ import {
   Trajectory,
   View,
 } from "@trajs/core";
+import * as Config from "@trajs/core/Config";
 import { Effect, Stream } from "effect";
 
 /** What the parts are built and read with: no tool, event, metric or extra datum. */
-const config = Trajectory.config({
+const config = Config.config({
   stream: false,
   toolkit: Toolkit.empty,
   eventkit: EventKit.empty,

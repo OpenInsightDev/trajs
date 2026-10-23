@@ -18,10 +18,11 @@
  */
 
 import { Prompt, Response, Trajectory } from "@trajs/core";
+import * as Config from "@trajs/core/Config";
 import { Stream } from "effect";
 
 /** What the run is built and read with: whole response parts, and no kit of its own. */
-const config = Trajectory.config({ stream: false });
+const config = Config.config({ stream: false });
 
 /** The builders of the parts of the run. */
 const part = Trajectory.parts(config);

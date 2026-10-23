@@ -22,7 +22,8 @@
  */
 
 import { Produce, Prompt, Response } from "@trajs/core";
-import type { Extra, Trajectory } from "@trajs/core";
+import type { Extra } from "@trajs/core";
+import * as Config from "@trajs/core/Config";
 import type { TrajectoryError } from "@trajs/core/TrajectoryError";
 import { DateTime, Effect, FileSystem, Option, Path, Predicate, Schema } from "effect";
 import type { PlatformError } from "effect";
@@ -461,7 +462,7 @@ const turnsOf = (
 export const produce = (
   main: Produce.ProduceSession<
     Tools,
-    Trajectory.UnknownConfig["eventkit"]["events"],
+    Config.UnknownConfig["eventkit"]["events"],
     (typeof extrakit)["extra"]
   >,
   document: Document,

@@ -10,6 +10,7 @@
  * the session it belongs to, its own id and the moment it was produced.
  */
 
+import * as Config from "@trajs/core/Config";
 import { Part as partSchema, type EncodingServices } from "@trajs/core/Exchange";
 import * as Trajectory from "@trajs/core/Trajectory";
 import { TrajectoryError } from "@trajs/core/TrajectoryError";
@@ -67,7 +68,7 @@ const moment = (timestamp: DateTime.Utc | undefined): string | null =>
  * stated, so a kind added to a trajectory is a kind this fails to read rather than
  * one it writes as nothing.
  */
-const stated = (part: Trajectory.Part<Trajectory.AnyConfig>) =>
+const stated = (part: Trajectory.Part<Config.AnyConfig>) =>
   Match.valueTags(part, {
     Prompt: (part) => ({
       tag: "Prompt",
@@ -113,12 +114,12 @@ const stated = (part: Trajectory.Part<Trajectory.AnyConfig>) =>
 const rowOf = (
   trajectoryId: string,
   position: number,
-  part: Trajectory.Part<Trajectory.AnyConfig>,
+  part: Trajectory.Part<Config.AnyConfig>,
   encoded: Encoded,
 ): Row => ({ trajectory_id: trajectoryId, position, ...stated(part), part: encoded });
 
 /** The parts of `trajectory` as the rows of {@link name}, in the order they arrive. */
-export const rowsOf = <C extends Trajectory.AnyConfig, E, R>(
+export const rowsOf = <C extends Config.AnyConfig, E, R>(
   trajectory: Trajectory.Trajectory<string, C, E, R>,
 ): Stream.Stream<Row, E | TrajectoryError, R | EncodingServices<C>> => {
   const encode = partSchema(trajectory).pipe(Schema.encodeEffect);

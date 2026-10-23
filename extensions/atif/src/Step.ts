@@ -20,7 +20,8 @@
  */
 
 import { View } from "@trajs/core";
-import type { Response, Trajectory } from "@trajs/core";
+import type { Response } from "@trajs/core";
+import * as Config from "@trajs/core/Config";
 import type * as Session from "@trajs/core/Session";
 import type { TrajectoryError } from "@trajs/core/TrajectoryError";
 import { Option, Stream } from "effect";
@@ -114,7 +115,7 @@ export type Step<Tools extends Record<string, Tool.Any>> = Readonly<{
 }>;
 
 /** The tools of a trajectory's toolkit, which the steps read from it are typed by. */
-type Tools<Config extends Trajectory.AnyConfig> = Config["toolkit"]["tools"];
+type Tools<Config extends Config.AnyConfig> = Config["toolkit"]["tools"];
 
 const sources: Record<Prompt.Message["role"], StepSource> = {
   system: "system",
@@ -148,7 +149,7 @@ const messageOf = (message: Prompt.Message): string =>
   message.role === "system" ? message.content : textOf(message.content);
 
 /** The steps one turn is read as. */
-const stepsOf = <Config extends Trajectory.AnyConfig>(
+const stepsOf = <Config extends Config.AnyConfig>(
   turn: View.PromptTurn<Config>,
 ): ReadonlyArray<Step<Tools<Config>>> => {
   const steps: Step<Tools<Config>>[] = turn.prompt.messages.map((message) => ({
@@ -235,11 +236,11 @@ const stepsOf = <Config extends Trajectory.AnyConfig>(
  * import { Prompt, Response, Session, Trajectory } from "@trajs/core"
  * import { Step } from "@trajs/extension-atif"
  *
- * const part = Trajectory.parts(Trajectory.anyConfig)
+ * const part = Trajectory.parts(Config.anyConfig)
  *
  * // What the main session's model was given, and what it returned for it as one whole
  * // part: a part that states no session belongs to the main session.
- * const trajectory = Trajectory.make(Trajectory.anyConfig)(
+ * const trajectory = Trajectory.make(Config.anyConfig)(
  *   Stream.make(
  *     part.mainSession(),
  *     part.prompt(Prompt.make("What is 2 + 2?")),
@@ -262,7 +263,7 @@ const stepsOf = <Config extends Trajectory.AnyConfig>(
  * @see {@link Session.Session.stream} — the parts a session is read by.
  * @category combinators
  */
-export const steps = <Config extends Trajectory.AnyConfig, E, R>(
+export const steps = <Config extends Config.AnyConfig, E, R>(
   stream: Session.SessionStream<Config, E, R>,
 ): Stream.Stream<Step<Tools<Config>>, E | TrajectoryError, R> =>
   View.promptTurns(stream).pipe(Stream.flatMap((turn) => Stream.fromIterable(stepsOf(turn))));

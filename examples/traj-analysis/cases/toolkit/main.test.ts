@@ -29,6 +29,7 @@ import {
   Trajectory,
   View,
 } from "@trajs/core";
+import * as Config from "@trajs/core/Config";
 import { Effect, Match, Result, Schema, Stream } from "effect";
 
 /** The tools the run had, as the parameters each of them takes. */
@@ -51,7 +52,7 @@ const toolkit = Toolkit.make(
 );
 
 /** What the trajectory is built and read with: the toolkit its responses were returned by, and no other kit. */
-const config = Trajectory.config({
+const config = Config.config({
   stream: false,
   toolkit,
   eventkit: EventKit.empty,

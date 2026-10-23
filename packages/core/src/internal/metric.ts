@@ -10,6 +10,7 @@
 
 import { Effect, Predicate, Stream } from "effect";
 
+import * as Config from "#/Config.ts";
 import { foldParts } from "#/internal/folding.ts";
 import type { Any, MetricParts, Producer, ProducerFailure } from "#/Metric.ts";
 import type { Producers } from "#/MetricKit.ts";
@@ -30,7 +31,7 @@ const isProducerFailure = (value: unknown): value is ProducerFailure<Any> =>
  */
 export const runProducers = <
   Metrics extends Record<string, Any>,
-  Config extends Trajectory.AnyConfig,
+  Config extends Config.AnyConfig,
   E,
   R,
 >(

@@ -19,6 +19,7 @@
  */
 
 import { EventKit, MetricKit, Produce, type Toolkit, Trajectory } from "@trajs/core";
+import * as Config from "@trajs/core/Config";
 import { TrajectoryError } from "@trajs/core/TrajectoryError";
 import { Effect, FileSystem, Path, Schema } from "effect";
 import type { PlatformError } from "effect";
@@ -253,7 +254,7 @@ export interface Options {
  * @see {@link Extras.StepFields} for what a document states of a step.
  * @see {@link Extras.DocumentFields} for what it states of a run.
  * @see {@link Extras.extrakit} for the kit the trajectory is read with.
- * @see {@link Trajectory.Config} for the kits the trajectory is read with.
+ * @see {@link Config.Config} for the kits the trajectory is read with.
  * @category constructors
  */
 export const encode = (
@@ -261,7 +262,7 @@ export const encode = (
   options?: Options,
 ): Trajectory.Trajectory<
   string,
-  Trajectory.Config<
+  Config.Config<
     true,
     Toolkit.Any,
     EventKit.Empty,
@@ -310,7 +311,7 @@ export const fromFile = (
 ): Effect.Effect<
   Trajectory.Trajectory<
     string,
-    Trajectory.Config<true, Toolkit.Any, EventKit.Empty, MetricKit.Empty, typeof extrakit>,
+    Config.Config<true, Toolkit.Any, EventKit.Empty, MetricKit.Empty, typeof extrakit>,
     TrajectoryError | PlatformError.PlatformError,
     FileSystem.FileSystem | Path.Path
   >,
@@ -338,7 +339,7 @@ export const fromFile = (
  */
 const kits = (document: Document) =>
   Produce.produce(
-    Trajectory.config({
+    Config.config({
       stream: true,
       toolkit: toolkitOf(document),
       eventkit: EventKit.empty,

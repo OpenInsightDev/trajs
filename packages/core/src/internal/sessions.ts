@@ -14,6 +14,7 @@ import {
 } from "@trajs/utils/ByteStore";
 import { Effect, Option, Scope, Stream } from "effect";
 
+import * as Config from "#/Config.ts";
 import type * as Extra from "#/Extra.ts";
 import { cached } from "#/internal/cache.ts";
 import type { EncodingServices, Readable } from "#/internal/parts.ts";
@@ -25,7 +26,7 @@ import { TrajectoryError } from "#/TrajectoryError.ts";
  * What the pass over a trajectory remembers of one session: where it sits among the others —
  * the declaration that names it, the fork that places it, and the extra data it states.
  */
-interface Recorded<Config extends Trajectory.AnyConfig> {
+interface Recorded<Config extends Config.AnyConfig> {
   /** The `uuid` of the part that declared the session, where the trajectory declares it. */
   declaration?: string;
   /** The session it continues from, and the part of it it continues from, where a declaration reads a `fork`. */
@@ -42,7 +43,7 @@ interface Recorded<Config extends Trajectory.AnyConfig> {
  * once the parts it was produced after have been read, so the sessions are read from what this
  * keeps rather than from the trajectory a second time.
  */
-const recordedIn = <Config extends Trajectory.AnyConfig, E, R>(
+const recordedIn = <Config extends Config.AnyConfig, E, R>(
   trajectory: Trajectory.Trajectory<string, Config, E, R>,
 ): Effect.Effect<ReadonlyMap<string, Recorded<Config>>, E | TrajectoryError, R> =>
   Effect.gen(function* () {
@@ -149,7 +150,7 @@ type Lineage = ReadonlyMap<string, string | undefined>;
  * the session it names contributes is known from the session that continues from it. So `id` is the
  * entry it holds first and the session at its root the one it holds last.
  */
-const lineageOf = <Config extends Trajectory.AnyConfig>(
+const lineageOf = <Config extends Config.AnyConfig>(
   recorded: ReadonlyMap<string, Recorded<Config>>,
   id: string,
 ): Lineage => {
@@ -181,7 +182,7 @@ const lineageOf = <Config extends Trajectory.AnyConfig>(
  * The parts of the trajectory a cache holds of the sessions of the lineage given: what each of them
  * produced, up to the part it is read to, and the metric parts attached to them.
  */
-const streamOf = <Config extends Trajectory.AnyConfig, E>(
+const streamOf = <Config extends Config.AnyConfig, E>(
   trajectory: Trajectory.Trajectory<string, Config, E, never>,
   ends: Lineage,
 ): Session.SessionStream<Config, E> =>
@@ -245,7 +246,7 @@ const streamOf = <Config extends Trajectory.AnyConfig, E>(
     return stream as Session.SessionStream<Config, E>;
   });
 
-const sessionsOf = <Config extends Trajectory.AnyConfig, E>(
+const sessionsOf = <Config extends Config.AnyConfig, E>(
   trajectory: Trajectory.Trajectory<string, Config, E, never>,
 ): Effect.Effect<Session.Sessions<Config, E | TrajectoryError>, E | TrajectoryError> =>
   Effect.gen(function* () {
@@ -283,7 +284,7 @@ const sessionsOf = <Config extends Trajectory.AnyConfig, E>(
  * Reads a trajectory as the sessions it names, keeping its parts in memory for as long as the
  * program runs: the store this reading states rather than the one a program provides.
  */
-export const read = <Config extends Trajectory.AnyConfig, E, R>(
+export const read = <Config extends Config.AnyConfig, E, R>(
   trajectory: Trajectory.Trajectory<string, Config, E, R> & Readable<Config>,
 ): Effect.Effect<
   Session.Sessions<Config, E | TrajectoryError | ByteStoreError>,
@@ -310,7 +311,7 @@ export const read = <Config extends Trajectory.AnyConfig, E, R>(
  * What `options` states is what that cache is read with ({@link Trajectory.CacheOptions}): how
  * many of the newest parts are kept in memory, and the rest written into the store.
  */
-export const readCached = <Config extends Trajectory.AnyConfig, E, R>(
+export const readCached = <Config extends Config.AnyConfig, E, R>(
   trajectory: Trajectory.Trajectory<string, Config, E, R> & Readable<Config>,
   options?: Trajectory.CacheOptions,
 ): Effect.Effect<

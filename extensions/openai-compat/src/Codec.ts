@@ -30,8 +30,8 @@
  */
 
 import type { OpenAiClient } from "@effect/ai-openai-compat";
-import type { Trajectory } from "@trajs/core";
 import { View } from "@trajs/core";
+import * as Config from "@trajs/core/Config";
 import type * as Session from "@trajs/core/Session";
 import type { TrajectoryError } from "@trajs/core/TrajectoryError";
 import { Effect, Predicate } from "effect";
@@ -94,7 +94,7 @@ export type OpenAiCompatSessions = Record<string, OpenAiCompatMessage[]>;
  *
  * // The main session, which the parts below belong to.
  * const sessionId = Trajectory.mainSessionId
- * const config = Trajectory.config({
+ * const config = Config.config({
  *   stream: false,
  *   toolkit: Toolkit.empty,
  *   eventkit: EventKit.empty,
@@ -156,7 +156,7 @@ export type OpenAiCompatSessions = Record<string, OpenAiCompatMessage[]>;
  * @see {@link Session.toSessions} for the sessions it is given.
  * @category constructors
  */
-export const makeOpenAiCompat = <Config extends Trajectory.AnyConfig, E, R>(
+export const makeOpenAiCompat = <Config extends Config.AnyConfig, E, R>(
   sessions: Session.Sessions<Config, E, R>,
 ): Effect.Effect<OpenAiCompatSessions, E | TrajectoryError, R> =>
   View.conversations(sessions).pipe(

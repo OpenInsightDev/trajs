@@ -1,3 +1,5 @@
+export * as Config from "#/Config.ts";
+
 export * as Event from "#/Event.ts";
 
 export * as EventKit from "#/EventKit.ts";

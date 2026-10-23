@@ -20,13 +20,14 @@ import {
   Toolkit,
   Trajectory,
 } from "@trajs/core";
+import * as Config from "@trajs/core/Config";
 import { DateTime, Effect, FileSystem, Stream } from "effect";
 
 const toolkit = Toolkit.empty;
 const extrakit = ExtraKit.empty;
 
 /** The kits the fixtures are built and read with: no events, no metrics, and whole response parts. */
-export const config = Trajectory.config({
+export const config = Config.config({
   stream: false,
   toolkit,
   extrakit,

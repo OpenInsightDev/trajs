@@ -8,6 +8,7 @@
  */
 import { NodeServices as PlatformNodeServices } from "@effect/platform-node";
 import { EventKit, ExtraKit, MetricKit, Prompt, Response, Toolkit, Trajectory } from "@trajs/core";
+import * as Config from "@trajs/core/Config";
 import { Exchange } from "@trajs/core/Exchange";
 import core from "@trajs/core/package.json" with { type: "json" };
 import { NodeServices } from "@trajs/platform-node";
@@ -29,7 +30,7 @@ const extrakit = ExtraKit.empty;
  * The kits the trajectory is built and read with: no tools, no events, no metrics,
  * and a response part stated whole rather than as the increments of a stream.
  */
-const config = Trajectory.config({
+const config = Config.config({
   stream: false,
   toolkit: Toolkit.empty,
   eventkit: EventKit.empty,

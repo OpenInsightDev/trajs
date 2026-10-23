@@ -31,8 +31,8 @@
  */
 
 import type { Generated } from "@effect/ai-anthropic";
-import type { Trajectory } from "@trajs/core";
 import { View } from "@trajs/core";
+import * as Config from "@trajs/core/Config";
 import type * as Session from "@trajs/core/Session";
 import type { TrajectoryError } from "@trajs/core/TrajectoryError";
 import { Effect, Predicate } from "effect";
@@ -115,7 +115,7 @@ export type AnthropicSessions = Record<string, AnthropicConversation>;
  *
  * // The main session, which the parts below belong to.
  * const sessionId = Trajectory.mainSessionId
- * const config = Trajectory.config({
+ * const config = Config.config({
  *   stream: false,
  *   toolkit: Toolkit.empty,
  *   eventkit: EventKit.empty,
@@ -184,7 +184,7 @@ export type AnthropicSessions = Record<string, AnthropicConversation>;
  * @see {@link Session.toSessions} for the sessions it is given.
  * @category constructors
  */
-export const makeAnthropic = <Config extends Trajectory.AnyConfig, E, R>(
+export const makeAnthropic = <Config extends Config.AnyConfig, E, R>(
   sessions: Session.Sessions<Config, E, R>,
 ): Effect.Effect<AnthropicSessions, E | TrajectoryError, R> =>
   View.conversations(sessions).pipe(

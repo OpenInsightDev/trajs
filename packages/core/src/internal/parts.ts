@@ -21,6 +21,7 @@
 import { Effect, Option, Schema, SchemaTransformation, Stream } from "effect";
 import { SchemaBinary } from "effect/encoding";
 
+import * as Config from "#/Config.ts";
 import type * as ExtraKit from "#/ExtraKit.ts";
 import { foldParts } from "#/internal/folding.ts";
 import { readFrames } from "#/internal/frames.ts";
@@ -43,7 +44,7 @@ const asReadable = <A, I, E>(parts: Schema.Codec<A, I, unknown, E>): Schema.Code
   parts as Schema.Codec<A, I, never, E>;
 
 /** The part schemas {@link part} builds, in the order a trajectory states them. */
-export type PartMembers<C extends Trajectory.AnyConfig> = readonly [
+export type PartMembers<C extends Config.AnyConfig> = readonly [
   ReturnType<typeof PromptPartTagged<C["extrakit"]>>,
   ReturnType<typeof Trajectory.SessionPart<C["extrakit"]>>,
   ReturnType<typeof Trajectory.ResponsePart<C["toolkit"], C["extrakit"], true>>,
@@ -65,13 +66,13 @@ export type PartMembers<C extends Trajectory.AnyConfig> = readonly [
  * through the toolkit's own schemas, so a toolkit whose own schemas need a service to read
  * a result of one of its tools is not one a trajectory is read with.
  */
-export type Readable<C extends Trajectory.AnyConfig> = C &
+export type Readable<C extends Config.AnyConfig> = C &
   (Schema.Union<PartMembers<C>>["DecodingServices"] extends never
     ? unknown
     : { readonly readable: never });
 
 /** The part a trajectory holds, as the bytes of one carry it. */
-type ProducedPart<C extends Trajectory.AnyConfig> = Schema.Union<PartMembers<C>>["Type"];
+type ProducedPart<C extends Config.AnyConfig> = Schema.Union<PartMembers<C>>["Type"];
 
 /**
  * The services encoding the parts of a config's trajectory takes, as the part schemas of
@@ -81,7 +82,7 @@ type ProducedPart<C extends Trajectory.AnyConfig> = Schema.Union<PartMembers<C>>
  * schemas of the toolkit it was produced with, and no other part states a service, since the
  * parts are rebuilt from the plain schemas of `effect/ai` and of `@trajs/core`.
  */
-export type EncodingServices<C extends Trajectory.AnyConfig> = Schema.Union<
+export type EncodingServices<C extends Config.AnyConfig> = Schema.Union<
   PartMembers<C>
 >["EncodingServices"];
 
@@ -101,7 +102,7 @@ export type EncodingServices<C extends Trajectory.AnyConfig> = Schema.Union<
  * services of none, since a trajectory is rebuilt from plain schemas rather than read
  * as the schemas it was produced with.
  */
-export const part = <C extends Trajectory.AnyConfig>(config: C): Schema.Union<PartMembers<C>> => {
+export const part = <C extends Config.AnyConfig>(config: C): Schema.Union<PartMembers<C>> => {
   const members: PartMembers<C> = [
     // Every member is stated with the kit of the config, since what a part is read as
     // is what that kit states of it rather than what the call alone infers.
@@ -127,7 +128,7 @@ export const part = <C extends Trajectory.AnyConfig>(config: C): Schema.Union<Pa
  * part produced for a tool the toolkit no longer holds still encodes as the
  * unrestricted part it was produced as.
  */
-export const encodePart = <C extends Trajectory.AnyConfig>(config: C) => {
+export const encodePart = <C extends Config.AnyConfig>(config: C) => {
   const encode = part(config).pipe(SchemaBinary.toCodec, Schema.encodeEffect);
 
   return (part: ProducedPart<C>): Effect.Effect<Uint8Array, TrajectoryError, EncodingServices<C>> =>
@@ -147,7 +148,7 @@ export const encodePart = <C extends Trajectory.AnyConfig>(config: C) => {
  * a trajectory and the reading fails rather than yielding none: what a store keeps is the one
  * part it was given, and a reading of it that yields nothing has lost that part.
  */
-export const decodePart = <C extends Trajectory.AnyConfig>(config: C) => {
+export const decodePart = <C extends Config.AnyConfig>(config: C) => {
   const parts = asReadable(part(config));
   const read = readFrames(parts);
 
@@ -252,7 +253,7 @@ const PromptPartTagged = <K extends ExtraKit.Any>(extrakit: K) =>
  * A config is what a trajectory is stated with, so what one holds is read off the trajectory
  * rather than declared beside it.
  */
-export const configOf = <C extends Trajectory.AnyConfig, E, R>(
+export const configOf = <C extends Config.AnyConfig, E, R>(
   trajectory: Trajectory.Trajectory<string, C, E, R>,
 ) => ({
   stream: trajectory.stream,
@@ -274,9 +275,9 @@ export const configOf = <C extends Trajectory.AnyConfig, E, R>(
 export const reading =
   <E, R>(bytes: Stream.Stream<Uint8Array, E, R>, id: string = uuid()) =>
   // SAFETY: reading with no config is reading with the kits that name nothing, which
-  // is what `Trajectory.anyConfig` is.
-  <C extends Trajectory.AnyConfig = Trajectory.AnyConfig>(
-    config: C = Trajectory.anyConfig as C,
+  // is what `anyConfig` is.
+  <C extends Config.AnyConfig = Config.AnyConfig>(
+    config: C = Config.anyConfig as C,
   ): Trajectory.Trajectory<string, C, E | TrajectoryError, R> => {
     const parts = asReadable(part(config));
     const frames = readFrames(parts);

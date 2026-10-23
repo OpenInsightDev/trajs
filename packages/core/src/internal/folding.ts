@@ -13,6 +13,7 @@
 import { Predicate, Stream } from "effect";
 import type { Tool } from "effect/ai";
 
+import * as Config from "#/Config.ts";
 import * as Response from "#/Response.ts";
 import * as Trajectory from "#/Trajectory.ts";
 
@@ -150,7 +151,7 @@ export const collapse = <Tools extends Record<string, Tool.Any>>(
  * increments a response arrived in says nothing about what reads the parts, so
  * every kit of the reading is carried over as it is.
  */
-type FoldedConfig<Config extends Trajectory.AnyConfig> = Trajectory.Config<
+type FoldedConfig<Config extends Config.AnyConfig> = Config.Config<
   false,
   Config["toolkit"],
   Config["eventkit"],
@@ -168,7 +169,7 @@ type FoldedConfig<Config extends Trajectory.AnyConfig> = Trajectory.Config<
  * The whole part is one a response of either kind of trajectory may hold, so what
  * is returned is still a part of the trajectory that was read.
  */
-const foldPart = <Config extends Trajectory.AnyConfig>(
+const foldPart = <Config extends Config.AnyConfig>(
   state: State,
   part: Trajectory.Part<Config>,
 ): readonly [State, ReadonlyArray<Trajectory.Part<Config>>] => {
@@ -192,7 +193,7 @@ const foldPart = <Config extends Trajectory.AnyConfig>(
  * Use when what reads a part is to read it as it was said rather than as it was
  * produced, since a trajectory is read as the most general one and the parts of it
  * are therefore the increments of a streamed response as well as the whole parts
- * those increments complete — see {@link Trajectory.AnyConfig}. The producers of a
+ * those increments complete — see {@link Config.AnyConfig}. The producers of a
  * metric are the readers this is for: a producer measures the parts a model was
  * given and returned, which are whole. So is a reading of the bytes a trajectory is
  * kept in under a config whose response parts are whole: `internal/exchange.ts`
@@ -221,7 +222,7 @@ const foldPart = <Config extends Trajectory.AnyConfig>(
  * @see {@link collapse} for the folding of one part.
  * @category combinators
  */
-export const foldParts = <Config extends Trajectory.AnyConfig, E, R>(
+export const foldParts = <Config extends Config.AnyConfig, E, R>(
   parts: Trajectory.TrajectoryStream<Config, E, R>,
 ): Trajectory.TrajectoryStream<FoldedConfig<Config>, E, R> => {
   const folded = parts.pipe(

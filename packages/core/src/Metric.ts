@@ -1,6 +1,7 @@
 import { Data, DateTime, Schema, Stream } from "effect";
 import type { NonEmptyArray } from "effect/Array";
 
+import * as Config from "#/Config.ts";
 import { runProducers } from "#/internal/metric.ts";
 import type * as MetricKit from "#/MetricKit.ts";
 import type * as Trajectory from "#/Trajectory.ts";
@@ -76,7 +77,7 @@ export const makeFailure = <Ext extends Any>(
 ): ProducerFailure<Ext> => new ProducerFailure<Ext>({ failure, timestamp, attach });
 
 export type Producer<Ext extends Any> = <E, R>(
-  trajectory: Trajectory.TrajectoryStream<Trajectory.NonStreamConfig, E, R>,
+  trajectory: Trajectory.TrajectoryStream<Config.NonStreamConfig, E, R>,
 ) => Stream.Stream<ProducerOutput<Ext>, E | TrajectoryError | ProducerFailure<Ext>, R>;
 
 type OutputSchema<Ext extends Any> = Schema.TaggedStruct<
@@ -126,7 +127,7 @@ export const MetricParts = <K extends MetricKit.Any>(
 
 export const produce =
   <K extends MetricKit.Any>({ producers }: MetricKit.WithProducers<K>) =>
-  <Config extends Trajectory.AnyConfig, E, R>(
+  <Config extends Config.AnyConfig, E, R>(
     produced: Trajectory.TrajectoryStream<Config, E, R>,
   ): Stream.Stream<MetricParts<K["metrics"]>, E | TrajectoryError, R> =>
     runProducers(producers, produced);

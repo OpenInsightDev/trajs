@@ -3,6 +3,7 @@ import { Storage, type StorageError } from "@trajs/utils/Storage";
 import { Algorithm as HashAlgorithm, StreamHash } from "@trajs/utils/StreamHash";
 import { Context, Effect, Layer, Schema } from "effect";
 
+import * as Config from "#/Config.ts";
 import { Contribution, service } from "#/internal/exchange.ts";
 import {
   part,
@@ -37,14 +38,14 @@ export const Metadata = Schema.Struct({
 
 export type Metadata = Schema.Schema.Type<typeof Metadata>;
 
-export type EncodingServices<C extends Trajectory.AnyConfig> = Encoding<C>;
+export type EncodingServices<C extends Config.AnyConfig> = Encoding<C>;
 
 export interface Loaded {
   readonly header: Header;
 
   readonly metadata: Metadata;
 
-  readonly read: <C extends Trajectory.AnyConfig = Trajectory.AnyConfig>(
+  readonly read: <C extends Config.AnyConfig = Config.AnyConfig>(
     config?: C & Readable<C>,
   ) => Trajectory.Trajectory<string, C, TrajectoryError | StorageError, never>;
 }
@@ -52,7 +53,7 @@ export interface Loaded {
 export interface Service {
   readonly load: (id: string) => Effect.Effect<Loaded, TrajectoryError | StorageError>;
 
-  readonly save: <C extends Trajectory.AnyConfig, E, R>(
+  readonly save: <C extends Config.AnyConfig, E, R>(
     trajectory: Trajectory.Trajectory<string, C, E, R>,
   ) => (
     id: string,
@@ -73,5 +74,5 @@ export class Exchange extends Context.Service<Exchange, Service>()("trajs/core/E
     );
 }
 
-export const Part = <C extends Trajectory.AnyConfig>(config: C): Schema.Union<PartMembers<C>> =>
+export const Part = <C extends Config.AnyConfig>(config: C): Schema.Union<PartMembers<C>> =>
   part(config);

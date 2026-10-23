@@ -142,10 +142,10 @@ export interface CountOptions {
  * ```ts import.meta.vitest
  * import { Effect } from "effect"
  * import { Prompt } from "effect/ai"
- * import { Trajectory } from "@trajs/core"
+ * import { Config, Trajectory } from "@trajs/core"
  * import { Count, Tokenizer } from "@trajs/extension-tokenize"
  *
- * const part = Trajectory.parts(Trajectory.anyConfig).prompt(
+ * const part = Trajectory.parts(Config.anyConfig).prompt(
  *   Prompt.make("Hello"),
  *   { sessionId: "01890a5d-ac96-774b-bcce-b302099a8057" }
  * )
@@ -199,11 +199,11 @@ export const promptPart = (
  *
  * ```ts import.meta.vitest
  * import { Effect, Option } from "effect"
- * import { EventKit, ExtraKit, MetricKit, Response, Toolkit, Trajectory } from "@trajs/core"
+ * import { Config, EventKit, ExtraKit, MetricKit, Response, Toolkit, Trajectory } from "@trajs/core"
  * import { Count, Tokenizer } from "@trajs/extension-tokenize"
  *
  * const sessionId = "01890a5d-ac96-774b-bcce-b302099a8057"
- * const config = Trajectory.config({
+ * const config = Config.config({
  *   stream: false,
  *   toolkit: Toolkit.empty,
  *   eventkit: EventKit.empty,

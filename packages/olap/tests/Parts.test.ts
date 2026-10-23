@@ -19,6 +19,7 @@ import {
   Trajectory,
   VersionedSchema,
 } from "@trajs/core";
+import * as Config from "@trajs/core/Config";
 import { DateTime, Effect, Schema, Stream } from "effect";
 import { expect, it } from "vite-plus/test";
 
@@ -32,7 +33,7 @@ const session = Trajectory.mainSessionId;
 const extrakit = ExtraKit.empty;
 
 /** The kits the trajectory is built with: no tools, no events, and whole response parts. */
-const config = Trajectory.config({
+const config = Config.config({
   stream: false,
   toolkit: Toolkit.empty,
   eventkit: EventKit.empty,
@@ -130,7 +131,7 @@ it("states what an event and a metric name, and the session a metric does not st
   const metrickit = MetricKit.make(measured);
 
   // What the trajectory that holds them is read with, and the parts of it built under it.
-  const kitted = Trajectory.config({ ...config, eventkit, metrickit });
+  const kitted = Config.config({ ...config, eventkit, metrickit });
   const described = Trajectory.parts(kitted);
 
   const eventPart = described.event(

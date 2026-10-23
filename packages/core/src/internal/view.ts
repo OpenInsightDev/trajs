@@ -13,6 +13,7 @@
 import { Effect, Option, Stream } from "effect";
 import { Prompt } from "effect/ai";
 
+import * as Config from "#/Config.ts";
 import { collapse, initial, type State } from "#/internal/folding.ts";
 import type * as Response from "#/Response.ts";
 import type * as Session from "#/Session.ts";
@@ -21,26 +22,26 @@ import { TrajectoryError } from "#/TrajectoryError.ts";
 import type { Conversation, PromptTurn, ToolTurn } from "#/View.ts";
 
 /** The turn being assembled from the parts of a session read so far, and the folding of its responses. */
-interface Assembly<Config extends Trajectory.AnyConfig> {
+interface Assembly<Config extends Config.AnyConfig> {
   readonly turn: Option.Option<PromptTurn<Config>>;
   readonly folding: State;
 }
 
-const closed = <Config extends Trajectory.AnyConfig>(): Assembly<Config> => ({
+const closed = <Config extends Config.AnyConfig>(): Assembly<Config> => ({
   turn: Option.none(),
   folding: initial(),
 });
 
 /** The turn a prompt opens: what a model was given, with nothing answered yet. */
-const opened = <Config extends Trajectory.AnyConfig>(
+const opened = <Config extends Config.AnyConfig>(
   prompt: Trajectory.PromptPart<Config["extrakit"]>,
 ): Assembly<Config> => ({ turn: Option.some({ prompt, response: [] }), folding: initial() });
 
-const turnsOf = <Config extends Trajectory.AnyConfig>(
+const turnsOf = <Config extends Config.AnyConfig>(
   turn: Option.Option<PromptTurn<Config>>,
 ): ReadonlyArray<PromptTurn<Config>> => (Option.isSome(turn) ? [turn.value] : []);
 
-const assemble = <Config extends Trajectory.AnyConfig>(
+const assemble = <Config extends Config.AnyConfig>(
   assembly: Assembly<Config>,
   part: Exclude<Trajectory.Part<Config>, Trajectory.SessionPart<Config["extrakit"]>>,
 ): readonly [Assembly<Config>, ReadonlyArray<PromptTurn<Config>>] => {
@@ -81,7 +82,7 @@ const assemble = <Config extends Trajectory.AnyConfig>(
  * opens a turn, the response parts that follow it are folded into that turn, and a turn is
  * closed by the prompt after it, or by the parts ending.
  */
-export const readTurns = <Config extends Trajectory.AnyConfig, E, R>(
+export const readTurns = <Config extends Config.AnyConfig, E, R>(
   stream: Session.SessionStream<Config, E, R>,
 ): Stream.Stream<PromptTurn<Config>, E, R> =>
   stream.pipe(
@@ -96,7 +97,7 @@ export const readTurns = <Config extends Trajectory.AnyConfig, E, R>(
  * Folds the parts of a session back into the prompt its model was given: the turns they were
  * produced in, concatenated in the order they were produced.
  */
-export const readPrompt = <Config extends Trajectory.AnyConfig, E, R>(
+export const readPrompt = <Config extends Config.AnyConfig, E, R>(
   stream: Session.SessionStream<Config, E, R>,
 ): Effect.Effect<Prompt.Prompt, E, R> =>
   readTurns(stream).pipe(
@@ -111,7 +112,7 @@ export const readPrompt = <Config extends Trajectory.AnyConfig, E, R>(
   );
 
 /** The conversation of every session, by session id: the messages each of them ran on. */
-export const readConversations = <Config extends Trajectory.AnyConfig, E, R>(
+export const readConversations = <Config extends Config.AnyConfig, E, R>(
   sessions: Session.Sessions<Config, E, R>,
 ): Effect.Effect<Record<string, Conversation>, E | TrajectoryError, R> =>
   Effect.forEach(sessions, (session) =>
@@ -127,7 +128,7 @@ export const readConversations = <Config extends Trajectory.AnyConfig, E, R>(
  * from where it is read to where the result that answers it arrives, and the two are emitted as
  * one turn there.
  */
-export const readToolTurns = <Config extends Trajectory.AnyConfig, E, R>(
+export const readToolTurns = <Config extends Config.AnyConfig, E, R>(
   stream: Session.SessionStream<Config, E, R>,
 ): Stream.Stream<ToolTurn<Config>, E, R> =>
   stream.pipe(

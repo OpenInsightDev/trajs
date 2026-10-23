@@ -17,6 +17,7 @@ import { fileURLToPath } from "node:url";
 
 import { NodeServices as PlatformNode } from "@effect/platform-node";
 import { EventKit, ExtraKit, MetricKit, Prompt, Response, Toolkit, Trajectory } from "@trajs/core";
+import * as Config from "@trajs/core/Config";
 import { Exchange } from "@trajs/core/Exchange";
 import { NodeServices } from "@trajs/platform-node";
 import { layerFileSystem } from "@trajs/utils/Storage";
@@ -37,7 +38,7 @@ const clarify = "clarify";
 const review = "review";
 
 /** What the sample is built and written with: response parts of either kind, and no other kit. */
-const config = Trajectory.config({
+const config = Config.config({
   stream: true,
   toolkit: Toolkit.empty,
   eventkit: EventKit.empty,
