@@ -1,3 +1,5 @@
+import type { Schema } from "effect";
+
 import type * as Extra from "#/Extra.ts";
 import type { IndexByKey } from "#/internal/types.ts";
 
@@ -26,6 +28,37 @@ export type Any = Kit<Record<string, Extra.Any>>;
 export const empty = make();
 
 export type Empty = typeof empty;
+
+/**
+ * A utility type which extracts the extra data from a {@link Kit}.
+ *
+ * @see {@link Extra.ExtraRecord} for the record schema those declarations make
+ * @category models
+ */
+export type Extras<K> = K extends Kit<infer Extras> ? Extras : never;
+
+type Schemas<K extends Any> = Exclude<
+  | K["extra"][keyof K["extra"]]["prompt"]
+  | K["extra"][keyof K["extra"]]["response"]
+  | K["extra"][keyof K["extra"]]["session"],
+  undefined
+>;
+
+/**
+ * The services that decoding the extra data schemas of a {@link Kit} requires.
+ *
+ * @see {@link EncodingServices} for the services of writing the same schemas
+ * @category models
+ */
+export type DecodingServices<K extends Any> = Schema.Codec.DecodingServices<Schemas<K>>;
+
+/**
+ * The services that encoding the extra data schemas of a {@link Kit} requires.
+ *
+ * @see {@link DecodingServices} for the services of reading the same schemas
+ * @category models
+ */
+export type EncodingServices<K extends Any> = Schema.Codec.EncodingServices<Schemas<K>>;
 
 type ExtrasMerged<Ks extends ReadonlyArray<Any>> = Ks extends readonly [
   infer Head extends Any,

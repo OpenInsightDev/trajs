@@ -1,4 +1,4 @@
-import { type ByteStore, type ByteStoreError } from "@trajs/utils/ByteStore";
+import { ByteStore } from "@trajs/utils";
 import { DateTime, Effect, Schema, Scope, Stream } from "effect";
 
 import * as Config from "#/Config.ts";
@@ -6,8 +6,7 @@ import * as Event from "#/Event.ts";
 import * as EventKit from "#/EventKit.ts";
 import * as Extra from "#/Extra.ts";
 import * as ExtraKit from "#/ExtraKit.ts";
-import { cached } from "#/internal/cache.ts";
-import type { EncodingServices, Readable } from "#/internal/parts.ts";
+import * as Cache from "#/internal/cache.ts";
 import { Timestamp, Uuid } from "#/internal/schema.ts";
 import { attach } from "#/internal/trajectory.ts";
 import type { Select } from "#/internal/types.ts";
@@ -194,11 +193,13 @@ export interface Parts<Config extends Config.AnyConfig> {
 export const parts = <Config extends Config.AnyConfig>(config: Config): Parts<Config> => {
   const Prompt = PromptPart(config.extrakit);
   const Session = SessionPart(config.extrakit);
+
   const Response = ResponsePart({
     toolkit: config.toolkit,
     extrakit: config.extrakit,
     stream: config.stream,
   });
+
   const Event = EventPart(config.eventkit);
   const Metric = MetricPart(config.metrickit);
 
@@ -269,44 +270,40 @@ export function make<Config extends Config.AnyConfig>(
 }
 
 export interface CacheOptions {
-  readonly capacity?: number | "unbounded" | undefined;
+  readonly capacity?: number | "unbounded";
 }
 
 type Cached<Id extends string, Config extends Config.AnyConfig, E, R> = Effect.Effect<
-  Trajectory<Id, Config, E | TrajectoryError | ByteStoreError, never>,
-  E | TrajectoryError | ByteStoreError,
-  Scope.Scope | R | EncodingServices<Config> | ByteStore
+  Trajectory<Id, Config, E | TrajectoryError | ByteStore.ByteStoreError>,
+  E | TrajectoryError | ByteStore.ByteStoreError,
+  Scope.Scope | R | Config.EncodingServices<Config> | ByteStore.ByteStore
 >;
 
 export function cache<Id extends string, Config extends Config.AnyConfig, E, R>(
-  trajectory: Trajectory<Id, Config, E, R> & Readable<Config>,
+  trajectory: Trajectory<Id, Config, E, R>,
   options?: CacheOptions,
 ): Cached<Id, Config, E, R>;
 export function cache(
   options?: CacheOptions,
 ): <Id extends string, Config extends Config.AnyConfig, E, R>(
-  trajectory: Trajectory<Id, Config, E, R> & Readable<Config>,
+  trajectory: Trajectory<Id, Config, E, R>,
 ) => Cached<Id, Config, E, R>;
 export function cache<Config extends Config.AnyConfig, E, R>(
   ...args:
-    | [
-        trajectory: Trajectory<string, Config, E, R> & Readable<Config>,
-        options?: CacheOptions | undefined,
-      ]
+    | [trajectory: Trajectory<string, Config, E, R>, options?: CacheOptions | undefined]
     | [options?: CacheOptions | undefined]
 ) {
   if (args.length === 2) {
     const [trajectory, options] = args;
 
-    return cached(trajectory, options);
+    return Cache.cache(trajectory, options);
   }
 
   const [given] = args;
 
   if (given !== undefined && Stream.isStream(given)) {
-    return cached(given);
+    return Cache.cache(given);
   }
 
-  return (trajectory: Trajectory<string, Config, E, R> & Readable<Config>) =>
-    cached(trajectory, given);
+  return (trajectory: Trajectory<string, Config, E, R>) => Cache.cache(trajectory, given);
 }
