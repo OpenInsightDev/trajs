@@ -13,6 +13,12 @@
  * What parts a trajectory is made of, and what they are read with, is `Trajectory`'s: a part
  * schema is built for the kit it is read with, and what a session runs on is those parts
  * ({@link Trajectory.Part}). This module reads them; it declares none of them.
+ *
+ * The forks place the sessions as one tree — each session is forked off one session, which the
+ * reading takes to be the one it continues from — and that tree is what
+ * {@link SessionTree.fromSessions} reads the sessions as: the main session as its root, and every
+ * other session under the one it was forked off, each holding what its declaration states of it.
+ * {@link SessionTree.sessionIds} and {@link SessionTree.forksOf} walk it.
  */
 
 import type { ByteStore, ByteStoreError } from "@trajs/utils/ByteStore";
@@ -149,8 +155,13 @@ export interface Session<Config extends Trajectory.AnyConfig, E = never, R = nev
  * the record holds — the reading fails instead ({@link toSessions}). Each is read with what the
  * trajectory is read with.
  *
+ * The forks place the sessions as one tree — each session is forked off one session, and the main
+ * session is forked off none — which is what {@link SessionTree.fromSessions} reads the record
+ * as.
+ *
  * @see {@link toSessions} for reading a trajectory as them.
  * @see {@link session} for the session one id names.
+ * @see {@link SessionTree.fromSessions} for them as the tree they were forked into.
  * @category models
  */
 export type Sessions<Config extends Trajectory.AnyConfig, E = never, R = never> = Readonly<
@@ -234,6 +245,7 @@ export type Sessions<Config extends Trajectory.AnyConfig, E = never, R = never> 
  *
  * @see {@link Session} for one session of a trajectory.
  * @see {@link session} for the session one id names.
+ * @see {@link SessionTree.fromSessions} for them as the tree they were forked into.
  * @see {@link toSessionsCached} for reading them through a store a program provides.
  * @see {@link View.conversations} for the conversations they ran in.
  * @category constructors
@@ -312,6 +324,7 @@ export const toSessions = <Config extends Trajectory.AnyConfig, E, R>(
  * ```
  *
  * @see {@link toSessions} for reading them into memory instead.
+ * @see {@link SessionTree.fromSessions} for them as the tree they were forked into.
  * @see {@link Session} for one session of a trajectory.
  * @see {@link Trajectory.cache} for the reading its parts are kept by.
  * @see {@link Trajectory.CacheOptions} for the window it keeps in memory.
