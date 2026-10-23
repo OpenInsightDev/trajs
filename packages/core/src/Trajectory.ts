@@ -189,13 +189,20 @@ const responseFields = {
   uuid: Uuid,
 };
 
+// A response is read as two readings of its parts, in this order: the toolkit's own,
+// which reads a tool call or tool result by the tool it names, and the toolkit-free
+// one, which reads a part naming any other tool with `unknown` parameters and
+// result. Decoding falls back to the second where the first does not describe the
+// part, and encoding takes the first where it does, so a tool of the toolkit keeps
+// the encoders its schemas state.
+
 /** The response part schema that reads the whole parts a model returned. */
 const NonStreamResponsePart = <T extends Toolkit.Any, K extends ExtraKit.Any>(
   toolkit: T,
   extrakit: K,
 ) =>
   Schema.TaggedStruct("Response", {
-    response: Response.PartView(toolkit),
+    response: Schema.Union([Response.Part(toolkit), Response.Part()]),
     extra: extraField(extrakit, "response"),
     ...responseFields,
   });
@@ -206,7 +213,7 @@ const StreamResponsePart = <T extends Toolkit.Any, K extends ExtraKit.Any>(
   extrakit: K,
 ) =>
   Schema.TaggedStruct("Response", {
-    response: Response.AllPartsView(toolkit),
+    response: Schema.Union([Response.AllParts(toolkit), Response.AllParts()]),
     extra: extraField(extrakit, "response"),
     ...responseFields,
   });
@@ -237,7 +244,8 @@ type AllResponseParts<
  *   schema too — see {@link Exchange.Part}.
  * - `toolkit` is what the response is read by: the tool call and tool result parts of
  *   its tools as those tools state them, and a part naming a tool the toolkit no
- *   longer holds as the part it was produced as — see {@link Response.AllPartsView}.
+ *   longer holds as the part it was produced as — see {@link Response.AllParts} and
+ *   its toolkit-free reading.
  * - `extrakit` reads the part's extra data ({@link Extra.ExtraRecord}); `timestamp`,
  *   `sessionId` and `uuid` are the fields every response part is produced with, and a
  *   part stating no session belongs to the main session, as one stating `"main"` does
@@ -269,7 +277,7 @@ type AllResponseParts<
  *
  * @see {@link parts} for building a part under the config of its trajectory.
  * @see {@link ResponsePartEncoded} for the encoded form of a part.
- * @see {@link Response.AllPartsView} for what the response of a part is read as.
+ * @see {@link Response.AllParts} for what the response of a part is read as.
  * @category schemas
  */
 export const ResponsePart = <

@@ -1,62 +1,68 @@
 /**
- * Response parts that tolerate tools the toolkit does not know about.
+ * Response parts as a trajectory holds them: the tools its toolkit names, read by
+ * the schemas those tools state, and any other tool, read by the toolkit-free
+ * schemas of `effect/ai/Response` with `unknown` parameters and result.
  *
- * `effect/ai/Response` types tool call and tool result parts by the tool names of
- * toolkit they were built from, so decoding a response a trajectory holds that mentions
- * any other tool fails. Each `*View` schema unions the upstream schema with the
- * two unconstrained parts below, {@link AnyToolCallPart} and
- * {@link AnyToolResultPart}, so those tools decode instead of being rejected
- * while tools that are in the toolkit keep their exact names, parameters and
- * results. A part claiming a known tool name whose payload no longer matches that
- * tool's schema also falls back to the unconstrained part, because loading
- * the history a trajectory holds should not depend on the current tool schemas.
+ * `effect/ai/Response` types tool call and tool result parts by the tool names of a
+ * toolkit, so it keeps those two readings apart: `AllParts(toolkit)` names the
+ * toolkit's tools alone and `AllParts()` accepts any tool. A trajectory holds both,
+ * which is what the types below state and what `Trajectory.ResponsePart` reads.
  */
 
-import { Effect, identity, Predicate, Schema, SchemaTransformation } from "effect";
-import type { Tool, Toolkit } from "effect/ai";
-import {
-  AllParts,
-  Part,
-  ProviderMetadata,
-  StreamPart,
-  toolCallPart,
-  toolResultPart,
-} from "effect/ai/Response";
+import type { Tool } from "effect/ai";
 import type {
-  AllPartsEncoded,
+  AllParts,
   ConstructorParams,
-  PartEncoded,
-  StreamPartEncoded,
+  Part,
   ToolCallPart,
-  ToolCallPartEncoded,
   ToolCallParts,
-  ToolParametersMode,
   ToolResultPart,
-  ToolResultPartEncoded,
   ToolResultParts,
 } from "effect/ai/Response";
+import { toolCallPart, toolResultPart } from "effect/ai/Response";
 
 export * from "effect/ai/Response";
 
-// HACK: `effect/ai/Response` does not export its `PartTypeId`, so it is copied
-// verbatim; if it drifts, the parts decoded below stop satisfying the
-// `ToolCallPart` / `ToolResultPart` types they are declared as.
-const PartTypeId = "~effect/ai/Response/Part" as const;
-
-const AnyToolCallPartTypeId = "~effect/ai/Content/AnyToolCallPart" as const;
-
-const AnyToolResultPartTypeId = "~effect/ai/Content/AnyToolResultPart" as const;
-
 /**
- * Union type for all response parts that also accepts tools outside the
- * provided toolkit.
+ * Tool call part of a tool that no toolkit names.
  *
  * **When to use**
  *
- * Use when a response part may name a tool that the provided toolkit does not
- * define.
+ * Use to type a call a trajectory holds for a tool whose schema is no longer
+ * available.
  *
- * @see {@link AllParts} for toolkit-specific response parts.
+ * @see {@link AllPartsView} for the parts of a response that hold one.
+ * @category models
+ */
+export type AnyToolCallPart = ToolCallPart<string, unknown>;
+
+/**
+ * Tool result part of a tool that no toolkit names.
+ *
+ * **When to use**
+ *
+ * Use to type a result a trajectory holds for a tool whose schema is no longer
+ * available.
+ *
+ * @see {@link AllPartsView} for the parts of a response that hold one.
+ * @category models
+ */
+export type AnyToolResultPart = ToolResultPart<string, unknown, unknown>;
+
+/**
+ * Every part of a response, including the tools the toolkit does not name.
+ *
+ * **When to use**
+ *
+ * Use to type the response of a trajectory part, which is read with the toolkit of
+ * the trajectory it belongs to.
+ *
+ * **Details**
+ *
+ * A tool of the toolkit keeps the name, parameters and result its schema states;
+ * any other tool is read as {@link AnyToolCallPart} or {@link AnyToolResultPart}.
+ *
+ * @see {@link PartView} for the whole parts alone.
  * @category models
  */
 export type AllPartsView<Tools extends Record<string, Tool.Any>> =
@@ -65,302 +71,59 @@ export type AllPartsView<Tools extends Record<string, Tool.Any>> =
   | AnyToolResultPart;
 
 /**
- * Creates a Schema for all response parts, including tools outside the provided
- * toolkit.
+ * A whole part of a response, including the tools the toolkit does not name.
  *
  * **When to use**
  *
- * Use when decoding or encoding the response parts a trajectory holds that may contain tools
- * the provided toolkit does not define.
+ * Use to type a response part a model returned whole, rather than every increment
+ * a streamed response arrived in.
  *
- * @see {@link AllParts} for a Schema restricted to the provided toolkit.
- * @category schemas
- */
-export const AllPartsView = <T extends Toolkit.Any | Toolkit.WithHandler<any>>(
-  toolkit: T,
-): Schema.Codec<
-  AllPartsView<T extends Toolkit.Any ? Toolkit.Tools<T> : Toolkit.WithHandlerTools<T>>,
-  AllPartsEncoded,
-  Tool.ResultDecodingServices<Toolkit.Tools<T>[keyof Toolkit.Tools<T>]>,
-  Tool.ResultEncodingServices<Toolkit.Tools<T>[keyof Toolkit.Tools<T>]>
-> => withAnyToolParts(AllParts(toolkit));
-
-/**
- * Union type for non-streaming response parts that also accepts tools outside
- * the provided toolkit.
- *
- * **When to use**
- *
- * Use when a single response part may name a tool that the provided toolkit
- * does not define.
- *
- * @see {@link Part} for toolkit-specific non-streaming response parts.
+ * @see {@link AllPartsView} for every part a response may hold.
  * @category models
  */
-export type PartView<
-  Tools extends Record<string, Tool.Any>,
-  EncodedToolParameters extends ToolParametersMode = "decoded",
-> = Part<Tools, EncodedToolParameters> | AnyToolCallPart | AnyToolResultPart;
+export type PartView<Tools extends Record<string, Tool.Any>> =
+  | Part<Tools>
+  | AnyToolCallPart
+  | AnyToolResultPart;
 
 /**
- * Creates a Schema for non-streaming response parts, including tools outside the
- * provided toolkit.
+ * The tool call parts of a response, including the tools the toolkit does not
+ * name.
  *
  * **When to use**
  *
- * Use when decoding or encoding a response part a trajectory holds that may contain tools
- * the provided toolkit does not define.
+ * Use to type the calls a trajectory holds, where the toolkit may name the tool.
  *
- * @see {@link Part} for a Schema restricted to the provided toolkit.
- * @category schemas
- */
-export const PartView = <T extends Toolkit.Any | Toolkit.WithHandler<any>>(
-  toolkit: T,
-): Schema.Codec<
-  PartView<T extends Toolkit.Any ? Toolkit.Tools<T> : Toolkit.WithHandlerTools<T>>,
-  PartEncoded,
-  Tool.ResultDecodingServices<Toolkit.Tools<T>[keyof Toolkit.Tools<T>]>,
-  Tool.ResultEncodingServices<Toolkit.Tools<T>[keyof Toolkit.Tools<T>]>
-> => withAnyToolParts(Part(toolkit));
-
-/**
- * Union type for streaming response parts that also accepts tools outside the
- * provided toolkit.
- *
- * **When to use**
- *
- * Use when a streaming response part may name a tool that the provided toolkit
- * does not define.
- *
- * @see {@link StreamPart} for toolkit-specific streaming response parts.
+ * @see {@link AnyToolCallPart} for a call of a tool it does not name.
  * @category models
  */
-export type StreamPartView<
-  Tools extends Record<string, Tool.Any>,
-  EncodedToolParameters extends ToolParametersMode = "decoded",
-> = StreamPart<Tools, EncodedToolParameters> | AnyToolCallPart | AnyToolResultPart;
+export type ToolCallPartsView<Tools extends Record<string, Tool.Any>> =
+  | ToolCallParts<Tools>
+  | AnyToolCallPart;
 
 /**
- * Creates a Schema for streaming response parts, including tools outside the
- * provided toolkit.
+ * The tool result parts of a response, including the tools the toolkit does not
+ * name.
  *
  * **When to use**
  *
- * Use when decoding or encoding a stream part a trajectory holds that may contain tools
- * the provided toolkit does not define.
+ * Use to type the results a trajectory holds, where the toolkit may name the tool.
  *
- * @see {@link StreamPart} for a Schema restricted to the provided toolkit.
- * @category schemas
- */
-export const StreamPartView = <T extends Toolkit.Any | Toolkit.WithHandler<any>>(
-  toolkit: T,
-): Schema.Codec<
-  StreamPartView<T extends Toolkit.Any ? Toolkit.Tools<T> : Toolkit.WithHandlerTools<T>>,
-  StreamPartEncoded,
-  Tool.ResultDecodingServices<Toolkit.Tools<T>[keyof Toolkit.Tools<T>]>,
-  Tool.ResultEncodingServices<Toolkit.Tools<T>[keyof Toolkit.Tools<T>]>
-> => withAnyToolParts(StreamPart(toolkit));
-
-/**
- * Union type for tool call parts that also accepts tools outside the provided
- * toolkit.
- *
- * **When to use**
- *
- * Use when a tool call part may name a tool that the provided toolkit does not
- * define.
- *
- * @see {@link ToolCallParts} for toolkit-specific tool call parts.
- * @category utility types
- */
-export type ToolCallPartsView<
-  Tools extends Record<string, Tool.Any>,
-  EncodedParameters extends ToolParametersMode = "decoded",
-> = ToolCallParts<Tools, EncodedParameters> | AnyToolCallPart;
-
-/**
- * Union type for tool result parts that also accepts tools outside the provided
- * toolkit.
- *
- * **When to use**
- *
- * Use when a tool result part may name a tool that the provided toolkit does not
- * define.
- *
- * @see {@link ToolResultParts} for toolkit-specific tool result parts.
- * @category utility types
+ * @see {@link AnyToolResultPart} for a result of a tool it does not name.
+ * @category models
  */
 export type ToolResultPartsView<Tools extends Record<string, Tool.Any>> =
   | ToolResultParts<Tools>
   | AnyToolResultPart;
 
 /**
- * Union of toolkit-specific tool call and result parts.
- *
- * **When to use**
- *
- * Use to type a tool call or tool result part built from the provided toolkit.
- *
- * @see {@link ToolPartView} for parts that may name tools outside the toolkit.
- * @category utility types
- */
-export type ToolPart<
-  Tools extends Record<string, Tool.Any>,
-  EncodedParameters extends ToolParametersMode = "decoded",
-> = ToolCallParts<Tools, EncodedParameters> | ToolResultParts<Tools>;
-
-/**
- * Union of tool call and result parts that also accepts tools outside the
- * provided toolkit.
- *
- * **When to use**
- *
- * Use to type a tool call or tool result part that the provided toolkit may or
- * may not define.
- *
- * @see {@link ToolPart} for toolkit-specific parts.
- * @category utility types
- */
-export type ToolPartView<
-  Tools extends Record<string, Tool.Any>,
-  EncodedParameters extends ToolParametersMode = "decoded",
-> = ToolCallPartsView<Tools, EncodedParameters> | ToolResultPartsView<Tools>;
-
-/**
- * Tool call part whose name and parameters are not restricted by a toolkit.
- *
- * **When to use**
- *
- * Use to type a tool call part a trajectory holds for a tool whose schema is no longer
- * available.
- *
- * @category models
- */
-export type AnyToolCallPart = ToolCallPart<string, unknown>;
-
-type RuntimeAnyToolCallPart = AnyToolCallPart & {
-  readonly [AnyToolCallPartTypeId]: typeof AnyToolCallPartTypeId;
-};
-
-/**
- * Type guard to check if a value is an unrestricted tool call part.
- *
- * **When to use**
- *
- * Use to check whether a tool call part is one that the toolkit does not
- * describe.
- *
- * @category guards
- */
-export const isAnyToolCallPart = (u: unknown): u is RuntimeAnyToolCallPart =>
-  Predicate.hasProperty(u, AnyToolCallPartTypeId);
-
-/**
- * Constructs a tool call part whose name and parameters are unrestricted.
- *
- * **When to use**
- *
- * Use to produce a tool call for a tool that is not part of a toolkit.
- *
- * @category constructors
- */
-export const anyToolCallPart = (
-  params: ConstructorParams<ToolCallPart<string, unknown>>,
-): AnyToolCallPart =>
-  Object.assign(toolCallPart(params), {
-    [AnyToolCallPartTypeId]: AnyToolCallPartTypeId,
-  });
-
-/**
- * Schema for a tool call whose name and parameters are not restricted by a
- * toolkit.
- *
- * **When to use**
- *
- * Use to decode or encode a tool call for a tool that a toolkit does not
- * describe.
- *
- * @category schemas
- */
-export const AnyToolCallPart: Schema.Codec<AnyToolCallPart, ToolCallPartEncoded> = Schema.Struct({
-  [PartTypeId]: Schema.Literal(PartTypeId).pipe(
-    Schema.withDecodingDefaultKey(Effect.succeed(PartTypeId), { encodingStrategy: "omit" }),
-  ),
-  [AnyToolCallPartTypeId]: Schema.Literal(AnyToolCallPartTypeId).pipe(
-    Schema.withDecodingDefaultKey(Effect.succeed(AnyToolCallPartTypeId), {
-      encodingStrategy: "omit",
-    }),
-  ),
-  metadata: ProviderMetadata.pipe(Schema.withDecodingDefault(Effect.succeed({}))),
-  type: Schema.Literal("tool-call"),
-  id: Schema.String,
-  name: Schema.String,
-  params: Schema.Unknown,
-  providerExecuted: Schema.Boolean.pipe(Schema.withDecodingDefaultKey(Effect.succeed(false))),
-}).annotate({ identifier: "AnyToolCallPart" });
-
-/**
- * Tool result part whose name and result are not restricted by a toolkit.
- *
- * **When to use**
- *
- * Use to type a tool result part a trajectory holds for a tool whose schema is no longer
- * available.
- *
- * @category models
- */
-export type AnyToolResultPart = ToolResultPart<string, unknown, unknown>;
-
-type RuntimeAnyToolResultPart = AnyToolResultPart & {
-  readonly [AnyToolResultPartTypeId]: typeof AnyToolResultPartTypeId;
-};
-
-/**
- * Type guard to check if a value is an unrestricted tool result part.
- *
- * **When to use**
- *
- * Use to check whether a tool result part is one that the toolkit does not
- * describe.
- *
- * @category guards
- */
-export const isAnyToolResultPart = (u: unknown): u is RuntimeAnyToolResultPart =>
-  Predicate.hasProperty(u, AnyToolResultPartTypeId);
-
-/**
- * Union of unrestricted tool call and tool result parts.
- *
- * **When to use**
- *
- * Use to type a tool part that the provided toolkit does not describe.
- *
- * @category models
- */
-export type AnyToolPart = AnyToolCallPart | AnyToolResultPart;
-
-type RuntimeAnyToolPart = RuntimeAnyToolCallPart | RuntimeAnyToolResultPart;
-
-/**
- * Type guard to check if a value is an unrestricted tool part.
- *
- * **When to use**
- *
- * Use to check whether a tool part is one that the toolkit does not describe.
- *
- * @category guards
- */
-export const isAnyToolPart = (u: unknown): u is RuntimeAnyToolPart =>
-  isAnyToolCallPart(u) || isAnyToolResultPart(u);
-
-/**
- * The fields a tolerant tool result part is built from.
+ * The fields a tool result part for a tool no toolkit describes is built from.
  *
  * It is what {@link ConstructorParams} states, with the two fields the decoded
  * part derives rather than takes: what a result is encoded as is the result
- * itself — a tolerant result is carried as it is — and a result is not
- * preliminary unless the caller says so. They may still be given, for a part
- * decoded and built again.
+ * itself — such a result is carried as it is — and a result is not preliminary
+ * unless the caller says so. They may still be given, for a part decoded and
+ * built again.
  */
 type AnyToolResultParams = Omit<
   ConstructorParams<ToolResultPart<string, unknown, unknown>>,
@@ -371,11 +134,31 @@ type AnyToolResultParams = Omit<
 };
 
 /**
- * Constructs a tool result part whose name and result are unrestricted.
+ * Builds a tool call part for a tool that no toolkit describes.
  *
  * **When to use**
  *
- * Use to produce a tool result for a tool that is not part of a toolkit.
+ * Use to state a call a run made with a tool the toolkit of its trajectory does
+ * not hold.
+ *
+ * **Details**
+ *
+ * The name and the parameters are left as stated: the part is an
+ * {@link AnyToolCallPart}, the shape the toolkit-free `AllParts()` reads, rather
+ * than one read by a tool's own schema.
+ *
+ * @category constructors
+ */
+export const anyToolCallPart = (params: ConstructorParams<AnyToolCallPart>): AnyToolCallPart =>
+  toolCallPart(params);
+
+/**
+ * Builds a tool result part for a tool that no toolkit describes.
+ *
+ * **When to use**
+ *
+ * Use to state the result of a call a run made with a tool the toolkit of its
+ * trajectory does not hold.
  *
  * **Details**
  *
@@ -384,84 +167,13 @@ type AnyToolResultParams = Omit<
  * filled in here, so the part built is the part a trajectory reads back — which is
  * what {@link Trajectory.parts} refuses a part built without them to be.
  *
- * @see {@link AnyToolResultPart} for the schema the part is read by.
  * @category constructors
  */
 export const anyToolResultPart = <const Params extends AnyToolResultParams>(
   params: Params,
 ): AnyToolResultPart =>
-  Object.assign(
-    toolResultPart({
-      ...params,
-      encodedResult: params.encodedResult ?? params.result,
-      preliminary: params.preliminary ?? false,
-    }),
-    { [AnyToolResultPartTypeId]: AnyToolResultPartTypeId },
-  );
-
-/**
- * Schema for a tool result whose name and result are not restricted by a
- * toolkit.
- *
- * **When to use**
- *
- * Use to decode or encode a tool result for a tool that a toolkit does not
- * describe.
- *
- * @category schemas
- */
-export const AnyToolResultPart: Schema.Codec<AnyToolResultPart, ToolResultPartEncoded> =
-  Schema.Struct({
-    id: Schema.String,
-    type: Schema.Literal("tool-result"),
-    isFailure: Schema.Boolean,
-    name: Schema.String,
-    [PartTypeId]: Schema.Literal(PartTypeId),
-    [AnyToolResultPartTypeId]: Schema.Literal(AnyToolResultPartTypeId).pipe(
-      Schema.withDecodingDefaultKey(Effect.succeed(AnyToolResultPartTypeId), {
-        encodingStrategy: "omit",
-      }),
-    ),
-    result: Schema.Unknown,
-    providerExecuted: Schema.Boolean,
-    metadata: ProviderMetadata,
-    encodedResult: Schema.Unknown,
-    preliminary: Schema.Boolean,
-  })
-    .pipe(
-      Schema.encodeTo(
-        Schema.Struct({
-          id: Schema.String,
-          type: Schema.Literal("tool-result"),
-          isFailure: Schema.Boolean,
-          name: Schema.String,
-          result: Schema.Unknown,
-          providerExecuted: Schema.optional(Schema.Boolean),
-          metadata: Schema.optional(ProviderMetadata),
-          preliminary: Schema.optional(Schema.Boolean),
-        }),
-        SchemaTransformation.transform({
-          decode: (encoded) => ({
-            ...encoded,
-            [PartTypeId]: PartTypeId,
-            providerExecuted: encoded.providerExecuted ?? false,
-            metadata: encoded.metadata ?? {},
-            encodedResult: encoded.result,
-            preliminary: encoded.preliminary ?? false,
-          }),
-          encode: identity,
-        }),
-      ),
-    )
-    .annotate({ identifier: "AnyToolResultPart" });
-
-// SAFETY: `Schema.Union` widens the encoded and service type parameters of its
-// members; the union of the three codecs is exactly the declared contract.
-const withAnyToolParts = <Value, Encoded, DecodingServices, EncodingServices>(
-  schema: Schema.Codec<Value, Encoded, DecodingServices, EncodingServices>,
-): Schema.Codec<
-  Value | AnyToolCallPart | AnyToolResultPart,
-  Encoded,
-  DecodingServices,
-  EncodingServices
-> => Schema.Union([schema, AnyToolCallPart, AnyToolResultPart]) as any;
+  toolResultPart({
+    ...params,
+    encodedResult: params.encodedResult ?? params.result,
+    preliminary: params.preliminary ?? false,
+  });

@@ -15,13 +15,13 @@ catalog:
   "@base-ui/react": ^1.9.0
   "@changesets/changelog-github": ^1.0.1
   "@changesets/cli": ^3.0.3
-  "@effect/ai-anthropic": ^4.0.2
-  "@effect/ai-openai-compat": ^4.0.2
-  # Pinned to the `effect` release the workspace is on: the 4.0.3 line peers on
-  # `effect@^4.0.3`.
-  "@effect/platform-node": 4.0.2
-  "@effect/vitest": 4.0.2
-  "@effect/sql-clickhouse": 4.0.2
+  "@effect/ai-anthropic": ^4.0.6
+  "@effect/ai-openai-compat": ^4.0.6
+  # Pinned to the `effect` release the workspace is on: a `@effect/*` package peers
+  # on the `effect` line it shares, so it moves with `effect`, not ahead of it.
+  "@effect/platform-node": 4.0.6
+  "@effect/vitest": 4.0.6
+  "@effect/sql-clickhouse": 4.0.6
   "@fontsource-variable/geist": ^5.3.0
   "@fontsource/ibm-plex-mono": ^5.3.0
   "@fontsource/poppins": ^5.3.0
@@ -39,7 +39,7 @@ catalog:
   class-variance-authority: ^0.7.1
   cmdk: ^1.1.1
   cn: ^0.4.0
-  effect: ^4.0.2
+  effect: ^4.0.6
   gpt-tokenizer: ^4.0.0
   lucide-react: ^1.55.0
   next-themes: ^0.4.6
@@ -55,9 +55,9 @@ catalog:
   vite-plus: 1.0.0-rc.1
   wrangler: ^4.149.0
 overrides:
-  # The platform package's shared runtime would otherwise resolve to 4.0.3,
-  # which peers on a newer `effect` than the workspace has.
-  "@effect/platform-node-shared": 4.0.2
+  # The platform package's shared runtime is held on the workspace's `effect` line,
+  # rather than to whatever a wider range would resolve to on its own.
+  "@effect/platform-node-shared": 4.0.6
   vite@*: "catalog:"
 peerDependencyRules:
   allowAny:
@@ -65,7 +65,15 @@ peerDependencyRules:
   allowedVersions:
     vite: "*"
 minimumReleaseAgeExclude:
-  - effect@4.0.2
+  # The Effect line the workspace is on, taken ahead of the minimum release age so
+  # `effect` and the `@effect/*` packages stay on one release.
+  - effect@4.0.6
+  - "@effect/ai-anthropic@4.0.6"
+  - "@effect/ai-openai-compat@4.0.6"
+  - "@effect/platform-node@4.0.6"
+  - "@effect/platform-node-shared@4.0.6"
+  - "@effect/sql-clickhouse@4.0.6"
+  - "@effect/vitest@4.0.6"
   - "@fumadocs/base-ui@16.17.3"
   - fumadocs-core@16.17.3
 allowBuilds:

@@ -180,20 +180,20 @@ catalogs:
       specifier: ^3.0.3
       version: 3.0.3
     '@effect/ai-anthropic':
-      specifier: ^4.0.2
-      version: 4.0.2
+      specifier: ^4.0.6
+      version: 4.0.6
     '@effect/ai-openai-compat':
-      specifier: ^4.0.2
-      version: 4.0.2
+      specifier: ^4.0.6
+      version: 4.0.6
     '@effect/platform-node':
-      specifier: 4.0.2
-      version: 4.0.2
+      specifier: 4.0.6
+      version: 4.0.6
     '@effect/sql-clickhouse':
-      specifier: 4.0.2
-      version: 4.0.2
+      specifier: 4.0.6
+      version: 4.0.6
     '@effect/vitest':
-      specifier: 4.0.2
-      version: 4.0.2
+      specifier: 4.0.6
+      version: 4.0.6
     '@fontsource-variable/geist':
       specifier: ^5.3.0
       version: 5.3.0
@@ -243,8 +243,8 @@ catalogs:
       specifier: ^0.4.0
       version: 0.4.0
     effect:
-      specifier: ^4.0.2
-      version: 4.0.2
+      specifier: ^4.0.6
+      version: 4.0.6
     gpt-tokenizer:
       specifier: ^4.0.0
       version: 4.0.0
@@ -289,7 +289,7 @@ catalogs:
       version: 4.149.0
 
 overrides:
-  '@effect/platform-node-shared': 4.0.2
+  '@effect/platform-node-shared': 4.0.6
   vite@*: npm:@voidzero-dev/vite-plus-core@1.0.0-rc.1
 
 importers:
@@ -319,7 +319,7 @@ importers:
     dependencies:
       '@effect/platform-node':
         specifier: 'catalog:'
-        version: 4.0.2(effect@4.0.2)(redis@6.3.0)
+        version: 4.0.6(effect@4.0.6)(redis@6.3.0)
       '@trajs/core':
         specifier: workspace:*
         version: link:../../packages/core
@@ -331,7 +331,7 @@ importers:
         version: link:../../packages/utils
       effect:
         specifier: 'catalog:'
-        version: 4.0.2
+        version: 4.0.6
     devDependencies:
       '@types/node':
         specifier: 'catalog:'
@@ -350,7 +350,7 @@ importers:
     dependencies:
       '@effect/platform-node':
         specifier: 'catalog:'
-        version: 4.0.2(effect@4.0.2)(redis@6.3.0)
+        version: 4.0.6(effect@4.0.6)(redis@6.3.0)
       '@trajs/core':
         specifier: workspace:*
         version: link:../../packages/core
@@ -365,11 +365,11 @@ importers:
         version: link:../../packages/platform-node
       effect:
         specifier: 'catalog:'
-        version: 4.0.2
+        version: 4.0.6
     devDependencies:
       '@effect/vitest':
         specifier: 'catalog:'
-        version: 4.0.2(effect@4.0.2)(vitest@5.0.1)
+        version: 4.0.6(effect@4.0.6)(vitest@5.0.1)
       '@types/node':
         specifier: 'catalog:'
         version: 24.19.1
@@ -387,13 +387,13 @@ importers:
     dependencies:
       '@effect/ai-anthropic':
         specifier: 'catalog:'
-        version: 4.0.2(effect@4.0.2)
+        version: 4.0.6(effect@4.0.6)
       '@trajs/core':
         specifier: workspace:*
         version: link:../../packages/core
       effect:
         specifier: 'catalog:'
-        version: 4.0.2
+        version: 4.0.6
     devDependencies:
       '@types/node':
         specifier: 'catalog:'
@@ -415,11 +415,11 @@ importers:
         version: link:../../packages/core
       effect:
         specifier: 'catalog:'
-        version: 4.0.2
+        version: 4.0.6
     devDependencies:
       '@effect/platform-node':
         specifier: 'catalog:'
-        version: 4.0.2(effect@4.0.2)(redis@6.3.0)
+        version: 4.0.6(effect@4.0.6)(redis@6.3.0)
       '@types/node':
         specifier: 'catalog:'
         version: 24.19.1
@@ -437,13 +437,13 @@ importers:
     dependencies:
       '@effect/ai-openai-compat':
         specifier: 'catalog:'
-        version: 4.0.2(effect@4.0.2)
+        version: 4.0.6(effect@4.0.6)
       '@trajs/core':
         specifier: workspace:*
         version: link:../../packages/core
       effect:
         specifier: 'catalog:'
-        version: 4.0.2
+        version: 4.0.6
     devDependencies:
       '@types/node':
         specifier: 'catalog:'
@@ -468,7 +468,7 @@ importers:
         version: link:../../packages/core
       effect:
         specifier: 'catalog:'
-        version: 4.0.2
+        version: 4.0.6
       gpt-tokenizer:
         specifier: 'catalog:'
         version: 4.0.0
@@ -493,7 +493,7 @@ importers:
         version: link:../utils
       effect:
         specifier: 'catalog:'
-        version: 4.0.2
+        version: 4.0.6
       uuid:
         specifier: 'catalog:'
         version: 14.0.2
@@ -515,7 +515,7 @@ importers:
     dependencies:
       '@effect/sql-clickhouse':
         specifier: 'catalog:'
-        version: 4.0.2(@effect/platform-node@4.0.2(effect@4.0.2)(redis@6.3.0))(effect@4.0.2)
+        version: 4.0.6(@effect/platform-node@4.0.6(effect@4.0.6)(redis@6.3.0))(effect@4.0.6)
       '@trajs/core':
         specifier: workspace:*
         version: link:../core
@@ -524,7 +524,7 @@ importers:
         version: 3.4.0(@aws-sdk/client-s3@3.1152.0)(@clickhouse/client@1.24.1)(ai@7.0.138(zod@4.6.5))(zod@4.6.5)
       effect:
         specifier: 'catalog:'
-        version: 4.0.2
+        version: 4.0.6
     devDependencies:
       '@types/node':
         specifier: 'catalog:'
@@ -552,7 +552,7 @@ importers:
         version: 2.1.5
       effect:
         specifier: 'catalog:'
-        version: 4.0.2
+        version: 4.0.6
     devDependencies:
       '@types/node':
         specifier: 'catalog:'
@@ -577,7 +577,7 @@ importers:
         version: link:../utils
       effect:
         specifier: 'catalog:'
-        version: 4.0.2
+        version: 4.0.6
     devDependencies:
       '@types/node':
         specifier: 'catalog:'
@@ -596,7 +596,7 @@ importers:
     dependencies:
       '@effect/platform-node':
         specifier: 'catalog:'
-        version: 4.0.2(effect@4.0.2)(redis@6.3.0)
+        version: 4.0.6(effect@4.0.6)(redis@6.3.0)
       '@napi-rs/blake-hash':
         specifier: 'catalog:'
         version: 1.4.0
@@ -605,7 +605,7 @@ importers:
         version: link:../utils
       effect:
         specifier: 'catalog:'
-        version: 4.0.2
+        version: 4.0.6
     devDependencies:
       '@types/node':
         specifier: 'catalog:'
@@ -630,7 +630,7 @@ importers:
         version: 2.4.0
       effect:
         specifier: 'catalog:'
-        version: 4.0.2
+        version: 4.0.6
     devDependencies:
       '@types/node':
         specifier: 'catalog:'
@@ -649,7 +649,7 @@ importers:
     dependencies:
       '@effect/platform-node':
         specifier: 'catalog:'
-        version: 4.0.2(effect@4.0.2)(redis@6.3.0)
+        version: 4.0.6(effect@4.0.6)(redis@6.3.0)
       '@trajs/core':
         specifier: workspace:*
         version: link:../../packages/core
@@ -661,7 +661,7 @@ importers:
         version: link:../../packages/utils
       effect:
         specifier: 'catalog:'
-        version: 4.0.2
+        version: 4.0.6
     devDependencies:
       '@types/node':
         specifier: 'catalog:'
@@ -689,7 +689,7 @@ importers:
         version: 0.4.0
       effect:
         specifier: 'catalog:'
-        version: 4.0.2
+        version: 4.0.6
       lucide-react:
         specifier: 'catalog:'
         version: 1.55.0(@types/react@19.3.0)(react@19.3.0)
@@ -735,7 +735,7 @@ importers:
         version: 0.4.0
       effect:
         specifier: 'catalog:'
-        version: 4.0.2
+        version: 4.0.6
       fumadocs-core:
         specifier: ^16.17.3
         version: 16.17.3(@mdx-js/mdx@3.1.1(supports-color@10.2.2))(@modelcontextprotocol/server@2.3.1)(@types/estree-jsx@1.0.5)(@types/hast@3.0.5)(@types/mdast@4.0.4)(@types/react@19.3.0)(flexsearch@0.8.212)(lucide-react@1.55.0(@types/react@19.3.0)(react@19.3.0))(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(supports-color@10.2.2)(zod@3.25.76)
@@ -902,7 +902,7 @@ importers:
         version: 0.4.0
       effect:
         specifier: 'catalog:'
-        version: 4.0.2
+        version: 4.0.6
       lucide-react:
         specifier: 'catalog:'
         version: 1.55.0(@types/react@19.3.0)(react@19.3.0)
@@ -921,7 +921,7 @@ importers:
     devDependencies:
       '@effect/platform-node':
         specifier: 'catalog:'
-        version: 4.0.2(effect@4.0.2)(redis@6.3.0)
+        version: 4.0.6(effect@4.0.6)(redis@6.3.0)
       '@streamdown/code':
         specifier: 'catalog:'
         version: 2.0.0(react@19.3.0)
@@ -1507,39 +1507,39 @@ packages:
   '@dotenvx/primitives@0.8.0':
     resolution: {integrity: sha512-VYJy0uhFm9zTJ1TxBaW/pA8bjbOM/OttaNMwZ1RHG4JKyRG7DhSdiqD1ipQoAyoD22olUtxbP78W9xY3Wd11bg==}
 
-  '@effect/ai-anthropic@4.0.2':
-    resolution: {integrity: sha512-HkObD5bG3GvlTgFJhu7B4wWdqEZ88RIrTAnQZIFKkhhip5ZlyQhIWwmvIaPUYFton8G3rgqQwq/wXJ/9LNLwHQ==}
+  '@effect/ai-anthropic@4.0.6':
+    resolution: {integrity: sha512-hGMzHIWCgUN0r02wWAIjaaIHK6HU+BXRVZiRbsT/zWwG0BwdYu0YPNuPOQwoqwOUANa7T2bhF+ghHaWcPfL9Xg==}
     peerDependencies:
-      effect: ^4.0.2
+      effect: ^4.0.6
 
-  '@effect/ai-openai-compat@4.0.2':
-    resolution: {integrity: sha512-M4mg50Pe9gxkJRabnSEyNT6vlT9gsmpyXxoZ8yX8dQ7d5Xs8dw3Im6Sf6Ab/r0IU/IkT8pZgCoLsnbeb8QChBA==}
+  '@effect/ai-openai-compat@4.0.6':
+    resolution: {integrity: sha512-+1g/0M6d8RD1RhBWE6c9MRvuPImNn5YliCKUOg+I0UYc+FSikDE774F0oteoF1zhR/0hTsoWgHiqNDSGvgPe9g==}
     peerDependencies:
-      effect: ^4.0.2
+      effect: ^4.0.6
 
-  '@effect/platform-node-shared@4.0.2':
-    resolution: {integrity: sha512-xn8aDw9p/QUPt1Yi0C3HUMcycT+MjHfAe19FDUDrUuzcwq0xxskkamVSqbdykF/Dsuus4aZTsCBZA/vkhHIfbQ==}
+  '@effect/platform-node-shared@4.0.6':
+    resolution: {integrity: sha512-0PhyC4uG30xGtsajnxjkcBWfTjNRzUh4ZKl1Kvo/MNyCTb+W2O+fBzf7wCRCoqt+nLudiq4V7vX40Q8XIBuMaQ==}
     engines: {node: '>=18.0.0'}
     peerDependencies:
-      effect: ^4.0.2
+      effect: ^4.0.6
 
-  '@effect/platform-node@4.0.2':
-    resolution: {integrity: sha512-RWesXBQStnFHdD465gR5thFKgXO7FSyCKRZ56nWXB7PedNVzr8vV0nb/3MULLdri493sMz/b/pmGBTb6K8cBjQ==}
+  '@effect/platform-node@4.0.6':
+    resolution: {integrity: sha512-gXvGHAy0/8PZbWvMMguloDUyeSP+rzYEo3FSEqUuGduxo9ORcGioDxPI+GOLCIFfam7VuNkmSUxBOiRMIrMrBw==}
     engines: {node: '>=18.0.0'}
     peerDependencies:
-      effect: ^4.0.2
+      effect: ^4.0.6
       redis: '>=5.0.0 <7.0.0'
 
-  '@effect/sql-clickhouse@4.0.2':
-    resolution: {integrity: sha512-ogaEgwNBlSlXFVi6OO91KBdcRfm/fWU3i7yq1W3vM6TFgdBUwbfxxAiVhHC7IEP8k2IlUKtaQLVWXg1j14Trrg==}
+  '@effect/sql-clickhouse@4.0.6':
+    resolution: {integrity: sha512-JQ1qNjEi9tRt4j9/qwisqqiuX4EV/wCWnw/ywEhTc95bEuO7r7g3wGa/Mog9gvPaHRoXAd7Su1AzduWNxWnD9A==}
     peerDependencies:
-      '@effect/platform-node': ^4.0.2
-      effect: ^4.0.2
+      '@effect/platform-node': ^4.0.6
+      effect: ^4.0.6
 
-  '@effect/vitest@4.0.2':
-    resolution: {integrity: sha512-Zb72nu7iUy3rNdBp9J1Xu5oUQGwJ8cOYsUwmYgujj88aqyvASRDjOS01SjlcPViqf77csduetKdCJTVndMNfzw==}
+  '@effect/vitest@4.0.6':
+    resolution: {integrity: sha512-oKNbtyUHK5+0o730CXwojULEu7f3+c235pYFD4U5T//o+hHrJbYbZU4bRkcv936tPr5IOnmujeyQiC/LuJJjHw==}
     peerDependencies:
-      effect: ^4.0.2
+      effect: ^4.0.6
       vitest: '>=5.0.0 <6.0.0'
 
   '@emnapi/core@1.11.1':
@@ -4098,8 +4098,8 @@ packages:
   ee-first@1.1.1:
     resolution: {integrity: sha512-WMwm9LhRUo+WUaRN+vRuETqG89IgZphVSNkdFgeb6sS/E4OrDIN7t48CAewSHXc6C8lefD8KKfr5vY61brQlow==}
 
-  effect@4.0.2:
-    resolution: {integrity: sha512-YeYnLqSFrL4+tCOXRrfNP03w8FILoF/wDl+ukraJAGzXrjcS383W7LAAvGBbLatEyktmLxRq+9xJinx7QzXW5A==}
+  effect@4.0.6:
+    resolution: {integrity: sha512-Tc3mkzuLR6t6P9dhLt0D2GrxYtmU5td4XEJEiXCmILz53IRIfJyHsKZWjTA3xEjiwpNTtXBgI4iqYPxMztBDrw==}
 
   electron-to-chromium@1.5.452:
     resolution: {integrity: sha512-cVvk1YBSj6571VmV6hdJTqj94Y79xSu8cj6Y9t6ae4Y4431z8/7EJFvu3rVp90xhfuv9BpPKUmaLfTo4+FOGBg==}
@@ -6147,8 +6147,8 @@ packages:
     resolution: {integrity: sha512-dkrQXeHSaoamnItlYbmzG0wFYrM0ZwDxCIg0A7aKjTyyhh9svRzCNFEzV+Vm05/yehjCzjDZ31KXfGEjYSztDQ==}
     engines: {node: '>=20.18.1'}
 
-  undici@8.11.2:
-    resolution: {integrity: sha512-u4UB2/IrKdU6lFxumHmmo1a3fCQO5tzQllRorfoRS63txhrB7xTpSn1PftwC4qEHkOaqP95fCWW4lJzwErwzhQ==}
+  undici@8.12.3:
+    resolution: {integrity: sha512-+fdndUTwBP86cVjihTp21hZHo7d6oj1c/47XPA3lL8mM0XHs+C4EkcjmgRsFnFk2f/UONGDy9ItBItmXsLOQHw==}
     engines: {node: '>=22.19.0'}
 
   unenv@2.0.0-rc.24:
@@ -7111,42 +7111,42 @@ snapshots:
 
   '@dotenvx/primitives@0.8.0': {}
 
-  '@effect/ai-anthropic@4.0.2(effect@4.0.2)':
+  '@effect/ai-anthropic@4.0.6(effect@4.0.6)':
     dependencies:
-      effect: 4.0.2
+      effect: 4.0.6
 
-  '@effect/ai-openai-compat@4.0.2(effect@4.0.2)':
+  '@effect/ai-openai-compat@4.0.6(effect@4.0.6)':
     dependencies:
-      effect: 4.0.2
+      effect: 4.0.6
 
-  '@effect/platform-node-shared@4.0.2(effect@4.0.2)':
+  '@effect/platform-node-shared@4.0.6(effect@4.0.6)':
     dependencies:
       '@types/ws': 8.18.2
-      effect: 4.0.2
+      effect: 4.0.6
       ws: 8.22.0
     transitivePeerDependencies:
       - bufferutil
       - utf-8-validate
 
-  '@effect/platform-node@4.0.2(effect@4.0.2)(redis@6.3.0)':
+  '@effect/platform-node@4.0.6(effect@4.0.6)(redis@6.3.0)':
     dependencies:
-      '@effect/platform-node-shared': 4.0.2(effect@4.0.2)
-      effect: 4.0.2
+      '@effect/platform-node-shared': 4.0.6(effect@4.0.6)
+      effect: 4.0.6
       redis: 6.3.0
-      undici: 8.11.2
+      undici: 8.12.3
     transitivePeerDependencies:
       - bufferutil
       - utf-8-validate
 
-  '@effect/sql-clickhouse@4.0.2(@effect/platform-node@4.0.2(effect@4.0.2)(redis@6.3.0))(effect@4.0.2)':
+  '@effect/sql-clickhouse@4.0.6(@effect/platform-node@4.0.6(effect@4.0.6)(redis@6.3.0))(effect@4.0.6)':
     dependencies:
       '@clickhouse/client': 1.24.1
-      '@effect/platform-node': 4.0.2(effect@4.0.2)(redis@6.3.0)
-      effect: 4.0.2
+      '@effect/platform-node': 4.0.6(effect@4.0.6)(redis@6.3.0)
+      effect: 4.0.6
 
-  '@effect/vitest@4.0.2(effect@4.0.2)(vitest@5.0.1)':
+  '@effect/vitest@4.0.6(effect@4.0.6)(vitest@5.0.1)':
     dependencies:
-      effect: 4.0.2
+      effect: 4.0.6
       vitest: 5.0.1(@types/node@24.19.1)(@vitest/browser-preview@5.0.1)(@vitest/ui@5.0.1)(@voidzero-dev/vite-plus-core@1.0.0-rc.1(@types/node@24.19.1)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(typescript@7.0.2)(yaml@2.9.1))(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(typescript@7.0.2)(yaml@2.9.1)
 
   '@emnapi/core@1.11.1':
@@ -9184,7 +9184,7 @@ snapshots:
 
   ee-first@1.1.1: {}
 
-  effect@4.0.2: {}
+  effect@4.0.6: {}
 
   electron-to-chromium@1.5.452: {}
 
@@ -11640,7 +11640,7 @@ snapshots:
 
   undici@7.30.0: {}
 
-  undici@8.11.2: {}
+  undici@8.12.3: {}
 
   unenv@2.0.0-rc.24:
     dependencies:
