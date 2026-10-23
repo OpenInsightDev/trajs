@@ -10,6 +10,8 @@
  * or the range the analysis at the end has to recover.
  */
 
+import { fileURLToPath } from "node:url";
+
 import {
   EventKit,
   Exchange,
@@ -52,7 +54,7 @@ type Message = ReadonlyArray<
 >;
 
 /** Where the set is kept: the `fixtures/` of this case, which the run generates and no commit holds. */
-export const Fixtures = "cases/olap/fixtures/trajs";
+export const Fixtures = fileURLToPath(new URL("fixtures/trajs", import.meta.url));
 
 /**
  * What the fixtures are drawn from: the weights the analysis has to recover.
