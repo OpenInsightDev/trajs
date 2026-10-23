@@ -11,7 +11,7 @@
  */
 
 import * as Config from "@trajs/core/Config";
-import { Part as partSchema, type EncodingServices } from "@trajs/core/Exchange";
+import { Part as partSchema } from "@trajs/core/Exchange";
 import * as Trajectory from "@trajs/core/Trajectory";
 import { TrajectoryError } from "@trajs/core/TrajectoryError";
 import { DateTime, Effect, Match, Schema, Stream } from "effect";
@@ -121,7 +121,7 @@ const rowOf = (
 /** The parts of `trajectory` as the rows of {@link name}, in the order they arrive. */
 export const rowsOf = <C extends Config.AnyConfig, E, R>(
   trajectory: Trajectory.Trajectory<string, C, E, R>,
-): Stream.Stream<Row, E | TrajectoryError, R | EncodingServices<C>> => {
+): Stream.Stream<Row, E | TrajectoryError, R | Config.EncodingServices<C>> => {
   const encode = partSchema(trajectory).pipe(Schema.encodeEffect);
 
   // Every row of one reading is of the trajectory it is read from, named by the id

@@ -36,7 +36,7 @@
  */
 
 import * as Config from "@trajs/core/Config";
-import { Part as partSchema, type EncodingServices } from "@trajs/core/Exchange";
+import { Part as partSchema } from "@trajs/core/Exchange";
 import type * as Trajectory from "@trajs/core/Trajectory";
 import { TrajectoryError } from "@trajs/core/TrajectoryError";
 import { Effect, Schema } from "effect";
@@ -188,7 +188,7 @@ export const create = (): Effect.Effect<void, SqlError, Client> =>
  * the payload column carries is the part as a trajectory states it rather than
  * as the toolkit it was produced with does: a tool result travels as its
  * encoded form, not as the decoded one. Encoding is what a toolkit states of
- * its own tools' results, so the stream takes {@link EncodingServices} beside
+ * its own tools' results, so the stream takes {@link Config.EncodingServices} beside
  * the services the trajectory is read with.
  *
  * @see {@link ingest} for writing the rows this stream makes.
@@ -258,5 +258,5 @@ export const write = writeRows;
  */
 export const ingest = <C extends Config.AnyConfig, E, R>(
   trajectory: Trajectory.Trajectory<string, C, E, R>,
-): Effect.Effect<number, E | TrajectoryError | SqlError, R | EncodingServices<C> | Client> =>
+): Effect.Effect<number, E | TrajectoryError | SqlError, R | Config.EncodingServices<C> | Client> =>
   rows(trajectory).pipe(write);

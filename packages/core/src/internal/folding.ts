@@ -140,10 +140,40 @@ type FoldedConfig<Config extends Config.AnyConfig> = Config.Config<
   Config["extrakit"]
 >;
 
+type StreamingConfig<Config extends Config.AnyConfig> = Config.Config<
+  true,
+  Config["toolkit"],
+  Config["eventkit"],
+  Config["metrickit"],
+  Config["extrakit"]
+>;
+
+type FoldablePart<Config extends Config.AnyConfig> =
+  | Trajectory.Part<Config>
+  | Trajectory.Part<StreamingConfig<Config>>;
+
+const StreamingTypes: ReadonlySet<string> = new Set([
+  "text-start",
+  "text-delta",
+  "text-end",
+  "reasoning-start",
+  "reasoning-delta",
+  "reasoning-end",
+  "tool-params-start",
+  "tool-params-delta",
+  "tool-params-end",
+  "error",
+]);
+
+const isStreaming = <Config extends Config.AnyConfig>(
+  part: FoldablePart<Config>,
+): part is Trajectory.Part<StreamingConfig<Config>> =>
+  part._tag === "Response" && StreamingTypes.has(part.response.type);
+
 const foldPart = <Config extends Config.AnyConfig>(
   state: State,
-  part: Trajectory.Part<Config>,
-): readonly [State, ReadonlyArray<Trajectory.Part<Config>>] => {
+  part: Trajectory.Part<StreamingConfig<Config>>,
+): readonly [State, ReadonlyArray<Trajectory.Part<FoldedConfig<Config>>>] => {
   if (part._tag !== "Response") return [state, [part]];
 
   const [folding, completed] = collapse(
@@ -156,11 +186,13 @@ const foldPart = <Config extends Config.AnyConfig>(
 };
 
 export const foldParts = <Config extends Config.AnyConfig, E, R>(
-  parts: Trajectory.TrajectoryStream<Config, E, R>,
-): Trajectory.TrajectoryStream<FoldedConfig<Config>, E, R> => {
+  parts: Stream.Stream<FoldablePart<Config>, E, R>,
+): Stream.Stream<Trajectory.Part<FoldedConfig<Config>>, E, R> => {
   const folded = parts.pipe(
-    Stream.mapAccum(initial, (state, part) => foldPart<Config>(state, part)),
+    Stream.mapAccum(initial, (state, part) =>
+      isStreaming(part) ? foldPart<Config>(state, part) : [state, [part]],
+    ),
   );
 
-  return folded as Trajectory.TrajectoryStream<FoldedConfig<Config>, E, R>;
+  return folded;
 };

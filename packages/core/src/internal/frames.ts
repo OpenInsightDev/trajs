@@ -1,4 +1,4 @@
-import { Schema, Stream } from "effect";
+import { Effect, Option, Schema, Stream } from "effect";
 import { SchemaBinary } from "effect/encoding";
 
 import { TrajectoryError } from "#/TrajectoryError.ts";
@@ -71,15 +71,15 @@ export const joined = (carried: Uint8Array, chunks: ReadonlyArray<Uint8Array>): 
  * - A body that ends in the middle of a frame fails as a {@link TrajectoryError} rather
  *   than losing the value silently.
  *
- * The schema is stated as one that takes no service at decoding, since a frame is read
- * synchronously rather than run: a schema that needs a service to read one is not one a
- * body is read with.
+ * The schema states the services decoding a frame takes, which the stream requires.
  */
 export const readFrames =
-  <S extends Schema.ConstraintDecoder<unknown>>(schema: S) =>
-  <E, R>(body: Stream.Stream<Uint8Array, E, R>): Stream.Stream<S["Type"], E | TrajectoryError, R> =>
+  <S extends Schema.Constraint>(schema: S) =>
+  <E, R>(
+    body: Stream.Stream<Uint8Array, E, R>,
+  ): Stream.Stream<S["Type"], E | TrajectoryError, R | S["DecodingServices"]> =>
     Stream.suspend(() => {
-      const decode = Schema.decodeUnknownSync(SchemaBinary.toCodec(schema));
+      const decode = Schema.decodeUnknownEffect(SchemaBinary.toCodec(schema));
 
       // A reading starts afresh, so the bytes a chunk ended in the middle of a frame with
       // are held per reading rather than by the combinator.
@@ -87,33 +87,34 @@ export const readFrames =
 
       return body.pipe(
         // Not `Stream.mapArray`: a chunk that holds no whole frame yields nothing.
-        Stream.mapAccumArray(
+        Stream.mapAccumArrayEffect(
           () => undefined,
-          (state, chunks) => {
-            let rest = joined(carried, chunks);
-            const values: Array<S["Type"]> = [];
-            let size = frameLength(rest);
+          (_state, chunks) =>
+            Effect.gen(function* () {
+              let rest = joined(carried, chunks);
+              const values: Array<S["Type"]> = [];
+              let size = frameLength(rest);
 
-            while (size !== undefined) {
-              const frame = rest.subarray(0, size);
+              while (size !== undefined) {
+                const frame = rest.subarray(0, size);
 
-              rest = rest.subarray(size);
+                rest = rest.subarray(size);
 
-              // A frame the schema does not read states no value of the body; a schema that
-              // fails any other way is a defect of its own rather than one of the bytes.
-              try {
-                values.push(decode(frame));
-              } catch (error) {
-                if (!Schema.isSchemaError(error)) throw error;
+                // A frame the schema does not read states no value of the body; a schema that
+                // fails any other way is a defect of its own rather than one of the bytes.
+                const decoded = yield* decode(frame).pipe(Effect.option);
+
+                if (Option.isSome(decoded)) {
+                  values.push(decoded.value);
+                }
+
+                size = frameLength(rest);
               }
 
-              size = frameLength(rest);
-            }
+              carried = rest;
 
-            carried = rest;
-
-            return [state, values] as const;
-          },
+              return [undefined, values] as const;
+            }),
         ),
         Stream.concat(
           Stream.suspend(() =>

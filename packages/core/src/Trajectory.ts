@@ -276,7 +276,7 @@ export interface CacheOptions {
 type Cached<Id extends string, Config extends Config.AnyConfig, E, R> = Effect.Effect<
   Trajectory<Id, Config, E | TrajectoryError | ByteStore.ByteStoreError>,
   E | TrajectoryError | ByteStore.ByteStoreError,
-  Scope.Scope | R | Config.EncodingServices<Config> | ByteStore.ByteStore
+  Scope.Scope | R | Config.SchemaServices<Config> | ByteStore.ByteStore
 >;
 
 export function cache<Id extends string, Config extends Config.AnyConfig, E, R>(

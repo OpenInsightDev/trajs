@@ -64,7 +64,7 @@ const Messages = Schema.Array(
 const PromptPart = <K extends ExtraKit.Any>(extrakit: K) =>
   Trajectory.PromptPart(extrakit).mapFields((fields) => ({ ...fields, messages: Messages }));
 
-export const ExchangePart = <C extends Config.AnyConfig>(config: C) =>
+const exchangePart = <C extends Config.AnyConfig>(config: C) =>
   Schema.Union([
     PromptPart<C["extrakit"]>(config.extrakit),
     Trajectory.SessionPart<C["extrakit"]>(config.extrakit),
@@ -77,7 +77,24 @@ export const ExchangePart = <C extends Config.AnyConfig>(config: C) =>
     Trajectory.MetricPart<C["metrickit"]>(config.metrickit),
   ]);
 
-type Part<C extends Config.AnyConfig> = Schema.Schema.Type<ReturnType<typeof ExchangePart<C>>>;
+type Part<C extends Config.AnyConfig> = Schema.Schema.Type<ReturnType<typeof exchangePart<C>>>;
+
+type PartEncoded<C extends Config.AnyConfig> = Schema.Codec.Encoded<
+  ReturnType<typeof exchangePart<C>>
+>;
+
+export const ExchangePart = <C extends Config.AnyConfig>(
+  config: C,
+): Schema.Codec<Part<C>, PartEncoded<C>, Config.DecodingServices<C>, Config.EncodingServices<C>> =>
+  // SAFETY: the exchange's schemas are the config's own, so the config's services cover them.
+  // Effect omits tool parameter services from response part types; see
+  // https://github.com/Effect-TS/effect/issues/9867.
+  exchangePart(config) as Schema.Codec<
+    Part<C>,
+    PartEncoded<C>,
+    Config.DecodingServices<C>,
+    Config.EncodingServices<C>
+  >;
 
 /** Encodes one trajectory part as a {@link SchemaBinary} frame. */
 export const encodePart = <C extends Config.AnyConfig>(config: C) => {
@@ -276,23 +293,17 @@ export const framed = <E, R>(
     Stream.catchTag("CompressionError", (cause) => Stream.fail(TrajectoryError.parse(cause))),
   );
 
-const readable = <C extends Config.AnyConfig>(
-  config: C,
-): Schema.ConstraintDecoder<Trajectory.Part<C>> =>
-  // SAFETY: a trajectory is read from its bytes rather than run, so reading a part takes no service.
-  ExchangePart(config) as Schema.ConstraintDecoder<Trajectory.Part<C>>;
-
 export const reading = <C extends Config.AnyConfig, E>(
   bytes: Stream.Stream<Uint8Array, E, never>,
   config: C,
-): Trajectory.Trajectory<string, C, E | TrajectoryError, never> => {
-  const parts = readFrames(readable(config))(bytes);
+): Trajectory.Trajectory<string, C, E | TrajectoryError, Config.DecodingServices<C>> => {
+  const parts = readFrames(ExchangePart(config))(bytes);
 
-  // SAFETY: the parts of a non-streaming reading are the whole parts of the parts it folds.
+  // SAFETY: the exchange writes streaming parts, so a non-streaming reading folds them into whole ones.
   const read = (config.stream ? parts : foldParts(parts)) as Stream.Stream<
     Trajectory.Part<C>,
     E | TrajectoryError,
-    never
+    Config.DecodingServices<C>
   >;
 
   return Trajectory.make(config)(read);

@@ -9,6 +9,7 @@ import {
   encodeHeader,
   encodePart,
   encodeTrailing,
+  ExchangePart,
   framed,
   framesOf,
   headerOf,
@@ -43,14 +44,21 @@ export const Metadata = Schema.Struct({
 
 export type Metadata = Schema.Schema.Type<typeof Metadata>;
 
-export interface Loaded {
+/**
+ * The schema of a trajectory part, as the exchange writes and reads one.
+ *
+ * @category constructors
+ */
+export const Part = <C extends Config.AnyConfig>(config: C) => ExchangePart(config);
+
+export interface Loaded<Config extends Config.AnyConfig = Config.AnyConfig> {
   readonly header: Header;
 
   readonly metadata: Metadata;
 
-  readonly read: <C extends Config.AnyConfig = Config.AnyConfig>(
+  readonly read: <C extends Config.AnyConfig = Config>(
     config?: C,
-  ) => Trajectory.Trajectory<string, C, TrajectoryError | StorageError, never>;
+  ) => Trajectory.Trajectory<string, C, TrajectoryError | StorageError, Config.DecodingServices<C>>;
 }
 
 export interface Service {
@@ -58,7 +66,11 @@ export interface Service {
     config: Config,
   ) => (
     id: string,
-  ) => Effect.Effect<Loaded, TrajectoryError | StorageError, Config.EncodingServices<Config>>;
+  ) => Effect.Effect<
+    Loaded<Config>,
+    TrajectoryError | StorageError,
+    Config.DecodingServices<Config>
+  >;
 
   readonly save: <Config extends Config.AnyConfig, E, R>(
     trajectory: Trajectory.Trajectory<string, Config, E, R>,
@@ -98,7 +110,7 @@ export class Exchange extends Context.Service<Exchange, Service>()("trajs/core/E
                 return {
                   header: stated.header,
                   metadata: trailing.metadata,
-                  read: <C extends Config.AnyConfig = Config.AnyConfig>(given?: C) =>
+                  read: <C extends Config.AnyConfig = Config>(given?: C) =>
                     reading(frame, given ?? asConfig<C>(config)),
                 };
               }),
@@ -143,12 +155,7 @@ export class Exchange extends Context.Service<Exchange, Service>()("trajs/core/E
                 );
               }).pipe(Stream.unwrap, Stream.scoped);
 
-              // SAFETY: the scope is provided by the save itself, and the encoding services are those the config states.
-              return Stream.run(encoded, storage.write(id)).pipe(Effect.scoped) as Effect.Effect<
-                void,
-                E | TrajectoryError | StorageError,
-                R | Config.EncodingServices<Config>
-              >;
+              return Stream.run(encoded, storage.write(id)).pipe(Effect.scoped);
             },
         };
       }),
