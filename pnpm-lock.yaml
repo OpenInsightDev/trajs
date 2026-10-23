@@ -248,6 +248,9 @@ catalogs:
     gpt-tokenizer:
       specifier: ^4.0.0
       version: 4.0.0
+    immer:
+      specifier: ^11.2.9
+      version: 11.2.9
     lucide-react:
       specifier: ^1.55.0
       version: 1.55.0
@@ -366,6 +369,9 @@ importers:
       effect:
         specifier: 'catalog:'
         version: 4.0.6
+      immer:
+        specifier: 'catalog:'
+        version: 11.2.9
     devDependencies:
       '@effect/vitest':
         specifier: 'catalog:'
@@ -4595,6 +4601,9 @@ packages:
   ignore@5.3.2:
     resolution: {integrity: sha512-hsBTNUqQTDwkWtcdYI2i06Y/nUBEsNEDJKjWdigLvegy8kDuJAS8uRlpkkcQpyEXL0Z/pjDy5HBmMjRCJ2gq+g==}
     engines: {node: '>= 4'}
+
+  immer@11.2.9:
+    resolution: {integrity: sha512-IQ4UEtXjZjyefyWjtLEDXUSrF6T2hwjKPi6BIJl3bY/2XXW24d6cNGdXJSBOA/+KNnuiXkZY6DR0C3efolhitA==}
 
   import-meta-resolve@4.2.0:
     resolution: {integrity: sha512-Iqv2fzaTQN28s/FwZAoFq0ZSs/7hMAHJVX+w8PZl3cY19Pxk6jFFalxQoIfW2826i/fDLXv8IiEZRIT0lDuWcg==}
@@ -9908,6 +9917,8 @@ snapshots:
       safer-buffer: 2.1.2
 
   ignore@5.3.2: {}
+
+  immer@11.2.9: {}
 
   import-meta-resolve@4.2.0: {}
 

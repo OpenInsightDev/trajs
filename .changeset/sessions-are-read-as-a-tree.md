@@ -2,16 +2,17 @@
 "@trajs/core": minor
 ---
 
-The sessions of a trajectory are read as the tree they were forked into.
+The sessions of a trajectory are read as the tree they were forked into, and each
+tree of it holds the session it places.
 
-`@trajs/core/SessionTree` states that tree: it is one session — the main session at its root —
-holding the trees of the sessions forked off it, each beside the id it is named by and the extra
-data its declaration states. What a session ran on is not part of it, so a tree is read without
-reading any part of a trajectory again.
+`@trajs/core/SessionTree` states that tree: one session — the main session at its
+root — with the sessions forked off it under it, each holding the session it places
+rather than the id to look one up by. `SessionTree.make(sessions)` reads the sessions
+`Session.toSessions` read as that tree, `SessionTree.dfs(tree)` reads them a session
+before the sessions forked off it, `SessionTree.sessionIds(tree)` the ids of that walk,
+and `SessionTree.forksOf(id)(tree)` the sessions forked directly off one of them.
 
-`SessionTree.fromSessions(sessions)` reads the sessions `Session.toSessions` read as that tree.
-`SessionTree.sessionIds(tree)` walks a tree in the order it was forked into, and
-`SessionTree.forksOf(id)(tree)` reads the sessions forked directly off one of them.
-
-`SessionTree.SessionTree(config)` is the schema of that tree, as the extra kit of a config reads it,
-so a tree is written where a program keeps one and read back.
+A tree is a reading of the sessions rather than something a program keeps of them: what
+a session ran on is part of it. The schema `SessionTree.SessionTree(config)` and the
+`SessionTree.SessionTreeEncoded` it wrote are gone with the plain tree they read and
+wrote.

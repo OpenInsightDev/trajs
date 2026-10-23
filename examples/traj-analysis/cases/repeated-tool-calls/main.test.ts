@@ -11,7 +11,7 @@
 
 import { expect, it } from "@effect/vitest";
 import { Prompt, Response, Session, Trajectory, View } from "@trajs/core";
-import { Effect, Option, Stream } from "effect";
+import { Effect, Stream } from "effect";
 
 /** What the parts are built and read with: no tool, event, metric or extra datum. */
 const config = Trajectory.config({ stream: false });
@@ -65,7 +65,8 @@ const trajectory = Trajectory.make(config)(
 
 const main = Effect.fn(function* (threshold: number) {
   const sessions = yield* Session.toSessions(trajectory);
-  const session = Option.getOrThrow(Session.session(Trajectory.mainSessionId)(sessions));
+  // The mainline is the one session a reading holds first.
+  const [session] = sessions;
 
   return yield* session.stream.pipe(
     // Parts to turns: a call with the result that answered it

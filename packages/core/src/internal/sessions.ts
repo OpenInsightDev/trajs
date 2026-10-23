@@ -134,18 +134,56 @@ const recordedIn = <Config extends Trajectory.AnyConfig, E, R>(
   });
 
 /**
- * The parts of the trajectory a cache holds of the session `id`: what it inherited from the
- * sessions it continues from, up to the part each of them is continued from, and what it produced
- * itself.
+ * Where the sessions a session is read with end: by the id of each of them, the part the session
+ * after it continues from — and none for the session itself, which is read to the end of the
+ * trajectory.
+ */
+type Lineage = ReadonlyMap<string, string | undefined>;
+
+/**
+ * The sessions the session `id` is read with, and the part each of them is read to: `id` itself,
+ * read to the end of the trajectory, and the sessions it continues from, each read to the part the
+ * session after it continues from.
  *
- * It is an index a session is read by, and it is walked back from `id` rather than forward: a
- * fork names the part it continues from, so what the session it names contributes is known from
- * the session that continues from it.
+ * It is walked back from `id` rather than forward: a fork names the part it continues from, so what
+ * the session it names contributes is known from the session that continues from it. So `id` is the
+ * entry it holds first and the session at its root the one it holds last.
+ */
+const lineageOf = <Config extends Trajectory.AnyConfig>(
+  recorded: ReadonlyMap<string, Recorded<Config>>,
+  id: string,
+): Lineage => {
+  /** The forks from the one `id` is nearest to up to the one at its root. */
+  const forks: Array<Session.Fork> = [];
+  const walked = new Set([id]);
+
+  let fork = recorded.get(id)?.fork;
+
+  // A fork names a part the trajectory reads before the declaration reading it, so walking back
+  // ends at a session that continues from nothing; one naming a session already walked is what
+  // ends the walk rather than continuing it.
+  while (fork !== undefined && !walked.has(fork.session)) {
+    walked.add(fork.session);
+    forks.push(fork);
+    fork = recorded.get(fork.session)?.fork;
+  }
+
+  const ends = new Map<string, string | undefined>([[id, undefined]]);
+
+  for (const from of forks) {
+    ends.set(from.session, from.part);
+  }
+
+  return ends;
+};
+
+/**
+ * The parts of the trajectory a cache holds of the sessions of the lineage given: what each of them
+ * produced, up to the part it is read to, and the metric parts attached to them.
  */
 const streamOf = <Config extends Trajectory.AnyConfig, E>(
   trajectory: Trajectory.Trajectory<string, Config, E, never>,
-  recorded: ReadonlyMap<string, Recorded<Config>>,
-  id: string,
+  ends: Lineage,
 ): Session.SessionStream<Config, E> =>
   Stream.suspend(() => {
     /** The parts kept so far, by `uuid`: what a metric part is attached to. */
@@ -154,40 +192,8 @@ const streamOf = <Config extends Trajectory.AnyConfig, E>(
     const ended = new Set<string>();
 
     /**
-     * Where each session `id` runs on from — the sessions it continues from, from the root down —
-     * ends: by the id of each of them, the part the session after it continues from, and none for
-     * `id` itself, which is read to the end of the trajectory.
-     */
-    const lineage = (): ReadonlyMap<string, string | undefined> => {
-      /** The forks from the one `id` is nearest to up to the one at its root. */
-      const forks: Array<Session.Fork> = [];
-      const walked = new Set([id]);
-
-      let fork = recorded.get(id)?.fork;
-
-      // A fork names a part the trajectory reads before the declaration reading it, so walking back
-      // ends at a session that continues from nothing; one naming a session already walked is what
-      // ends the walk rather than continuing it.
-      while (fork !== undefined && !walked.has(fork.session)) {
-        walked.add(fork.session);
-        forks.push(fork);
-        fork = recorded.get(fork.session)?.fork;
-      }
-
-      const ends = new Map<string, string | undefined>([[id, undefined]]);
-
-      for (const from of forks) {
-        ends.set(from.session, from.part);
-      }
-
-      return ends;
-    };
-
-    const ends = lineage();
-
-    /**
-     * Whether the part given is a part of the session: a part of a session of its lineage before
-     * the part that session ends at, or a metric part attached to one of them.
+     * Whether the part given is a part of the reading: a part of a session of the lineage before the
+     * part that session ends at, or a metric part attached to one of them.
      */
     const keep = (part: Trajectory.Part<Config>): boolean => {
       // A declaration names the session it declares rather than the one it was produced in, and is
@@ -245,15 +251,29 @@ const sessionsOf = <Config extends Trajectory.AnyConfig, E>(
   Effect.gen(function* () {
     const recorded = yield* recordedIn(trajectory);
 
-    const sessions: Record<string, Session.Session<Config, E | TrajectoryError>> = {};
+    // The sessions are read in the order the trajectory named them, which is the order the reading
+    // holds them in: a session after the one it continues from, since a fork names a part read
+    // before the declaration that reads it.
+    const sessions: Array<Session.Session<Config, E | TrajectoryError>> = [];
 
     for (const [id, recordedOf] of recorded) {
-      sessions[id] = {
+      const ends = lineageOf(recorded, id);
+
+      sessions.push({
         id,
         forkedFrom: Option.fromUndefinedOr(recordedOf.fork),
         extra: recordedOf.extra ?? {},
-        stream: streamOf(trajectory, recorded, id),
-      };
+        // `ends` holds the session read first and the ones it continues from after it.
+        inherited: [...ends]
+          .slice(1)
+          .toReversed()
+          .map(([session, end]) => ({
+            session,
+            stream: streamOf(trajectory, new Map([[session, end]])),
+          })),
+        own: streamOf(trajectory, new Map([[id, undefined]])),
+        stream: streamOf(trajectory, ends),
+      });
     }
 
     return sessions;

@@ -16,7 +16,7 @@
  * the parts that are its own rather than those a kit made of it.
  */
 
-import { Session, Trajectory, View } from "@trajs/core";
+import { Session, SessionTree, Trajectory, View } from "@trajs/core";
 import { Exchange } from "@trajs/core/Exchange";
 import type { TrajectoryError } from "@trajs/core/TrajectoryError";
 import { BrowserServices } from "@trajs/platform-browser";
@@ -118,66 +118,30 @@ const turnsOf = (
   );
 
 /**
- * The sessions a session continues from, from the root down.
- *
- * A session's parts are what it ran on — what it inherited, and what it produced — so a stretch
- * of the conversation is the parts of one session out of them.
- */
-const ancestorsOf = (
-  sessions: Session.Sessions<Trajectory.AnyConfig, Failure>,
-  session: Session.Session<Trajectory.AnyConfig, Failure>,
-): ReadonlyArray<string> => {
-  const walked: Array<string> = [];
-
-  let fork = session.forkedFrom;
-
-  while (Option.isSome(fork) && !walked.includes(fork.value.session)) {
-    walked.push(fork.value.session);
-    fork = Option.flatMap(
-      Option.fromUndefinedOr(sessions[fork.value.session]),
-      (from) => from.forkedFrom,
-    );
-  }
-
-  return walked.reverse();
-};
-
-/** The parts of the session `id` out of what it ran on, as the turns they were produced in. */
-const turnsOfSession = (
-  session: Session.Session<Trajectory.AnyConfig, Failure>,
-  id: string,
-): Effect.Effect<ReadonlyArray<Turn>, Failure> =>
-  turnsOf(
-    session.stream.pipe(Stream.filter((part) => part._tag !== "Metric" && part.sessionId === id)),
-  );
-
-/**
  * One session as the viewer reads it, and the sessions forked off it.
  *
- * A session is read from the sessions `Session.toSessions` read, which hold what each
- * of them ran on: the parts of the sessions it continues from, up to the part each of them
- * is continued from, and the parts of its own ({@link Session.Session.stream}).
+ * Each reading of a session is read as the turns it produced, so the turns a session inherited are
+ * read off the session that produced them rather than looked up by an id.
  */
 const readSession = (
-  sessions: Session.Sessions<Trajectory.AnyConfig, Failure>,
-  session: Session.Session<Trajectory.AnyConfig, Failure>,
+  tree: SessionTree.SessionTree<Trajectory.AnyConfig, Failure>,
 ): Effect.Effect<TrajectorySession, Failure> =>
   Effect.gen(function* () {
-    const forks = Object.values(sessions).filter((forked) =>
-      Option.exists(forked.forkedFrom, (from) => from.session === session.id),
-    );
+    const { session } = tree;
 
     return {
       id: session.id,
-      turns: yield* turnsOfSession(session, session.id),
-      inherited: yield* Effect.forEach(ancestorsOf(sessions, session), (from) =>
-        turnsOfSession(session, from).pipe(Effect.map((turns) => ({ sessionId: from, turns }))),
+      turns: yield* turnsOf(session.own),
+      inherited: yield* Effect.forEach(session.inherited, (inherited) =>
+        turnsOf(inherited.stream).pipe(
+          Effect.map((turns) => ({ sessionId: inherited.session, turns })),
+        ),
       ),
       continuesFrom: Option.map(session.forkedFrom, (from) => ({
         sessionId: from.session,
         partUuid: from.part,
       })),
-      forks: yield* Effect.forEach(forks, (forked) => readSession(sessions, forked)),
+      forks: yield* Effect.forEach(tree.forks, readSession),
     };
   });
 
@@ -210,9 +174,9 @@ export const read = (bytes: Uint8Array): Effect.Effect<Trajectory, Failure, Scop
     const loaded = yield* exchange.load(Handed);
 
     const sessions = yield* Session.toSessions(loaded.read());
-    const roots = Object.values(sessions).filter((session) => Option.isNone(session.forkedFrom));
 
+    // A reading of a trajectory is one tree, so a page is shown one root.
     return {
-      roots: yield* Effect.forEach(roots, (session) => readSession(sessions, session)),
+      roots: [yield* readSession(SessionTree.make(sessions))],
     };
   }).pipe(Effect.provide(Layer.provide(browserExchange, Layer.succeed(Storage, handed(bytes)))));

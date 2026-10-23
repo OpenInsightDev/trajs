@@ -114,7 +114,7 @@ export const readPrompt = <Config extends Trajectory.AnyConfig, E, R>(
 export const readConversations = <Config extends Trajectory.AnyConfig, E, R>(
   sessions: Session.Sessions<Config, E, R>,
 ): Effect.Effect<Record<string, Conversation>, E | TrajectoryError, R> =>
-  Effect.forEach(Object.values(sessions), (session) =>
+  Effect.forEach(sessions, (session) =>
     readPrompt(session.stream).pipe(
       Effect.map((prompt) => ({ id: session.id, conversation: prompt.content })),
     ),

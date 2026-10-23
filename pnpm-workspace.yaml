@@ -41,6 +41,7 @@ catalog:
   cn: ^0.4.0
   effect: ^4.0.6
   gpt-tokenizer: ^4.0.0
+  immer: ^11.2.9
   lucide-react: ^1.55.0
   next-themes: ^0.4.6
   react-json-view-lite: ^2.5.0
@@ -76,6 +77,7 @@ minimumReleaseAgeExclude:
   - "@effect/vitest@4.0.6"
   - "@fumadocs/base-ui@16.17.3"
   - fumadocs-core@16.17.3
+  - immer@11.2.9
 allowBuilds:
   # `chdb` states its install script as a no-op and ships its engine as the
   # prebuilt `@chdb/lib-*` package of the platform it runs on, so there is

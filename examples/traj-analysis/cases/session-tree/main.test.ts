@@ -15,8 +15,9 @@
  */
 
 import { expect, it } from "@effect/vitest";
-import { Session, SessionTree, Trajectory } from "@trajs/core";
+import { Session, SessionTree } from "@trajs/core";
 import { Effect, Option, Result, Stream } from "effect";
+import { produce } from "immer";
 
 import { trajectory } from "./fixture.ts";
 
@@ -61,76 +62,74 @@ interface Report {
 
 const main = Effect.fn(function* () {
   const sessions = yield* Session.toSessions(trajectory);
-  const tree = SessionTree.fromSessions(sessions);
+  const tree = SessionTree.make(sessions);
 
-  // The sessions in the order they were forked into — a session before the sessions forked off it,
-  // which is also the order a rollup of them is read back in.
-  const ids = SessionTree.sessionIds(tree);
+  // What each session was read as: the parts it produced itself, folded as they arrive into what it
+  // was asked, what it called and what its requests were billed, and the turns it inherited, counted
+  // off the sessions it continues from. The parts come out of the trajectory `toSessions` cached, so
+  // reading a session costs no pass over the run.
+  const readings = yield* Effect.forEach(SessionTree.dfs(tree), (session) =>
+    Effect.gen(function* () {
+      // The turns it started on: the prompts of the sessions it continues from, which its own parts
+      // do not hold.
+      const inherited = yield* Effect.forEach(session.inherited, ({ stream }) =>
+        stream.pipe(
+          Stream.filter((part) => part._tag === "Prompt"),
+          Stream.runCount,
+        ),
+      );
 
-  // One pass over each session, folded as its parts arrive: what it inherited, the turns it was
-  // asked, the tools it called, and what its requests were billed. The parts come out of the
-  // trajectory `toSessions` cached once, so reading a session costs no pass over the run.
-  const readings = yield* Effect.forEach(ids, (id) => {
-    const session = Option.getOrThrow(Session.session(id)(sessions));
-
-    return session.stream.pipe(
-      // A metric part states no session of its own, and this run's kits contribute none, so the
-      // parts a kit contributes are read past.
-      Stream.filterMap((part) =>
-        part._tag === "Prompt" || part._tag === "Response" ? Result.succeed(part) : Result.failVoid,
-      ),
-      Stream.runFold(
-        (): Reading => ({
-          id,
-          forkedFrom: Option.match(session.forkedFrom, {
-            onNone: () => null,
-            onSome: (fork) => fork.session,
+      // One pass over the parts it produced itself, folded as they arrive: the turns it was asked,
+      // the tools it called and what its requests were billed — and the parts a kit contributes read
+      // past, since a metric part states no session of its own.
+      return yield* session.own.pipe(
+        Stream.filterMap((part) =>
+          part._tag === "Prompt" || part._tag === "Response"
+            ? Result.succeed(part)
+            : Result.failVoid,
+        ),
+        Stream.runFold(
+          (): Reading => ({
+            id: session.id,
+            forkedFrom: Option.getOrNull(Option.map(session.forkedFrom, (fork) => fork.session)),
+            turns: { inherited: inherited.reduce((turns, count) => turns + count, 0), own: 0 },
+            tools: {},
+            requests: 0,
+            input: 0,
+            output: 0,
+            firstRequest: 0,
           }),
-          turns: { inherited: 0, own: 0 },
-          tools: {},
-          requests: 0,
-          input: 0,
-          output: 0,
-          firstRequest: 0,
-        }),
-        (reading, part) => {
-          // A part of the session is one it states: a part it inherited states the session it was
-          // forked off, or states none at all, which is the main session.
-          const own = (part.sessionId ?? Trajectory.mainSessionId) === id;
+          (reading, part) =>
+            produce(reading, (draft) => {
+              if (part._tag === "Prompt") {
+                draft.turns.own += 1;
 
-          if (part._tag === "Prompt") {
-            return own
-              ? { ...reading, turns: { ...reading.turns, own: reading.turns.own + 1 } }
-              : { ...reading, turns: { ...reading.turns, inherited: reading.turns.inherited + 1 } };
-          }
+                return;
+              }
 
-          if (!own) return reading;
+              const response = part.response;
 
-          const response = part.response;
+              if (response.type === "tool-call") {
+                draft.tools[response.name] = (draft.tools[response.name] ?? 0) + 1;
 
-          if (response.type === "tool-call") {
-            return {
-              ...reading,
-              tools: { ...reading.tools, [response.name]: (reading.tools[response.name] ?? 0) + 1 },
-            };
-          }
+                return;
+              }
 
-          if (response.type !== "finish") return reading;
+              if (response.type !== "finish") return;
 
-          const input = response.usage.inputTokens.total ?? 0;
+              const input = response.usage.inputTokens.total ?? 0;
 
-          return {
-            ...reading,
-            requests: reading.requests + 1,
-            input: reading.input + input,
-            output: reading.output + (response.usage.outputTokens.total ?? 0),
-            // The first request a session makes itself is the one given the context it inherited.
-            firstRequest: reading.requests === 0 ? input : reading.firstRequest,
-          };
-        },
-      ),
-    );
-  });
+              // The first request a session makes itself is the one given the context it inherited.
+              if (draft.requests === 0) draft.firstRequest = input;
+
+              draft.requests += 1;
+              draft.input += input;
+              draft.output += response.usage.outputTokens.total ?? 0;
+            }),
+        ),
+      );
+    }),
+  );
 
   // What each session's subtree was billed: the tree is walked a session before the sessions forked
   // off it, so walking it back adds every fork of a session to it before the session itself is.

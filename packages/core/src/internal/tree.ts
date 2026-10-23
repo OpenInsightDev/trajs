@@ -1,7 +1,7 @@
 /**
- * The reading behind {@link SessionTree.fromSessions}, {@link SessionTree.sessionIds} and
+ * The reading behind {@link SessionTree.make}, {@link SessionTree.dfs} and
  * {@link SessionTree.forksOf}: the sessions of a trajectory as the tree they were forked into, the
- * ids the tree holds, and the forks of one session of it.
+ * sessions it walks, and the forks of one session of it.
  *
  * Nothing here is published: a program reaches the tree through `SessionTree`.
  */
@@ -10,27 +10,24 @@ import { Option } from "effect";
 
 import type * as Session from "#/Session.ts";
 import type { SessionTree } from "#/SessionTree.ts";
-import * as Trajectory from "#/Trajectory.ts";
+import type * as Trajectory from "#/Trajectory.ts";
 
 /**
- * The tree the sessions given were forked into: the main session as its root
- * ({@link Trajectory.mainSessionId}), and every other session under the one it states it was forked
- * off.
+ * The tree the sessions given were forked into: the main session at its root, and every other session
+ * under the one it states it was forked off.
  *
- * A session is forked off one session and the main session is forked off none, so every session of
- * a trajectory hangs under that one root, which is what the record of its sessions holds.
+ * A session is forked off one session and the main session is forked off none, so every session of a
+ * reading hangs under that one root — which is the one the reading holds first
+ * ({@link Session.Sessions}).
  */
 export const readTree = <Config extends Trajectory.AnyConfig, E, R>(
   sessions: Session.Sessions<Config, E, R>,
-): SessionTree<Config> => treeOf(sessions[Trajectory.mainSessionId], forkedIn(sessions));
+): SessionTree<Config, E, R> => treeOf(sessions[0], forkedIn(sessions));
 
-/**
- * Every session of the tree, a session before the sessions forked off it, in the order they are
- * held.
- */
-export const readSessionIds = <Config extends Trajectory.AnyConfig>(
-  tree: SessionTree<Config>,
-): ReadonlyArray<string> => [tree.id, ...tree.forks.flatMap(readSessionIds)];
+/** Every session of the tree, a session before the sessions forked off it. */
+export const readDfs = <Config extends Trajectory.AnyConfig, E, R>(
+  tree: SessionTree<Config, E, R>,
+): ReadonlyArray<Session.Session<Config, E, R>> => [tree.session, ...tree.forks.flatMap(readDfs)];
 
 /**
  * The sessions the tree holds as forked directly off the session `id`, in the order it holds them:
@@ -38,24 +35,26 @@ export const readSessionIds = <Config extends Trajectory.AnyConfig>(
  */
 export const readForks =
   (id: string) =>
-  <Config extends Trajectory.AnyConfig>(tree: SessionTree<Config>): ReadonlyArray<string> =>
+  <Config extends Trajectory.AnyConfig, E, R>(
+    tree: SessionTree<Config, E, R>,
+  ): ReadonlyArray<Session.Session<Config, E, R>> =>
     Option.match(sessionOf(id, tree), {
       onNone: () => [],
-      onSome: (session) => session.forks.map((fork) => fork.id),
+      onSome: (session) => session.forks.map((fork) => fork.session),
     });
 
 /**
  * The sessions forked off each session, by the id of the session they state they were forked off.
  *
  * What is forked off each session is gathered before any of them is placed in the tree, so that
- * placing one does not read the record of sessions again for each of them.
+ * placing one does not read the sessions again for each of them.
  */
 const forkedIn = <Config extends Trajectory.AnyConfig, E, R>(
   sessions: Session.Sessions<Config, E, R>,
 ): ReadonlyMap<string, ReadonlyArray<Session.Session<Config, E, R>>> => {
   const forked = new Map<string, Array<Session.Session<Config, E, R>>>();
 
-  for (const session of Object.values(sessions)) {
+  for (const session of sessions) {
     const from = Option.getOrUndefined(Option.map(session.forkedFrom, (fork) => fork.session));
 
     // A session forked off none is the root of a tree: nothing is held under it.
@@ -77,9 +76,8 @@ const forkedIn = <Config extends Trajectory.AnyConfig, E, R>(
 const treeOf = <Config extends Trajectory.AnyConfig, E, R>(
   session: Session.Session<Config, E, R>,
   forked: ReadonlyMap<string, ReadonlyArray<Session.Session<Config, E, R>>>,
-): SessionTree<Config> => ({
-  id: session.id,
-  extra: session.extra,
+): SessionTree<Config, E, R> => ({
+  session,
   forks: (forked.get(session.id) ?? []).map((fork) => treeOf(fork, forked)),
 });
 
@@ -87,11 +85,11 @@ const treeOf = <Config extends Trajectory.AnyConfig, E, R>(
  * The session `id` of the tree, wherever the tree holds it — or `None` where it holds no session of
  * that id.
  */
-const sessionOf = <Config extends Trajectory.AnyConfig>(
+const sessionOf = <Config extends Trajectory.AnyConfig, E, R>(
   id: string,
-  tree: SessionTree<Config>,
-): Option.Option<SessionTree<Config>> => {
-  if (tree.id === id) {
+  tree: SessionTree<Config, E, R>,
+): Option.Option<SessionTree<Config, E, R>> => {
+  if (tree.session.id === id) {
     return Option.some(tree);
   }
 

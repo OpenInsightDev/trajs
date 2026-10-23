@@ -231,7 +231,7 @@ const stepsOf = <Config extends Trajectory.AnyConfig>(
  * **Example** (Reading the parts of a session as its steps)
  *
  * ```ts import.meta.vitest
- * import { Effect, Option, Stream } from "effect"
+ * import { Effect, Stream } from "effect"
  * import { Prompt, Response, Session, Trajectory } from "@trajs/core"
  * import { Step } from "@trajs/extension-atif"
  *
@@ -248,7 +248,9 @@ const stepsOf = <Config extends Trajectory.AnyConfig>(
  * )
  *
  * const sessions = await Effect.runPromise(Session.toSessions(trajectory))
- * const session = Option.getOrThrow(Session.session(Trajectory.mainSessionId)(sessions))
+ *
+ * // The main session is the one session a reading holds first.
+ * const [session] = sessions
  *
  * const steps = await Effect.runPromise(Stream.runCollect(Step.steps(session.stream)))
  *

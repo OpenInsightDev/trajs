@@ -29,7 +29,7 @@ import {
   Trajectory,
   View,
 } from "@trajs/core";
-import { Effect, Match, Option, Result, Schema, Stream } from "effect";
+import { Effect, Match, Result, Schema, Stream } from "effect";
 
 /** The tools the run had, as the parameters each of them takes. */
 const toolkit = Toolkit.make(
@@ -153,7 +153,8 @@ const trajectory = Trajectory.make(config)(
 
 const main = Effect.fn(function* () {
   const sessions = yield* Session.toSessions(trajectory);
-  const session = Option.getOrThrow(Session.session(Trajectory.mainSessionId)(sessions));
+  // The mainline is the one session a reading holds first.
+  const [session] = sessions;
 
   return yield* session.stream.pipe(
     // Parts to calls: what the run asked of its tools is what the report is of, so a part

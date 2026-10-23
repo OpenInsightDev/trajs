@@ -4,175 +4,102 @@
  * A session states the session it was forked off rather than repeating what it inherited, and the
  * reading takes a session to be forked off one session, so what the sessions of a trajectory are to
  * each other is one tree: the main session at its root, and the sessions forked off it, each with
- * the sessions forked off it in turn. This module states that tree ({@link SessionTree}, and the
- * schema `SessionTree.SessionTree` that reads and writes one), reads it out of the sessions
- * {@link Session.toSessions} read ({@link fromSessions}), and walks it ({@link sessionIds},
- * {@link forksOf}).
+ * the sessions forked off it in turn. This module states that tree ({@link SessionTree}), reads it
+ * out of the sessions {@link Session.toSessions} read ({@link make}), and walks it
+ * ({@link dfs}, {@link sessionIds}, {@link forksOf}).
  *
- * The tree is what the sessions state of themselves — the id each is named by, and the extra data
- * its declaration holds — rather than what they ran on: the parts of a session are read of the
- * trajectory ({@link Session.Session.stream}), and the tree is read of the sessions rather than of
- * the trajectory. So the tree is a plain value rather than an effect, and no part of a trajectory
- * is read again for it.
+ * A tree holds the session it places, so a walk of the tree is a walk of the sessions: what a
+ * session ran on is read where the tree is found ({@link Session.Session.stream}) rather than
+ * looked up by the id the session is named by. The tree places the sessions and reads no part of a
+ * trajectory again for it.
  */
 
-import { Schema } from "effect";
-
-import * as Extra from "#/Extra.ts";
-import { readForks, readSessionIds, readTree } from "#/internal/tree.ts";
+import { readDfs, readForks, readTree } from "#/internal/tree.ts";
 import type * as Session from "#/Session.ts";
 import type * as Trajectory from "#/Trajectory.ts";
 
 /**
- * The tree the sessions of a trajectory were forked into: one session, with the trees of the
- * sessions forked off it held under it.
+ * One session of a trajectory, and the trees of the sessions forked off it.
  *
  * **When to use**
  *
- * Use to read a session of a trajectory with the sessions forked off it — to show a trajectory as
- * the sessions it was forked into, or to walk them — rather than reading the `forkedFrom` of every
- * session to find it.
+ * Use to read a session with the sessions forked off it — to show a trajectory as the sessions it
+ * was forked into, to walk them, or to read what one of them came to with its forks — rather than
+ * reading the `forkedFrom` of every session to find the ones that name it.
  *
  * **Details**
  *
- * - A tree is a session — the one at its root — with the trees of the sessions forked off it under
- *   it, and those with the sessions forked off them in turn. The sessions of a trajectory hang off
- *   one root, since the main session is the one session of a trajectory forked off none
- *   ({@link Trajectory.mainSessionId}): {@link fromSessions} reads them as that one tree.
- * - `id` is the id the trajectory names the session by, and `extra` is the extra data its
- *   declaration states ({@link Extra.ExtraRecord}) — what a session states of itself beside the
- *   id, since where it sits among the others is the tree itself.
+ * - `session` is the session the tree places, with what it ran on ({@link Session.Session}): the id
+ *   it is named by, the `forkedFrom` it continues, the extra data its declaration states, and its
+ *   `stream`.
  * - `forks` is the trees of the sessions that state it as the one they were forked off, in the
- *   order the record of sessions holds them, and is empty for a session nothing was forked off.
- * - What a session ran on is not part of a tree: the parts of a session are read of the
- *   trajectory ({@link Session.Session.stream}), so a tree states the sessions of a trajectory
- *   rather than what they hold.
- * - The part a session continues from — the `part` of the `fork` it states
- *   ({@link Session.Session.forkedFrom}) — is not part of a tree either: the tree places the
- *   sessions, and the part one continues from is read of the session itself.
+ *   order the reading holds them, and is empty for a session nothing was forked off.
+ * - The sessions of a trajectory hang off one root, since the main session is the one session
+ *   forked off none ({@link Trajectory.mainSessionId}): {@link make} reads them as that one tree,
+ *   and a tree is read of the sessions rather than of the trajectory, so no part of one is read for
+ *   it.
  *
- * **Example** (A tree of sessions, and the sessions forked off its root)
+ * **Example** (A tree of sessions, read with the sessions forked off its root)
  *
  * ```ts import.meta.vitest
- * import { SessionTree, Trajectory } from "@trajs/core"
+ * import { Effect, Stream } from "effect"
+ * import { Prompt, Response, Session, SessionTree, Trajectory } from "@trajs/core"
  *
- * // The main session, with the two sessions forked off it held under it.
- * const tree: SessionTree.SessionTree<Trajectory.AnyConfig> = {
- *   id: "main",
- *   extra: {},
- *   forks: [
- *     { id: "reply", extra: {}, forks: [] },
- *     { id: "aside", extra: {}, forks: [] }
- *   ]
- * }
+ * const part = Trajectory.parts(Trajectory.anyConfig)
  *
- * tree.forks.map((session) => session.id) // => ["reply", "aside"]
+ * const answered = part.response(Response.makePart("text", { text: "A tree." }))
+ *
+ * // The main session asks and is answered, and a session forked off the answer asks again.
+ * const trajectory = Trajectory.make(Trajectory.anyConfig)(
+ *   Stream.make(
+ *     part.mainSession(),
+ *     part.prompt(Prompt.make("What is a fork?")),
+ *     answered,
+ *     part.subSession("reply", { fork: answered.uuid })
+ *   )
+ * )
+ *
+ * const sessions = await Effect.runPromise(Session.toSessions(trajectory))
+ * const tree = SessionTree.make(sessions)
+ *
+ * // The root holds its own session, and the sessions forked off it under it.
+ * tree.session.id // => "main"
+ * tree.forks.map((fork) => fork.session.id) // => ["reply"]
  * ```
  *
- * @see {@link fromSessions} for reading the sessions of a trajectory as one.
- * @see {@link sessionIds} and {@link forksOf} for walking it.
- * @see {@link Session.Session} for the session a tree is read of.
+ * @see {@link make} for reading the sessions of a trajectory as one.
+ * @see {@link dfs} and {@link sessionIds} for walking it.
+ * @see {@link forksOf} for the sessions forked off one of them.
+ * @see {@link Session.Session} for the session a tree holds.
  * @category models
  */
-export interface SessionTree<Config extends Trajectory.AnyConfig> {
-  readonly id: string;
-  readonly extra: Extra.ExtraRecord<Config["extrakit"]["extra"], "session">;
-  readonly forks: ReadonlyArray<SessionTree<Config>>;
+export interface SessionTree<Config extends Trajectory.AnyConfig, E = never, R = never> {
+  readonly session: Session.Session<Config, E, R>;
+  readonly forks: ReadonlyArray<SessionTree<Config, E, R>>;
 }
-
-/**
- * A tree as it is encoded: the sessions it holds and the forks that place them, with the extra data
- * of each as the kit of its config writes it.
- *
- * @see {@link SessionTree} for the tree itself, and for the schema that writes one.
- * @category models
- */
-export type SessionTreeEncoded<Config extends Trajectory.AnyConfig> = Readonly<{
-  id: string;
-  extra: Extra.ExtraRecordEncoded<Config["extrakit"]["extra"], "session">;
-  forks: ReadonlyArray<SessionTreeEncoded<Config>>;
-}>;
-
-/**
- * The schema of a tree, as the extra kit of the config given reads it.
- *
- * **When to use**
- *
- * Use to write a tree where a program keeps one — an index beside the trajectory, what a page is
- * handed — and to read it back, rather than to read the sessions of a trajectory as one
- * ({@link fromSessions}).
- *
- * **Details**
- *
- * - Every session of the tree is read by the schema of a session part of the config
- *   ({@link Extra.ExtraRecord}), so the extra data of one is what the declaration of the session
- *   states, at each version the kit reads ({@link Extra.ExtraRecordEncoded}).
- * - A tree is as deep as the forks of a trajectory are, so the schema is stated with
- *   {@link Schema.suspend}: one schema reads a tree of any depth, rather than the schema of a tree
- *   being stated once per depth it is read at.
- * - What a session ran on is no part of a tree, so no part of a trajectory is read or written by
- *   it: a tree is read of the sessions rather than of the trajectory they were read of.
- *
- * **Example** (Writing a tree of sessions, and reading it back)
- *
- * ```ts import.meta.vitest
- * import { Schema } from "effect"
- * import { SessionTree, Trajectory } from "@trajs/core"
- *
- * const schema = SessionTree.SessionTree(Trajectory.anyConfig)
- *
- * // The main session, and the session forked off it.
- * const tree: SessionTree.SessionTree<Trajectory.AnyConfig> = {
- *   id: "main",
- *   extra: {},
- *   forks: [{ id: "reply", extra: {}, forks: [] }]
- * }
- *
- * // A tree of sessions is what the schema reads, and what it writes is a tree again.
- * Schema.is(schema)(tree) // => true
- * Schema.decodeUnknownSync(schema)(Schema.encodeSync(schema)(tree)) // => tree
- * Schema.is(schema)({ main: "reply" }) // => false
- * ```
- *
- * @see {@link SessionTree} for the tree it reads.
- * @see {@link fromSessions} for reading the sessions of a trajectory as one.
- * @category schemas
- */
-export const SessionTree = <Config extends Trajectory.AnyConfig>(
-  config: Config,
-): Schema.Codec<SessionTree<Config>, SessionTreeEncoded<Config>> => {
-  const tree: Schema.Codec<SessionTree<Config>, SessionTreeEncoded<Config>> = Schema.Struct({
-    id: Schema.String,
-    extra: Extra.ExtraRecord(config.extrakit, "session"),
-    forks: Schema.Array(
-      Schema.suspend((): Schema.Codec<SessionTree<Config>, SessionTreeEncoded<Config>> => tree),
-    ),
-  });
-
-  return tree;
-};
 
 /**
  * Reads the sessions given as the tree they were forked into.
  *
  * **When to use**
  *
- * Use to read what the sessions of a trajectory are to each other — to list them in the order they
+ * Use to read what the sessions of a trajectory are to each other — to read them in the order they
  * were forked into, to find the sessions forked off one of them, or to show a trajectory as the
  * sessions it holds — rather than walking the `forkedFrom` of each of them to find it.
  *
  * **Details**
  *
- * What it reads is the {@link SessionTree} of the sessions: the main session as its root
- * ({@link Trajectory.mainSessionId}), holding the sessions forked off it, each with the sessions
- * forked off it in turn. It is a reading of the sessions rather than of the trajectory: a session
- * states the session it was forked off and the extra data its declaration holds, so what the tree
- * is made of is what the sessions already hold, and no part of a trajectory is read again for it.
+ * What it reads is the {@link SessionTree} of the sessions: the main session at its root, holding
+ * the sessions forked off it, each with the sessions forked off it in turn. It is a reading of the
+ * sessions rather than of the trajectory: a session states the session it was forked off and holds
+ * what it ran on, so what the tree is made of is what the sessions already hold, and no part of a
+ * trajectory is read again for it.
  *
  * The sessions of a trajectory hold the main session: a session of its own is declared by a fork
- * that names a part of a session the trajectory already read ({@link Session.Fork}), so every
+ * that names a part of a session the reading already reached ({@link Session.Fork}), so every
  * session hangs off the main session, the one session a trajectory reads without declaring it
- * ({@link Trajectory.mainSessionId}).
+ * ({@link Trajectory.mainSessionId}) — and the one the reading holds first
+ * ({@link Session.Sessions}). An empty reading is no sessions, and has no tree.
  *
  * **Example** (Reading the sessions of a trajectory as the tree they were forked into)
  *
@@ -198,108 +125,186 @@ export const SessionTree = <Config extends Trajectory.AnyConfig>(
  * )
  *
  * const sessions = await Effect.runPromise(Session.toSessions(trajectory))
- * const tree = SessionTree.fromSessions(sessions)
+ * const tree = SessionTree.make(sessions)
  *
  * // The main session is the root of it, and the session forked off its answer hangs under it.
- * tree.id // => "main"
+ * tree.session.id // => "main"
  * SessionTree.sessionIds(tree) // => ["main", "reply"]
- * SessionTree.forksOf(Trajectory.mainSessionId)(tree) // => ["reply"]
+ * SessionTree.forksOf(Trajectory.mainSessionId)(tree).map((session) => session.id) // => ["reply"]
  * ```
  *
  * @see {@link SessionTree} for the tree it reads.
  * @see {@link Session.Sessions} for the sessions it is read from.
- * @see {@link sessionIds} and {@link forksOf} for walking it.
- * @see {@link Session.Session.forkedFrom} for the session one of them was forked off.
+ * @see {@link dfs} and {@link sessionIds} for walking it.
+ * @see {@link forksOf} for the sessions forked off one of them.
  * @category constructors
  */
-export const fromSessions = <Config extends Trajectory.AnyConfig, E, R>(
+export const make = <Config extends Trajectory.AnyConfig, E, R>(
   sessions: Session.Sessions<Config, E, R>,
-): SessionTree<Config> => readTree(sessions);
+): SessionTree<Config, E, R> => readTree(sessions);
 
 /**
  * Every session of the tree, a session before the sessions forked off it.
  *
  * **When to use**
  *
- * Use to read the sessions of a trajectory in the order they were forked into — to list them with
- * each under the one it continues from, or to read a {@link SessionTree} as the ids it holds.
+ * Use to read every session of a trajectory in the order they were forked into, each with what it
+ * ran on — to read them one at a time, or to fold what each of them came to — rather than walking
+ * the forks of the tree from its root by hand.
  *
  * **Details**
  *
- * The ids are those a depth-first walk of the tree reads: a session before the sessions forked off
- * it, each with what was forked off it before the forks beside it. So the tree of the sessions
+ * It is the depth-first walk of the tree, from its root down: a session before the sessions forked
+ * off it, each with what was forked off it before the forks beside it. So the tree of the sessions
  * `main`, `reply` and `follow-up` — the last forked off `reply`, which was forked off `main` — is
- * read as `["main", "reply", "follow-up"]`. A session is held once in a tree, so an id is read
- * once.
+ * read as those three in that order. A session is held once in a tree, so it is read once.
+ *
+ * **Example** (Reading every session of a tree, in the order it was forked into)
+ *
+ * ```ts import.meta.vitest
+ * import { Effect, Stream } from "effect"
+ * import { Prompt, Response, Session, SessionTree, Trajectory } from "@trajs/core"
+ *
+ * const part = Trajectory.parts(Trajectory.anyConfig)
+ *
+ * const answered = part.response(Response.makePart("text", { text: "A tree." }))
+ *
+ * // The main session asks and is answered, and two sessions forked off its answer ask again.
+ * const trajectory = Trajectory.make(Trajectory.anyConfig)(
+ *   Stream.make(
+ *     part.mainSession(),
+ *     part.prompt(Prompt.make("What is a fork?")),
+ *     answered,
+ *     part.subSession("reply", { fork: answered.uuid }),
+ *     part.subSession("aside", { fork: answered.uuid })
+ *   )
+ * )
+ *
+ * const sessions = await Effect.runPromise(Session.toSessions(trajectory))
+ * const tree = SessionTree.make(sessions)
+ *
+ * // Each session is read where it is found, with what it ran on.
+ * SessionTree.dfs(tree).map((session) => session.id) // => ["main", "reply", "aside"]
+ * ```
+ *
+ * @see {@link SessionTree} for the tree it walks.
+ * @see {@link sessionIds} for the ids of the sessions it reads.
+ * @see {@link forksOf} for the sessions forked off one of them.
+ * @category combinators
+ */
+export const dfs = <Config extends Trajectory.AnyConfig, E, R>(
+  tree: SessionTree<Config, E, R>,
+): ReadonlyArray<Session.Session<Config, E, R>> => readDfs(tree);
+
+/**
+ * The id of every session of the tree, a session before the sessions forked off it.
+ *
+ * **When to use**
+ *
+ * Use to read the sessions of a trajectory in the order they were forked into where nothing of them
+ * but the id is needed — to list them with each under the one it continues from — rather than
+ * reading the sessions themselves ({@link dfs}).
+ *
+ * **Details**
+ *
+ * The ids are those of the sessions {@link dfs} reads, in the order it reads them: a session before
+ * the sessions forked off it, each with what was forked off it before the forks beside it. So the
+ * tree of `main`, `reply` and `follow-up` — the last forked off `reply`, which was forked off
+ * `main` — is read as `["main", "reply", "follow-up"]`. A session is held once in a tree, so an id
+ * is read once.
  *
  * **Example** (Reading the ids of a tree of sessions)
  *
  * ```ts import.meta.vitest
- * import { SessionTree, Trajectory } from "@trajs/core"
+ * import { Effect, Stream } from "effect"
+ * import { Prompt, Response, Session, SessionTree, Trajectory } from "@trajs/core"
  *
- * // The main session, a session forked off it, and one forked off that.
- * const tree: SessionTree.SessionTree<Trajectory.AnyConfig> = {
- *   id: "main",
- *   extra: {},
- *   forks: [
- *     { id: "reply", extra: {}, forks: [{ id: "follow-up", extra: {}, forks: [] }] },
- *     { id: "aside", extra: {}, forks: [] }
- *   ]
- * }
+ * const part = Trajectory.parts(Trajectory.anyConfig)
  *
- * SessionTree.sessionIds(tree) // => ["main", "reply", "follow-up", "aside"]
+ * const answered = part.response(Response.makePart("text", { text: "A tree." }))
+ * const answeredAgain = part.response(Response.makePart("text", { text: "A branch." }), {
+ *   sessionId: "reply"
+ * })
+ *
+ * // The main session asks and is answered, a session forked off the answer asks again, and a
+ * // session forked off that answer asks once more.
+ * const trajectory = Trajectory.make(Trajectory.anyConfig)(
+ *   Stream.make(
+ *     part.mainSession(),
+ *     part.prompt(Prompt.make("What is a fork?")),
+ *     answered,
+ *     part.subSession("reply", { fork: answered.uuid }),
+ *     part.prompt(Prompt.make("And what does it hold?"), { sessionId: "reply" }),
+ *     answeredAgain,
+ *     part.subSession("follow-up", { fork: answeredAgain.uuid })
+ *   )
+ * )
+ *
+ * const sessions = await Effect.runPromise(Session.toSessions(trajectory))
+ *
+ * SessionTree.sessionIds(SessionTree.make(sessions)) // => ["main", "reply", "follow-up"]
  * ```
  *
  * @see {@link SessionTree} for the tree it is read from.
+ * @see {@link dfs} for the sessions it reads the ids of.
  * @see {@link forksOf} for the sessions forked off one of them.
- * @see {@link fromSessions} for reading the sessions of a trajectory as that tree.
  * @category combinators
  */
-export const sessionIds = <Config extends Trajectory.AnyConfig>(
-  tree: SessionTree<Config>,
-): ReadonlyArray<string> => readSessionIds(tree);
+export const sessionIds = <Config extends Trajectory.AnyConfig, E, R>(
+  tree: SessionTree<Config, E, R>,
+): ReadonlyArray<string> => dfs(tree).map((session) => session.id);
 
 /**
  * The sessions the tree holds as forked directly off the session given.
  *
  * **When to use**
  *
- * Use to find the sessions that continue one session — what was forked off it — rather than
- * reading every session of a trajectory for the ones whose `forkedFrom` names it.
+ * Use to find the sessions that continue one session — what was forked off it — rather than reading
+ * every session of a trajectory for the ones whose `forkedFrom` names it.
  *
  * **Details**
  *
- * The session may be held anywhere in the tree, and the ids are read in the order the tree holds
- * them. Only the sessions forked off it are read, not the sessions forked off those: the whole of
- * the tree is what {@link sessionIds} reads. A session nothing was forked off — the main session,
+ * The session may be held anywhere in the tree, and the sessions are read in the order the tree
+ * holds them. Only the sessions forked off it are read, not the sessions forked off those: the
+ * whole of the tree is what {@link dfs} reads. A session nothing was forked off — the main session,
  * and a session none continues — has none forked off it, and so does an id the tree does not hold.
  *
  * **Example** (Reading the sessions forked off one session)
  *
  * ```ts import.meta.vitest
- * import { SessionTree, Trajectory } from "@trajs/core"
+ * import { Effect, Stream } from "effect"
+ * import { Prompt, Response, Session, SessionTree, Trajectory } from "@trajs/core"
  *
- * // The main session, two sessions forked off it, and one of those forked off once again.
- * const tree: SessionTree.SessionTree<Trajectory.AnyConfig> = {
- *   id: "main",
- *   extra: {},
- *   forks: [
- *     { id: "reply", extra: {}, forks: [{ id: "follow-up", extra: {}, forks: [] }] },
- *     { id: "aside", extra: {}, forks: [] }
- *   ]
- * }
+ * const part = Trajectory.parts(Trajectory.anyConfig)
  *
- * SessionTree.forksOf("main")(tree) // => ["reply", "aside"]
- * SessionTree.forksOf("reply")(tree) // => ["follow-up"]
- * SessionTree.forksOf("aside")(tree) // => []
+ * const answered = part.response(Response.makePart("text", { text: "A tree." }))
+ *
+ * // The main session asks and is answered, and the sessions forked off its answer ask again.
+ * const trajectory = Trajectory.make(Trajectory.anyConfig)(
+ *   Stream.make(
+ *     part.mainSession(),
+ *     part.prompt(Prompt.make("What is a fork?")),
+ *     answered,
+ *     part.subSession("reply", { fork: answered.uuid }),
+ *     part.subSession("aside", { fork: answered.uuid })
+ *   )
+ * )
+ *
+ * const sessions = await Effect.runPromise(Session.toSessions(trajectory))
+ * const tree = SessionTree.make(sessions)
+ *
+ * SessionTree.forksOf("main")(tree).map((session) => session.id) // => ["reply", "aside"]
+ * SessionTree.forksOf("reply")(tree) // => []
  * ```
  *
  * @see {@link SessionTree} for the tree it is read from.
- * @see {@link sessionIds} for every session of it.
+ * @see {@link dfs} for every session of it.
  * @see {@link Session.Session.forkedFrom} for the session one of them was forked off.
  * @category combinators
  */
 export const forksOf =
   (id: string) =>
-  <Config extends Trajectory.AnyConfig>(tree: SessionTree<Config>): ReadonlyArray<string> =>
+  <Config extends Trajectory.AnyConfig, E, R>(
+    tree: SessionTree<Config, E, R>,
+  ): ReadonlyArray<Session.Session<Config, E, R>> =>
     readForks(id)(tree);
