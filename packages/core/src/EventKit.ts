@@ -1,10 +1,6 @@
-import { Option, Predicate, Schema, Stream } from "effect";
-
-import type * as Config from "#/Config.ts";
 import * as Event from "#/Event.ts";
-import { attach } from "#/internal/trajectory.ts";
 import type { IndexByKey } from "#/internal/types.ts";
-import type * as Trajectory from "#/Trajectory.ts";
+import type { Schema } from "effect";
 
 type EventsByTag<Es> = IndexByKey<Es, "tag">;
 
@@ -73,71 +69,4 @@ export const merge = <Ks extends ReadonlyArray<Any>>(...kits: Ks): Merged<Ks> =>
   }
 
   return { events } as Merged<Ks>;
-};
-
-type WithEvents<Config extends Config.AnyConfig, K extends Any> = Config.Config<
-  Config["stream"],
-  Config["toolkit"],
-  Merged<readonly [Config["eventkit"], K]>,
-  Config["metrickit"],
-  Config["extrakit"]
->;
-
-type Reader<K extends Any> = {
-  <Id extends string, Config extends Config.AnyConfig, E, R>(
-    trajectory: Trajectory.Trajectory<Id, Config, E, R>,
-  ): Trajectory.Trajectory<Id, WithEvents<Config, K>, E, R>;
-  <Config extends Config.AnyConfig, E, R>(
-    stream: Trajectory.TrajectoryStream<Config, E, R>,
-  ): Trajectory.TrajectoryStream<WithEvents<Config, K>, E, R>;
-};
-
-export const encode = <K extends Any>(kit: K): Reader<K> => {
-  // SAFETY: the kit names the part of each of its events, so it reads an event
-  // part of any tag as the event it names there, and as nothing where it names none.
-  const readAs: Schema.Codec<
-    Event.EventPart<string, unknown>,
-    Event.EventPart<string, unknown>,
-    never,
-    never
-  > = Event.EventParts(kit) as any;
-
-  // SAFETY: the overloads of `Reader` say which of the two a caller gets, while
-  // the implementation reads either of them the same way.
-  return (<Config extends Config.AnyConfig, E, R>(
-    stream: Trajectory.TrajectoryStream<Config, E, R> | Trajectory.Trajectory<string, Config, E, R>,
-  ):
-    | Trajectory.TrajectoryStream<WithEvents<Config, K>, E, R>
-    | Trajectory.Trajectory<string, WithEvents<Config, K>, E, R> => {
-    const parts = stream.pipe(
-      Stream.map((part): Trajectory.Part<WithEvents<Config, K>> => {
-        if (part._tag !== "Event") {
-          return part;
-        }
-
-        // SAFETY: an event part is the tag of an event and the data stated at it,
-        // which is what the union of the kit's events reads.
-        const read = Schema.decodeOption(readAs)(part.event);
-
-        // SAFETY: the kit names the events read here, so a part read as one of
-        // them is a part of the trajectory that kit names; a part none of them
-        // reads is carried over as it is.
-        return (Option.isSome(read) ? { ...part, event: read.value } : part) as Trajectory.Part<
-          WithEvents<Config, K>
-        >;
-      }),
-    );
-
-    if (!Predicate.hasProperty(stream, "eventkit")) {
-      return parts;
-    }
-
-    return attach(stream.id, {
-      stream: stream.stream,
-      toolkit: stream.toolkit,
-      eventkit: merge(stream.eventkit, kit),
-      metrickit: stream.metrickit,
-      extrakit: stream.extrakit,
-    })(parts);
-  }) as Reader<K>;
 };

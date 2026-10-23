@@ -7,10 +7,16 @@
  * the packages over a file a program would keep, rather than any one of them.
  */
 import { NodeServices as PlatformNodeServices } from "@effect/platform-node";
-import { EventKit, ExtraKit, MetricKit, Prompt, Response, Toolkit, Trajectory } from "@trajs/core";
 import * as Config from "@trajs/core/Config";
+import * as EventKit from "@trajs/core/EventKit";
 import { Exchange } from "@trajs/core/Exchange";
+import * as ExtraKit from "@trajs/core/ExtraKit";
+import * as MetricKit from "@trajs/core/MetricKit";
 import core from "@trajs/core/package.json" with { type: "json" };
+import * as Prompt from "@trajs/core/Prompt";
+import * as Response from "@trajs/core/Response";
+import * as Toolkit from "@trajs/core/Toolkit";
+import * as Trajectory from "@trajs/core/Trajectory";
 import { NodeServices } from "@trajs/platform-node";
 import { Algorithm as CompressionAlgorithm } from "@trajs/utils/Compression";
 import { layerFileSystem } from "@trajs/utils/Storage";
@@ -88,12 +94,12 @@ const roundTrip = Effect.gen(function* () {
 
   yield* exchange.save(trajectory)(id);
 
-  const loaded = yield* exchange.load(id);
+  const loaded = yield* exchange.load(config)(id);
 
   return {
     header: loaded.header,
     metadata: loaded.metadata,
-    read: Array.from(yield* loaded.read(config).pipe(Stream.runCollect)),
+    read: Array.from(yield* loaded.read().pipe(Stream.runCollect)),
   };
 }).pipe(Effect.scoped, Effect.provide(Nodes));
 
