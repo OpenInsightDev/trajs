@@ -1,9 +1,9 @@
 import { ByteStore } from "@trajs/utils";
-import { Effect, Scope, Stream } from "effect";
+import { Effect, Stream } from "effect";
 
 import type * as Config from "#/Config.ts";
 import { decodePart, encodePart } from "#/internal/exchange.ts";
-import { attach } from "#/internal/trajectory.ts";
+import { attach, configOf } from "#/internal/trajectory.ts";
 import type * as Trajectory from "#/Trajectory.ts";
 import type { TrajectoryError } from "#/TrajectoryError.ts";
 
@@ -20,16 +20,20 @@ export const cache = Effect.fn(function* <Id extends string, Config extends Conf
   trajectory: Trajectory.Trajectory<Id, Config, E, R>,
   options: Trajectory.CacheOptions = {},
 ): Effect.fn.Return<
-  Trajectory.Trajectory<Id, Config, E | TrajectoryError | ByteStore.ByteStoreError>,
+  Trajectory.Trajectory<
+    Id,
+    Config,
+    TrajectoryError | ByteStore.ByteStoreError,
+    Config.DecodingServices<Config>
+  >,
   E | TrajectoryError | ByteStore.ByteStoreError,
-  Scope.Scope | R | ByteStore.ByteStore | Config.SchemaServices<Config>
+  R | ByteStore.ByteStore | Config.EncodingServices<Config>
 > {
   const capacity = capacityOf(options);
   const store = yield* ByteStore.ByteStore;
 
   const keyOf = (index: number): string => `${trajectory.id}/${index}`;
 
-  // The schemas a spilled part is written and read with, built where one first spills.
   const codecs = yield* Effect.sync(() => ({
     encode: encodePart<Config>(trajectory),
     decode: decodePart<Config>(trajectory),
@@ -52,14 +56,12 @@ export const cache = Effect.fn(function* <Id extends string, Config extends Conf
         .read(keyOf(index))
         .pipe(Effect.flatMap((bytes) => bytes.readAlloc()));
 
-      // SAFETY: the exchange holds a response part as the stream part a trajectory does.
-      return (yield* decode(bytes)) as Trajectory.Part<Config>;
+      return yield* decode(bytes);
     });
 
   // One pass keeps the parts within the window and writes the rest out as frames.
   const kept: Array<Trajectory.Part<Config>> = [];
 
-  // SAFETY: a part is encoded with the config's schemas, whose services the signature states.
   const spilledCount = yield* trajectory.pipe(
     Stream.mapAccumArray(
       () => 0,
@@ -78,11 +80,7 @@ export const cache = Effect.fn(function* <Id extends string, Config extends Conf
     ),
     Stream.mapEffect(([index, part]) => spill(index, part)),
     Stream.runCount,
-  ) as Effect.Effect<
-    number,
-    E | TrajectoryError | ByteStore.ByteStoreError,
-    R | ByteStore.ByteStore | Config.SchemaServices<Config>
-  >;
+  );
 
   const total = kept.length + spilledCount;
 
@@ -92,20 +90,5 @@ export const cache = Effect.fn(function* <Id extends string, Config extends Conf
     Stream.range(capacity, total - 1).pipe(Stream.mapEffect(read)),
   );
 
-  // A trajectory carries the stream its parts arrive in, which a config does not state.
-  // SAFETY: every field a config states is read off the trajectory, which carries one.
-  const carried = {
-    stream: trajectory.stream,
-    toolkit: trajectory.toolkit,
-    eventkit: trajectory.eventkit,
-    metrickit: trajectory.metrickit,
-    extrakit: trajectory.extrakit,
-  } as Config;
-
-  // SAFETY: a cached trajectory is read with the store and the config it was made with.
-  return attach<Config>(trajectory.id, carried)(parts) as Trajectory.Trajectory<
-    Id,
-    Config,
-    E | TrajectoryError | ByteStore.ByteStoreError
-  >;
+  return attach<Id, Config>(trajectory.id, configOf<Config>(trajectory))(parts);
 });

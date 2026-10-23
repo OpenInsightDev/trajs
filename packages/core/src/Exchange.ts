@@ -5,9 +5,8 @@ import { Context, Effect, Fiber, Layer, Schema, Stream } from "effect";
 
 import * as Config from "#/Config.ts";
 import {
-  configOf,
+  encodeExchangePart,
   encodeHeader,
-  encodePart,
   encodeTrailing,
   ExchangePart,
   framed,
@@ -17,6 +16,7 @@ import {
   reading,
   trailingOf,
 } from "#/internal/exchange.ts";
+import { configOf } from "#/internal/trajectory.ts";
 import * as Trajectory from "#/Trajectory.ts";
 import { TrajectoryError } from "#/TrajectoryError.ts";
 
@@ -125,7 +125,7 @@ export class Exchange extends Context.Service<Exchange, Service>()("trajs/core/E
                 const header = new TextEncoder().encode(encodeHeader(config));
 
                 const frames = trajectory.pipe(
-                  Stream.mapEffect(encodePart(config), { concurrency: 1 }),
+                  Stream.mapEffect(encodeExchangePart(config), { concurrency: 1 }),
                 );
 
                 const [written, hashed] = yield* Stream.broadcastN(frames, {

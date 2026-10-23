@@ -64,40 +64,63 @@ const Messages = Schema.Array(
 const PromptPart = <K extends ExtraKit.Any>(extrakit: K) =>
   Trajectory.PromptPart(extrakit).mapFields((fields) => ({ ...fields, messages: Messages }));
 
-const exchangePart = <C extends Config.AnyConfig>(config: C) =>
+const exchangePart = <C extends Config.AnyConfig, Stream extends boolean>(
+  config: C,
+  stream: Stream,
+) =>
   Schema.Union([
     PromptPart<C["extrakit"]>(config.extrakit),
     Trajectory.SessionPart<C["extrakit"]>(config.extrakit),
-    Trajectory.ResponsePart<C["toolkit"], C["extrakit"], true>({
+    Trajectory.ResponsePart<C["toolkit"], C["extrakit"], Stream>({
       toolkit: config.toolkit,
       extrakit: config.extrakit,
-      stream: true,
+      stream,
     }),
     Trajectory.EventPart<C["eventkit"]>(config.eventkit),
     Trajectory.MetricPart<C["metrickit"]>(config.metrickit),
   ]);
 
-type Part<C extends Config.AnyConfig> = Schema.Schema.Type<ReturnType<typeof exchangePart<C>>>;
-
-type PartEncoded<C extends Config.AnyConfig> = Schema.Codec.Encoded<
-  ReturnType<typeof exchangePart<C>>
+type Part<C extends Config.AnyConfig, Stream extends boolean = true> = Schema.Schema.Type<
+  ReturnType<typeof exchangePart<C, Stream>>
 >;
 
+type PartEncoded<C extends Config.AnyConfig, Stream extends boolean = true> = Schema.Codec.Encoded<
+  ReturnType<typeof exchangePart<C, Stream>>
+>;
+
+/** The part schema the exchange writes. It is streaming, so a non-streaming read folds it. */
 export const ExchangePart = <C extends Config.AnyConfig>(
   config: C,
 ): Schema.Codec<Part<C>, PartEncoded<C>, Config.DecodingServices<C>, Config.EncodingServices<C>> =>
   // SAFETY: the exchange's schemas are the config's own, so the config's services cover them.
   // Effect omits tool parameter services from response part types; see
   // https://github.com/Effect-TS/effect/issues/9867.
-  exchangePart(config) as Schema.Codec<
+  exchangePart(config, true) as Schema.Codec<
     Part<C>,
     PartEncoded<C>,
     Config.DecodingServices<C>,
     Config.EncodingServices<C>
   >;
 
-/** Encodes one trajectory part as a {@link SchemaBinary} frame. */
-export const encodePart = <C extends Config.AnyConfig>(config: C) => {
+/** The part schema of a cache, in the shape the config itself reads its parts. */
+export const TrajectoryPart = <C extends Config.AnyConfig>(
+  config: C,
+): Schema.Codec<
+  Trajectory.Part<C>,
+  PartEncoded<C, C["stream"]>,
+  Config.DecodingServices<C>,
+  Config.EncodingServices<C>
+> =>
+  // SAFETY: the union selects a response part by `config.stream`, as `Trajectory.Part` does.
+  exchangePart(config, config.stream) as Schema.Codec<
+    Trajectory.Part<C>,
+    PartEncoded<C, C["stream"]>,
+    Config.DecodingServices<C>,
+    Config.EncodingServices<C>
+  >;
+
+/** Encodes one trajectory part in the streaming shape the exchange writes. */
+export const encodeExchangePart = <C extends Config.AnyConfig>(config: C) => {
   const encode = ExchangePart(config).pipe(SchemaBinary.toCodec, Schema.encodeEffect);
 
   return (part: Part<C>) =>
@@ -107,9 +130,20 @@ export const encodePart = <C extends Config.AnyConfig>(config: C) => {
     );
 };
 
+/** Encodes one trajectory part in the shape the config reads it. */
+export const encodePart = <C extends Config.AnyConfig>(config: C) => {
+  const encode = TrajectoryPart(config).pipe(SchemaBinary.toCodec, Schema.encodeEffect);
+
+  return (part: Trajectory.Part<C>) =>
+    encode(part).pipe(
+      Effect.mapError((cause) => TrajectoryError.parse(cause)),
+      Effect.map((frame) => frame.slice()),
+    );
+};
+
 /** Decodes one trajectory part from the frame {@link encodePart} wrote. */
 export const decodePart = <C extends Config.AnyConfig>(config: C) => {
-  const decode = ExchangePart(config).pipe(SchemaBinary.toCodec, Schema.decodeUnknownEffect);
+  const decode = TrajectoryPart(config).pipe(SchemaBinary.toCodec, Schema.decodeUnknownEffect);
 
   return (bytes: Uint8Array) =>
     decode(bytes).pipe(Effect.mapError((cause) => TrajectoryError.parse(cause)));
@@ -308,15 +342,3 @@ export const reading = <C extends Config.AnyConfig, E>(
 
   return Trajectory.make(config)(read);
 };
-
-export const configOf = <C extends Config.AnyConfig, E, R>(
-  trajectory: Trajectory.Trajectory<string, C, E, R>,
-): C =>
-  // SAFETY: every field a config states is read off the trajectory, which carries one.
-  ({
-    stream: trajectory.stream,
-    toolkit: trajectory.toolkit,
-    eventkit: trajectory.eventkit,
-    metrickit: trajectory.metrickit,
-    extrakit: trajectory.extrakit,
-  }) as C;

@@ -26,10 +26,23 @@ import type { Trajectory, TrajectoryStream } from "#/Trajectory.ts";
 export const uuid = (): string => uuidv7();
 
 /**
- * `config` attached to the stream given under the id given — or under a new uuid where no
- * id is stated — as the trajectory its parts make.
+ * `config` attached to the stream given under the id given as the trajectory its parts
+ * make.
  */
 export const attach =
-  <Config extends Config.AnyConfig>(id: string | undefined, config: Config) =>
-  <E, R>(stream: TrajectoryStream<Config, E, R>): Trajectory<string, Config, E, R> =>
-    Object.assign(stream, config, { id: id ?? uuid() });
+  <Id extends string, Config extends Config.AnyConfig>(id: Id, config: Config) =>
+  <E, R>(stream: TrajectoryStream<Config, E, R>): Trajectory<Id, Config, E, R> =>
+    Object.assign(stream, config, { id });
+
+/**
+ * The config a trajectory carries, read off every field the trajectory states.
+ */
+export const configOf = <Config extends Config.AnyConfig>(trajectory: Readonly<Config>): Config =>
+  // SAFETY: every field a config states is read off the trajectory, which carries one.
+  ({
+    stream: trajectory.stream,
+    toolkit: trajectory.toolkit,
+    eventkit: trajectory.eventkit,
+    metrickit: trajectory.metrickit,
+    extrakit: trajectory.extrakit,
+  }) as Config;

@@ -1,5 +1,5 @@
 import { ByteStore } from "@trajs/utils";
-import { DateTime, Effect, Schema, Scope, Stream } from "effect";
+import { DateTime, Effect, Schema, Stream } from "effect";
 
 import * as Config from "#/Config.ts";
 import * as Event from "#/Event.ts";
@@ -8,7 +8,7 @@ import * as Extra from "#/Extra.ts";
 import * as ExtraKit from "#/ExtraKit.ts";
 import * as Cache from "#/internal/cache.ts";
 import { Timestamp, Uuid } from "#/internal/schema.ts";
-import { attach } from "#/internal/trajectory.ts";
+import { attach, uuid } from "#/internal/trajectory.ts";
 import type { Select } from "#/internal/types.ts";
 import * as Metric from "#/Metric.ts";
 import * as MetricKit from "#/MetricKit.ts";
@@ -261,7 +261,7 @@ export function make<Config extends Config.AnyConfig>(
   if (args.length === 1) {
     const [config] = args;
 
-    return attach(undefined, config);
+    return attach(uuid(), config);
   }
 
   const [id, config] = args;
@@ -274,9 +274,14 @@ export interface CacheOptions {
 }
 
 type Cached<Id extends string, Config extends Config.AnyConfig, E, R> = Effect.Effect<
-  Trajectory<Id, Config, E | TrajectoryError | ByteStore.ByteStoreError>,
+  Trajectory<
+    Id,
+    Config,
+    TrajectoryError | ByteStore.ByteStoreError,
+    Config.DecodingServices<Config>
+  >,
   E | TrajectoryError | ByteStore.ByteStoreError,
-  Scope.Scope | R | Config.SchemaServices<Config> | ByteStore.ByteStore
+  R | Config.EncodingServices<Config> | ByteStore.ByteStore
 >;
 
 export function cache<Id extends string, Config extends Config.AnyConfig, E, R>(

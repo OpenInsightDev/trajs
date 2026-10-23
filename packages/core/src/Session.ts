@@ -32,7 +32,7 @@ export const main = Effect.fn(function* <Config extends Config.AnyConfig, E, R>(
 ): Effect.fn.Return<
   MainSession<Config, E, R>,
   TrajectoryError | ByteStore.ByteStoreError,
-  ByteStore.ByteStore
+  ByteStore.ByteStore | Config.SchemaServices<Config>
 > {
   throw new Error("Not implemented");
 });
