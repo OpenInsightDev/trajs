@@ -1,15 +1,3 @@
-/**
- * The core package: what a trajectory is, the kits that describe what extensions
- * contribute to one, and the {@link Exchange} that carries a trajectory as bytes —
- * beside the services a trajectory is carried through, which `@trajs/utils` states
- * and this package re-exports, so that a program reads a trajectory and provides what
- * reads it from `@trajs/core` alone.
- *
- * Every module is re-exported as a namespace — `Metric.Metric`,
- * `Storage.layerFileSystem` — and each of this package's own modules is also
- * available as a subpath import such as `@trajs/core/Metric`.
- */
-
 export * as Event from "#/Event.ts";
 
 export * as EventKit from "#/EventKit.ts";

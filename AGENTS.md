@@ -36,7 +36,28 @@ release. Add a tool name to select part of the graph. For example, run
 
 ## Comment Style
 
-Public API comments strictly follow the [Effect](https://github.com/Effect-TS/effect) documentation style: every public module and export has a JSDoc block with a description, optional `**When to use**`, `**Details**` and `**Example**` sections in that order, and `@see` and `@category` tags.
+Short technical sentences, one per line, at most 20 words.
+
+- `packages/core/src/Trajectory.ts` is the reference for this style. Match its comments.
+- No relative clauses, no em dashes, no rhetorical colons. `SAFETY:` keeps its colon, the anti-slop linter requires it.
+- Write only what the code and the types cannot say.
+- Link every type a comment names with `{@link}`, and link the concrete type rather than its `Any` alias.
+- Every public export has a JSDoc block with an `@category` tag.
+- `**When to use**`, `**Details**` and `**Example**` sections are allowed. Never grow one for a small change.
+- Section order is a description, `**When to use**`, `**Details**`, `**Example**`, then tags.
+- A description opens with a verb for a function, and with a noun phrase for a value or type.
+- An `**Example**` must run as written and end with `// =>` giving the result.
+- `@see` contrasts a sibling export and says how the two differ.
+
+Checklist when auditing a file:
+
+- [ ] One sentence per line.
+- [ ] No sentence over 20 words.
+- [ ] No em dash, no rhetorical colon, no relative clause.
+- [ ] Every type a comment names is linked with `{@link}`.
+- [ ] Deleting a comment loses information the code does not carry.
+- [ ] Every public export has a JSDoc block and a `@category`.
+- [ ] No section grew for a small change.
 
 ## Command Execution
 
@@ -46,9 +67,3 @@ Public API comments strictly follow the [Effect](https://github.com/Effect-TS/ef
 
 - Do not change the test suite unless the user explicitly asks for it.
 - Temporary unit tests written while implementing are allowed, but delete every one of them once the task is done.
-
-## Versioning
-
-- Keep the `@trajs/*` packages on the same version via the `fixed` group in `.changeset/config.json` (`@trajs/*` excluding `@trajs/extension-*` and `@trajs/ui-*`) — the libraries under `packages/` and the `@trajs/cli` command under `apps/` alike, since the command reads the format the libraries write. Packages under `extensions/` version independently.
-- The libraries under `ui/` are never published: they are `private`, consumed from source by the apps that render them, and `ignore` in `.changeset/config.json` keeps them out of versioning and releasing — so a new `ui/` library needs no changeset, only its place under `ui/`.
-- Publish every package as an `alpha` prerelease: `.changeset/pre.json` holds Changesets in pre mode, so `changeset version` keeps the `X.Y.Z-alpha.N` line (`changeset pre exit` leaves pre mode).

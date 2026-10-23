@@ -1,21 +1,10 @@
-/**
- * A toolkit as a trajectory's header describes it: {@link encode} writes a toolkit as
- * the JSON objects of {@link ToolkitEncoded}, so a trajectory names the tools its
- * responses refer to without their Effect Schemas. The rest of `effect/ai/Toolkit`
- * is re-exported.
- *
- * A trajectory read as the calls it made with those tools is {@link View.toolTurns}.
- */
-
 import { JsonSchema, pipe, Schema } from "effect";
 import { Tool, type Toolkit } from "effect/ai";
 
 export * from "effect/ai/Toolkit";
 
-/** A tool schema as a JSON Schema draft-07 document. */
 export type JsonSchemaDocument = JsonSchema.Document<"draft-07">;
 
-/** One tool as a trajectory's header describes it. */
 export type ToolEncoded = Readonly<{
   id: string;
   name: string;
@@ -25,10 +14,8 @@ export type ToolEncoded = Readonly<{
   failure: JsonSchemaDocument;
 }>;
 
-/** A toolkit as a trajectory's header describes it, keyed by the key each tool is held at. */
 export type ToolkitEncoded = Record<string, ToolEncoded>;
 
-/** Encodes a toolkit as the descriptions a trajectory's header carries. */
 export const encode = (toolkit: Toolkit.Any): ToolkitEncoded =>
   Object.fromEntries(
     Object.entries(toolkit.tools).map(([key, tool]) => {
@@ -53,5 +40,4 @@ export const encode = (toolkit: Toolkit.Any): ToolkitEncoded =>
     }),
   );
 
-/** The type of {@link empty}: a toolkit that holds no tool. */
 export type Empty = typeof Toolkit.empty;
