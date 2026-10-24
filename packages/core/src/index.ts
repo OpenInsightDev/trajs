@@ -22,8 +22,6 @@ export * as Response from "#/Response.ts";
 
 export * as Session from "#/Session.ts";
 
-export * as SessionTree from "#/SessionTree.ts";
-
 export * as Tool from "#/Tool.ts";
 
 export * as Toolkit from "#/Toolkit.ts";
