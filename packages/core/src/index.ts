@@ -1,3 +1,5 @@
+export * as Cache from "#/Cache.ts";
+
 export * as Config from "#/Config.ts";
 
 export * as Event from "#/Event.ts";

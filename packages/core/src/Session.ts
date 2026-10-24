@@ -1,6 +1,7 @@
 import { ByteStore } from "@trajs/utils";
 import { Effect, type Stream } from "effect";
 
+import * as Cache from "#/Cache.ts";
 import * as Config from "#/Config.ts";
 import { read } from "#/internal/session.ts";
 import * as Trajectory from "#/Trajectory.ts";
@@ -94,7 +95,7 @@ export const main = Effect.fn(function* <Config extends Config.AnyConfig, E, R>(
     R | Config.DecodingServices<Config>
   >,
   E | TrajectoryError | ByteStore.ByteStoreError,
-  R | Config.EncodingServices<Config> | Config.DecodingServices<Config> | ByteStore.ByteStore
+  R | Config.EncodingServices<Config> | Config.DecodingServices<Config> | Cache.Cache
 > {
   return yield* read(trajectory);
 });

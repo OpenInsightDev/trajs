@@ -1,4 +1,3 @@
-import { ByteStore } from "@trajs/utils";
 import { DateTime, Effect, Schema, Stream } from "effect";
 
 import * as Config from "#/Config.ts";
@@ -6,7 +5,6 @@ import * as Event from "#/Event.ts";
 import * as EventKit from "#/EventKit.ts";
 import * as Extra from "#/Extra.ts";
 import * as ExtraKit from "#/ExtraKit.ts";
-import * as Cache from "#/internal/cache.ts";
 import { Timestamp, Uuid } from "#/internal/schema.ts";
 import { attach, uuid } from "#/internal/trajectory.ts";
 import type { Select } from "#/internal/types.ts";
@@ -15,7 +13,6 @@ import * as MetricKit from "#/MetricKit.ts";
 import * as Prompt from "#/Prompt.ts";
 import * as Response from "#/Response.ts";
 import * as Toolkit from "#/Toolkit.ts";
-import type { TrajectoryError } from "#/TrajectoryError.ts";
 
 const extraField = <K extends ExtraKit.Any, P extends Extra.Part>(extrakit: K, part: P) =>
   Extra.ExtraRecord(extrakit, part).pipe(Schema.withDecodingDefault(Effect.succeed({})));
@@ -267,48 +264,4 @@ export function make<Config extends Config.AnyConfig>(
   const [id, config] = args;
 
   return attach(id, config);
-}
-
-export interface CacheOptions {
-  readonly capacity?: number | "unbounded";
-}
-
-type Cached<Id extends string, Config extends Config.AnyConfig, E, R> = Effect.Effect<
-  Trajectory<
-    Id,
-    Config,
-    TrajectoryError | ByteStore.ByteStoreError,
-    Config.DecodingServices<Config>
-  >,
-  E | TrajectoryError | ByteStore.ByteStoreError,
-  R | Config.EncodingServices<Config> | ByteStore.ByteStore
->;
-
-export function cache<Id extends string, Config extends Config.AnyConfig, E, R>(
-  trajectory: Trajectory<Id, Config, E, R>,
-  options?: CacheOptions,
-): Cached<Id, Config, E, R>;
-export function cache(
-  options?: CacheOptions,
-): <Id extends string, Config extends Config.AnyConfig, E, R>(
-  trajectory: Trajectory<Id, Config, E, R>,
-) => Cached<Id, Config, E, R>;
-export function cache<Config extends Config.AnyConfig, E, R>(
-  ...args:
-    | [trajectory: Trajectory<string, Config, E, R>, options?: CacheOptions | undefined]
-    | [options?: CacheOptions | undefined]
-) {
-  if (args.length === 2) {
-    const [trajectory, options] = args;
-
-    return Cache.cache(trajectory, options);
-  }
-
-  const [given] = args;
-
-  if (given !== undefined && Stream.isStream(given)) {
-    return Cache.cache(given);
-  }
-
-  return (trajectory: Trajectory<string, Config, E, R>) => Cache.cache(trajectory, given);
 }

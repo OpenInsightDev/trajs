@@ -1,6 +1,14 @@
+/**
+ * The caching behind {@link Cache.cache}: the parts within a cache's window kept in
+ * memory, and the rest written to its store as frames.
+ *
+ * Nothing here is published: a program reaches the reading through {@link Cache.cache}.
+ */
+
 import { ByteStore } from "@trajs/utils";
 import { Effect, Stream } from "effect";
 
+import type * as Cache from "#/Cache.ts";
 import type * as Config from "#/Config.ts";
 import { decodePart, encodePart } from "#/internal/exchange.ts";
 import { attach, configOf } from "#/internal/trajectory.ts";
@@ -8,7 +16,9 @@ import type * as Trajectory from "#/Trajectory.ts";
 import type { TrajectoryError } from "#/TrajectoryError.ts";
 
 /** How many parts a cache keeps in memory: the stated capacity as a whole count, or `Infinity`. */
-const capacityOf = ({ capacity }: Trajectory.CacheOptions): number => {
+export const capacityOf = (options: Cache.Options | undefined): number => {
+  const capacity = options?.capacity;
+
   if (capacity === undefined || capacity === "unbounded" || Number.isNaN(capacity)) {
     return Infinity;
   }
@@ -16,9 +26,18 @@ const capacityOf = ({ capacity }: Trajectory.CacheOptions): number => {
   return Math.max(0, Math.floor(capacity));
 };
 
-export const cache = Effect.fn(function* <Id extends string, Config extends Config.AnyConfig, E, R>(
+/**
+ * The reading behind {@link Cache.cache}: the source read once, the parts within the
+ * window kept in memory, and the rest written out and read back from the store.
+ */
+export const cached = Effect.fn(function* <
+  Id extends string,
+  Config extends Config.AnyConfig,
+  E,
+  R,
+>(
+  cache: Cache.Service,
   trajectory: Trajectory.Trajectory<Id, Config, E, R>,
-  options: Trajectory.CacheOptions = {},
 ): Effect.fn.Return<
   Trajectory.Trajectory<
     Id,
@@ -27,10 +46,9 @@ export const cache = Effect.fn(function* <Id extends string, Config extends Conf
     Config.DecodingServices<Config>
   >,
   E | TrajectoryError | ByteStore.ByteStoreError,
-  R | ByteStore.ByteStore | Config.EncodingServices<Config>
+  R | Config.EncodingServices<Config>
 > {
-  const capacity = capacityOf(options);
-  const store = yield* ByteStore.ByteStore;
+  const { capacity, store } = cache;
 
   const keyOf = (index: number): string => `${trajectory.id}/${index}`;
 
