@@ -1,96 +1,319 @@
 /**
- * The state and the predicates {@link Session.main} reads a trajectory through: the parts
- * a session holds, and what the parts of a trajectory state of the sessions they name
- * before the tree is built.
+ * The reading behind {@link Session.main}: one pass over a cached trajectory records the
+ * sessions it declares, and each session is then read as the parts of that cache which
+ * state its id, as often as it is read.
+ *
+ * No part is kept by this reading. What the pass keeps is what the parts state of the
+ * sessions they name: one entry per session, one per fork, and the ids metrics attach
+ * to. The parts themselves stay in the cache the program provided.
  *
  * Nothing here is published: a program reaches the reading through {@link Session.main}.
  */
 
-import { Stream } from "effect";
+import { Effect, Stream } from "effect";
 
 import type * as Config from "#/Config.ts";
 import type * as Session from "#/Session.ts";
 import * as Trajectory from "#/Trajectory.ts";
+import { TrajectoryError } from "#/TrajectoryError.ts";
 
 /** A part of a session, which is every part of a trajectory but the declaration of one. */
-export type Part<Config extends Config.AnyConfig> = Exclude<
+type Part<Config extends Config.AnyConfig> = Exclude<
   Trajectory.Part<Config>,
   Trajectory.SessionPart<Config["extrakit"]>
 >;
 
 /** What the declaration of a session states of the session it places in the tree. */
-export interface Declared {
-  /** The session it continues from, named by the part it continues from. */
-  readonly session: string;
+interface Declared {
   /** The `uuid` of the part it continues from. */
   readonly fork: string;
+  /** The position of the declaration in the trajectory. */
+  readonly index: number;
+  /** The session that produced the part it continues from, once the reading resolved it. */
+  session?: string;
 }
 
 /** What the parts of a trajectory state of the sessions they name, before the tree is built. */
-export interface Reading {
-  /** The session each part a session continues from was produced in, by the part's `uuid`. */
-  readonly producing: Map<string, string>;
-  /** The session each part was produced in, by the part's `uuid`, for the metrics attached to it. */
-  readonly contained: Map<string, string>;
-  /** The parts of each session that named it before the declaration reading it. */
-  readonly named: Set<string>;
-  /** What each declared session states, by id, in the order the trajectory declares them. */
+interface Reading {
+  /** The sessions a part named, by declaration order, with what their declaration states. */
   readonly declared: Map<string, Declared>;
+  /** The sessions parts named, whether or not the trajectory declares them. */
+  readonly named: Set<string>;
+  /** The part `uuid`s a metric may be attached to, which is what a metric names. */
+  readonly attached: Set<string>;
 }
 
 /** The reading a trajectory starts from: no part read yet. */
-export const reading = (): Reading => ({
-  producing: new Map(),
-  contained: new Map(),
-  named: new Set(),
+const reading = (): Reading => ({
   declared: new Map(),
+  named: new Set(),
+  attached: new Set(),
 });
 
 /**
- * Whether a part is one a session holds: every part but a declaration, which names the
- * session it declares rather than being a part of it.
+ * Reads `part`, at `index`, into the reading given.
+ *
+ * The main session is the root whether or not the trajectory declares it, and a session
+ * declared again is read where it first was declared.
  */
-export const isPart = <Config extends Config.AnyConfig>(
+const recordPart = <Config extends Config.AnyConfig>(
+  state: Reading,
   part: Trajectory.Part<Config>,
-): part is Part<Config> => part._tag !== "Session";
-
-/**
- * Whether a part belongs to the session given: a part states the session it was produced
- * in, and a part stating none belongs to the main session. A metric part names no session
- * and belongs to the sessions of the parts it is attached to.
- */
-export const belongsTo = <Config extends Config.AnyConfig>(
-  part: Part<Config>,
-  id: string,
-  contained: ReadonlyMap<string, string>,
-): boolean => {
+  index: number,
+): Effect.Effect<void, TrajectoryError> => {
   switch (part._tag) {
-    case "Metric":
-      return part.metric.data.attach.some(
-        (attached) => attached === id || contained.get(attached) === id,
-      );
+    case "Session": {
+      const id = part.type.id;
+
+      if (id === Trajectory.mainSessionId || state.declared.has(id)) {
+        return Effect.void;
+      }
+
+      // A session is declared before the parts it produced.
+      if (state.named.has(id)) {
+        return Effect.fail(TrajectoryError.session(id, "late-declaration"));
+      }
+
+      switch (part.type._tag) {
+        case "main":
+          return Effect.void;
+
+        case "sub":
+          state.declared.set(id, { fork: part.type.fork, index });
+
+          return Effect.void;
+      }
+    }
+
+    // A metric part names no session: it is read by the parts it is attached to.
+    case "Metric": {
+      for (const attached of part.metric.data.attach) {
+        state.attached.add(attached);
+      }
+
+      return Effect.void;
+    }
 
     case "Prompt":
     case "Response":
-    case "Event":
-      return (part.sessionId ?? Trajectory.mainSessionId) === id;
+    case "Event": {
+      state.named.add(part.sessionId ?? Trajectory.mainSessionId);
+
+      return Effect.void;
+    }
+  }
+};
+
+/** The session named by a part and never declared by the trajectory, where one is. */
+const undeclared = (state: Reading): string | undefined =>
+  [...state.named].find((id) => id !== Trajectory.mainSessionId && !state.declared.has(id));
+
+type Read<Config extends Config.AnyConfig, E, R> = Session.MainSession<Config, E, R>;
+
+/**
+ * Reads `part` as a part of the session given, holding the `uuid` of every part a
+ * metric may be attached to.
+ */
+const belongsTo = <Config extends Config.AnyConfig>(
+  part: Trajectory.Part<Config>,
+  id: string,
+  attached: ReadonlySet<string>,
+  held: Set<string>,
+): part is Part<Config> => {
+  switch (part._tag) {
+    // A declaration places a session rather than being a part of it, but a metric may
+    // be attached to it.
+    case "Session": {
+      if (part.type.id === id && attached.has(part.uuid)) {
+        held.add(part.uuid);
+      }
+
+      return false;
+    }
+
+    // A metric part names no session: it is held by the sessions of the parts it is
+    // attached to, or by the session it names directly. A metric is produced after the
+    // part it names, so a reading holds it by the parts read so far.
+    case "Metric":
+      return part.metric.data.attach.some((target) => target === id || held.has(target));
+
+    case "Prompt":
+    case "Response":
+    case "Event": {
+      if ((part.sessionId ?? Trajectory.mainSessionId) !== id) {
+        return false;
+      }
+
+      if (attached.has(part.uuid)) {
+        held.add(part.uuid);
+      }
+
+      return true;
+    }
   }
 };
 
 /** The parts of one session, read out of the cache of a trajectory as often as asked for. */
-export const streamOf = <Config extends Config.AnyConfig, E, R>(
+const streamOf = <Config extends Config.AnyConfig, E, R>(
   trajectory: Stream.Stream<Trajectory.Part<Config>, E, R>,
-  contained: ReadonlyMap<string, string>,
   id: string,
+  attached: ReadonlySet<string>,
 ): Session.SessionStream<Config, E, R> =>
-  trajectory.pipe(
-    Stream.filter(isPart<Config>),
-    Stream.filter((part) => belongsTo(part, id, contained)),
-  );
+  // The parts a metric names are held per reading, so one reading does not see another.
+  Stream.suspend(() => {
+    const held = new Set<string>();
+
+    return trajectory.pipe(Stream.filter((part) => belongsTo(part, id, attached, held)));
+  });
+
+/** Records the sessions a cached trajectory declares, failing where one states them wrong. */
+const readParts = <Config extends Config.AnyConfig, E, R>(
+  trajectory: Stream.Stream<Trajectory.Part<Config>, E, R>,
+): Effect.Effect<Reading, E | TrajectoryError, R> =>
+  Effect.gen(function* () {
+    const state = reading();
+
+    yield* trajectory.pipe(
+      Stream.zipWithIndex,
+      Stream.runForEach(([part, index]) => recordPart(state, part, index)),
+    );
+
+    const missing = undeclared(state);
+
+    if (missing !== undefined) {
+      return yield* Effect.fail(TrajectoryError.session(missing, "undeclared-session"));
+    }
+
+    return state;
+  });
 
 /**
- * The session named by a part and never declared by the trajectory, where one is:
- * the main session is the one session read without a declaration.
+ * Resolves the part each declaration continues from, in a second pass over the cache.
+ *
+ * A `fork` names a part read before the declaration reading it, so only the parts before
+ * the last declaration are read, and only the `uuid`s a fork names are kept.
  */
-export const undeclared = (state: Reading): string | undefined =>
-  [...state.named].find((id) => id !== Trajectory.mainSessionId && !state.declared.has(id));
+const resolveForks = <Config extends Config.AnyConfig, E, R>(
+  trajectory: Stream.Stream<Trajectory.Part<Config>, E, R>,
+  state: Reading,
+): Effect.Effect<void, E | TrajectoryError, R> =>
+  Effect.gen(function* () {
+    const wanted = new Set<string>();
+    let last = 0;
+
+    for (const declared of state.declared.values()) {
+      wanted.add(declared.fork);
+      last = Math.max(last, declared.index);
+    }
+
+    if (wanted.size === 0) {
+      return;
+    }
+
+    /** The session that produced each part a fork named, by the part's `uuid`. */
+    const found = new Map<string, { readonly index: number; readonly session: string }>();
+
+    if (last > 0) {
+      yield* trajectory.pipe(
+        Stream.zipWithIndex,
+        Stream.take(last),
+        // Every fork the reading can resolve is resolved before the last declaration.
+        Stream.takeWhile(() => found.size < wanted.size),
+        Stream.runForEach(([part, index]) =>
+          Effect.sync(() => {
+            switch (part._tag) {
+              // A session continues from a prompt, a response, or a declaration.
+              case "Session":
+              case "Prompt":
+              case "Response": {
+                if (!wanted.has(part.uuid)) {
+                  return;
+                }
+
+                const session =
+                  part._tag === "Session"
+                    ? part.type.id
+                    : (part.sessionId ?? Trajectory.mainSessionId);
+
+                found.set(part.uuid, { index, session });
+
+                return;
+              }
+
+              case "Event":
+              case "Metric":
+                return;
+            }
+          }),
+        ),
+      );
+    }
+
+    for (const [id, declared] of state.declared) {
+      const target = found.get(declared.fork);
+
+      // A fork names a part read before the declaration reading it.
+      if (target === undefined || target.index >= declared.index) {
+        return yield* Effect.fail(TrajectoryError.session(id, "unproduced-fork"));
+      }
+
+      declared.session = target.session;
+    }
+  });
+
+/** The tree the recorded sessions were forked into, the main session at its root. */
+const treeOf = <Config extends Config.AnyConfig, E, R>(
+  trajectory: Stream.Stream<Trajectory.Part<Config>, E, R>,
+  state: Reading,
+): Effect.Effect<Read<Config, E | TrajectoryError, R>, TrajectoryError> =>
+  Effect.gen(function* () {
+    const streamOfSession = (id: string) => streamOf(trajectory, id, state.attached);
+
+    const root: Read<Config, E | TrajectoryError, R> = {
+      id: Trajectory.mainSessionId,
+      forkBy: {},
+      stream: streamOfSession(Trajectory.mainSessionId),
+    };
+
+    const sessions = new Map<string, Session.Session<Config, E | TrajectoryError, R>>();
+
+    for (const [id, declared] of state.declared) {
+      if (declared.session === undefined) {
+        return yield* Effect.fail(TrajectoryError.session(id, "unproduced-fork"));
+      }
+
+      const parent =
+        declared.session === Trajectory.mainSessionId ? root : sessions.get(declared.session);
+
+      if (parent === undefined) {
+        return yield* Effect.fail(TrajectoryError.session(id, "unproduced-fork"));
+      }
+
+      const forked: Session.Session<Config, E | TrajectoryError, R> = {
+        id,
+        forkFrom: { session: parent, uuid: declared.fork },
+        forkBy: {},
+        stream: streamOfSession(id),
+      };
+
+      parent.forkBy[id] = forked;
+      sessions.set(id, forked);
+    }
+
+    return root;
+  });
+
+/**
+ * Reads a cached trajectory as the sessions it declares, with the main session at the
+ * root. The trajectory is read twice at most, and no part of it is kept.
+ */
+export const read = <Config extends Config.AnyConfig, E, R>(
+  trajectory: Trajectory.Trajectory<string, Config, E, R>,
+): Effect.Effect<Read<Config, E | TrajectoryError, R>, E | TrajectoryError, R> =>
+  Effect.gen(function* () {
+    const state = yield* readParts(trajectory);
+
+    yield* resolveForks(trajectory, state);
+
+    return yield* treeOf(trajectory, state);
+  });
