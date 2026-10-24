@@ -317,3 +317,80 @@ export const read = <Config extends Config.AnyConfig, E, R>(
 
     return yield* treeOf(trajectory, state);
   });
+
+type AnySession<Config extends Config.AnyConfig, E, R> =
+  | Session.Session<Config, E, R>
+  | Session.MainSession<Config, E, R>;
+
+const find = <Config extends Config.AnyConfig, E, R>(
+  session: AnySession<Config, E, R>,
+  id: string,
+): AnySession<Config, E, R> | undefined => {
+  if (session.id === id) {
+    return session;
+  }
+
+  for (const forked of Object.values(session.forkBy)) {
+    const found = find(forked, id);
+
+    if (found !== undefined) {
+      return found;
+    }
+  }
+
+  return undefined;
+};
+
+const holds = <Config extends Config.AnyConfig, E, R>(
+  stream: Session.SessionStream<Config, E, R>,
+  uuid: string,
+): Effect.Effect<boolean, E, R> =>
+  stream.pipe(
+    Stream.takeUntil((part) => part._tag !== "Metric" && part.uuid === uuid),
+    Stream.runFold(
+      () => false,
+      (_, part) => part._tag !== "Metric" && part.uuid === uuid,
+    ),
+  );
+
+const inherited = <Config extends Config.AnyConfig, E, R>(
+  stream: Session.SessionStream<Config, E, R>,
+  fork: string,
+): Session.SessionStream<Config, E, R> =>
+  holds(stream, fork).pipe(
+    Effect.map((produces) =>
+      produces
+        ? stream.pipe(Stream.takeUntil((part) => part._tag !== "Metric" && part.uuid === fork))
+        : Stream.empty,
+    ),
+    Stream.unwrap,
+  );
+
+export const stream = <Config extends Config.AnyConfig, E, R>(
+  main: Session.MainSession<Config, E, R>,
+  id: string,
+): Session.SessionStream<Config, E | TrajectoryError, R> => {
+  const session = find(main, id);
+
+  if (session === undefined) {
+    return Stream.fail(TrajectoryError.session(id, "unknown-session"));
+  }
+
+  const steps: Array<Session.SessionStream<Config, E, R>> = [];
+
+  let current: AnySession<Config, E, R> = session;
+
+  while ("forkFrom" in current) {
+    steps.unshift(inherited(current.forkFrom.session.stream, current.forkFrom.uuid));
+
+    current = current.forkFrom.session;
+  }
+
+  let full: Session.SessionStream<Config, E | TrajectoryError, R> = session.stream;
+
+  for (const step of steps.toReversed()) {
+    full = Stream.concat(step, full);
+  }
+
+  return full;
+};

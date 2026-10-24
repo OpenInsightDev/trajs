@@ -1,17 +1,6 @@
-/**
- * A short conversation, read as the turns it was produced in and summarised.
- *
- * The parts of one session are read as the turns they were produced in — every prompt, with
- * the response that answered it — and each turn is counted into the summary: the messages it
- * was asked and answered with, the characters of the text it holds, and the tools it called.
- *
- * The parts are built here rather than read from a `.trajs` file so the case stands on its
- * own; a real analysis reads the same parts as the `stream` of a session
- * `Session.toSessions` read of a trajectory an `Exchange` loaded.
- */
-
 import { expect, it } from "@effect/vitest";
 import {
+  Cache,
   EventKit,
   ExtraKit,
   MetricKit,
@@ -25,7 +14,6 @@ import {
 import * as Config from "@trajs/core/Config";
 import { Effect, Stream } from "effect";
 
-/** What the parts are built and read with: no tool, event, metric or extra datum. */
 const config = Config.config({
   stream: false,
   toolkit: Toolkit.empty,
@@ -34,7 +22,6 @@ const config = Config.config({
   extrakit: ExtraKit.empty,
 });
 
-/** The conversation counted: messages of both sides, text characters, and tools called. */
 interface Summary {
   readonly turns: number;
   readonly messages: number;
@@ -56,7 +43,6 @@ const makeTurn = (id: string, { city, answer }: { city: string; answer: string }
   part.response(Response.makePart("text", { text: answer })),
 ];
 
-/** What the trajectory holds: what one session's model was given and answered. */
 const trajectory = Trajectory.make(config)(
   Stream.fromArray([
     part.prompt(Prompt.make("What is the weather in Paris?")),
@@ -67,9 +53,7 @@ const trajectory = Trajectory.make(config)(
 );
 
 const main = Effect.fn(function* () {
-  const sessions = yield* Session.toSessions(trajectory);
-  // The mainline is the one session a reading holds first.
-  const [session] = sessions;
+  const session = yield* Session.main(trajectory);
 
   const turns = yield* View.promptTurns(session.stream).pipe(Stream.runCollect);
 
@@ -104,5 +88,6 @@ it.effect("main", () =>
         toolCalls: { get_weather: 2 },
       } satisfies Summary),
     ),
+    Effect.provide(Cache.Cache.layer()),
   ),
 );

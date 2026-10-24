@@ -26,13 +26,18 @@ export class ToolDecodeError extends Data.TaggedError("ToolDecodeError")<{
   }
 }
 
-export type SessionErrorReason = "unproduced-fork" | "late-declaration" | "undeclared-session";
+export type SessionErrorReason =
+  | "unproduced-fork"
+  | "late-declaration"
+  | "undeclared-session"
+  | "unknown-session";
 
 const sessionFailure: Record<SessionErrorReason, string> = {
   "unproduced-fork":
     "it continues from a part the trajectory does not hold, or one no session continues from",
   "late-declaration": "it was declared after the parts it produced",
   "undeclared-session": "it is named by a part, and no session part declares it",
+  "unknown-session": "no session of the reading states that id",
 };
 
 export class SessionError extends Data.TaggedError("SessionError")<{

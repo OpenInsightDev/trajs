@@ -1,9 +1,9 @@
 import type { ByteStore } from "@trajs/utils";
-import { Effect, type Stream } from "effect";
+import { Effect, Function, type Stream } from "effect";
 
 import * as Cache from "#/Cache.ts";
 import type * as Config from "#/Config.ts";
-import { read } from "#/internal/session.ts";
+import { read, stream as streamOf } from "#/internal/session.ts";
 import type * as Trajectory from "#/Trajectory.ts";
 import type { TrajectoryError } from "#/TrajectoryError.ts";
 
@@ -111,3 +111,15 @@ export const main = Effect.fn(function* <Config extends Config.AnyConfig, E, R>(
 
   return yield* read(cached);
 });
+
+export const stream: {
+  (
+    id: string,
+  ): <Config extends Config.AnyConfig, E, R>(
+    main: MainSession<Config, E, R>,
+  ) => SessionStream<Config, E | TrajectoryError, R>;
+  <Config extends Config.AnyConfig, E, R>(
+    main: MainSession<Config, E, R>,
+    id: string,
+  ): SessionStream<Config, E | TrajectoryError, R>;
+} = Function.dual(2, streamOf);

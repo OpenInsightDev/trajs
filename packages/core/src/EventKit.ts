@@ -1,6 +1,7 @@
+import type { Schema } from "effect";
+
 import * as Event from "#/Event.ts";
 import type { IndexByKey } from "#/internal/types.ts";
-import type { Schema } from "effect";
 
 type EventsByTag<Es> = IndexByKey<Es, "tag">;
 
