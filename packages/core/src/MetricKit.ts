@@ -1,3 +1,12 @@
+/**
+ * Metric declarations and their producers collected by tag.
+ *
+ * {@link make} collects declarations.
+ * {@link toProducers} associates a producer with every metric in a kit.
+ *
+ * @stability stable
+ */
+
 import { Predicate, type Schema } from "effect";
 
 import type { IndexByKey } from "#/internal/types.ts";
@@ -5,10 +14,30 @@ import type * as Metric from "#/Metric.ts";
 
 type MetricsByTag<Ms> = IndexByKey<Ms, "tag">;
 
+/**
+ * A record of {@link Metric.Metric} declarations keyed by tag.
+ *
+ * @see {@link make} for construction.
+ * @see {@link WithProducers} for executable metrics.
+ * @stability stable
+ * @category models
+ */
 export type Kit<Metrics extends Record<string, Metric.Any>> = Readonly<{
   metrics: Metrics;
 }>;
 
+/**
+ * Collects metric declarations under their tags.
+ *
+ * **Gotchas**
+ *
+ * The last declaration wins for a repeated tag.
+ *
+ * @see {@link merge} for combining existing kits.
+ * @see {@link toProducers} for supplying producers.
+ * @stability stable
+ * @category constructors
+ */
 export const make = <Ms extends ReadonlyArray<Metric.Any>>(...metrics: Ms) => {
   // SAFETY: every metric given is inserted under its own tag below, so what the record
   // holds is one metric per tag the kit names.
@@ -23,35 +52,57 @@ export const make = <Ms extends ReadonlyArray<Metric.Any>>(...metrics: Ms) => {
   return { metrics: output } as Kit<MetricsByTag<Ms>>;
 };
 
+/**
+ * A {@link Kit} without specific metric types.
+ *
+ * @stability stable
+ * @category utility types
+ */
 export type Any = Kit<Record<string, Metric.Any>>;
 
+/**
+ * A metric kit with no declarations or producers.
+ *
+ * @see {@link toProducers} for a producer-bearing empty kit.
+ * @stability stable
+ * @category constants
+ */
 export const empty = make();
 
+/**
+ * The type of the declaration-free {@link empty} kit.
+ *
+ * @stability stable
+ * @category utility types
+ */
 export type Empty = typeof empty;
 
 /**
- * A utility type which extracts the metrics from a {@link Kit}.
+ * Metric declarations of a {@link Kit}, or `never` for another type.
  *
- * @see {@link Metric.MetricParts} for the part schema those metrics make
- * @category models
+ * @see {@link Metric.MetricParts} for the corresponding tagged reports.
+ * @stability stable
+ * @category utility types
  */
 export type Metrics<K> = K extends Kit<infer Metrics> ? Metrics : never;
 
 /**
- * The services that decoding the metric schemas of a {@link Kit} requires.
+ * Schema requirements for decoding metric outputs and failures of a {@link Kit}.
  *
- * @see {@link EncodingServices} for the services of writing the same schemas
- * @category models
+ * @see {@link EncodingServices} for writing the same reports.
+ * @stability stable
+ * @category utility types
  */
 export type DecodingServices<K extends Any> = Schema.Codec.DecodingServices<
   K["metrics"][keyof K["metrics"]]["output"] | K["metrics"][keyof K["metrics"]]["failure"]
 >;
 
 /**
- * The services that encoding the metric schemas of a {@link Kit} requires.
+ * Schema requirements for encoding metric outputs and failures of a {@link Kit}.
  *
- * @see {@link DecodingServices} for the services of reading the same schemas
- * @category models
+ * @see {@link DecodingServices} for reading the same reports.
+ * @stability stable
+ * @category utility types
  */
 export type EncodingServices<K extends Any> = Schema.Codec.EncodingServices<
   K["metrics"][keyof K["metrics"]]["output"] | K["metrics"][keyof K["metrics"]]["failure"]
@@ -71,11 +122,39 @@ type ProducersMerged<Ks extends ReadonlyArray<WithProducers<Any>>> = Ks extends 
   ? Omit<Head["producers"], keyof ProducersMerged<Tail>> & ProducersMerged<Tail>
   : {};
 
+/**
+ * The {@link Kit} produced by merging kits in tuple order.
+ *
+ * **Details**
+ *
+ * Producer types survive only when every input has producers.
+ *
+ * @see {@link merge} for duplicate-tag behavior.
+ * @stability stable
+ * @category utility types
+ */
 export type Merged<Ks extends ReadonlyArray<Any>> =
   Ks extends ReadonlyArray<WithProducers<Any>>
     ? Kit<MetricsMerged<Ks>> & { readonly producers: ProducersMerged<Ks> }
     : Kit<MetricsMerged<Ks>>;
 
+/**
+ * Combines the declarations of existing metric kits.
+ *
+ * **Details**
+ *
+ * The last kit wins for a repeated tag.
+ * Producers are retained only when every input has producers.
+ *
+ * **Gotchas**
+ *
+ * One input without producers removes producers from the whole result.
+ *
+ * @see {@link make} for collecting individual declarations.
+ * @see {@link toProducers} for supplying producers.
+ * @stability stable
+ * @category combining
+ */
 export const merge = <Ks extends ReadonlyArray<Any>>(...kits: Ks): Merged<Ks> => {
   // SAFETY: every metric of every kit is inserted under its own tag below, so what
   // the record holds is one metric per tag the kits name.
@@ -107,14 +186,41 @@ export const merge = <Ks extends ReadonlyArray<Any>>(...kits: Ks): Merged<Ks> =>
   return (reported ? { metrics, producers } : { metrics }) as Merged<Ks>;
 };
 
+/**
+ * One {@link Metric.Producer} per metric tag.
+ *
+ * @see {@link toProducers} for attaching this record to a kit.
+ * @stability stable
+ * @category models
+ */
 export type Producers<Metrics extends Record<string, Metric.Any>> = Readonly<{
   [Ext in Metrics[keyof Metrics] as Ext["tag"]]: Metric.Producer<Ext>;
 }>;
 
+/**
+ * A {@link Kit} with a producer for every declared metric.
+ *
+ * @see {@link toProducers} for construction.
+ * @see {@link Metric.produce} for running the producers.
+ * @stability stable
+ * @category models
+ */
 export type WithProducers<K extends Any> = K & {
   readonly producers: Producers<K["metrics"]>;
 };
 
+/**
+ * Associates producers with a metric kit.
+ *
+ * **Details**
+ *
+ * The producer record uses metric tags as keys.
+ * Existing producers are replaced.
+ *
+ * @see {@link Metric.produce} for producing reports.
+ * @stability stable
+ * @category constructors
+ */
 export const toProducers = <K extends Any>(
   kit: K,
   producers: Producers<K["metrics"]>,

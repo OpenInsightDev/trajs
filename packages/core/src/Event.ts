@@ -1,13 +1,41 @@
+/**
+ * Versioned event declarations and tagged event payloads.
+ *
+ * {@link Event} names an event schema.
+ * {@link EventParts} reads the events declared by a kit.
+ *
+ * @stability stable
+ */
+
 import { Data, Schema } from "effect";
 
 import type * as EventKit from "#/EventKit.ts";
 import * as VersionedSchema from "#/VersionedSchema.ts";
 
+/**
+ * Optional display information for an {@link Event}.
+ *
+ * @stability stable
+ * @category schemas
+ */
 export class Metadata extends Schema.Class<Metadata>("Metadata")({
   name: Schema.optional(Schema.String),
   description: Schema.optional(Schema.String),
 }) {}
 
+/**
+ * An event declaration with a versioned payload schema.
+ *
+ * **Details**
+ *
+ * `tag` joins `package` and `id` with `/`.
+ * Kits and event parts use this tag as the event's identity.
+ *
+ * @see {@link EventKit.make} for collecting declarations.
+ * @see {@link EventPart} for a tagged payload.
+ * @stability stable
+ * @category models
+ */
 export class Event<
   Pkg extends string,
   Id extends string,
@@ -23,10 +51,30 @@ export class Event<
   }
 }
 
+/**
+ * An {@link Event} without specific identity or payload types.
+ *
+ * @stability stable
+ * @category utility types
+ */
 export type Any = Event<string, string, VersionedSchema.Any>;
 
+/**
+ * An event payload identified by its declaration's tag.
+ *
+ * @see {@link EventPart} for the schema.
+ * @stability stable
+ * @category models
+ */
 export type EventPart<Tag extends string, Data> = Readonly<{ _tag: Tag; data: Data }>;
 
+/**
+ * Creates a schema for a tagged event payload.
+ *
+ * @see {@link EventParts} for all declarations of a kit.
+ * @stability stable
+ * @category schemas
+ */
 export const EventPart = <Tag extends string, S extends Schema.Top>(tag: Tag, schema: S) =>
   Schema.TaggedStruct(tag, { data: schema });
 
@@ -40,8 +88,27 @@ type EventPartOf<Ext> = Ext extends Any
   ? EventPart<Ext["tag"], Schema.Schema.Type<Ext["schema"]>>
   : never;
 
+/**
+ * The tagged payloads of a record of {@link Event} declarations.
+ *
+ * @see {@link EventParts} for the schema built from a kit.
+ * @stability stable
+ * @category models
+ */
 export type EventParts<Events extends Record<string, Any>> = EventPartOf<Events[keyof Events]>;
 
+/**
+ * Creates a union schema for the events declared by `kit`.
+ *
+ * **Details**
+ *
+ * Each payload uses its declaration's tag and versioned schema.
+ * An empty kit accepts no event payloads.
+ *
+ * @see {@link EventPart} for a single payload schema.
+ * @stability stable
+ * @category schemas
+ */
 export const EventParts = <K extends EventKit.Any>(
   kit: K,
 ): Schema.Union<ReadonlyArray<EventPartSchemas<K["events"]>>> => {

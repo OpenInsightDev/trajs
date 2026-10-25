@@ -1,32 +1,10 @@
 /**
- * Reading a trajectory as the conversations a chat completions API of an
- * OpenAI-compatible client takes.
+ * Session conversations for OpenAI-compatible Chat Completions APIs.
  *
- * A trajectory holds every session that ran, in one stream of parts — see
- * `Trajectory` of `@trajs/core` — and what a chat completions API is handed is not
- * that stream: it is one conversation per session, holding the messages the
- * session's model was given and answered in the order they were produced, and what
- * the session inherited from the one it continues from. {@link make}
- * reads a trajectory as those conversations.
+ * {@link make} converts a session tree into message arrays keyed by session id.
+ * Tool results become separate `tool` messages.
  *
- * The conversations are read with `View.prompt` of `@trajs/core`, one session
- * at a time, and each of their messages is then written as this API states it. A
- * trajectory is read as its sessions with `Session.main`, which is what
- * reading one here is given: a trajectory whose sessions cannot be read fails that
- * reading — an unproduced fork, or a late declaration, is what reading one fails with.
- *
- * **What is not carried**
- *
- * What a trajectory holds and no message states is left out rather than invented:
- *
- * - A model's reasoning, since this API states none per message.
- * - A tool a provider executed itself, and the result it answered with, since those
- *   are the provider's own record of a call it made — see `providerExecuted`.
- * - A file part that is not an image, and an image the API does not read — a
- *   document, a media type of the caller's own — which the API refers to in ways of
- *   its own rather than by the bytes a trajectory holds.
- * - The approval of a tool call, which is part of a handshake with the program that
- *   ran the tools rather than of the conversation the API was given.
+ * @stability stable
  */
 
 import type { OpenAiClient } from "@effect/ai-openai-compat";
@@ -40,86 +18,66 @@ import * as Session from "#/Session.ts";
 import * as View from "#/View.ts";
 
 /**
- * A message of the chat completions API of an OpenAI-compatible client.
+ * An OpenAI-compatible Chat Completions input message.
  *
- * @see {@link make} for the operation that reads a trajectory as them.
+ * @see {@link make} for conversion from session parts.
+ * @stability stable
  * @category models
  */
 export type Message = OpenAiClient.ChatCompletionRequestMessage;
 
 /**
- * The messages of every session of a trajectory, keyed by the id of the session.
+ * OpenAI-compatible message arrays keyed by session id.
  *
- * @see {@link make} for the operation that reads a trajectory as them.
+ * @see {@link make} for converting a session tree.
+ * @stability stable
  * @category models
  */
 export type Sessions = Record<string, Message[]>;
 
 /**
- * Reads the sessions of a trajectory as the conversations a chat completions API of an
- * OpenAI-compatible client takes, one conversation per session.
+ * Converts every session in a tree into OpenAI-compatible Chat Completions messages.
  *
  * **When to use**
  *
- * Use when a conversation read from a trajectory is handed to a model over an OpenAI-compatible
- * API — to continue it, or to run it against another model — rather than read in
- * `@trajs/core`'s own terms.
+ * Use to replay recorded context through an OpenAI-compatible model API.
  *
  * **Details**
  *
- * - What it is given is what `Session.main` read of a trajectory, so a trajectory is
- *   read as its sessions before it is read as conversations: one reading of it serves every
- *   session it holds ({@link Session.MainSession}).
- * - The conversation of a session holds the messages the session produced and the
- *   messages it inherited: what the sessions it continues from produced up to the
- *   part it continues from, from the root of the fork down.
- * - A prompt message is carried as the message of its own role, and the response
- *   parts of a turn as the messages they were produced as — the text and the tool
- *   calls a model answered with in one `assistant` message, and each tool result
- *   in a `tool` message of its own, which is where this API states one.
- * - A system message is left where it was produced rather than read as part of a
- *   conversation, since this API takes one anywhere.
- * - The text of a message is carried as the string it is, and the images it was
- *   given as the parts of its content, where any of them is an image.
+ * Each conversation includes inherited context through {@link Session.stream}.
+ * System messages retain their position among conversation messages.
+ * Assistant text and tool calls share one assistant message.
+ * Each tool result becomes a separate tool message.
+ * User images become image URL content, using data URLs for embedded bytes.
  *
- * The effect fails with what reading the parts of a session fails with, and requires
- * the services `R` names.
+ * **Gotchas**
  *
- * **Example** (Reading a trajectory as the messages of a call and its answer)
+ * Reasoning, provider-executed calls and results, approvals, and non-image files are omitted.
+ * Empty user content and assistant content without text, calls, or results are omitted.
+ * Tool results are converted to text rather than multimodal content.
+ * Conversion retains every session's complete conversation in memory.
+ * Session reads scan the cached trajectory and can repeat inherited context.
+ *
+ * **Example** (Converting an OpenAI-compatible tool exchange)
  *
  * ```ts import.meta.vitest
  * import { OpenAiCompat } from "@trajs/core/codec"
- * import { Cache, Config, EventKit, ExtraKit, MetricKit, Prompt, Response, Session, Toolkit, Trajectory } from "@trajs/core"
+ * import { Cache, Config, Prompt, Response, Session, Trajectory } from "@trajs/core"
  * import { Effect, Stream } from "effect"
  *
- * // The main session, which the parts below belong to.
- * const sessionId = Trajectory.mainSessionId
- * const config = Config.config({
- *   stream: false,
- *   toolkit: Toolkit.empty,
- *   eventkit: EventKit.empty,
- *   metrickit: MetricKit.empty,
- *   extrakit: ExtraKit.empty
- * })
- *
+ * const config = Config.config({ stream: false })
  * const part = Trajectory.parts(config)
  *
- * // An exchange a trajectory holds: what a model was given, the tool it called for it, the
- * // result that call was answered with, and what it answered of that result.
  * const parts = [
- *   part.mainSession(),
  *   part.prompt(
- *     Prompt.make("What is the weather in Paris?"),
- *     { sessionId }
+ *     Prompt.make("What is the weather in Paris?")
  *   ),
  *   part.response(
  *     Response.anyToolCallPart({
  *       id: "call_1",
  *       name: "weather",
  *       params: { city: "Paris" },
- *       providerExecuted: false
- *     }),
- *     { sessionId }
+ *     })
  *   ),
  *   part.prompt(
  *     Prompt.fromMessages([
@@ -134,27 +92,28 @@ export type Sessions = Record<string, Message[]>;
  *           })
  *         ]
  *       })
- *     ]),
- *     { sessionId }
+ *     ])
  *   ),
  *   part.response(
- *     Response.makePart("text", { text: "It is 18°C." }),
- *     { sessionId }
+ *     Response.makePart("text", { text: "It is 18°C." })
  *   )
  * ]
  *
  * const trajectory = Trajectory.make(config)(Stream.fromIterable(parts))
  *
- * const root = await Effect.runPromise(Session.main(trajectory).pipe(Effect.provide(Cache.layer())))
- * const conversations = await Effect.runPromise(OpenAiCompat.make(root))
+ * const conversations = await Effect.runPromise(Session.main(trajectory).pipe(
+ *   Effect.flatMap(OpenAiCompat.make),
+ *   Effect.provide(Cache.layer()),
+ * ))
  *
- * conversations[sessionId]?.map((message) => message.role) // => ["user", "assistant", "tool", "assistant"]
+ * conversations[Trajectory.mainSessionId]?.map((message) => message.role) // => ["user", "assistant", "tool", "assistant"]
  * ```
  *
- * @see {@link Sessions} for the messages it reads to.
- * @see {@link View.prompt} for the messages of one session.
- * @see {@link Session.main} for the tree it is given.
- * @category constructors
+ * @see {@link Sessions} for the result map.
+ * @see {@link View.prompt} for a core prompt without API conversion.
+ * @see {@link Session.main} for session discovery and validation.
+ * @stability stable
+ * @category converting
  */
 export const make = <Config extends Config.AnyConfig, E, R>(
   main: Session.MainSession<Config, E, R>,

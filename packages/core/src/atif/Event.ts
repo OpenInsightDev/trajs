@@ -1,9 +1,10 @@
 /**
- * The events ATIF's own conventions are produced as.
+ * Event declarations for ATIF context-management conventions.
  *
- * ATIF v1.8 defines one: a system step that transforms the agent's context declares a
- * `context_management` object. The module produces that convention as an event, so a
- * run that transforms its context produces it among the events of its trajectory.
+ * {@link contextManagement} constructs a tagged payload for a context transformation.
+ * {@link eventkit} supplies its declaration for trajectory decoding.
+ *
+ * @stability stable
  */
 
 import { Schema } from "effect";
@@ -20,29 +21,37 @@ const types = ["compaction", "pruning", "injection"] as const;
 const boundaries = ["replace", "append", "truncate"] as const;
 
 /**
- * The kind of transformation a context management event states.
+ * The context transformations supported by this ATIF event declaration.
  *
- * ATIF RFC 0001 v1.8, Section VII "Context Management Convention".
+ * **Gotchas**
  *
- * ATIF leaves the set open to a producer, so a document may state a kind beyond
- * `compaction`, `pruning` and `injection`.
+ * ATIF permits producer-defined kinds, but this declaration accepts only the listed literals.
  *
+ * @see {@link ContextManagement} for the payload schema.
+ * @stability stable
  * @category models
  */
 export type ContextManagementType = (typeof types)[number];
 
 /**
- * How a context management event bounds the agent's context for the steps after it.
+ * The context-boundary operations supported by the event declaration.
  *
- * ATIF RFC 0001 v1.8, Section VII "Context Management Convention".
- *
+ * @see {@link ContextManagement} for the payload schema.
+ * @stability stable
  * @category models
  */
 export type ContextManagementBoundary = (typeof boundaries)[number];
 
 /**
- * The event the module produces ATIF's context management convention as.
+ * Event declaration for ATIF v1.8 context transformations.
  *
+ * **Gotchas**
+ *
+ * Importing an ATIF document does not automatically produce these events.
+ *
+ * @see {@link contextManagement} for constructing a payload.
+ * @see {@link ContextManagement} for the current data schema.
+ * @stability stable
  * @category constants
  */
 export const contextManagementEvent = new Event.Event({
@@ -53,35 +62,41 @@ export const contextManagementEvent = new Event.Event({
     description: "What ATIF states of a system step that transformed the agent's context.",
   }),
   schema: Schema.Struct({
-    /** The ATIF RFC version that defines the convention this event conforms to. */
     version: Schema.Literal("1.8"),
-    /** The kind of transformation the run performed. */
     type: Schema.Literals(types),
-    /** How the transformation bounds the agent's context for the steps after it. */
     boundary: Schema.Literals(boundaries),
   }).pipe(VersionedSchema.make),
 });
 
 /**
- * The context management event at the newest version of the event's data.
+ * Schema for current context-management data at version `"1.8"`.
  *
- * ATIF RFC 0001 v1.8, Section VII "Context Management Convention".
- *
+ * @see {@link contextManagementEvent} for the versioned declaration.
+ * @stability stable
  * @category schemas
  */
 export const ContextManagement = contextManagementEvent.schema.self;
 
 /**
- * A context management event as the module produces it, at the newest version of
- * the event's data.
+ * Current decoded context-management data without the event tag.
  *
+ * @see {@link ContextManagement} for the schema.
+ * @stability stable
  * @category models
  */
 export type ContextManagement = Schema.Schema.Type<typeof ContextManagement>;
 
 /**
- * Produces an event that transformed the agent's context.
+ * Creates a tagged context-management payload with the current data version.
  *
+ * **Details**
+ *
+ * The payload can be passed to a trajectory event builder or session writer.
+ * Construction does not perform the context transformation.
+ *
+ * @see {@link contextManagementEvent} for the declaration.
+ * @see {@link eventkit} for the decoding kit.
+ * @stability stable
  * @category constructors
  */
 export const contextManagement = (
@@ -95,8 +110,10 @@ export const contextManagement = (
 });
 
 /**
- * The events this module produces with, collected into a kit.
+ * The kit containing the ATIF context-management declaration.
  *
+ * @see {@link contextManagement} for a payload accepted by the kit.
+ * @stability stable
  * @category constants
  */
 export const eventkit = EventKit.make(contextManagementEvent);

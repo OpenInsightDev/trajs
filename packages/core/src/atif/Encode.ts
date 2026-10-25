@@ -1,8 +1,10 @@
 /**
- * An ATIF document read as a trajectory.
+ * ATIF document import into trajectory parts.
  *
- * {@link encode} reads a {@link Document.Document} as the `@trajs/core` trajectory it
- * states, and {@link fromFile} does the same for the `trajectory.json` a path names.
+ * {@link encode} converts a structured {@link Document}.
+ * {@link fromFile} decodes JSON and resolves media paths beside the source file.
+ *
+ * @stability stable
  */
 
 import { Effect, FileSystem, Path, Schema } from "effect";
@@ -22,29 +24,52 @@ import * as Trajectory from "#/Trajectory.ts";
 import { TrajectoryError } from "#/TrajectoryError.ts";
 
 /**
- * What a document is read with beside the document itself.
+ * Base-directory options for ATIF media files.
  *
- * `cwd` is the directory the paths a document states are read from; an absolute path is
- * read as stated either way.
+ * **Details**
  *
- * @category models
+ * `cwd` prefixes relative media paths.
+ * Absolute paths remain unchanged.
+ * Without `cwd`, paths pass directly to the filesystem service.
+ *
+ * @see {@link encode} for conversion.
+ * @stability stable
+ * @category configuration
  */
 export interface Options {
-  /** Where the paths a document states are read from, relative paths among them. */
   readonly cwd?: string;
 }
 
 /**
- * Reads an ATIF document as the trajectory it states.
+ * Converts an ATIF document into a lazily produced trajectory.
  *
- * A step that states a message opens a turn with it, and an agent step is produced as
- * the parts of the response it answered with. What the document states of a step and of
- * the run is carried as extra data on the part it belongs to, and the media a step
- * states is read from the path it names.
+ * **When to use**
  *
- * What a trajectory holds no part for is not read: delegations and continuations,
- * copied steps, what a system step is answered with, and context management.
+ * Use to import recorded conversation steps and supported metadata into core parts.
  *
+ * **Details**
+ *
+ * The document becomes a child of the main session.
+ * Its id uses `session_id`, then `trajectory_id`, then `"atif"`.
+ * Agent tool definitions become the trajectory's toolkit.
+ * System and user steps become prompts; agent steps become response parts.
+ * Run and step metadata are carried as declared extras.
+ * Valid step timestamps are attached to the prompt or first response part.
+ *
+ * **Gotchas**
+ *
+ * This conversion is not a lossless ATIF round trip.
+ * Delegated documents and continuation references are not imported.
+ * Copied-context flags do not suppress duplicated steps.
+ * System observations and context-management conventions do not become events.
+ * Media locations are read through the filesystem, including strings containing URLs.
+ * The conversion retains all prepared turns and media before enqueuing their message parts.
+ * Invalid timestamps are treated as absent.
+ * A document id of `"main"` conflicts with the reserved main session.
+ *
+ * @see {@link fromFile} for JSON-file import.
+ * @see {@link Options} for media path resolution.
+ * @stability stable
  * @category constructors
  */
 export const encode = (
@@ -64,11 +89,21 @@ export const encode = (
 > => kits(document)((main) => produce(main, document, options?.cwd));
 
 /**
- * Reads the ATIF document a file holds, as the trajectory it states.
+ * Reads and decodes an ATIF JSON file before constructing its trajectory.
  *
- * The document is decoded with {@link Document.FromJson} and read beside it, as
- * {@link encode} reads one.
+ * **Details**
  *
+ * {@link FromJson} validates the file's JSON text.
+ * Relative media paths resolve beside the document file.
+ * Media reads and trajectory production remain lazy.
+ *
+ * **Gotchas**
+ *
+ * The returned trajectory still requires filesystem and path services when consumed.
+ * Document decoding failures become {@link TrajectoryError}; filesystem failures retain their platform error.
+ *
+ * @see {@link encode} for conversion behavior and unsupported ATIF fields.
+ * @stability stable
  * @category constructors
  */
 export const fromFile = (

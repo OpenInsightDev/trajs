@@ -1,17 +1,48 @@
 /**
- * ATIF — the Agent Trajectory Interchange Format — and a `@trajs/core` trajectory,
- * read as each other.
+ * Agent Trajectory Interchange Format schemas and trajectory conversion views.
  *
- * `Document` states the format, `Step` reads a trajectory as the steps ATIF
- * exchanges, and `Encode` reads a document as a trajectory. `Event` and `Extra`
- * declare what the format states of a convention and of the data a part carries.
+ * Document schemas validate recorded runs before importing their supported conversation data.
+ * Text-oriented session views expose steps without promising complete document serialization.
+ *
+ * @stability stable
+ */
+
+/**
+ * ATIF document, content, observation, and metadata schemas.
+ *
+ * @stability stable
+ * @category re-exports
  */
 export * as Document from "#/atif/Document.ts";
 
+/**
+ * ATIF document and JSON-file import into trajectory parts.
+ *
+ * @stability stable
+ * @category re-exports
+ */
 export * as Encode from "#/atif/Encode.ts";
 
+/**
+ * ATIF context-management event declarations and constructors.
+ *
+ * @stability stable
+ * @category re-exports
+ */
 export * as Event from "#/atif/Event.ts";
 
+/**
+ * Versioned ATIF run and step extras.
+ *
+ * @stability stable
+ * @category re-exports
+ */
 export * as Extra from "#/atif/Extra.ts";
 
+/**
+ * Text-oriented ATIF step views over session streams.
+ *
+ * @stability stable
+ * @category re-exports
+ */
 export * as Step from "#/atif/Step.ts";

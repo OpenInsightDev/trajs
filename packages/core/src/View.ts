@@ -1,3 +1,12 @@
+/**
+ * Conversation steps, tool turns, and metric views over trajectory parts.
+ *
+ * {@link steps} groups one session's responses and {@link prompt} reconstructs its conversation.
+ * {@link metricTrajectory} exposes reports through streams attached to their target parts.
+ *
+ * @stability stable
+ */
+
 import { Data, Effect, Result, Stream } from "effect";
 import { Prompt } from "effect/ai";
 
@@ -11,6 +20,29 @@ import * as Trajectory from "#/Trajectory.ts";
 
 type Tools<Config extends Config.AnyConfig> = Config["toolkit"]["tools"];
 
+/**
+ * Reconstructs a prompt from a session's messages and finished responses.
+ *
+ * **When to use**
+ *
+ * Use to build conversation context for another model call.
+ *
+ * **Details**
+ *
+ * Prompt messages retain their order.
+ * Response steps become messages through {@link Prompt.fromResponseParts}.
+ * Events and metric reports add no messages.
+ *
+ * **Gotchas**
+ *
+ * The entire conversation is retained until the input ends.
+ * An infinite session never returns a prompt.
+ *
+ * @see {@link steps} for incremental step access and response-folding limits.
+ * @see {@link Session.stream} for including inherited context.
+ * @stability stable
+ * @category converting
+ */
 export const prompt = <Config extends Config.AnyConfig, E, R>(
   stream: Session.SessionStream<Config, E, R>,
 ): Effect.Effect<Prompt.Prompt, E, R> =>
@@ -26,29 +58,15 @@ export const prompt = <Config extends Config.AnyConfig, E, R>(
   );
 
 /**
- * One step of a session: a prompt, the responses produced together, or an event.
- *
- * **When to use**
- *
- * Use to read a session as the units its parts state: each prompt it was given,
- * the responses produced together, and each event of the run. Use it to display
- * them, to score them, or to hand them to a format that states a run as steps.
+ * A prompt, a completed response group, or an event from one session.
  *
  * **Details**
  *
- * A step holds one of the three kinds of part a session runs on, and its `_tag` states
- * which. A {@link PromptStep} holds one request a model was given, with the messages
- * and the moment of that request. A {@link ResponseStep} holds the parts a model
- * produced together, in the order it produced them. An {@link EventStep} holds one
- * happening of the run.
+ * Steps have no ordinal.
+ * Session declarations and metric reports do not become steps.
  *
- * Session declarations and metric parts are not steps, and a metric part does not end
- * a run of responses.
- *
- * A step states no ordinal of its own. The steps of a stream are in the order the
- * parts were produced in, so a reader numbers them by their position.
- *
- * @see {@link steps} for the reading that emits them.
+ * @see {@link steps} for grouping and emission rules.
+ * @stability stable
  * @category models
  */
 export type Step<Config extends Config.AnyConfig> =
@@ -57,9 +75,10 @@ export type Step<Config extends Config.AnyConfig> =
   | EventStep<Config>;
 
 /**
- * A step that holds one request a model was given.
+ * A prompt part retaining its messages, extras, and timing.
  *
- * @see {@link Step} for the steps a session is read as.
+ * @see {@link Step} for all step variants.
+ * @stability stable
  * @category models
  */
 export class PromptStep<Config extends Config.AnyConfig> extends Data.TaggedClass("Prompt")<{
@@ -67,9 +86,14 @@ export class PromptStep<Config extends Config.AnyConfig> extends Data.TaggedClas
 }> {}
 
 /**
- * A step that holds the parts a model produced together.
+ * Finished response payloads grouped between prompts or events.
  *
- * @see {@link Step} for the steps a session is read as.
+ * **Gotchas**
+ *
+ * The group does not retain trajectory part uuids, timestamps, or extras.
+ *
+ * @see {@link steps} for group boundaries and folding.
+ * @stability stable
  * @category models
  */
 export class ResponseStep<Config extends Config.AnyConfig> extends Data.TaggedClass("Response")<{
@@ -77,9 +101,10 @@ export class ResponseStep<Config extends Config.AnyConfig> extends Data.TaggedCl
 }> {}
 
 /**
- * A step that holds one happening of the run.
+ * An event part retaining its payload, uuid, and timing.
  *
- * @see {@link Step} for the steps a session is read as.
+ * @see {@link Step} for all step variants.
+ * @stability stable
  * @category models
  */
 export class EventStep<Config extends Config.AnyConfig> extends Data.TaggedClass("Event")<{
@@ -125,30 +150,31 @@ const assembleStep = <Config extends Config.AnyConfig>(
 };
 
 /**
- * Reads the parts of a session as the steps they state.
+ * Groups one session's parts into prompt, response, and event steps.
  *
  * **When to use**
  *
- * Use when a session is to be read by what its parts are: each prompt it was
- * given, the responses produced together, and each event of the run.
+ * Use when displaying or converting a conversation by turn rather than by individual response increments.
  *
  * **Details**
  *
- * The parts are read once, in the order the session holds them. The increments of a
- * streamed response are folded into the parts they complete, and a response part with
- * no completed part of its own is read past.
+ * A prompt or event closes the current response group.
+ * End of input also emits the remaining group.
+ * Metric reports do not close a group.
+ * Text and reasoning increments become finished parts at their matching end markers.
  *
- * A run of response parts ends at the prompt or the event that follows it, and at the
- * end of the parts. The step of the run is emitted where the run ends, so a step is
- * emitted once the parts that state it are complete.
+ * **Gotchas**
  *
- * What the stream reads is the parts of one session
- * ({@link Session.SessionStream}), so a trajectory of several sessions is read one
- * session at a time.
+ * Input must contain only one session.
+ * Tool parameter increments and response error payloads are omitted.
+ * Unfinished text and reasoning are not emitted at end of input.
+ * A new prompt discards open increments; an event leaves them open.
+ * The current response group remains in memory until its boundary.
  *
- * @see {@link Step} for the steps it emits.
- * @see {@link prompt} for folding the steps back into a prompt.
- * @category combinators
+ * @see {@link Step} for the output variants.
+ * @see {@link prompt} for collecting the conversation into a prompt.
+ * @stability stable
+ * @category transforming
  */
 export const steps = <Config extends Config.AnyConfig, E, R>(
   stream: Session.SessionStream<Config, E, R>,
@@ -162,24 +188,20 @@ export const steps = <Config extends Config.AnyConfig, E, R>(
   );
 
 /**
- * Reads the parts of a trajectory as the outputs `metric` states of them.
+ * Selects successful reports for one metric in input order.
  *
  * **When to use**
  *
- * Use to read what a metric kit produced of a trajectory without knowing the tag the
- * metric parts are carried under, such as to read the estimate a token count states.
+ * Use to consume a metric's outputs without matching its tag manually.
  *
  * **Details**
  *
- * Every metric part tagged with `metric` is read as the output it states, in the order
- * the trajectory holds the parts. A part of another metric, or one that states the
- * failure of `metric`, is read past.
+ * Reports from other metrics and failure reports are omitted.
+ * Values are selected by tag without schema validation.
  *
- * What the stream reads is the parts of a trajectory, so a session's stream
- * ({@link Session.SessionStream}) reads the metric parts attached to its own parts.
- *
- * @see {@link Metric.Output} for the output it emits.
- * @category combinators
+ * @see {@link Metric.Output} for timing and attachment fields.
+ * @stability stable
+ * @category filtering
  */
 export const produced =
   <Ext extends Metric.Any>(metric: Ext) =>
@@ -201,10 +223,24 @@ export const produced =
       }),
     );
 
+/**
+ * Reports attached to one part, including reports already encountered during the outer reading.
+ *
+ * @see {@link metricTrajectory} for lifetime and consumption rules.
+ * @stability stable
+ * @category models
+ */
 export type AttachedMetrics<Config extends Config.AnyConfig> = Stream.Stream<
   Trajectory.MetricPartOf<Config>
 >;
 
+/**
+ * A part with an attached report stream, or an unattached metric part.
+ *
+ * @see {@link metricTrajectory} for routing reports to target parts.
+ * @stability stable
+ * @category models
+ */
 export type MetricTrajectoryPart<Config extends Config.AnyConfig> =
   | (AttachablePart<Config> & Readonly<{ metrics: AttachedMetrics<Config> }>)
   | Trajectory.MetricPartOf<Config>;
@@ -215,12 +251,48 @@ type AttachablePart<Config extends Config.AnyConfig> =
   | Trajectory.ResponsePartOf<Config>
   | Trajectory.EventPartOf<Config>;
 
+/**
+ * A trajectory view exposing attached report streams on non-metric parts.
+ *
+ * @see {@link MetricTrajectoryPart} for each emitted value.
+ * @see {@link metricTrajectory} for construction.
+ * @stability stable
+ * @category models
+ */
 export type MetricTrajectoryStream<
   Config extends Config.AnyConfig,
   E = never,
   R = never,
 > = Stream.Stream<MetricTrajectoryPart<Config>, E, R>;
 
+/**
+ * Routes attached metric reports into streams on their target parts.
+ *
+ * **When to use**
+ *
+ * Use to display a part before all its metric reports arrive.
+ *
+ * **Details**
+ *
+ * Non-metric parts gain a `metrics` stream keyed by their uuid.
+ * Reports without `attach` remain in the outer stream.
+ * Reports with `attach` leave the outer stream and enter each named target's stream.
+ * Repeated target ids within one report are deduplicated.
+ * Inner streams replay encountered reports and close when the outer stream ends.
+ *
+ * **Gotchas**
+ *
+ * Keep consuming the outer stream while reading inner streams.
+ * Waiting for an inner stream to end inside a sequential outer read can stall indefinitely.
+ * Attachments match part uuids only, not session ids.
+ * Unknown targets do not fail and produce no outer report.
+ * Attachment state retains encountered reports without a capacity limit.
+ * Inner streams close without propagating the outer stream's error.
+ *
+ * @see {@link produced} for selecting metric outputs directly.
+ * @stability stable
+ * @category transforming
+ */
 export const metricTrajectory = <Config extends Config.AnyConfig, E, R>(
   stream: Trajectory.TrajectoryStream<Config, E, R>,
 ): MetricTrajectoryStream<Config, E, R> =>
@@ -234,22 +306,21 @@ export const metricTrajectory = <Config extends Config.AnyConfig, E, R>(
   });
 
 /**
- * Reads the tool calls a session states, in the order it produced them.
+ * Selects tool calls from response parts in session order.
  *
  * **When to use**
  *
- * Use when every call a model made is to be read, including one with no result the
- * session holds yet.
+ * Use when unanswered calls must remain visible.
  *
  * **Details**
  *
- * A call is read as it is produced rather than paired with the result that answers it,
- * and a call of a tool the toolkit does not describe is read as the part the trajectory
- * holds.
+ * Calls to undeclared tools are included.
+ * Tool calls inside prompt messages are not inspected.
  *
- * @see {@link toolTurns} for the calls that were answered, with their results.
- * @see {@link Response.ToolCallOf} for the call it emits.
- * @category combinators
+ * @see {@link toolTurns} for pairing calls with final results.
+ * @see {@link Response.ToolCallOf} for the emitted call type.
+ * @stability stable
+ * @category filtering
  */
 export const toolCalls = <Config extends Config.AnyConfig, E, R>(
   stream: Session.SessionStream<Config, E, R>,
@@ -262,11 +333,38 @@ export const toolCalls = <Config extends Config.AnyConfig, E, R>(
     ),
   );
 
+/**
+ * A response tool call paired with its final result by call id.
+ *
+ * @see {@link toolTurns} for pairing rules.
+ * @stability stable
+ * @category models
+ */
 export type ToolTurn<Config extends Config.AnyConfig> = Readonly<{
   call: Response.ToolCallOf<Config>;
   result: Response.ToolResultOf<Config>;
 }>;
 
+/**
+ * Pairs response tool calls with final results in result-arrival order.
+ *
+ * **Details**
+ *
+ * Calls are remembered by id until a non-preliminary result arrives.
+ * A matching final result emits one pair and removes the remembered call.
+ *
+ * **Gotchas**
+ *
+ * Preliminary results and results without a preceding call are omitted.
+ * Reusing an unanswered call id replaces its earlier call.
+ * Unanswered calls remain in memory until the input ends and emit no pair.
+ * Prompt messages are not inspected for calls or results.
+ *
+ * @see {@link toolCalls} for calls without requiring results.
+ * @see {@link ToolTurn} for the emitted pair.
+ * @stability stable
+ * @category transforming
+ */
 export const toolTurns = <Config extends Config.AnyConfig, E, R>(
   stream: Session.SessionStream<Config, E, R>,
 ): Stream.Stream<ToolTurn<Config>, E, R> =>

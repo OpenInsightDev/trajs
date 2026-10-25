@@ -1,3 +1,12 @@
+/**
+ * Session trees and inherited conversation streams.
+ *
+ * {@link main} reads and validates a cached trajectory.
+ * {@link stream} adds inherited parts to a session's own stream.
+ *
+ * @stability stable
+ */
+
 import { Effect, type Option, type Stream } from "effect";
 
 import * as Cache from "#/Cache.ts";
@@ -7,13 +16,17 @@ import type * as Trajectory from "#/Trajectory.ts";
 import type { TrajectoryError } from "#/TrajectoryError.ts";
 
 /**
- * The parts one session ran on: every part of a trajectory that states its id, and the
- * metric parts attached to those, in the order the trajectory holds them.
+ * A session's own parts and attached metric reports in trajectory order.
  *
- * A declaration names the session it declares rather than being a part of it, so what a
- * session stream holds is every other kind of part.
+ * **Details**
  *
- * @see {@link Session} for the session it is read from.
+ * Session declarations are excluded.
+ * Metrics can attach to the session id, its declaration uuid, or an earlier part uuid.
+ * Unattached metrics are excluded.
+ *
+ * @see {@link Session} for the session owning the stream.
+ * @see {@link stream} for including inherited parts.
+ * @stability stable
  * @category models
  */
 export type SessionStream<Config extends Config.AnyConfig, E, R> = Stream.Stream<
@@ -23,18 +36,18 @@ export type SessionStream<Config extends Config.AnyConfig, E, R> = Stream.Stream
 >;
 
 /**
- * One session of a trajectory, placed in the tree it was forked into.
+ * A non-main session with its parent fork and direct children.
  *
  * **Details**
  *
- * - `forkFrom` is the session it continues from, and the `uuid` of the part it continues
- *   from: a prompt, a response, or the declaration of that session.
- * - `forkBy` holds the sessions forked directly off it, keyed by their id.
- * - `stream` is what it ran on, read out of the cache of the trajectory, so it can be
- *   iterated as often as it is asked for. It holds no part inherited from `forkFrom`;
- *   {@link stream} splices those in.
+ * `forkFrom` names the parent session and fork part uuid.
+ * A fork targets a prompt, response, or session declaration.
+ * `forkBy` holds direct children keyed by session id.
+ * The `stream` field replays only this session's own parts from the cache.
  *
- * @see {@link MainSession} for the root of the tree.
+ * @see {@link stream} for including inherited parts.
+ * @see {@link MainSession} for the root without a parent fork.
+ * @stability stable
  * @category models
  */
 export type Session<Config extends Config.AnyConfig, E, R> = Readonly<{
@@ -48,11 +61,17 @@ export type Session<Config extends Config.AnyConfig, E, R> = Readonly<{
 }>;
 
 /**
- * The main session of a trajectory: the root of the tree it declares, the one session
- * whose parts state no id of their own or state {@link Trajectory.mainSessionId}.
+ * The session tree root, identified by {@link Trajectory.mainSessionId}.
  *
- * @see {@link Session} for a session forked off it.
- * @see {@link main} for reading a trajectory as it.
+ * **Details**
+ *
+ * Parts with an omitted `sessionId` belong to this session.
+ * An explicit main-session id has the same meaning.
+ * The root requires no declaration and has no parent fork.
+ *
+ * @see {@link Session} for non-main sessions.
+ * @see {@link main} for reading the tree.
+ * @stability stable
  * @category models
  */
 export type MainSession<Config extends Config.AnyConfig, E, R> = Readonly<{
@@ -62,15 +81,15 @@ export type MainSession<Config extends Config.AnyConfig, E, R> = Readonly<{
 }>;
 
 /**
- * A session of a trajectory, whether the main session at the root of the tree or one
- * forked off another.
+ * A session tree node, including the root.
  *
  * **When to use**
  *
- * Use to hold a session the tree walks over without knowing whether it is the root.
+ * Use when traversing sessions without assuming a parent exists.
  *
  * @see {@link MainSession} for the root of the tree.
- * @see {@link Session} for a session forked off another.
+ * @see {@link Session} for a node with a parent fork.
+ * @stability stable
  * @category models
  */
 export type AnySession<Config extends Config.AnyConfig, E, R> =
@@ -78,37 +97,30 @@ export type AnySession<Config extends Config.AnyConfig, E, R> =
   | MainSession<Config, E, R>;
 
 /**
- * Reads a trajectory as the sessions it declares, with the main session at the root.
+ * Reads a trajectory into a validated session tree.
  *
  * **When to use**
  *
- * Use to read a trajectory one session at a time rather than as the single order its
- * parts arrived in.
+ * Use to separate interleaved sessions and resolve their parent forks.
  *
  * **Details**
  *
- * The trajectory is cached first, so its parts are read once and every session stream
- * reads them again. A trajectory the cache already read under the same id is not read
- * again. One pass records what the parts state of the sessions they name, and a second
- * pass resolves the forks. This reading keeps no part. Every stream then filters the
- * cache, so where the parts live is the {@link Cache.Cache} the program provides: a
- * trajectory too large to hold in memory is read through
- * {@link Cache.layerFsTemp}, which keeps the parts in a temporary directory.
+ * {@link Cache.Cache} reads the source to completion before session discovery.
+ * Session streams replay filtered parts from that cache.
+ * The main session exists without a declaration.
  *
- * The sessions read the parts the cache kept, so they are read while the cache's store
- * lives.
+ * **Gotchas**
  *
- * A session's stream holds the parts that state its id, and the metric parts attached to
- * them, in the order the trajectory holds them. The main session is the one session read
- * without a declaration, and a part naming another session the trajectory does not
- * declare fails the reading.
+ * Non-main sessions must be declared before their first prompt, response, or event.
+ * Forks must name an earlier prompt, response, or session declaration.
+ * Invalid sessions fail with {@link TrajectoryError}.
+ * Repeated declarations for an already declared id are ignored.
+ * Session streams require the cache's backing store to remain available.
+ * Each session replay scans the cached trajectory.
  *
- * A session is declared before the parts it produced, and a `fork` names a part read
- * before the declaration reading it. A trajectory that breaks either rule fails with a
- * {@link TrajectoryError}.
- *
- * @see {@link MainSession} for the reading.
- * @see {@link Session} for one session of it.
+ * @see {@link MainSession} for the resulting tree root.
+ * @see {@link Cache.layerFsTemp} for disk-backed caching with a finite capacity.
+ * @stability stable
  * @category constructors
  */
 export const main = Effect.fn(function* <Config extends Config.AnyConfig, E, R>(
@@ -125,21 +137,25 @@ export const main = Effect.fn(function* <Config extends Config.AnyConfig, E, R>(
 });
 
 /**
- * Reads the parts `session` ran on, spliced with what it inherited from the sessions it
- * continues from.
+ * Reads a session's parts after its inherited ancestor prefixes.
  *
  * **When to use**
  *
- * Use to read everything a session saw, whether it produced it or inherited it.
+ * Use to reconstruct the conversation available to a forked session.
  *
  * **Details**
  *
- * The stream holds the parts of the session that was continued from up to the part it
- * was continued at, down the chain of continuations, then the parts the session produced
- * itself. {@link Session.stream} holds only what a session produced itself.
+ * Ancestor prefixes appear from root to parent, each ending at its fork part inclusively.
+ * The session's own parts follow those prefixes.
  *
- * @see {@link main} for the tree the session is read from.
- * @see {@link Session.stream} for the parts a session produced itself.
+ * **Gotchas**
+ *
+ * A fork from a session declaration inherits no parts from that parent.
+ * Declarations are absent from session streams.
+ * Metrics after a fork part are excluded from that inherited prefix.
+ *
+ * @see {@link Session} for the stream field containing only its own parts.
+ * @stability stable
  * @category combinators
  */
 export const stream = <Config extends Config.AnyConfig, E, R>(
@@ -147,37 +163,31 @@ export const stream = <Config extends Config.AnyConfig, E, R>(
 ): SessionStream<Config, E, R> => sessionParts(session);
 
 /**
- * Reads every session of the tree, the main session before the sessions forked off it.
+ * Returns every session in depth-first preorder, starting with the root.
  *
  * **When to use**
  *
- * Use to read a whole trajectory one session at a time, such as to report what each
- * session did or to render the tree it declares.
+ * Use to process or display each session once.
  *
  * **Details**
  *
- * A session is read before the sessions forked off it, and the sessions forked off one
- * are read in the order they were declared.
+ * Children follow the property enumeration order of each `forkBy` record.
+ * Numeric-looking ids can therefore precede other ids regardless of declaration order.
  *
- * @see {@link main} for the tree this walks.
- * @see {@link find} for one session of it, by the id it carries.
- * @category combinators
+ * @see {@link find} for lookup by id.
+ * @stability stable
+ * @category getters
  */
 export const all = <Config extends Config.AnyConfig, E, R>(
   main: MainSession<Config, E, R>,
 ): ReadonlyArray<AnySession<Config, E, R>> => allSessions(main);
 
 /**
- * Finds the session `id` names in the tree, or none where the tree holds no such
- * session.
+ * Finds a session by id, returning none when absent.
  *
- * **When to use**
- *
- * Use to read one session a reader names, rather than the sessions a walk reaches.
- *
- * @see {@link all} for every session of the tree.
- * @see {@link stream} for the parts a session ran on.
- * @category combinators
+ * @see {@link all} for every session in traversal order.
+ * @stability stable
+ * @category getters
  */
 export const find = <Config extends Config.AnyConfig, E, R>(
   main: MainSession<Config, E, R>,

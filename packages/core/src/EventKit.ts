@@ -1,3 +1,12 @@
+/**
+ * Event declarations collected by tag.
+ *
+ * {@link make} collects declarations and {@link merge} combines kits.
+ * Later declarations replace earlier declarations under the same tag.
+ *
+ * @stability stable
+ */
+
 import type { Schema } from "effect";
 
 import * as Event from "#/Event.ts";
@@ -5,10 +14,28 @@ import type { IndexByKey } from "#/internal/types.ts";
 
 type EventsByTag<Es> = IndexByKey<Es, "tag">;
 
+/**
+ * A record of {@link Event.Event} declarations keyed by tag.
+ *
+ * @see {@link make} for construction.
+ * @stability stable
+ * @category models
+ */
 export type Eventkit<Events extends Record<string, Event.Any>> = Readonly<{
   events: Events;
 }>;
 
+/**
+ * Collects event declarations under their tags.
+ *
+ * **Gotchas**
+ *
+ * The last declaration wins for a repeated tag.
+ *
+ * @see {@link merge} for combining existing kits.
+ * @stability stable
+ * @category constructors
+ */
 export const make = <Es extends ReadonlyArray<Event.Any>>(...events: Es) => {
   // SAFETY: every event given is inserted under its own tag below, so the record
   // holds one event per tag the kit names.
@@ -23,35 +50,57 @@ export const make = <Es extends ReadonlyArray<Event.Any>>(...events: Es) => {
   return { events: output } as Eventkit<EventsByTag<Es>>;
 };
 
+/**
+ * An {@link Eventkit} without specific event types.
+ *
+ * @stability stable
+ * @category utility types
+ */
 export type Any = Eventkit<Record<string, Event.Any>>;
 
+/**
+ * An event kit with no declarations.
+ *
+ * @see {@link make} for a kit with declarations.
+ * @stability stable
+ * @category constants
+ */
 export const empty = make();
 
+/**
+ * The type of the declaration-free {@link empty} kit.
+ *
+ * @stability stable
+ * @category utility types
+ */
 export type Empty = typeof empty;
 
 /**
- * A utility type which extracts the events from an {@link Eventkit}.
+ * Event declarations of an {@link Eventkit}, or `never` for another type.
  *
- * @see {@link Event.EventParts} for the part schema those events make
- * @category models
+ * @see {@link Event.EventParts} for the corresponding tagged payloads.
+ * @stability stable
+ * @category utility types
  */
 export type Events<K> = K extends Eventkit<infer Events> ? Events : never;
 
 /**
- * The services that decoding the event schemas of a {@link Eventkit} requires.
+ * Schema requirements for decoding the events of an {@link Eventkit}.
  *
- * @see {@link EncodingServices} for the services of writing the same schemas
- * @category models
+ * @see {@link EncodingServices} for writing the same events.
+ * @stability stable
+ * @category utility types
  */
 export type DecodingServices<K extends Any> = Schema.Codec.DecodingServices<
   K["events"][keyof K["events"]]["schema"]
 >;
 
 /**
- * The services that encoding the event schemas of a {@link Eventkit} requires.
+ * Schema requirements for encoding the events of an {@link Eventkit}.
  *
- * @see {@link DecodingServices} for the services of reading the same schemas
- * @category models
+ * @see {@link DecodingServices} for reading the same events.
+ * @stability stable
+ * @category utility types
  */
 export type EncodingServices<K extends Any> = Schema.Codec.EncodingServices<
   K["events"][keyof K["events"]]["schema"]
@@ -64,8 +113,27 @@ type EventsMerged<Ks extends ReadonlyArray<Any>> = Ks extends readonly [
   ? Omit<Head["events"], keyof EventsMerged<Tail>> & EventsMerged<Tail>
   : {};
 
+/**
+ * The {@link Eventkit} produced by merging kits in tuple order.
+ *
+ * @see {@link merge} for duplicate-tag behavior.
+ * @stability stable
+ * @category utility types
+ */
 export type Merged<Ks extends ReadonlyArray<Any>> = Eventkit<EventsMerged<Ks>>;
 
+/**
+ * Combines the declarations of existing event kits.
+ *
+ * **Gotchas**
+ *
+ * The last kit wins for a repeated tag.
+ * Declarations are replaced, not combined.
+ *
+ * @see {@link make} for collecting individual declarations.
+ * @stability stable
+ * @category combining
+ */
 export const merge = <Ks extends ReadonlyArray<Any>>(...kits: Ks): Merged<Ks> => {
   // SAFETY: every event of every kit is inserted under its own tag below, so the
   // record holds one event per tag the kits name.

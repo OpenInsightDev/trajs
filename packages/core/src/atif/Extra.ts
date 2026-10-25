@@ -1,9 +1,10 @@
 /**
- * The fields ATIF states of a document and of its steps that a trajectory holds no
- * place for, carried as extra data.
+ * ATIF run and step metadata carried as versioned extras.
  *
- * {@link documentExtra} carries what a document states of the run, and {@link stepExtra}
- * what a step states beyond what it says.
+ * {@link documentExtra} declares session metadata and {@link stepExtra} declares prompt and response metadata.
+ * {@link extrakit} collects both declarations.
+ *
+ * @stability stable
  */
 
 import { Schema } from "effect";
@@ -59,8 +60,16 @@ const document180 = Schema.Struct({
 }).pipe(VersionedSchema.make);
 
 /**
- * The fields ATIF states of a document, held by the session part of a trajectory.
+ * Extra declaration for ATIF run metadata on session parts.
  *
+ * **Details**
+ *
+ * Agent identity and run metadata remain here.
+ * Agent tool definitions are carried separately as the trajectory's toolkit.
+ *
+ * @see {@link DocumentFields} for the current payload schema.
+ * @see {@link stepExtra} for per-step metadata.
+ * @stability stable
  * @category constants
  */
 export const documentExtra = new Extra.Extra({
@@ -72,8 +81,16 @@ export const documentExtra = new Extra.Extra({
 });
 
 /**
- * The fields ATIF states of a step, held by the prompt or response part of the step.
+ * Extra declaration for ATIF metadata on prompt and response parts.
  *
+ * **Details**
+ *
+ * The payload carries the original step id, model settings, metrics, and producer fields.
+ * Step timestamps belong to the trajectory part rather than this extra.
+ *
+ * @see {@link StepFields} for the current payload schema.
+ * @see {@link documentExtra} for run metadata.
+ * @stability stable
  * @category constants
  */
 export const stepExtra = new Extra.Extra({
@@ -86,41 +103,56 @@ export const stepExtra = new Extra.Extra({
 });
 
 /**
- * The fields of a document at the newest version of their shape.
+ * Schema for current ATIF run extras at data version `"1.8"`.
  *
- * ATIF RFC 0001 v1.8, Section II "Root-Level Metadata" and "AgentSchema".
+ * **Gotchas**
  *
+ * The data `version` is separate from the source document's `schema_version`.
+ * This schema alone does not read historical extra versions.
+ *
+ * @see {@link documentExtra} for the versioned declaration.
+ * @stability stable
  * @category schemas
  */
 export const DocumentFields = document180.self;
 
 /**
- * A document's fields as the module carries them, at the newest version of their
- * shape.
+ * Current decoded ATIF run extras.
  *
+ * @see {@link DocumentFields} for the schema.
+ * @stability stable
  * @category models
  */
 export type DocumentFields = Schema.Schema.Type<typeof DocumentFields>;
 
 /**
- * The fields of a step at the newest version of their shape.
+ * Schema for current ATIF step extras at data version `"1.8"`.
  *
- * ATIF RFC 0001 v1.8, Section II "StepObject" and "MetricsSchema".
+ * **Gotchas**
  *
+ * This schema alone does not read historical extra versions.
+ *
+ * @see {@link stepExtra} for the versioned declaration.
+ * @stability stable
  * @category schemas
  */
 export const StepFields = step180.self;
 
 /**
- * A step's fields as the module carries them, at the newest version of their shape.
+ * Current decoded ATIF step extras.
  *
+ * @see {@link StepFields} for the schema.
+ * @stability stable
  * @category models
  */
 export type StepFields = Schema.Schema.Type<typeof StepFields>;
 
 /**
- * The extra data this module carries, collected into a kit.
+ * The kit containing ATIF run and step extra declarations.
  *
+ * @see {@link documentExtra} for session metadata.
+ * @see {@link stepExtra} for prompt and response metadata.
+ * @stability stable
  * @category constants
  */
 export const extrakit = ExtraKit.make(stepExtra, documentExtra);

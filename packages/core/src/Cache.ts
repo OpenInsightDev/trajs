@@ -1,3 +1,12 @@
+/**
+ * Replayable trajectories backed by memory and a byte store.
+ *
+ * {@link Service.cache} reads a source once and returns a {@link Cached} trajectory.
+ * {@link layer}, {@link layerFsTemp}, and {@link layerKVStore} choose the backing store.
+ *
+ * @stability stable
+ */
+
 import { ByteStore } from "@trajs/utils";
 import { Context, Data, Effect, Formatter, Layer } from "effect";
 import type { FileSystem, Option, Path } from "effect";
@@ -9,61 +18,37 @@ import type * as Trajectory from "#/Trajectory.ts";
 import type { TrajectoryError } from "#/TrajectoryError.ts";
 
 /**
- * The cache a trajectory is read through: a trajectory read once from its source and kept
- * to be read again, its newest parts in memory and the ones before them in a
- * {@link ByteStore.ByteStore}.
- *
- * A cache is asked for a trajectory rather than for bytes. {@link Service.cache} reads one
- * once and answers with a {@link Cached} trajectory, which reads its parts again as often
- * as a program asks and serves one at a time by its index. How a part is kept is the
- * cache's own, so a program reads parts and never frames.
- *
- * A trajectory is kept by its id, and an id names one trajectory: a trajectory of an id
- * the cache read is answered with what that reading kept, so its source is not read again.
- *
- * Where a cache lives is its layer's to say: in memory ({@link layer}), in a
- * temporary directory of the file system ({@link layerFsTemp}), or in the byte
- * store a program provides ({@link layerKVStore}).
- */
-
-/**
- * What a cache is built with: how many of the newest parts it keeps in memory.
- *
- * **When to use**
- *
- * Use where a cache is built ({@link layer}, {@link layerFsTemp},
- * {@link layerKVStore}) and the window it holds matters.
+ * The in-memory window for each cached trajectory.
  *
  * **Details**
  *
- * - `capacity` states how many of the newest parts of each trajectory are kept in memory,
- *   as a whole count. It defaults to `"unbounded"`: every part is kept and none is written
- *   to the store.
+ * `capacity` counts the newest parts kept in memory, not bytes.
+ * Omission or `"unbounded"` keeps every part in memory.
+ * Numeric capacities are rounded down and clamped to zero.
+ * `NaN` also selects unbounded capacity.
  *
- * @see {@link Service.cache} for the reading that uses the window.
- * @category models
+ * @see {@link make} for applying the window to a byte store.
+ * @stability stable
+ * @category configuration
  */
 export interface Options {
   readonly capacity?: number | "unbounded";
 }
 
 /**
- * What a cache failed with: a part it could not read from or write to its store.
+ * A backing-store failure while reading or writing a cached part.
  *
  * **When to use**
  *
- * Use to tell the failure of the cache's store apart from the failure of the trajectory
- * it read: a store that refused or was cut short fails as this error, where bytes that
- * do not hold a part fail as a {@link TrajectoryError}.
+ * Use to distinguish store failures from source errors and {@link TrajectoryError} decoding failures.
  *
  * **Details**
  *
- * - `id` names the trajectory whose part could not be kept.
- * - `index` is the index of that part in the trajectory.
- * - `operation` says whether the part was being read or written.
- * - `cause` is what the store failed with, as it reported it.
+ * `id` names the trajectory and `index` is the zero-based part index.
+ * `cause` retains the store's original failure.
  *
- * @see {@link Cached} for the trajectory whose parts are read.
+ * @see {@link Cached} for replay and indexed access.
+ * @stability stable
  * @category errors
  */
 export class CacheError extends Data.TaggedError("CacheError")<{
@@ -78,18 +63,23 @@ export class CacheError extends Data.TaggedError("CacheError")<{
 }
 
 /**
- * A trajectory a cache keeps: the parts it read from the source, read again as often as
- * asked and served one at a time by their index.
+ * A replayable trajectory with a known length and indexed access.
  *
  * **Details**
  *
- * - `length` is how many parts the source held once the cache read it.
- * - `at` serves the part at an index, out of memory or the store, and `none` where the
- *   trajectory held fewer parts.
- * - It is read for as long as the cache lives.
+ * `length` counts all parts after the source completes.
+ * `at` reads a zero-based index from memory or the store.
+ * Negative indices and indices beyond the end return none.
+ * Replaying stored parts decodes them with the trajectory's config.
  *
- * @see {@link Service.cache} for the reading that keeps a trajectory.
- * @see {@link CacheError} for a part the store could not serve or keep.
+ * **Gotchas**
+ *
+ * Reads require the backing store to remain available.
+ * Pass integer indices to `at`.
+ *
+ * @see {@link Service.cache} for creating the cached trajectory.
+ * @see {@link CacheError} for store failures.
+ * @stability stable
  * @category models
  */
 export type Cached<Id extends string, Config extends Config.AnyConfig> = Trajectory.Trajectory<
@@ -110,34 +100,35 @@ export type Cached<Id extends string, Config extends Config.AnyConfig> = Traject
   }>;
 
 /**
- * What a cache gives: the trajectories it keeps, each read once from its source.
+ * Service for caching trajectories by id.
  *
  * **When to use**
  *
- * Use to require a cache of a program, and {@link make}, {@link layer},
- * {@link layerFsTemp} or {@link layerKVStore} to provide it.
+ * Use when source streams cannot be rerun but their parts need repeated reads.
  *
- * @see {@link Cached} for a trajectory it keeps.
- * @category models
+ * @see {@link Cache} for the service tag.
+ * @see {@link make} for construction without a layer.
+ * @stability stable
+ * @category services
  */
 export interface Service {
   /**
-   * Reads `trajectory` once and keeps it, answering with the trajectory to read again.
+   * Reads a trajectory to completion and retains its parts for replay.
    *
    * **Details**
    *
-   * The source is read once. The newest parts within the cache's window are kept in
-   * memory, and the ones before them are written to the store as frames, named by the
-   * trajectory's id and the part's index. A part the window left is read back and decoded
-   * with the trajectory's own config, and a source that fails fails the reading.
+   * The newest parts stay in memory within the configured capacity.
+   * Earlier parts are encoded into the backing store.
+   * Repeated calls for an id reuse its cached reading.
+   * A failed reading is removed, so a later call can retry.
    *
-   * The trajectory is kept by its id, and an id names one trajectory, so a trajectory of
-   * an id the cache read is answered with what that reading kept: its source is not read
-   * again. A reading that failed is not kept, so the next one reads the source again.
+   * **Gotchas**
    *
-   * The parts a cache kept are read for as long as the cache lives.
+   * An id must always identify the same parts and config.
+   * Reusing an id for different input returns the earlier cached trajectory.
+   * An infinite source never returns a cached result.
    *
-   * @see {@link Cached} for the trajectory it answers with.
+   * @see {@link Cached} for replay and indexed access.
    */
   readonly cache: <Id extends string, Config extends Config.AnyConfig, E, R>(
     trajectory: Trajectory.Trajectory<Id, Config, E, R>,
@@ -149,84 +140,84 @@ export interface Service {
 }
 
 /**
- * A cache over the store given: the newest parts kept in memory, and the ones before them
- * written to that store.
+ * Creates a cache over an existing byte store.
  *
  * **When to use**
  *
- * Use where a program holds the store itself rather than requiring a cache over one
- * ({@link layerKVStore}).
+ * Use when the caller manages the store's lifetime directly.
  *
- * @see {@link Service} for the cache this makes.
+ * @see {@link layerKVStore} for obtaining the store from context.
+ * @see {@link Options} for the in-memory window.
+ * @stability stable
  * @category constructors
  */
 export const make = (store: ByteStore.ByteStore, options?: Options): Service =>
   serviceOf(store, options);
 
 /**
- * The cache a program reads trajectories through: the store the parts are kept in, the
- * window of them kept in memory, and the trajectories it read, by the id each is named by.
+ * Service tag for trajectory caching.
  *
- * **When to use**
- *
- * Use to require a cache of a program, and {@link make}, {@link layer},
- * {@link layerFsTemp} or {@link layerKVStore} to provide it.
- *
- * @see {@link Service} for what the cache gives.
- * @see {@link Cached} for a trajectory a cache keeps.
- * @category services
+ * @see {@link Service} for the caching contract.
+ * @see {@link layer} for an in-memory provider.
+ * @stability stable
+ * @category tags
  */
 export class Cache extends Context.Service<Cache, Service>()("trajs/core/Cache") {}
 
 /**
- * A cache over the byte store a program provides.
+ * Creates a layer using the byte store from context.
  *
  * **When to use**
  *
- * Use to keep the parts outside the window in a store a program states — memory, a
- * file system, a database — without naming one of them here.
+ * Use when the application supplies its own storage backend.
  *
- * @see {@link Service} for the cache this provides.
- * @see {@link layer} for the same cache over a byte store in memory.
+ * @see {@link layer} for an in-memory backend.
+ * @see {@link layerFsTemp} for a temporary filesystem backend.
+ * @see {@link Options} for the in-memory window.
+ * @stability stable
  * @category layers
  */
 export const layerKVStore = (options?: Options): Layer.Layer<Cache, never, ByteStore.ByteStore> =>
   Layer.effect(Cache, ByteStore.ByteStore.pipe(Effect.map((store) => make(store, options))));
 
 /**
- * The cache this package ships where a program states nothing: the parts outside the
- * window in a byte store in memory.
+ * Creates a cache layer with an in-memory byte store.
  *
  * **When to use**
  *
- * Use where the parts are kept for as long as the program runs and no longer — what a
- * reading of a trajectory keeps between its readings, say.
+ * Use when cached trajectories fit in memory.
  *
- * @see {@link Service} for the cache this provides.
- * @see {@link layerKVStore} for the same cache over a byte store a program states.
+ * **Gotchas**
+ *
+ * A finite capacity moves older parts into another in-memory representation, not onto disk.
+ *
+ * @see {@link layerFsTemp} for spilling parts to disk.
+ * @see {@link layerKVStore} for a caller-supplied backend.
+ * @stability stable
  * @category layers
  */
 export const layer = (options?: Options): Layer.Layer<Cache> =>
   layerKVStore(options).pipe(Layer.provide(ByteStore.layer()));
 
 /**
- * The cache this package ships in a temporary directory of the file system: the parts
- * outside the window kept in a directory made when the layer is built and removed when
- * the scope it was built in closes.
+ * Creates a cache layer backed by a scoped temporary directory.
  *
  * **When to use**
  *
- * Use where the parts a program keeps are too many to hold in memory for as long as it
- * runs, and are not to be found after it ends.
+ * Use when older parts should spill to disk without persistent storage.
  *
  * **Details**
  *
- * It is {@link layerKVStore} over `ByteStore.layerFsTemp`, in a directory named
- * after `prefix` and defaulting to `"trajs-"`. Nothing of it is left behind when the
- * scope closes.
+ * The directory uses `prefix`, defaulting to `"trajs-"`, and is removed when the layer's scope closes.
  *
- * @see {@link Service} for the cache this provides.
- * @see {@link layer} for the same cache held in memory.
+ * **Gotchas**
+ *
+ * Set a finite `capacity` to spill parts.
+ * The default capacity keeps every part in memory, even with a filesystem backend.
+ *
+ * @see {@link layer} for an in-memory backend.
+ * @see {@link Options} for the in-memory window.
+ * @stability stable
  * @category layers
  */
 export const layerFsTemp = (

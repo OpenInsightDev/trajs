@@ -1,33 +1,10 @@
 /**
- * Reading a trajectory as the conversations the Anthropic Messages API takes.
+ * Session conversations for the Anthropic Messages API.
  *
- * A trajectory holds every session that ran, in one stream of parts — see
- * `Trajectory` of `@trajs/core` — and what the API is handed is not that stream: it
- * is one conversation per session, holding the messages the session's model was given
- * and answered in the order they were produced, and what the session inherited from
- * the one it continues from. {@link make} reads the sessions of a trajectory
- * as those conversations; a trajectory read as the messages a chat completions API of
- * an OpenAI-compatible client takes is `@trajs/core/codec/OpenAiCompat`.
+ * {@link make} converts a session tree into API conversations keyed by session id.
+ * {@link Conversation} keeps system instructions separate from user and assistant messages.
  *
- * The conversations are read with `View.prompt` of `@trajs/core`, one session
- * at a time, and each of their messages is then written as this API states it. A
- * trajectory is read as its sessions with `Session.main`, which is what
- * reading one here is given: a trajectory whose sessions cannot be read fails that
- * reading — an unproduced fork, or a late declaration, is what reading one fails with.
- *
- * **What is not carried**
- *
- * What a trajectory holds and no message states is left out rather than invented:
- *
- * - A model's reasoning, since the API takes a thinking block back only with the
- *   signature it was returned with.
- * - A tool a provider executed itself, and the result it answered with, since those
- *   are the provider's own record of a call it made — see `providerExecuted`.
- * - A file part that is not an image, and an image the API does not read — a
- *   document, a media type of the caller's own — which the API refers to in ways of
- *   its own rather than by the bytes a trajectory holds.
- * - The approval of a tool call, which is part of a handshake with the program that
- *   ran the tools rather than of the conversation the API was given.
+ * @stability stable
  */
 
 import type { Generated } from "@effect/ai-anthropic";
@@ -41,26 +18,24 @@ import * as Session from "#/Session.ts";
 import * as View from "#/View.ts";
 
 /**
- * A message of the Anthropic Messages API.
+ * An Anthropic API input message without system instructions.
  *
- * @see {@link make} for the operation that reads a trajectory as them.
+ * @see {@link Conversation} for messages with separate system instructions.
+ * @stability stable
  * @category models
  */
 export type Message = Generated.BetaInputMessage;
 
 /**
- * One conversation of a trajectory as the Anthropic Messages API takes it: the
- * instructions the model was given, and the messages it was given and answered.
+ * Anthropic input messages with optional system instructions.
  *
  * **Details**
  *
- * `system` is every system message of the conversation, read as the text blocks
- * the API states instructions in, and is left out where the conversation was given
- * none: the API takes the instructions of a call apart from the messages of the
- * conversation, so a system message produced among them is read here rather than
- * where it was produced.
+ * Conversion places all system messages in `system` as text blocks.
+ * Without system messages, `system` is `undefined`.
  *
- * @see {@link make} for the operation that reads a trajectory as them.
+ * @see {@link make} for conversion rules and omitted content.
+ * @stability stable
  * @category models
  */
 export type Conversation = Readonly<{
@@ -69,83 +44,61 @@ export type Conversation = Readonly<{
 }>;
 
 /**
- * The conversations of every session of a trajectory, keyed by the id of the
- * session.
+ * Anthropic conversations keyed by session id.
  *
- * @see {@link make} for the operation that reads a trajectory as them.
+ * @see {@link make} for converting a session tree.
+ * @stability stable
  * @category models
  */
 export type Sessions = Record<string, Conversation>;
 
 /**
- * Reads the sessions of a trajectory as the conversations the Anthropic Messages API takes,
- * one conversation per session.
+ * Converts every session in a tree into an Anthropic API conversation.
  *
  * **When to use**
  *
- * Use when a conversation read from a trajectory is handed back to Claude — to continue it, or
- * to run it against another model — rather than read in `@trajs/core`'s own terms.
+ * Use to replay recorded context through the Anthropic Messages API.
  *
  * **Details**
  *
- * - What it is given is what `Session.main` read of a trajectory, so a trajectory is
- *   read as its sessions before it is read as conversations: one reading of it serves every
- *   session it holds ({@link Session.MainSession}).
- * - The conversation of a session holds the messages the session produced and the
- *   messages it inherited: what the sessions it continues from produced up to the
- *   part it continues from, from the root of the fork down.
- * - Every system message of a conversation is read as its `system`, since the API
- *   states the instructions of a call apart from the messages of the conversation
- *   ({@link Conversation}).
- * - A tool result is read on the user's side of the conversation, which is where
- *   the API states one, whether the trajectory holds it as a tool message of a
- *   prompt or as part of a response; a user message and the tool results following
- *   it are read as one message, since the API states the roles of a conversation
- *   alternating.
+ * Each conversation includes inherited context through {@link Session.stream}.
+ * System messages become separate system text blocks.
+ * Tool results become user content blocks.
+ * Adjacent messages with the same role are merged.
+ * Text and user images are retained; tool results become text content.
  *
- * The effect fails with what reading the parts of a session fails with, and requires
- * the services `R` names.
+ * **Gotchas**
  *
- * **Example** (Reading a trajectory as the messages of a call and its answer)
+ * Reasoning, provider-executed calls and results, approvals, and non-image files are omitted.
+ * Embedded images support JPEG, PNG, GIF, and WebP.
+ * Conversion retains every session's complete conversation in memory.
+ * Session reads scan the cached trajectory and can repeat inherited context.
+ *
+ * **Example** (Converting an Anthropic tool exchange)
  *
  * ```ts import.meta.vitest
  * import { Anthropic } from "@trajs/core/codec"
- * import { Cache, Config, EventKit, ExtraKit, MetricKit, Prompt, Response, Session, Toolkit, Trajectory } from "@trajs/core"
+ * import { Cache, Config, Prompt, Response, Session, Trajectory } from "@trajs/core"
  * import { Effect, Stream } from "effect"
  *
- * // The main session, which the parts below belong to.
- * const sessionId = Trajectory.mainSessionId
- * const config = Config.config({
- *   stream: false,
- *   toolkit: Toolkit.empty,
- *   eventkit: EventKit.empty,
- *   metrickit: MetricKit.empty,
- *   extrakit: ExtraKit.empty
- * })
- *
+ * const config = Config.config({ stream: false })
  * const part = Trajectory.parts(config)
  *
- * // An exchange a trajectory holds: what a model was given, the tool it called for it, the
- * // result that call was answered with, and what it answered of that result.
  * const parts = [
- *   part.mainSession(),
  *   part.prompt(
  *     Prompt.fromMessages([
  *       Prompt.makeMessage("system", { content: "Answer in one sentence." }),
  *       Prompt.makeMessage("user", {
  *         content: [Prompt.makePart("text", { text: "What is the weather in Paris?" })]
  *       })
- *     ]),
- *     { sessionId }
+ *     ])
  *   ),
  *   part.response(
  *     Response.anyToolCallPart({
  *       id: "call_1",
  *       name: "weather",
  *       params: { city: "Paris" },
- *       providerExecuted: false
- *     }),
- *     { sessionId }
+ *     })
  *   ),
  *   part.prompt(
  *     Prompt.fromMessages([
@@ -160,29 +113,30 @@ export type Sessions = Record<string, Conversation>;
  *           })
  *         ]
  *       })
- *     ]),
- *     { sessionId }
+ *     ])
  *   ),
  *   part.response(
- *     Response.makePart("text", { text: "It is 18°C." }),
- *     { sessionId }
+ *     Response.makePart("text", { text: "It is 18°C." })
  *   )
  * ]
  *
  * const trajectory = Trajectory.make(config)(Stream.fromIterable(parts))
  *
- * const root = await Effect.runPromise(Session.main(trajectory).pipe(Effect.provide(Cache.layer())))
- * const conversations = await Effect.runPromise(Anthropic.make(root))
- * const conversation = conversations[sessionId]
+ * const conversations = await Effect.runPromise(Session.main(trajectory).pipe(
+ *   Effect.flatMap(Anthropic.make),
+ *   Effect.provide(Cache.layer()),
+ * ))
+ * const conversation = conversations[Trajectory.mainSessionId]
  *
  * conversation?.messages.map((message) => message.role) // => ["user", "assistant", "user", "assistant"]
  * Array.isArray(conversation?.system) ? conversation.system.length : 0 // => 1
  * ```
  *
- * @see {@link Sessions} for the conversations it reads to.
- * @see {@link View.prompt} for the messages of one session.
- * @see {@link Session.main} for the tree it is given.
- * @category constructors
+ * @see {@link Sessions} for the result map.
+ * @see {@link View.prompt} for a core prompt without API conversion.
+ * @see {@link Session.main} for session discovery and validation.
+ * @stability stable
+ * @category converting
  */
 export const make = <Config extends Config.AnyConfig, E, R>(
   main: Session.MainSession<Config, E, R>,

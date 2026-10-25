@@ -1,3 +1,12 @@
+/**
+ * Experimental index declarations over configured trajectory parts.
+ *
+ * {@link Index} associates a result schema, dependencies, and a sink with a package-scoped identity.
+ * Evaluating a declaration returns its sink without consuming a trajectory.
+ *
+ * @stability experimental
+ */
+
 import { Context, Effect, Effectable, Sink, type Schema } from "effect";
 
 import * as Config from "#/Config.ts";
@@ -31,6 +40,23 @@ type Props<
   readonly sink: SinkOf<S, Config, Dependencies>;
 };
 
+/**
+ * An effectful index declaration yielding its configured trajectory sink.
+ *
+ * **Details**
+ *
+ * `tag` joins `package` and `id` with `/`.
+ * `schema` describes the sink's result and `config` describes its input parts.
+ * Evaluating the declaration retains the declared dependency requirements.
+ *
+ * **Gotchas**
+ *
+ * Evaluation does not run the sink or validate its output against `schema`.
+ * The declaration does not provide its dependencies.
+ *
+ * @stability experimental
+ * @category models
+ */
 export class Index<
   Pkg extends string,
   Id extends string,

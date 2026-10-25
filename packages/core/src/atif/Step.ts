@@ -1,9 +1,10 @@
 /**
- * A trajectory read as the steps ATIF exchanges.
+ * Text-oriented ATIF step views over one session.
  *
- * {@link steps} reads a session's steps on ATIF's terms, and {@link Step} says what a
- * step holds. What ATIF states of a step beyond what it says is extra data this module
- * carries, which the reading does not fold back into a step yet.
+ * {@link steps} converts conversation steps into {@link Step} values.
+ * These values are not complete ATIF document records.
+ *
+ * @stability stable
  */
 
 import { Option, Stream } from "effect";
@@ -16,43 +17,36 @@ import type { TrajectoryError } from "#/TrajectoryError.ts";
 import * as View from "#/View.ts";
 
 /**
- * Who contributed a step: the system prompt a model was given, the user, or the agent
- * that answered them.
+ * The contributor role used by ATIF step views.
  *
- * ATIF RFC 0001 v1.8, Section II "StepObject", the values of its `source`.
+ * **Details**
  *
+ * Assistant prompt messages map to `"agent"` and tool prompt messages map to `"user"`.
+ *
+ * @see {@link Step} for the view fields.
+ * @stability stable
  * @category models
  */
 export type StepSource = "system" | "user" | "agent";
 
 /**
- * One step of a trajectory: a message a model was given, or the turn the model
- * answered it with.
+ * A text-oriented message or agent turn without ATIF document metadata.
  *
- * ATIF RFC 0001 v1.8, Section II "StepObject", of which a step here states what a
- * trajectory holds. `reasoning`, `toolCalls` and `observations` are empty on a step of a
- * source other than the agent.
+ * **Details**
  *
+ * Prompt-message views have no reasoning, calls, or observations, even for assistant messages.
+ * Response-group views carry concatenated text and reasoning, tool calls, and tool results.
+ * `observations` omits ATIF's enclosing observation object.
+ *
+ * @see {@link steps} for conversion and omitted fields.
+ * @stability stable
  * @category models
  */
 export type Step<Tools extends Record<string, Tool.Any>> = Readonly<{
-  /** Who contributed the step. */
   source: StepSource;
-  /**
-   * The dialogue of the step.
-   *
-   * TODO: read the content parts of a message, which ATIF added in v1.6.
-   */
   message: string;
-  /** What the agent thought, where it is an agent step that thought. */
   reasoning: Option.Option<string>;
-  /** The tools the step called, where it is an agent step that called any. */
   toolCalls: ReadonlyArray<Response.ToolCallPartsView<Tools>>;
-  /**
-   * The results those calls were answered with.
-   *
-   * ATIF wraps them in an `observation` object; the wrapper is dropped here.
-   */
   observations: ReadonlyArray<Response.ToolResultPartsView<Tools>>;
 }>;
 
@@ -146,13 +140,24 @@ const stepsOf = <Config extends Config.AnyConfig>(
 };
 
 /**
- * Reads the parts of a session as the steps they are made of.
+ * Converts one session into unnumbered, text-oriented ATIF step views.
  *
- * A `Prompt` is read as one step per message, a `Response` as one agent step for the
- * parts it holds, and an `Event` as no step. The steps are emitted in order and
- * unnumbered, since ATIF numbers them by their position in the document.
+ * **Details**
  *
- * @category combinators
+ * Each prompt message becomes one step.
+ * Each response group becomes one agent step.
+ * Events produce no steps.
+ * Response grouping and streaming completion follow {@link View.steps}.
+ *
+ * **Gotchas**
+ *
+ * Media content, timestamps, extras, metric reports, and step ids are not carried into the view.
+ * Tool-result content inside prompt messages contributes no text.
+ * The result cannot reconstruct a complete original ATIF document.
+ *
+ * @see {@link Step} for the output fields.
+ * @stability stable
+ * @category converting
  */
 export const steps = <Config extends Config.AnyConfig, E, R>(
   stream: Session.SessionStream<Config, E, R>,

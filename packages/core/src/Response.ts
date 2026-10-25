@@ -1,3 +1,12 @@
+/**
+ * Effect response parts and views accepting undeclared tools.
+ *
+ * {@link anyToolCallPart} and {@link anyToolResultPart} construct parts without a toolkit.
+ * View types retain known tools while accepting unknown tool payloads.
+ *
+ * @stability stable
+ */
+
 import type { Tool } from "effect/ai";
 import type {
   AllParts,
@@ -12,52 +21,99 @@ import { toolCallPart, toolResultPart } from "effect/ai/Response";
 
 import type * as Config from "#/Config.ts";
 
+/**
+ * Re-exports Effect's response APIs without modification.
+ *
+ * @stability stable
+ * @category re-exports
+ */
 export * from "effect/ai/Response";
 
+/**
+ * A {@link ToolCallPart} without a declared tool name or parameter schema.
+ *
+ * @see {@link anyToolCallPart} for construction.
+ * @stability stable
+ * @category models
+ */
 export type AnyToolCallPart = ToolCallPart<string, unknown>;
 
+/**
+ * A {@link ToolResultPart} without a declared tool name or result schema.
+ *
+ * @see {@link anyToolResultPart} for construction.
+ * @stability stable
+ * @category models
+ */
 export type AnyToolResultPart = ToolResultPart<string, unknown, unknown>;
 
+/**
+ * Streaming and finished response parts, including undeclared tool calls and results.
+ *
+ * **Gotchas**
+ *
+ * A tool name alone cannot prove a payload follows a known tool's schema.
+ * The undeclared-tool variants also accept known names.
+ *
+ * @see {@link PartView} for finished parts only.
+ * @stability stable
+ * @category models
+ */
 export type AllPartsView<Tools extends Record<string, Tool.Any>> =
   | AllParts<Tools>
   | AnyToolCallPart
   | AnyToolResultPart;
 
+/**
+ * Finished response parts, including undeclared tool calls and results.
+ *
+ * @see {@link AllPartsView} for streaming increments and tool-name narrowing limits.
+ * @stability stable
+ * @category models
+ */
 export type PartView<Tools extends Record<string, Tool.Any>> =
   | Part<Tools>
   | AnyToolCallPart
   | AnyToolResultPart;
 
+/**
+ * Tool calls accepting both declared and undeclared parameter payloads.
+ *
+ * @see {@link AllPartsView} for tool-name narrowing limits.
+ * @see {@link ToolCallOf} for calls typed through a config.
+ * @stability stable
+ * @category models
+ */
 export type ToolCallPartsView<Tools extends Record<string, Tool.Any>> =
   | ToolCallParts<Tools>
   | AnyToolCallPart;
 
+/**
+ * Tool results accepting both declared and undeclared result payloads.
+ *
+ * @see {@link AllPartsView} for tool-name narrowing limits.
+ * @see {@link ToolResultOf} for results typed through a config.
+ * @stability stable
+ * @category models
+ */
 export type ToolResultPartsView<Tools extends Record<string, Tool.Any>> =
   | ToolResultParts<Tools>
   | AnyToolResultPart;
 
 /**
- * The tool call a trajectory read with `Config` states.
+ * A tool call read through a config, including calls to undeclared tools.
  *
- * **When to use**
- *
- * Use to type a call read through the toolkit of a configuration rather than through
- * the toolkit alone.
- *
- * @see {@link ToolCallPartsView} for the call read with its tools alone.
+ * @see {@link ToolCallPartsView} for calls typed through tool declarations alone.
+ * @stability stable
  * @category models
  */
 export type ToolCallOf<Config extends Config.AnyConfig> = ToolCallPartsView<Config.ToolsOf<Config>>;
 
 /**
- * The tool result a trajectory read with `Config` states.
+ * A tool result read through a config, including results from undeclared tools.
  *
- * **When to use**
- *
- * Use to type a result read through the toolkit of a configuration rather than through
- * the toolkit alone.
- *
- * @see {@link ToolResultPartsView} for the result read with its tools alone.
+ * @see {@link ToolResultPartsView} for results typed through tool declarations alone.
+ * @stability stable
  * @category models
  */
 export type ToolResultOf<Config extends Config.AnyConfig> = ToolResultPartsView<
@@ -78,34 +134,44 @@ type AnyToolResultParams = Omit<
 };
 
 /**
- * Constructs a tool call part of a tool a toolkit does not describe.
+ * Creates a tool call without requiring a tool declaration.
  *
  * **When to use**
  *
- * Use where the call is built without the toolkit it will be read through.
+ * Use when importing calls without their original toolkit.
  *
  * **Details**
  *
- * `providerExecuted` defaults to `false`, the framework executing the call.
+ * `providerExecuted` defaults to `false`.
+ * Parameters are not validated against a tool schema.
  *
- * @see {@link anyToolResultPart} for the result that answers the call.
+ * @see {@link anyToolResultPart} for constructing the corresponding result.
+ * @stability stable
  * @category constructors
  */
 export const anyToolCallPart = (params: AnyToolCallParams): AnyToolCallPart =>
   toolCallPart({ ...params, providerExecuted: params.providerExecuted ?? false });
 
 /**
- * Constructs a tool result part of a tool a toolkit does not describe.
+ * Creates a tool result without requiring a tool declaration.
  *
  * **When to use**
  *
- * Use where the result is built without the toolkit it will be read through.
+ * Use when importing results without their original toolkit.
  *
  * **Details**
  *
- * `encodedResult` defaults to `result`, `preliminary` to `false`, and
- * `providerExecuted` to `false`.
+ * - `encodedResult` defaults to `result`.
+ * - `preliminary` defaults to `false`.
+ * - `providerExecuted` defaults to `false`.
  *
+ * **Gotchas**
+ *
+ * A `null` encoded result also falls back to `result`.
+ * Results are not validated against a tool schema.
+ *
+ * @see {@link anyToolCallPart} for constructing the corresponding call.
+ * @stability stable
  * @category constructors
  */
 export const anyToolResultPart = <const Params extends AnyToolResultParams>(

@@ -1,3 +1,12 @@
+/**
+ * Stored trajectories with a JSON header, binary part frame, and JSON metadata tail.
+ *
+ * {@link Service.inspect} reads descriptive records without decoding parts.
+ * {@link Service.load} and {@link Service.save} read and write complete trajectories.
+ *
+ * @stability stable
+ */
+
 import {
   Algorithm as CompressionAlgorithm,
   Compression,
@@ -25,45 +34,34 @@ import { TrajectoryError } from "#/TrajectoryError.ts";
 import pkg from "../package.json" with { type: "json" };
 
 /**
- * Reading and writing a trajectory as bytes.
+ * The UTF-8 `TRAJS` marker ending a stored trajectory.
  *
- * {@link Service.inspect} reads the header and the metadata.
- * {@link Service.load} reads the parts as well.
- * {@link Service.save} writes a trajectory under an id.
- *
- * {@link Header} sits at the head.
- * {@link Metadata} sits at the tail.
- * The frame of parts sits between them.
- *
- * @see {@link layer} for providing the exchange.
- */
-
-/**
- * Tail marker of a trajectory, after the metadata length.
- *
- * @see {@link Metadata} for the JSON before the length.
- * @category models
+ * @see {@link Metadata} for the record before the tail length and marker.
+ * @stability stable
+ * @category constants
  */
 export const Magic = new TextEncoder().encode("TRAJS");
 
 /**
- * Trajs version in {@link Metadata}.
+ * The core package version written into {@link Metadata}.
  *
- * @see {@link Metadata} for the tail record.
- * @category models
+ * @stability stable
+ * @category constants
  */
 export const Version = pkg.version;
 
 /**
- * Schema of {@link Header}.
+ * Schema for stored kit descriptions at the start of a trajectory.
  *
  * **Details**
  *
- * JSON text, with a 4-byte big-endian length before it.
- * Not compressed.
+ * The uncompressed JSON record follows a four-byte big-endian length.
+ * Tool entries include JSON Schema descriptions but no executable handlers or schema transformations.
+ * Event, metric, and extra entries contain display metadata, not decoding schemas.
  *
  * @see {@link Metadata} for the tail.
- * @category models
+ * @stability stable
+ * @category schemas
  */
 export const Header = Schema.Struct({
   toolkit: Schema.JsonObject,
@@ -73,23 +71,25 @@ export const Header = Schema.Struct({
 });
 
 /**
- * Kits at the head of a trajectory.
+ * Stored kit descriptions without executable handlers or runtime decoding schemas.
  *
- * @see {@link Metadata} for the tail.
+ * @see {@link Header} for the schema and layout.
+ * @stability stable
  * @category models
  */
 export type Header = Schema.Schema.Type<typeof Header>;
 
 /**
- * Schema of {@link Metadata}.
+ * Schema for the version, compression, and digest record at the trajectory tail.
  *
  * **Details**
  *
- * JSON text, then a 4-byte big-endian length, then {@link Magic}.
- * Not compressed.
+ * The uncompressed JSON record precedes its four-byte big-endian length and {@link Magic}.
+ * The digest covers encoded part bytes before compression, excluding the header and metadata.
  *
  * @see {@link Header} for the head.
- * @category models
+ * @stability stable
+ * @category schemas
  */
 export const Metadata = Schema.Struct({
   version: Schema.String,
@@ -99,33 +99,35 @@ export const Metadata = Schema.Struct({
 });
 
 /**
- * Metadata at the tail of a trajectory.
+ * The stored format version, compression algorithm, hash algorithm, and part digest.
  *
- * @see {@link Header} for the head.
+ * @see {@link Metadata} for the schema and layout.
+ * @stability stable
  * @category models
  */
 export type Metadata = Schema.Schema.Type<typeof Metadata>;
 
 /**
- * Returns the streaming part schema of `config`.
+ * Creates the storage part schema using `config`'s kits and streaming response variant.
  *
  * **Details**
  *
- * {@link Loaded.read} folds parts when the config is not streaming.
+ * Storage always accepts streaming response increments, regardless of `config.stream`.
+ * {@link Loaded.read} folds increments for a non-streaming read config.
+ * Prompt file data also accepts stored URL representations.
  *
- * @see {@link Trajectory.Part} for a config's own part, streaming or not.
- * @category constructors
+ * @see {@link Trajectory.Part} for ordinary trajectory parts.
+ * @stability stable
+ * @category schemas
  */
 export const Part = <C extends Config.AnyConfig>(config: C) => ExchangePart(config);
 
 /**
- * Header and metadata of a trajectory, without the parts.
+ * A stored trajectory's header and metadata without decoded parts.
  *
- * **When to use**
- *
- * Use to hold the result of {@link Service.inspect}.
- *
- * @see {@link Loaded} for the same fields plus the parts.
+ * @see {@link Service.inspect} for reading these records.
+ * @see {@link Loaded} for access to parts as well.
+ * @stability stable
  * @category models
  */
 export interface Inspected {
@@ -134,18 +136,20 @@ export interface Inspected {
 }
 
 /**
- * Header, metadata and parts of a stored trajectory.
- *
- * **When to use**
- *
- * Use to hold the result of {@link Service.load}.
+ * A stored trajectory's descriptive records and a lazy part reader.
  *
  * **Details**
  *
- * `read` uses the load config when called with none.
- * A config argument reads the parts with that config instead.
+ * `read` uses the load config unless another config is supplied.
+ * Each call returns a trajectory with a fresh uuid v7, not the storage key.
  *
- * @see {@link Inspected} for the header and the metadata alone.
+ * **Gotchas**
+ *
+ * Header descriptions do not rebuild the decoding kits.
+ * The caller supplies compatible schemas through the read config.
+ *
+ * @see {@link Inspected} for descriptive records only.
+ * @stability stable
  * @category models
  */
 export interface Loaded<Config extends Config.AnyConfig = Config.AnyConfig> {
@@ -153,48 +157,67 @@ export interface Loaded<Config extends Config.AnyConfig = Config.AnyConfig> {
 
   readonly metadata: Metadata;
 
+  /**
+   * Returns a lazy trajectory decoded with the supplied or default config.
+   *
+   * **Details**
+   *
+   * A non-streaming config folds text and reasoning increments into finished parts.
+   * Decoding and storage failures occur during stream consumption.
+   *
+   * **Gotchas**
+   *
+   * Tool parameter increments, response error payloads, and unfinished text or reasoning are omitted by non-streaming folding.
+   */
   readonly read: <C extends Config.AnyConfig = Config>(
     config?: C,
   ) => Trajectory.Trajectory<string, C, TrajectoryError | StorageError, Config.DecodingServices<C>>;
 }
 
 /**
- * Reading and writing of stored trajectories.
- *
- * **When to use**
- *
- * Use to require an exchange, and {@link layer} to provide it.
+ * Service for inspecting, loading, and saving stored trajectories.
  *
  * @see {@link Exchange} for the service tag.
- * @category models
+ * @see {@link layer} for the storage-backed provider.
+ * @stability stable
+ * @category services
  */
 export interface Service {
   /**
-   * Reads the header and the metadata under `id`.
+   * Reads a stored trajectory's header and metadata without decoding its parts.
    *
    * **When to use**
    *
-   * Use to read the header and the metadata without the parts.
+   * Use to inspect available kits and format metadata before choosing decoding schemas.
    *
    * **Details**
    *
-   * The header sits at the head and the metadata at the tail.
-   * Neither is compressed, so the frame of parts is not read.
+   * The part frame is neither read nor decompressed.
+   *
+   * **Gotchas**
+   *
+   * Inspection does not verify the part digest.
    *
    * @see {@link Service.load} for the parts as well.
    */
   readonly inspect: (id: string) => Effect.Effect<Inspected, TrajectoryError | StorageError>;
 
   /**
-   * Reads the trajectory under `id`.
+   * Opens a stored trajectory using a default decoding config.
    *
    * **When to use**
    *
-   * Use to read the parts, not only the header and the metadata.
+   * Use when parts will be decoded after inspecting the descriptive records.
    *
    * **Details**
    *
-   * `config` is the default config of {@link Loaded.read}.
+   * Header and metadata are read immediately.
+   * Part decompression and decoding wait until the returned trajectory is consumed.
+   *
+   * **Gotchas**
+   *
+   * Loading does not verify the digest or select compression from the metadata.
+   * The provided compression service must support the stored frame.
    *
    * @see {@link Service.inspect} for the header and the metadata alone.
    * @see {@link Service.save} for writing a trajectory.
@@ -210,11 +233,20 @@ export interface Service {
   >;
 
   /**
-   * Writes `trajectory` into storage under `id`.
+   * Writes a trajectory under a caller-supplied storage key.
    *
    * **Details**
    *
-   * Parts go out as one compressed frame between the header and the metadata.
+   * The source is consumed once and its parts are encoded in order.
+   * Encoded parts form one compressed frame between the header and metadata.
+   * Hashing covers the uncompressed encoded part bytes.
+   * The storage key is independent of the trajectory's id.
+   *
+   * **Gotchas**
+   *
+   * Unsupported tool schemas can fail header conversion as defects.
+   * Hashing and writing share an unbounded broadcast buffer.
+   * A slower hashing branch can retain an unbounded backlog.
    *
    * @see {@link Service.load} for reading a trajectory back.
    */
@@ -237,32 +269,30 @@ const catchCompression = <E, R>(
   );
 
 /**
- * Service tag for {@link Service}.
- *
- * **When to use**
- *
- * Use to require an exchange, and {@link layer} to provide it.
+ * Service tag for stored trajectory exchange.
  *
  * @see {@link Service} for the operations.
- * @category services
+ * @see {@link layer} for the provider.
+ * @stability stable
+ * @category tags
  */
 export class Exchange extends Context.Service<Exchange, Service>()("trajs/core/Exchange") {}
 
 /**
- * Exchange over {@link Storage}, {@link Compression} and {@link StreamHash}.
+ * Layer using {@link Storage}, {@link Compression}, and {@link StreamHash} for trajectory exchange.
  *
  * **When to use**
  *
- * Use to read and write trajectories.
- * Provide those three services beside it.
+ * Use when the application supplies its storage, compression, and hashing implementations.
  *
  * **Details**
  *
- * {@link Storage} keeps the bytes.
- * {@link Compression} carries the frame of parts.
- * {@link StreamHash} names the parts by digest.
+ * Storage controls persistence and storage-key behavior.
+ * Compression handles the binary part frame.
+ * Hashing records a digest during saving.
  *
  * @see {@link Service} for the operations.
+ * @stability stable
  * @category layers
  */
 export const layer: Layer.Layer<Exchange, never, Storage | Compression | StreamHash> = Layer.effect(
