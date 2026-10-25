@@ -47,6 +47,7 @@ const layers = Layer.mergeAll(
 
 const main = () =>
   Effect.gen(function* () {
+    // writeFixture stored the token counts on the file.
     yield* writeFixture();
 
     const exchange = yield* Exchange.Exchange;
@@ -54,16 +55,19 @@ const main = () =>
 
     const trajectory = loaded.read();
 
+    // View.produced reads those stored estimates. No tokenizer runs here.
     const reading = yield* View.produced(tokenEstimate)(trajectory).pipe(
       Stream.map((output) => output.output),
       Stream.runFold(
         (): Reading => ({ growth: [], prompt: undefined }),
         (reading, { count, total }) => ({
+          // count.tokens is this part. total is the session so far.
           growth: [
             ...reading.growth,
             { parts: reading.growth.length + 1, tokens: count.tokens, total },
           ],
 
+          // Only a prompt estimate is kept. The last one is the kind breakdown.
           prompt: count._tag === "prompt" ? count : reading.prompt,
         }),
       ),
@@ -103,6 +107,7 @@ it.effect("main", () =>
 
     for (const part of prompt) expect(part.tokens).toBeGreaterThan(0);
 
+    // OpenAI image estimate stored with the fixture.
     expect(prompt.find((part) => part.kind === "media")?.tokens).toBe(255);
   }),
 );

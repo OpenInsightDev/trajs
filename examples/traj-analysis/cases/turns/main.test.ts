@@ -32,6 +32,7 @@ const trajectory = Trajectory.make(config)(
 const main = Effect.fn(function* () {
   const session = yield* Session.main(trajectory);
 
+  // Parts are flat. View.steps emits one prompt, then the responses before the next prompt.
   return yield* View.steps(session.stream).pipe(
     Stream.runFold(
       (): Report => ({ prompts: 0, messages: 0, characters: 0, toolCalls: {} }),
@@ -78,6 +79,8 @@ it.effect("main", () =>
         toolCalls: { get_weather: 2 },
       } satisfies Report),
     ),
+    // Session.main reads parts from Cache. This layer keeps them in memory.
+    // Cache.layerFsTemp keeps them in a temporary directory instead.
     Effect.provide(Cache.layer()),
   ),
 );

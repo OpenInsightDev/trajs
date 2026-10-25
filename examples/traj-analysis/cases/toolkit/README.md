@@ -1,22 +1,9 @@
 # Case: toolkit
 
-## What it shows
+The agent checks the weather in Paris and Berlin, searches the docs for a retry policy and for backoff, and reads one TypeScript file and one Markdown file. It also fetches a page with a tool this report was never told about.
 
-Tool calls read in the terms of the tools that made them. A toolkit declared once types every
-call by the name it carries, so an analysis reads the parameters a tool actually takes — a city,
-a page size, a path — instead of a payload of `unknown`. A call of a tool the toolkit does not
-describe is still read, and counted apart rather than dropped.
+You want the calls counted in each tool's own words. The cities, the search queries, the largest page size asked for (20), and the file extensions (`ts`, `md`). The unknown fetch should show up as one extra call. It should not vanish, and it should not fail the report.
 
-The trajectory is read as a stream: each call is folded into the report as it arrives rather
-than the turns being collected first, so a run costs one pass over its trajectory whatever
-length it grew to.
-
-## When you need it
-
-- Per-tool analytics over your own tool set: which tools runs lean on, and what they were asked
-  to do.
-- A tool added in production: it shows up as an undescribed call while the toolkit catches up,
-  rather than breaking the report.
-- Policy checks on parameters — a limit over N, a path outside the repository — before a call is
-  replayed.
-- A session long enough that holding its calls is a cost: the report is folded as they arrive.
+```sh
+vp test cases/toolkit
+```

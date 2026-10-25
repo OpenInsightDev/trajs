@@ -1,14 +1,11 @@
 # Case: turns
 
-## What it shows
+Someone asks for the weather in Paris, then in Berlin. The model looks each city up and answers with one sentence.
 
-A trajectory read as the conversation it was: one prompt, with the responses that answered it,
-rather than a flat stream of parts. Each turn then stands on its own — the messages it was asked
-and answered with, the text it holds, and the tools it called.
+You want a summary of that conversation: how many questions, how much text came back, and which tools were used. The log is not stored as turns, though. One reply is several pieces in a row, and a summary that counts pieces will treat one reply as many.
 
-## When you need it
+Counted as turns, the session is 2 prompts, 2 messages, 26 characters of answer text ("It is sunny." and "It is raining."), and `get_weather` twice.
 
-- Reporting a run as turns: how many a session had, and how long each of them was.
-- Finding what is expensive inside a conversation, rather than in the run as a whole.
-- Feeding a view that lists a conversation: a transcript pane, a comparison of two runs, or the
-  unit an evaluator scores.
+```sh
+vp test cases/turns
+```

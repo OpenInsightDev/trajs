@@ -21,6 +21,8 @@ const toolkit = Toolkit.make(
   }),
 );
 
+// A toolkit on the config types params.
+// city stays a string, not an unknown payload.
 const config = Config.config({ stream: false, toolkit });
 
 interface Report {
@@ -105,6 +107,7 @@ const trajectory = Trajectory.make(config)(
 const main = Effect.fn(function* () {
   const session = yield* Session.main(trajectory);
 
+  // View.toolCalls also yields an undeclared tool.
   return yield* View.toolCalls(session.stream).pipe(
     Stream.runFold(
       (): Report => ({ cities: [], queries: [], limit: 0, extensions: {}, undescribed: 0 }),
@@ -130,6 +133,7 @@ const main = Effect.fn(function* () {
               },
             };
           }),
+          // web_fetch has no declaration. Count it here instead of dropping the call.
           Match.orElse(() => ({ ...report, undescribed: report.undescribed + 1 })),
         ),
     ),

@@ -28,6 +28,7 @@ const main = Effect.fn(function* () {
 
   const sessions = yield* Effect.forEach(Session.all(root), (session) =>
     Effect.gen(function* () {
+      // This stream omits the inherited prefix. Sum tokens here.
       const produced = yield* session.stream.pipe(
         Stream.runFold(
           () => ({
@@ -65,6 +66,7 @@ const main = Effect.fn(function* () {
                       inputTokens: produced.inputTokens + inputTokens,
                       outputTokens:
                         produced.outputTokens + (response.usage.outputTokens.total ?? 0),
+                      // The first finish re-bills inherited context. Later finishes are new work.
                       firstInputTokens:
                         produced.finishes === 0 ? inputTokens : produced.firstInputTokens,
                     };
@@ -82,7 +84,9 @@ const main = Effect.fn(function* () {
         ),
       );
 
-      // Session.stream includes the inherited prefix. Produced prompts are subtracted.
+      // Session.stream splices the inherited prefix back on, down to the fork.
+      // Inherited prompts equal this count minus the produced prompt count.
+      // Do not sum tokens here. Each fork would bill the prefix again.
       const prompts = yield* Session.stream(session).pipe(
         Stream.filter((part) => part._tag === "Prompt"),
         Stream.runCount,
@@ -158,6 +162,7 @@ it.effect("main", () =>
       expect(historian.firstInputTokens).toBe(2_760);
       expect(archivist.firstInputTokens).toBe(3_880);
     }),
+    // Session.main requires Cache. Cache.layerFsTemp stores the parts on disk.
     Effect.provide(Cache.layer()),
   ),
 );

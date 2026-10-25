@@ -2,33 +2,17 @@
 
 Worked examples of analysing a trajectory with `@trajs/core`.
 
-Each case is one directory under [`cases/`](./cases): a `main.test.ts` whose subject is a
-`main`, beside the modules it is made of and a `README.md` that states what it shows.
-The `main` is the analysis the case demonstrates, and the way the case reads it is asserted
-right below it, so what the code does and what it expects are read together.
+Each case is a directory under [`cases/`](./cases). The analysis is `main` in `main.test.ts`, and the test directly under it asserts what `main` returns. The case README is the situation and the result. Open `main` for the code. Comments there cover the API choices.
 
 ## Cases
 
-- [turns](./cases/turns/README.md) — reads a trajectory as the turns its
-  conversation was produced in and summarises it.
-- [sessions](./cases/sessions/README.md) — reads a run as the sessions it declares: what each
-  inherited from the session it continues from, what it did, and what the mainline spent against
-  what it delegated.
-- [repeated-tool-calls](./cases/repeated-tool-calls/README.md) — reads a trajectory
-  as the tool calls it holds and reports the ones made over and over.
-- [compaction](./cases/compaction/README.md) — reads a run as the steps it happened in,
-  split into the phases either side of a context compaction, and reports what the agent had
-  to read again.
-- [toolkit](./cases/toolkit/README.md) — reads a trajectory typed with the toolkit
-  its responses were returned by, so each call is counted in the terms its own tool's
-  parameters state.
-- [tokenize](./cases/tokenize/README.md) — produces a trajectory with the token count
-  of each of its parts, and reads it back for how the session grew and what its context
-  was made of.
-- [olap](./cases/olap/README.md) — generates hundreds of trajectories from
-  known weights, imports them into the ClickHouse engine `chdb` embeds, and
-  answers the shares and averages they were drawn from with SQL aggregates over
-  the parts.
+- [turns](./cases/turns/README.md) — count prompts, text, and tool calls, one turn at a time.
+- [sessions](./cases/sessions/README.md) — attribute cost to the main agent and the sub-agents it forked, without billing inherited context twice.
+- [repeated-tool-calls](./cases/repeated-tool-calls/README.md) — report a tool call that was made again and again with the same arguments.
+- [compaction](./cases/compaction/README.md) — split a run at a context compaction, and list the files the agent had to read again.
+- [toolkit](./cases/toolkit/README.md) — count calls by the fields your tools take, and keep calls the toolkit does not describe.
+- [tokenize](./cases/tokenize/README.md) — read token counts stored with the trajectory: how the session grew, and what the last prompt was made of.
+- [olap](./cases/olap/README.md) — load hundreds of trajectories into embedded ClickHouse and answer with SQL.
 
 ## Running
 

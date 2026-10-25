@@ -19,6 +19,7 @@ const toolkit = Toolkit.make(
   }),
 );
 
+// The eventkit must sit on the config, or this event cannot be stored.
 const config = Config.config({ stream: false, toolkit, eventkit });
 
 interface Phase {
@@ -131,6 +132,7 @@ const trajectory = Trajectory.make(config)(
     finished("stop", 2_140, 210),
 
     // The run compacts its context here.
+    // contextManagement records that compaction as an event, not a message.
     part.event(contextManagement({ type: "compaction", boundary: "replace" })),
 
     part.prompt(Prompt.make("Continue and fix the failing test.")),
@@ -170,6 +172,7 @@ const main = Effect.fn(function* () {
   const session = yield* Session.main(trajectory);
 
   const draft = yield* session.stream.pipe(
+    // View.steps keeps the event in order with the prompts and the responses.
     View.steps,
     Stream.runFold(
       (): ReportDraft => ({

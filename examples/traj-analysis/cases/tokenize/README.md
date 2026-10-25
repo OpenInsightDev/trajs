@@ -1,21 +1,15 @@
 # Case: tokenize
 
-## What it shows
+The user asks where a timeout is read, and attaches a screenshot of the settings page. The model thinks, searches the repo, and answers.
 
-A trajectory read as the tokens its parts are worth. The counts are not taken here: they
-were taken when the trajectory was produced, by the producer the tokenize extension builds,
-and written among the parts they are about — so a reading gets them back without a tokenizer
-in the run.
+You want to see the session grow, and you want to see what the last prompt was made of. The counts were saved when the trajectory was written, so this read does not tokenize anything again.
 
-Two questions are asked of them. How the session grew as its parts accumulated: what each
-part added, and what the session had been worth by it. And what the context of the last turn
-was made of: how much of it is text, the reasoning a model was given back, the calls of tools
-and their results, and a payload that is not text.
+Growth is six parts. Each one adds some tokens, and the total is the sum so far.
 
-## When you need it
+The last prompt splits into the question text, the model's own reasoning played back into the prompt, the tool call, the tool result, and the screenshot. The screenshot is worth 255 tokens. Those five pieces add up to the whole prompt.
 
-- Context windows: whether what fills one is the conversation, the tools, or the images in
-  it — a share says what to cut without cutting anything first.
-- Cost of a session over time: which turn or tool call made it grow, read off the growth of
-  the total rather than summed part by part.
-- Comparing a prompt change: the same context read before and after, kind by kind.
+That is an estimate of the text. It is not the bill the provider sent.
+
+```sh
+vp test cases/tokenize
+```

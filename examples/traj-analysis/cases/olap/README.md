@@ -1,15 +1,11 @@
 # Case: olap
 
-## What it shows
+Two weeks of agent runs, 420 of them, 30 a day. You want the usual questions in one place. Which tools were used, which models answered, how many prompts a session averages, how often a run spawned a sub-agent, and how many tokens each day cost.
 
-Hundreds of trajectories read at once. The parts of every run are written as rows of a table in
-the ClickHouse engine `chdb` embeds, so a question about all of them is a `GROUP BY` rather than
-a fold in memory: shares, averages, and per-day totals answered over thousands of rows.
+Walking every trajectory in the program to answer that does not stay cheap. This case loads every part into one table and asks with SQL. The database runs inside the test. Nothing is uploaded.
 
-## When you need it
+The runs are generated from known odds, so the test can check the answers. Tools should land near `grep` 50%, `read_file` 25%, `bash` 15%, `edit` 10%. Models near `gpt-5` 60% and `claude-sonnet-4-6` 40%. About a quarter of the runs have a sub-agent.
 
-- Usage across many runs: the share each tool and each model got, prompts per session, how often
-  a run delegates to a sub-agent.
-- Cost: tokens per day, per team or per model, read off the parts that state a usage.
-- Comparing two windows of runs — before and after a prompt or model change — with the same
-  queries.
+```sh
+vp test cases/olap
+```

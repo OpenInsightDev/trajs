@@ -52,8 +52,10 @@ const main = Effect.fn(function* (threshold: number) {
   const session = yield* Session.main(trajectory);
 
   return yield* session.stream.pipe(
+    // View.toolTurns pairs a call with its result.
     View.toolTurns,
 
+    // A new call id does not split the group. The key is name and params.
     Stream.groupAdjacentBy(({ call: { name, params } }) => ({ name, params })),
 
     Stream.runFold(
@@ -61,6 +63,7 @@ const main = Effect.fn(function* (threshold: number) {
       (report, [{ name, params }, run]) => ({
         totalToolTurns: report.totalToolTurns + run.length,
 
+        // At 2, two identical reads are not a repeat.
         repeated:
           run.length > threshold
             ? [...report.repeated, { name, params, ids: run.map(({ call }) => call.id) }]

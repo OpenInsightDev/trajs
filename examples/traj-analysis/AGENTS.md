@@ -17,8 +17,11 @@ Effect runs as the test, and failing or dying is what fails it.
 2. Write the analysis as a `main` in it, and what it is made of in modules beside
    it — what it reads, what it is of, and the layers it runs with.
 3. Assert what `main` returns, right below it, in `it.effect`.
-4. Write the `README.md` beside it — `# Case: <name>`, then what it shows and when you need it
-   — without describing the file: the reader can open the test.
+4. Write `README.md` as the scenario, in plain language.
+   Say what the run was, what question the analysis answers, and what it finds.
+   Do not explain an API there. Put that in a short comment in `main.test.ts`, next to the call, and only where the call is not obvious from its name.
+   Say how to run the case (`vp test cases/<name>`).
+   Do not use a "What it shows" / "When you need it" outline, and do not invent products the case could feed.
 
 `main` is read in one pass: its steps stay in it rather than becoming functions of their own,
 so a reader never leaves it to finish a thought.

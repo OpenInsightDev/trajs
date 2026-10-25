@@ -52,6 +52,7 @@ const storage = Layer.merge(NodeServices.layer(), Storage.layerFileSystem);
 const Layers = Layer.mergeAll(
   PlatformNodeServices.layer,
   Exchange.layer.pipe(Layer.provide(storage), Layer.provide(PlatformNodeServices.layer)),
+  // Clickhouse.layerEmbedded runs chdb in this process. No server is contacted.
   Clickhouse.layerEmbedded(),
 );
 
@@ -70,6 +71,9 @@ const main = () =>
       FROM parts
     `;
 
+    // variant holds tool-call, finish, or response-metadata.
+    // tag holds Prompt, Response, and the other part kinds.
+    // A dotted part path reads one field of the JSON payload.
     const tools = yield* ch<Tool>`
       SELECT name, calls, round(calls / sum(calls) OVER (), 4) AS share
       FROM (
