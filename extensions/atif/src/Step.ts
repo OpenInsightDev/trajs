@@ -1,21 +1,9 @@
 /**
  * A trajectory read as the steps ATIF exchanges.
  *
- * ATIF — the Agent Trajectory Interchange Format — carries an agent's run as one
- * ordered list of steps, each of them a system prompt, a user message or a
- * complete agent turn. This module derives that list from a trajectory:
- * {@link steps} reads what `View.steps` of `@trajs/core` states: one step per
- * message a prompt carries, and one more for each run of responses. {@link Step}
- * says what a step holds and {@link StepSource} who contributed one.
- *
- * A step holds what a trajectory holds of the turn it is read from, which is less
- * than ATIF's `StepObject` states: what the step says, and the parts it answered
- * with. What ATIF states of a step beyond that — the model that answered it, the
- * tokens and the cost of the turn, the ordinal of the step and the markers that tell
- * copied or deterministic steps apart — is extra data this package carries on the
- * part of the step — see `Extras` — which this reading does not fold back into a
- * step yet. {@link Step} says of each field what ATIF states and what a step holds,
- * so that what is left to whoever writes the document is read off it.
+ * {@link steps} reads a session's steps on ATIF's terms, and {@link Step} says what a
+ * step holds. What ATIF states of a step beyond what it says is extra data this package
+ * carries, which the reading does not fold back into a step yet.
  */
 
 import { View } from "@trajs/core";
@@ -27,23 +15,11 @@ import { Option, Stream } from "effect";
 import type { Prompt, Tool } from "effect/ai";
 
 /**
- * Who contributed a step: the system prompt a model was given, the user, or the
- * agent that answered them.
+ * Who contributed a step: the system prompt a model was given, the user, or the agent
+ * that answered them.
  *
  * ATIF RFC 0001 v1.8, Section II "StepObject", the values of its `source`.
  *
- * **When to use**
- *
- * Use when a step is read by who contributed it rather than by what it holds.
- *
- * **Details**
- *
- * The values are ATIF's own, and they are the `source` of a `StepObject`. A
- * message a model was given contributes the side of the conversation its role
- * names, so an assistant message a prompt carries is the agent's side and a tool
- * message — environment feedback delivered as a message — the user's.
- *
- * @see {@link Step} for the steps a trajectory is read as.
  * @category models
  */
 export type StepSource = "system" | "user" | "agent";
@@ -52,51 +28,19 @@ export type StepSource = "system" | "user" | "agent";
  * One step of a trajectory: a message a model was given, or the turn the model
  * answered it with.
  *
- * ATIF RFC 0001 v1.8, Section II "StepObject", of which a step here states what
- * a trajectory holds.
+ * ATIF RFC 0001 v1.8, Section II "StepObject", of which a step here states what a
+ * trajectory holds. `reasoning`, `toolCalls` and `observations` are empty on a step of a
+ * source other than the agent.
  *
- * **When to use**
- *
- * Use when a trajectory is to be read or carried step by step — one message or one
- * turn at a time — such as to display it, to score it, or to hand it to the
- * ATIF document a program exchanges trajectories in.
- *
- * **Details**
- *
- * A step is the unit ATIF exchanges a trajectory in: a system prompt, a user
- * message, or one complete agent turn — the inference that answered the messages
- * before it together with the tools it called and the results those calls were
- * answered with. `source` says which of the three a step is, and the rest of the
- * step says what it contributed. `message` is the dialogue of the step: what a
- * message a model was given said, or the text a model answered with. The
- * remaining fields are the agent's own and are empty on a step of any other
- * source: `reasoning` is what the agent thought, `toolCalls` the tools it called,
- * and `observations` the results those calls were answered with, each result
- * naming the call it answers by the same id the call carries.
- *
- * What the steps are read from is `View.steps`, so a step reads the conversation
- * rather than the increments a streamed response arrived in.
- *
- * A step carries what a trajectory holds of the turn it is read from. What ATIF
- * states of a step beyond that — a model's name, the tokens or the cost of a turn,
- * a step's ordinal position and the markers that tell copied or deterministic steps
- * apart — is carried as extra data on the part of the step, which this reading does
- * not fold back into a step yet.
- *
- * @see {@link steps} for the steps a trajectory is read as.
- * @see {@link StepSource} for who contributed one.
  * @category models
  */
 export type Step<Tools extends Record<string, Tool.Any>> = Readonly<{
   /** Who contributed the step. */
   source: StepSource;
   /**
-   * The dialogue of the step: what was said.
+   * The dialogue of the step.
    *
-   * TODO: read the content parts of a message, which ATIF added in v1.6. A part
-   * that is not text carries no path a `ContentPart` could name, and a
-   * trajectory holds its bytes instead, so the parts a step cannot state are not
-   * stated rather than being written out as references nothing resolves.
+   * TODO: read the content parts of a message, which ATIF added in v1.6.
    */
   message: string;
   /** What the agent thought, where it is an agent step that thought. */
@@ -106,8 +50,7 @@ export type Step<Tools extends Record<string, Tool.Any>> = Readonly<{
   /**
    * The results those calls were answered with.
    *
-   * Deviation: ATIF wraps them in an `observation` object whose only field is
-   * the results, so the wrapper is dropped here.
+   * ATIF wraps them in an `observation` object; the wrapper is dropped here.
    */
   observations: ReadonlyArray<Response.ToolResultPartsView<Tools>>;
 }>;
@@ -118,19 +61,16 @@ type Tools<Config extends Config.AnyConfig> = Config["toolkit"]["tools"];
 const sources: Record<Prompt.Message["role"], StepSource> = {
   system: "system",
   user: "user",
-  // An assistant message a prompt carries is context the agent produced, so it
-  // is the agent's side of the conversation.
+  // An assistant message is context the agent produced, so it is the agent's side.
   assistant: "agent",
-  // A tool message is environment feedback delivered as a message, which ATIF
-  // reads as the user's side of the conversation.
+  // A tool message is environment feedback, which ATIF reads as the user's side.
   tool: "user",
 };
 
 /**
- * The text of the parts given, which is what a step says of them.
+ * The text of the parts given.
  *
- * TODO: a tool result carries no text, so a tool message says nothing; reading
- * it means reading the result of its parts, which may not be a string.
+ * TODO: a tool result carries no text, so a tool message says nothing.
  */
 const textOf = (parts: ReadonlyArray<Prompt.Part>): string => {
   let text = "";
@@ -207,66 +147,10 @@ const stepsOf = <Config extends Config.AnyConfig>(
 /**
  * Reads the parts of a session as the steps they are made of.
  *
- * **When to use**
+ * A `Prompt` is read as one step per message, a `Response` as one agent step for the
+ * parts it holds, and an `Event` as no step. The steps are emitted in order and
+ * unnumbered, since ATIF numbers them by their position in the document.
  *
- * Use when a session is to be read or carried step by step — one message or one turn
- * at a time — such as to display it, to score it, or to hand it to a program that reads
- * a trajectory as its steps, such as the results viewer of the Harbor framework, which
- * displays the steps of an ATIF document.
- *
- * **Details**
- *
- * - What it reads is the parts of one session ({@link Session.SessionStream}), which
- *   `Session.toSessions` reads of a trajectory: the steps of a document are the steps
- *   of one run, so a trajectory of several sessions is read one session at a time.
- * - A `Prompt` step is read as a step for each message of its prompt. A `Response`
- *   step is read as one `agent` step for the parts it holds — where it holds any — so
- *   the steps are in the order the conversation was produced in: the system prompt and
- *   the user message a model was given, then the run that answered them.
- * - An `Event` step is read as no step.
- * - A step is derived from `View.steps`, so it inherits how the parts are read: the
- *   increments of a streamed response are folded into the parts they complete, and a
- *   response part with no completed part of its own is read past.
- *
- * ATIF numbers the steps of a document from `1` and requires the numbers to stay
- * sequential; what is read here holds no such number, so the steps are emitted in order
- * and unnumbered, and whoever writes the document numbers them by their position.
- *
- * The stream fails with what reading the parts fails with — `E` — and requires the
- * services `R` names.
- *
- * **Example** (Reading the parts of a session as its steps)
- *
- * ```ts import.meta.vitest
- * import { Effect, Stream } from "effect"
- * import { Prompt, Response, Session, Trajectory } from "@trajs/core"
- * import { Step } from "@trajs/extension-atif"
- *
- * const part = Trajectory.parts(Config.anyConfig)
- *
- * // What the main session's model was given, and what it returned for it as one whole
- * // part: a part that states no session belongs to the main session.
- * const trajectory = Trajectory.make(Config.anyConfig)(
- *   Stream.make(
- *     part.mainSession(),
- *     part.prompt(Prompt.make("What is 2 + 2?")),
- *     part.response(Response.makePart("text", { text: "4" }))
- *   )
- * )
- *
- * const sessions = await Effect.runPromise(Session.toSessions(trajectory))
- *
- * // The main session is the one session a reading holds first.
- * const [session] = sessions
- *
- * const steps = await Effect.runPromise(Stream.runCollect(Step.steps(session.stream)))
- *
- * Array.from(steps).map((step) => step.source) // => ["user", "agent"]
- * ```
- *
- * @see {@link Step} — the steps that are emitted.
- * @see {@link View.steps} — the steps they are read from.
- * @see {@link Session.Session.stream} — the parts a session is read by.
  * @category combinators
  */
 export const steps = <Config extends Config.AnyConfig, E, R>(
