@@ -1,6 +1,6 @@
 {
   "name": "@trajs/platform-node",
-  "version": "0.0.0-alpha.0",
+  "version": "0.0.0-alpha.1",
   "description": "The Node.js implementations of the trajs platform services.",
   "homepage": "https://github.com/OpenInsightDev/trajs",
   "license": "MIT",
