@@ -5,31 +5,29 @@ import * as Config from "#/Config.ts";
 import * as Response from "#/Response.ts";
 import * as Trajectory from "#/Trajectory.ts";
 
-interface Chunk {
+interface Open {
   text: string;
   metadata: Response.ProviderMetadata;
 }
 
-type OpenChunks = Map<string, Map<string, Chunk>>;
+type OpenBySession = Map<string, Map<string, Open>>;
 
-/** The chunks of a streamed response that are still open, by session and by chunk. */
 export interface State {
-  readonly text: OpenChunks;
-  readonly reasoning: OpenChunks;
+  readonly text: OpenBySession;
+  readonly reasoning: OpenBySession;
 }
 
-/** The state a folding starts from: no chunk open yet. */
 export const initial = (): State => ({ text: new Map(), reasoning: new Map() });
 
-const chunksOf = (chunks: OpenChunks, id: string): Map<string, Chunk> => {
-  let open = chunks.get(id);
+const openOf = (open: OpenBySession, id: string): Map<string, Open> => {
+  let parts = open.get(id);
 
-  if (open === undefined) {
-    open = new Map();
-    chunks.set(id, open);
+  if (parts === undefined) {
+    parts = new Map();
+    open.set(id, parts);
   }
 
-  return open;
+  return parts;
 };
 
 const mergeMetadata = (
@@ -50,76 +48,76 @@ const mergeMetadata = (
   return merged;
 };
 
-export const collapse = <Tools extends Record<string, Tool.Any>>(
+export const foldResponse = <Tools extends Record<string, Tool.Any>>(
   state: State,
   id: string,
   part: Response.AllPartsView<Tools>,
 ): readonly [State, ReadonlyArray<Response.PartView<Tools>>] => {
   switch (part.type) {
     case "text-start":
-      chunksOf(state.text, id).set(part.id, { text: "", metadata: part.metadata });
+      openOf(state.text, id).set(part.id, { text: "", metadata: part.metadata });
 
       return [state, []];
     case "text-delta": {
-      const chunk = chunksOf(state.text, id).get(part.id);
+      const text = openOf(state.text, id).get(part.id);
 
-      if (chunk !== undefined) {
-        chunk.text += part.delta;
-        chunk.metadata = mergeMetadata(chunk.metadata, part.metadata);
+      if (text !== undefined) {
+        text.text += part.delta;
+        text.metadata = mergeMetadata(text.metadata, part.metadata);
       }
 
       return [state, []];
     }
 
     case "text-end": {
-      const open = chunksOf(state.text, id);
-      const chunk = open.get(part.id);
+      const open = openOf(state.text, id);
+      const text = open.get(part.id);
 
-      if (chunk === undefined) {
+      if (text === undefined) {
         return [state, []];
       }
 
       open.delete(part.id);
 
-      const text = Response.makePart("text", {
-        text: chunk.text,
-        metadata: mergeMetadata(chunk.metadata, part.metadata),
+      const completed = Response.makePart("text", {
+        text: text.text,
+        metadata: mergeMetadata(text.metadata, part.metadata),
       });
 
-      return [state, [text]];
+      return [state, [completed]];
     }
 
     case "reasoning-start":
-      chunksOf(state.reasoning, id).set(part.id, { text: "", metadata: part.metadata });
+      openOf(state.reasoning, id).set(part.id, { text: "", metadata: part.metadata });
 
       return [state, []];
     case "reasoning-delta": {
-      const chunk = chunksOf(state.reasoning, id).get(part.id);
+      const text = openOf(state.reasoning, id).get(part.id);
 
-      if (chunk !== undefined) {
-        chunk.text += part.delta;
-        chunk.metadata = mergeMetadata(chunk.metadata, part.metadata);
+      if (text !== undefined) {
+        text.text += part.delta;
+        text.metadata = mergeMetadata(text.metadata, part.metadata);
       }
 
       return [state, []];
     }
 
     case "reasoning-end": {
-      const open = chunksOf(state.reasoning, id);
-      const chunk = open.get(part.id);
+      const open = openOf(state.reasoning, id);
+      const text = open.get(part.id);
 
-      if (chunk === undefined) {
+      if (text === undefined) {
         return [state, []];
       }
 
       open.delete(part.id);
 
-      const reasoning = Response.makePart("reasoning", {
-        text: chunk.text,
-        metadata: mergeMetadata(chunk.metadata, part.metadata),
+      const completed = Response.makePart("reasoning", {
+        text: text.text,
+        metadata: mergeMetadata(text.metadata, part.metadata),
       });
 
-      return [state, [reasoning]];
+      return [state, [completed]];
     }
 
     case "tool-params-start":
@@ -176,7 +174,7 @@ const foldPart = <Config extends Config.AnyConfig>(
 ): readonly [State, ReadonlyArray<Trajectory.Part<FoldedConfig<Config>>>] => {
   if (part._tag !== "Response") return [state, [part]];
 
-  const [folding, completed] = collapse(
+  const [folding, completed] = foldResponse(
     state,
     part.sessionId ?? Trajectory.mainSessionId,
     part.response,

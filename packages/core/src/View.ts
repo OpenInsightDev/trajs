@@ -2,7 +2,7 @@ import { Data, Effect, Result, Stream } from "effect";
 import { Prompt } from "effect/ai";
 
 import * as Config from "#/Config.ts";
-import { collapse } from "#/internal/folding.ts";
+import { foldResponse } from "#/internal/folding.ts";
 import { attachment, attachPart, endAttachment, idle, type Run } from "#/internal/view.ts";
 import type * as Metric from "#/Metric.ts";
 import type * as Response from "#/Response.ts";
@@ -102,14 +102,15 @@ const assembleStep = <Config extends Config.AnyConfig>(
       return [idle<Tools<Config>>(), [...stepsOf(run), new PromptStep<Config>({ prompt: part })]];
 
     case "Event":
-      // An event ends the run of responses before it, but a chunk it interrupted stays open.
+      // An event ends the run of responses before it.
+      // Open text and reasoning stay open.
       return [
         { response: [], folding: run.folding },
         [...stepsOf(run), new EventStep<Config>({ event: part })],
       ];
 
     case "Response": {
-      const [folding, folded] = collapse(
+      const [folding, folded] = foldResponse(
         run.folding,
         part.sessionId ?? Trajectory.mainSessionId,
         part.response,

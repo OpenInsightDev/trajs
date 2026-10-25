@@ -1,11 +1,3 @@
-/**
- * The states {@link View.steps} folds the parts of a session through: the run of
- * responses being assembled and the fold of their streams. The grouping itself is
- * stated by the reader.
- *
- * Nothing here is published: a program reaches the reading through {@link View}.
- */
-
 import { Effect, Stream, SubscriptionRef } from "effect";
 import type { Tool } from "effect/ai";
 
@@ -15,26 +7,24 @@ import type * as Response from "#/Response.ts";
 import type * as Trajectory from "#/Trajectory.ts";
 import type * as View from "#/View.ts";
 
-/** The responses produced together from the parts read so far, and the folding of their stream. */
 export interface Run<Tools extends Record<string, Tool.Any>> {
   readonly response: ReadonlyArray<Response.PartView<Tools>>;
   readonly folding: State;
 }
 
-/** The run a reading starts from: no response produced. */
 export const idle = <Tools extends Record<string, Tool.Any>>(): Run<Tools> => ({
   response: [],
   folding: initial(),
 });
 
-export interface Metrics<Config extends Config.AnyConfig> {
+export interface Attached<Config extends Config.AnyConfig> {
   readonly parts: ReadonlyArray<Trajectory.MetricPartOf<Config>>;
   readonly ended: boolean;
 }
 
 export type Attachment<Config extends Config.AnyConfig> = Map<
   string,
-  SubscriptionRef.SubscriptionRef<Metrics<Config>>
+  SubscriptionRef.SubscriptionRef<Attached<Config>>
 >;
 
 export const attachment = <Config extends Config.AnyConfig>(): Attachment<Config> => new Map();
@@ -42,14 +32,14 @@ export const attachment = <Config extends Config.AnyConfig>(): Attachment<Config
 const refOf = <Config extends Config.AnyConfig>(
   attached: Attachment<Config>,
   uuid: string,
-): Effect.Effect<SubscriptionRef.SubscriptionRef<Metrics<Config>>> => {
+): Effect.Effect<SubscriptionRef.SubscriptionRef<Attached<Config>>> => {
   const existing = attached.get(uuid);
 
   if (existing !== undefined) {
     return Effect.succeed(existing);
   }
 
-  return SubscriptionRef.make<Metrics<Config>>({ parts: [], ended: false }).pipe(
+  return SubscriptionRef.make<Attached<Config>>({ parts: [], ended: false }).pipe(
     Effect.map((ref) => {
       attached.set(uuid, ref);
 
@@ -59,7 +49,7 @@ const refOf = <Config extends Config.AnyConfig>(
 };
 
 const metricsOf = <Config extends Config.AnyConfig>(
-  ref: SubscriptionRef.SubscriptionRef<Metrics<Config>>,
+  ref: SubscriptionRef.SubscriptionRef<Attached<Config>>,
 ): Stream.Stream<Trajectory.MetricPartOf<Config>> =>
   SubscriptionRef.changes(ref).pipe(
     Stream.takeUntil((metrics) => metrics.ended),

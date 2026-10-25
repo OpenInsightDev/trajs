@@ -1,13 +1,3 @@
-/**
- * The reading behind {@link Metric.produce}: the producers of a kit run over one
- * trajectory, each report emitted under the tag of the metric it is reported by — a
- * failure a producer derived of a part produced as the data of that metric rather
- * than failing the run.
- *
- * Nothing here is published: a program reaches the reading through
- * {@link Metric.produce}.
- */
-
 import { Effect, Predicate, Stream } from "effect";
 
 import * as Config from "#/Config.ts";
@@ -29,8 +19,6 @@ export const runProducers = <
   producers: Producers<Metrics>,
   produced: Trajectory.TrajectoryStream<Config, E, R>,
 ): Stream.Stream<MetricParts<Metrics>, E | TrajectoryError, R> => {
-  // A producer is read from a kit by tag alone, so the kit is read as the record of
-  // producers it is keyed as rather than as the parts its metrics make.
   const byTag: Readonly<Record<string, Producer<Any>>> = producers;
   const tags = Object.keys(byTag);
 
@@ -38,14 +26,15 @@ export const runProducers = <
     return Stream.empty;
   }
 
-  // SAFETY: every report is emitted under the tag of the metric it is reported by,
-  // which is the part the kit holds of that metric — one part per metric it names.
+  // SAFETY: each report uses the tag of its metric.
+  // That tag is the metric part the kit holds.
+  // The kit has one part per metric.
   return foldParts(produced).pipe(
     Stream.broadcastN({ n: tags.length, capacity: "unbounded" }),
-    Effect.map((readings) =>
+    Effect.map((streams) =>
       Stream.mergeAll(
         tags.map((tag, index) =>
-          byTag[tag](readings[index]).pipe(
+          byTag[tag](streams[index]).pipe(
             Stream.map((reported) => ({ _tag: tag, data: reported })),
             Stream.catchIf(isFailure, (failure) => Stream.make({ _tag: tag, data: failure })),
           ),

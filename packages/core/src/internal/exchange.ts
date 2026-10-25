@@ -1,12 +1,11 @@
 import type { Byte } from "@trajs/utils/Byte";
-import type { CompressionError } from "@trajs/utils/Compression";
 import type { StorageError } from "@trajs/utils/Storage";
 import { Effect, Schema, SchemaTransformation, Stream } from "effect";
 import { SchemaBinary } from "effect/encoding";
 
 import type * as Config from "#/Config.ts";
 import * as Event from "#/Event.ts";
-import type { Header, Metadata } from "#/Exchange.ts";
+import type * as Exchange from "#/Exchange.ts";
 import type * as ExtraKit from "#/ExtraKit.ts";
 import { foldParts } from "#/internal/folding.ts";
 import { readFrames } from "#/internal/frames.ts";
@@ -16,8 +15,8 @@ import * as Toolkit from "#/Toolkit.ts";
 import * as Trajectory from "#/Trajectory.ts";
 import { TrajectoryError } from "#/TrajectoryError.ts";
 
-// HACK: `effect/ai` types a file part's data as `string | Uint8Array | URL`, and
-// a `URL` encodes as a string the way any other does, so SchemaBinary rejects it.
+// HACK: `effect/ai` types file-part data as `string | Uint8Array | URL`.
+// SchemaBinary rejects `URL`, so a URL is encoded as `{ url }`.
 const FilePartData = Schema.Union([
   Schema.String,
   Schema.Uint8Array,
@@ -88,10 +87,11 @@ type PartEncoded<C extends Config.AnyConfig, Stream extends boolean = true> = Sc
   ReturnType<typeof exchangePart<C, Stream>>
 >;
 
-/** The part schema the exchange writes. It is streaming, so a non-streaming read folds it. */
 export const ExchangePart = <C extends Config.AnyConfig>(
   config: C,
 ): Schema.Codec<Part<C>, PartEncoded<C>, Config.DecodingServices<C>, Config.EncodingServices<C>> =>
+  // The exchange always writes streaming parts.
+  // A non-streaming read folds them.
   // SAFETY: the exchange's schemas are the config's own, so the config's services cover them.
   // Effect omits tool parameter services from response part types; see
   // https://github.com/Effect-TS/effect/issues/9867.
@@ -102,7 +102,6 @@ export const ExchangePart = <C extends Config.AnyConfig>(
     Config.EncodingServices<C>
   >;
 
-/** The part schema of a cache, in the shape the config itself reads its parts. */
 export const TrajectoryPart = <C extends Config.AnyConfig>(
   config: C,
 ): Schema.Codec<
@@ -119,7 +118,6 @@ export const TrajectoryPart = <C extends Config.AnyConfig>(
     Config.EncodingServices<C>
   >;
 
-/** Encodes one trajectory part in the streaming shape the exchange writes. */
 export const encodeExchangePart = <C extends Config.AnyConfig>(config: C) => {
   const encode = ExchangePart(config).pipe(SchemaBinary.toCodec, Schema.encodeEffect);
 
@@ -130,7 +128,6 @@ export const encodeExchangePart = <C extends Config.AnyConfig>(config: C) => {
     );
 };
 
-/** Encodes one trajectory part in the shape the config reads it. */
 export const encodePart = <C extends Config.AnyConfig>(config: C) => {
   const encode = TrajectoryPart(config).pipe(SchemaBinary.toCodec, Schema.encodeEffect);
 
@@ -141,7 +138,6 @@ export const encodePart = <C extends Config.AnyConfig>(config: C) => {
     );
 };
 
-/** Decodes one trajectory part from the frame {@link encodePart} wrote. */
 export const decodePart = <C extends Config.AnyConfig>(config: C) => {
   const decode = TrajectoryPart(config).pipe(SchemaBinary.toCodec, Schema.decodeUnknownEffect);
 
@@ -149,7 +145,7 @@ export const decodePart = <C extends Config.AnyConfig>(config: C) => {
     decode(bytes).pipe(Effect.mapError((cause) => TrajectoryError.parse(cause)));
 };
 
-/** How many bytes state the length of the header and of the metadata: four, big-endian. */
+/** Big-endian length of the header and of the metadata, in bytes. */
 const LengthBytes = 4;
 
 const encodeLength = (length: number): Uint8Array => {
@@ -165,7 +161,7 @@ const decodeLength = (bytes: Uint8Array): number | undefined =>
     ? undefined
     : new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength).getUint32(0, false);
 
-export const lengthPrefixed = (body: Uint8Array): Uint8Array => {
+const lengthPrefixed = (body: Uint8Array): Uint8Array => {
   const bytes = new Uint8Array(LengthBytes + body.length);
 
   bytes.set(encodeLength(body.length));
@@ -177,9 +173,16 @@ export const lengthPrefixed = (body: Uint8Array): Uint8Array => {
 const isMagic = (magic: Uint8Array, bytes: Uint8Array): boolean =>
   bytes.length === magic.length && magic.every((byte, at) => bytes[at] === byte);
 
-/** The header a trajectory states, as the JSON text it starts with. */
-export const encodeHeader = (config: Config.AnyConfig): string =>
-  JSON.stringify({
+const decodeJson = <A>(
+  schema: Schema.ConstraintCodec<A, unknown, never, never>,
+  bytes: Uint8Array,
+) =>
+  Schema.decodeUnknownEffect(Schema.fromJsonString(schema))(new TextDecoder().decode(bytes)).pipe(
+    Effect.mapError(TrajectoryError.parse),
+  );
+
+export const encodeHeader = (config: Config.AnyConfig): Uint8Array => {
+  const json = JSON.stringify({
     toolkit: Toolkit.encode(config.toolkit),
     eventkit: Object.fromEntries(
       Object.entries(config.eventkit.events).map(([tag, event]) => [
@@ -201,19 +204,17 @@ export const encodeHeader = (config: Config.AnyConfig): string =>
     ),
   });
 
-/** The header a trajectory starts with, and where its parts begin. */
-interface Stated {
-  readonly header: Header;
-  readonly end: bigint;
-}
+  return lengthPrefixed(new TextEncoder().encode(json));
+};
 
-export const headerOf = <S extends Schema.ConstraintCodec<Header, unknown, never, never>>(
-  header: S,
+export const headerOf = (
+  header: Schema.ConstraintCodec<Exchange.Header, unknown, never, never>,
   bytes: Byte<StorageError>,
-): Effect.Effect<Stated, TrajectoryError | StorageError> => {
-  const stated = Schema.fromJsonString(header);
-
-  return Effect.gen(function* () {
+): Effect.Effect<
+  { readonly header: Exchange.Header; readonly end: bigint },
+  TrajectoryError | StorageError
+> =>
+  Effect.gen(function* () {
     const prefix = yield* bytes.readAlloc({ offset: 0n, size: LengthBytes });
     const size = decodeLength(prefix);
 
@@ -221,74 +222,62 @@ export const headerOf = <S extends Schema.ConstraintCodec<Header, unknown, never
       return yield* Effect.fail(TrajectoryError.parse("the bytes end before a header length"));
     }
 
-    const held = yield* bytes.readAlloc({ offset: BigInt(LengthBytes), size });
+    const headerBytes = yield* bytes.readAlloc({ offset: BigInt(LengthBytes), size });
 
-    if (held.length < size) {
+    if (headerBytes.length < size) {
       return yield* Effect.fail(TrajectoryError.parse("the bytes end before a header"));
     }
 
     return {
-      header: yield* Schema.decodeUnknownEffect(stated)(new TextDecoder().decode(held)).pipe(
-        Effect.mapError(TrajectoryError.parse),
-      ),
+      header: yield* decodeJson(header, headerBytes),
       end: BigInt(LengthBytes + size),
     };
   });
-};
 
-/** The metadata a trajectory ends with, and where its parts end. */
-interface Trailing {
-  readonly metadata: Metadata;
-  readonly end: bigint;
-}
-
-export const trailingOf = <S extends Schema.ConstraintCodec<Metadata, unknown, never, never>>(
-  metadata: S,
+export const metadataOf = (
+  metadata: Schema.ConstraintCodec<Exchange.Metadata, unknown, never, never>,
   magic: Uint8Array,
   bytes: Byte<StorageError>,
-): Effect.Effect<Trailing, TrajectoryError | StorageError> => {
-  const stated = Schema.fromJsonString(metadata);
-
-  return Effect.gen(function* () {
+): Effect.Effect<
+  { readonly metadata: Exchange.Metadata; readonly end: bigint },
+  TrajectoryError | StorageError
+> =>
+  Effect.gen(function* () {
     const length = yield* bytes.length;
-    const trailer = LengthBytes + magic.length;
+    const tailSize = LengthBytes + magic.length;
 
     const tail =
-      length < BigInt(trailer)
+      length < BigInt(tailSize)
         ? new Uint8Array()
-        : yield* bytes.readAlloc({ offset: length - BigInt(trailer), size: trailer });
+        : yield* bytes.readAlloc({ offset: length - BigInt(tailSize), size: tailSize });
 
     const size = decodeLength(tail);
 
     if (
       size === undefined ||
       !isMagic(magic, tail.subarray(LengthBytes)) ||
-      BigInt(size) > length - BigInt(trailer)
+      BigInt(size) > length - BigInt(tailSize)
     ) {
       return yield* Effect.fail(
         TrajectoryError.parse("the bytes do not end with the metadata of a trajectory"),
       );
     }
 
-    const start = length - BigInt(trailer) - BigInt(size);
-
-    const held = yield* bytes.readAlloc({ offset: start, size });
+    const start = length - BigInt(tailSize) - BigInt(size);
+    const metadataBytes = yield* bytes.readAlloc({ offset: start, size });
 
     return {
-      metadata: yield* Schema.decodeUnknownEffect(stated)(new TextDecoder().decode(held)).pipe(
-        Effect.mapError(TrajectoryError.parse),
-      ),
+      metadata: yield* decodeJson(metadata, metadataBytes),
       end: start,
     };
   });
-};
 
-export const encodeTrailing = <S extends Schema.ConstraintCodec<Metadata, unknown, never, never>>(
-  metadata: S,
+export const encodeMetadata = (
+  schema: Schema.ConstraintCodec<Exchange.Metadata, unknown, never, never>,
   magic: Uint8Array,
-  stated: Metadata,
+  metadata: Exchange.Metadata,
 ): Uint8Array => {
-  const json = new TextEncoder().encode(Schema.encodeSync(Schema.fromJsonString(metadata))(stated));
+  const json = new TextEncoder().encode(Schema.encodeSync(Schema.fromJsonString(schema))(metadata));
   const bytes = new Uint8Array(json.length + LengthBytes + magic.length);
 
   bytes.set(json);
@@ -300,8 +289,7 @@ export const encodeTrailing = <S extends Schema.ConstraintCodec<Metadata, unknow
 
 const FrameChunk = 64 * 1024;
 
-/** The bytes of the frame the parts are carried in, from `from` to `to`. */
-export const framesOf =
+export const frameOf =
   <E>({ from, to }: { readonly from: bigint; readonly to: bigint }) =>
   (bytes: Byte<E>): Stream.Stream<Uint8Array, E> =>
     Stream.unfold(from, (offset) => {
@@ -320,20 +308,14 @@ export const framesOf =
         );
     });
 
-export const framed = <E, R>(
-  bytes: Stream.Stream<Uint8Array, E | CompressionError, R>,
-): Stream.Stream<Uint8Array, E | TrajectoryError, R> =>
-  bytes.pipe(
-    Stream.catchTag("CompressionError", (cause) => Stream.fail(TrajectoryError.parse(cause))),
-  );
-
-export const reading = <C extends Config.AnyConfig, E>(
+export const trajectoryOf = <C extends Config.AnyConfig, E>(
   bytes: Stream.Stream<Uint8Array, E, never>,
   config: C,
 ): Trajectory.Trajectory<string, C, E | TrajectoryError, Config.DecodingServices<C>> => {
   const parts = readFrames(ExchangePart(config))(bytes);
 
-  // SAFETY: the exchange writes streaming parts, so a non-streaming reading folds them into whole ones.
+  // SAFETY: the exchange writes streaming parts.
+  // A non-streaming config folds them into whole parts.
   const read = (config.stream ? parts : foldParts(parts)) as Stream.Stream<
     Trajectory.Part<C>,
     E | TrajectoryError,
