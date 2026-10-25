@@ -38,25 +38,43 @@ checks so the verified artifact is what gets pushed.
 
 ## 3. Verify
 
-Run the repository's own aggregate check from the repo root:
+Do not use `vp run -r` or `vp run -t`. `-t` runs a package and the packages it
+depends on, which is the wrong direction: the tests that import a change live
+in its dependents. Vitest's `related` follows that import graph
+([`vitest related`](https://vitest.dev/guide/cli.html#vitest-related)).
+
+The landing diff is `git diff --name-only origin/main` (committed and unstaged)
+plus untracked files (`git ls-files --others --exclude-standard`). When
+`origin/main` does not exist yet, the diff is the files about to be committed.
+A path belongs to the nearest ancestor directory, other than the repository
+root, that contains a `package.json`. Root files select nothing. An empty set
+is success: say that no package changed and do not substitute a
+repository-wide run.
+
+Build only those packages, and only when `scripts.build` exists. Repeat
+`--filter` once per package:
 
 ```bash
-vp run ready
+vp run --fail-if-no-match --filter <name> build
 ```
 
-`package.json` defines `ready` as `vp check && vp run -r test && vp run -r
-build`. There is no CI workflow, so this run is the required
-verification: every step must pass before landing. Do not substitute a different
-command. If a step fails, fix it or stop and report; never treat started, pending,
-partial, or failing checks as success.
+Test with `related`, not by running each package's whole suite. Pass the
+absolute paths of the changed `*.ts`, `*.tsx`, `*.js`, and `*.mjs` files.
+`--filter ...<name>` is the changed package plus the packages that depend on
+it; packages without `scripts.test` are skipped by `vp run`. One `--filter` per
+changed package:
 
-One failure is expected: a `test` task that fails only because its package has no
-test files. The repository keeps its tests as in-source doctests that nothing
-collects yet, so `vp test` prints `No test files found` and exits 1 in a package
-without them, and `ready` then exits non-zero for that reason alone. Read the task
-details (`vp run --last-details`) and land when every other step passed; a `test`
-task that fails for any other reason — a failing test, a package that does have
-tests, a step that did not run — stops the landing as before.
+```bash
+vp run --fail-if-no-match --filter ...<name> test -- related <files> --run --passWithNoTests
+```
+
+`--run` is required so Vitest does not stay in watch mode. A package whose
+graph does not import those files exits 0 because of `--passWithNoTests`. Skip
+the test command when the diff has no source files of those extensions.
+
+Any other failure — a failing test, a failing build, a filter that matched
+nothing — stops the landing. Never treat a started, pending, or partial run as
+success.
 
 ## 4. Commit
 
@@ -85,14 +103,14 @@ tests, a step that did not run — stops the landing as before.
 ## Divergence
 
 A remote that has advanced is not a conflict: merge it in (`git merge
-origin/main`), re-run `vp run ready`, and land. Stop only when git reports a
-conflict it cannot merge, or when the checks fail for the merged tree. Never
-force-push.
+origin/main`), re-run Verify on the packages that differ from `origin/main`,
+and land. Stop only when git reports a conflict it cannot merge, or when those
+checks fail. Never force-push.
 
 ## Gates
 
 Stop and report without bypassing when: `origin` is not the expected repository;
-`vp run ready` fails for a reason other than the missing-test packages described
-under Verify; a merge needs a conflict resolved by hand; the push is rejected for
+a `related` test or a changed package's `build` fails for a reason other than
+having no test files; a merge needs a conflict resolved by hand; the push is rejected for
 a reason other than the remote having advanced; or the scope of the change is
 ambiguous.
