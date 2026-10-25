@@ -58,12 +58,12 @@ const main = Effect.fn(function* (threshold: number) {
 
     Stream.runFold(
       (): Report => ({ totalToolTurns: 0, repeated: [] }),
-      (report, [input, run]) => ({
+      (report, [{ name, params }, run]) => ({
         totalToolTurns: report.totalToolTurns + run.length,
 
         repeated:
           run.length > threshold
-            ? [...report.repeated, { ...input, ids: run.map(({ call }) => call.id) }]
+            ? [...report.repeated, { name, params, ids: run.map(({ call }) => call.id) }]
             : report.repeated,
       }),
     ),

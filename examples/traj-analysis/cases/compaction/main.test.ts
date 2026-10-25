@@ -21,7 +21,6 @@ const toolkit = Toolkit.make(
 
 const config = Config.config({ stream: false, toolkit, eventkit });
 
-/** What one phase of the run held: its steps, its tools, its files. */
 interface Phase {
   /** What opened the phase: `"run"`, or the type of an event. */
   readonly openedBy: string;
@@ -29,18 +28,16 @@ interface Phase {
   /** The number of the phase's first step. */
   readonly at: number;
 
-  /** The prompts and the responses the phase ran. */
   readonly prompts: number;
   readonly responses: number;
 
   /** The parts each response folds. */
   readonly parts: number;
 
-  /** The tools the phase called, by name. */
   readonly tools: Readonly<Record<string, number>>;
 
   /** The paths the phase read, once each. */
-  readonly files: ReadonlyArray<string>;
+  readonly paths: ReadonlyArray<string>;
 }
 
 /** A phase while the pass fills it, before it is stated as a {@link Phase}. */
@@ -55,12 +52,10 @@ interface PhaseDraft {
 
   readonly tools: Map<string, number>;
 
-  readonly files: Set<string>;
+  readonly paths: Set<string>;
 }
 
-/** What the pass states of the run: its steps, its phases, the files read twice. */
 interface Report {
-  /** The steps of the run, counted by kind. */
   readonly steps: Readonly<Record<"prompt" | "response" | "event", number>>;
 
   /** The phases the events split the run into. */
@@ -100,13 +95,13 @@ const answered = (id: string, name: string, result: string) =>
 
 const said = (text: string) => part.response(Response.makePart("text", { text }));
 
-const finished = (reason: Response.FinishReason, input: number, output: number) =>
+const finished = (reason: Response.FinishReason, inputTokens: number, outputTokens: number) =>
   part.response(
     Response.makePart("finish", {
       reason,
       usage: new Response.Usage({
-        inputTokens: { total: input },
-        outputTokens: { total: output },
+        inputTokens: { total: inputTokens },
+        outputTokens: { total: outputTokens },
       }),
     }),
   );
@@ -154,7 +149,6 @@ const trajectory = Trajectory.make(config)(
   ]),
 );
 
-/** Opens a phase whose first step is numbered `at`. */
 const open = (openedBy: string, at: number): PhaseDraft => ({
   openedBy,
   at,
@@ -162,7 +156,7 @@ const open = (openedBy: string, at: number): PhaseDraft => ({
   responses: 0,
   parts: 0,
   tools: new Map(),
-  files: new Set(),
+  paths: new Set(),
 });
 
 /** The path a `read_file` call reads, where the part is one. */
@@ -172,12 +166,10 @@ const readPath = (call: Response.ToolCallOf<typeof config>): string | undefined 
     Match.orElse(() => undefined),
   );
 
-/** Answers what the run did either side of the compaction, and what it read twice. */
 const main = Effect.fn(function* () {
   const session = yield* Session.main(trajectory);
 
   const draft = yield* session.stream.pipe(
-    // A step is one prompt, one model output, or one event.
     View.steps,
     Stream.runFold(
       (): ReportDraft => ({
@@ -230,7 +222,7 @@ const main = Effect.fn(function* () {
               if (readPhase === undefined) draft.firstRead.set(path, phaseIndex);
               else if (readPhase !== phaseIndex) draft.rediscovered.add(path);
 
-              phase.files.add(path);
+              phase.paths.add(path);
             }
 
             return draft;
@@ -243,10 +235,10 @@ const main = Effect.fn(function* () {
   return {
     steps: { ...draft.steps },
 
-    phases: draft.phases.map(({ tools, files, ...phase }): Phase => ({
+    phases: draft.phases.map(({ tools, paths, ...phase }): Phase => ({
       ...phase,
       tools: Object.fromEntries(tools),
-      files: [...files],
+      paths: [...paths],
     })),
 
     rediscovered: [...draft.rediscovered],
@@ -267,7 +259,7 @@ it.effect("main", () =>
           responses: 2,
           parts: 7,
           tools: { grep: 1, read_file: 1 },
-          files: ["src/config.ts"],
+          paths: ["src/config.ts"],
         },
         {
           openedBy: "compaction",
@@ -276,7 +268,7 @@ it.effect("main", () =>
           responses: 2,
           parts: 7,
           tools: { read_file: 1, edit_file: 1 },
-          files: ["src/config.ts"],
+          paths: ["src/config.ts"],
         },
       ]);
 

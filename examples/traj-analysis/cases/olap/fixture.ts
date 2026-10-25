@@ -20,11 +20,14 @@ export const generation = {
   trajectories: 420,
   days: 14,
   seed: 20_260_101,
-  turns: { low: 1, high: 4 },
-  subAgents: 0.25,
+  prompts: { low: 1, high: 4 },
+  subSessions: 0.25,
   tools: { grep: 0.5, read_file: 0.25, bash: 0.15, edit: 0.1 },
   models: { "gpt-5": 0.6, "claude-sonnet-4-6": 0.4 },
-  tokens: { input: { low: 20, high: 140 }, output: { low: 10, high: 50 } },
+  tokens: {
+    inputTokens: { low: 20, high: 140 },
+    outputTokens: { low: 10, high: 50 },
+  },
 };
 
 const questions = {
@@ -73,7 +76,7 @@ const produced = (index: number): DateTime.Utc =>
 const prompt = (sessionId: string | undefined, text: string, timestamp: DateTime.Utc) =>
   part.prompt(Prompt.make(text), { sessionId, timestamp });
 
-const turn = (
+const responses = (
   sessionId: string | undefined,
   id: string,
   timestamp: DateTime.Utc,
@@ -99,10 +102,18 @@ const turn = (
       reason: "tool-calls",
       usage: new Response.Usage({
         inputTokens: {
-          total: between(draw, generation.tokens.input.low, generation.tokens.input.high),
+          total: between(
+            draw,
+            generation.tokens.inputTokens.low,
+            generation.tokens.inputTokens.high,
+          ),
         },
         outputTokens: {
-          total: between(draw, generation.tokens.output.low, generation.tokens.output.high),
+          total: between(
+            draw,
+            generation.tokens.outputTokens.low,
+            generation.tokens.outputTokens.high,
+          ),
         },
       }),
     }),
@@ -113,30 +124,30 @@ const turn = (
 const conversation = (
   sessionId: string | undefined,
   id: string,
-  turns: number,
+  prompts: number,
   timestamp: DateTime.Utc,
   draw: () => number,
 ): Message =>
-  Array.from({ length: turns }, (_, turnIndex) => [
+  Array.from({ length: prompts }, (_, promptIndex) => [
     prompt(sessionId, pick(draw, questions), timestamp),
-    ...turn(sessionId, `${id}_${turnIndex}`, timestamp, draw),
+    ...responses(sessionId, `${id}_${promptIndex}`, timestamp, draw),
   ]).flat();
 
 const partsOf = (index: number): Produced => {
   const draw = random(generation.seed + index);
   const timestamp = produced(index);
   const sub = sessionIdOf(index * 2 + 1);
-  const turns = (): number => between(draw, generation.turns.low, generation.turns.high);
+  const prompts = (): number => between(draw, generation.prompts.low, generation.prompts.high);
 
-  const answered = conversation(undefined, `${index}/root`, turns(), timestamp, draw);
+  const answered = conversation(undefined, `${index}/root`, prompts(), timestamp, draw);
 
   return [
     part.mainSession(),
     ...answered,
-    ...(draw() < generation.subAgents
+    ...(draw() < generation.subSessions
       ? [
           part.subSession(sub, { fork: answered.at(-1)!.uuid }),
-          ...conversation(sub, `${index}/sub`, turns(), timestamp, draw),
+          ...conversation(sub, `${index}/sub`, prompts(), timestamp, draw),
         ]
       : []),
   ];

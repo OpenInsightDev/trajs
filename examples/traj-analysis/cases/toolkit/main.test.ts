@@ -28,7 +28,7 @@ interface Report {
 
   readonly queries: ReadonlyArray<string>;
 
-  readonly widestLimit: number;
+  readonly limit: number;
 
   readonly extensions: Readonly<Record<string, number>>;
 
@@ -107,7 +107,7 @@ const main = Effect.fn(function* () {
 
   return yield* View.toolCalls(session.stream).pipe(
     Stream.runFold(
-      (): Report => ({ cities: [], queries: [], widestLimit: 0, extensions: {}, undescribed: 0 }),
+      (): Report => ({ cities: [], queries: [], limit: 0, extensions: {}, undescribed: 0 }),
       (report, call) =>
         Match.value(call).pipe(
           Match.discriminator("name")("get_weather", ({ params: { city } }) => ({
@@ -117,7 +117,7 @@ const main = Effect.fn(function* () {
           Match.discriminator("name")("search_docs", ({ params: { query, limit } }) => ({
             ...report,
             queries: report.queries.includes(query) ? report.queries : [...report.queries, query],
-            widestLimit: Math.max(report.widestLimit, limit),
+            limit: Math.max(report.limit, limit),
           })),
           Match.discriminator("name")("read_file", ({ params: { path } }) => {
             const extension = path.slice(path.lastIndexOf(".") + 1);
@@ -143,7 +143,7 @@ it.effect("main", () =>
         cities: ["Paris", "Berlin"],
 
         queries: ["retry policy", "backoff"],
-        widestLimit: 20,
+        limit: 20,
         extensions: { ts: 1, md: 1 },
         undescribed: 1,
       } satisfies Report),

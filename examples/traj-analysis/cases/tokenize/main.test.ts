@@ -8,7 +8,7 @@ import { Effect, Layer, Stream } from "effect";
 
 import { config, Fixture, writeFixture } from "./produce.ts";
 
-type ContextKind = Exclude<keyof Tokens.PromptTokens, "_tag" | "tokens">;
+type PromptKind = Exclude<keyof Tokens.PromptTokens, "_tag" | "tokens">;
 
 const kinds = [
   "text",
@@ -16,30 +16,24 @@ const kinds = [
   "toolCall",
   "toolResult",
   "media",
-] as const satisfies ReadonlyArray<ContextKind>;
-
-interface GrowthStep {
-  readonly parts: number;
-
-  readonly added: number;
-
-  readonly total: number;
-}
-
-interface ContextShare {
-  readonly kind: ContextKind;
-  readonly tokens: number;
-  readonly share: number;
-}
+] as const satisfies ReadonlyArray<PromptKind>;
 
 interface Report {
-  readonly growth: ReadonlyArray<GrowthStep>;
+  readonly growth: ReadonlyArray<{
+    readonly parts: number;
+    readonly tokens: number;
+    readonly total: number;
+  }>;
 
-  readonly context: ReadonlyArray<ContextShare>;
+  readonly prompt: ReadonlyArray<{
+    readonly kind: PromptKind;
+    readonly tokens: number;
+    readonly share: number;
+  }>;
 }
 
 interface Reading {
-  readonly growth: ReadonlyArray<GrowthStep>;
+  readonly growth: Report["growth"];
 
   readonly prompt: Tokens.PromptTokens | undefined;
 }
@@ -67,7 +61,7 @@ const main = () =>
         (reading, { count, total }) => ({
           growth: [
             ...reading.growth,
-            { parts: reading.growth.length + 1, added: count.tokens, total },
+            { parts: reading.growth.length + 1, tokens: count.tokens, total },
           ],
 
           prompt: count._tag === "prompt" ? count : reading.prompt,
@@ -75,40 +69,40 @@ const main = () =>
       ),
     );
 
-    const prompt = reading.prompt;
-    const contextTokens = prompt?.tokens ?? 0;
+    const counted = reading.prompt;
+    const promptTokens = counted?.tokens ?? 0;
 
     return {
       growth: reading.growth,
-      context: kinds.map((kind) => {
-        const tokens = prompt?.[kind] ?? 0;
+      prompt: kinds.map((kind) => {
+        const tokens = counted?.[kind] ?? 0;
 
-        return { kind, tokens, share: contextTokens === 0 ? 0 : tokens / contextTokens };
+        return { kind, tokens, share: promptTokens === 0 ? 0 : tokens / promptTokens };
       }),
     } satisfies Report;
   }).pipe(Effect.provide(layers));
 
 it.effect("main", () =>
   Effect.gen(function* () {
-    const { growth, context } = yield* main();
+    const { growth, prompt } = yield* main();
 
     expect(growth.map((step) => step.parts)).toEqual([1, 2, 3, 4, 5, 6]);
 
     let total = 0;
 
     for (const step of growth) {
-      expect(step.added).toBeGreaterThan(0);
+      expect(step.tokens).toBeGreaterThan(0);
 
-      total += step.added;
+      total += step.tokens;
 
       expect(step.total).toBe(total);
     }
 
-    expect(context.map((share) => share.kind)).toEqual(kinds);
-    expect(context.reduce((sum, share) => sum + share.share, 0)).toBeCloseTo(1, 2);
+    expect(prompt.map((part) => part.kind)).toEqual(kinds);
+    expect(prompt.reduce((sum, part) => sum + part.share, 0)).toBeCloseTo(1, 2);
 
-    for (const share of context) expect(share.tokens).toBeGreaterThan(0);
+    for (const part of prompt) expect(part.tokens).toBeGreaterThan(0);
 
-    expect(context.find((share) => share.kind === "media")?.tokens).toBe(255);
+    expect(prompt.find((part) => part.kind === "media")?.tokens).toBe(255);
   }),
 );

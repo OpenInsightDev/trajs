@@ -9,13 +9,13 @@ import { generation, meanOf, writeFixtures } from "./fixture.ts";
 import { importFixtures, prepareTable } from "./table.ts";
 
 interface Tool {
-  readonly tool: string;
+  readonly name: string;
   readonly calls: number;
   readonly share: number;
 }
 
 interface Model {
-  readonly model: string;
+  readonly modelId: string;
   readonly responses: number;
   readonly share: number;
 }
@@ -33,11 +33,11 @@ interface Analysis {
 
   readonly models: ReadonlyArray<Model>;
 
-  readonly tokens: { readonly input: number; readonly output: number };
+  readonly tokens: { readonly inputTokens: number; readonly outputTokens: number };
 
   readonly promptsPerSession: number;
 
-  readonly subAgentShare: number;
+  readonly subSessionShare: number;
 
   readonly days: ReadonlyArray<Day>;
 }
@@ -71,31 +71,31 @@ const main = () =>
     `;
 
     const tools = yield* ch<Tool>`
-      SELECT tool, calls, round(calls / sum(calls) OVER (), 4) AS share
+      SELECT name, calls, round(calls / sum(calls) OVER (), 4) AS share
       FROM (
-        SELECT part.\`response.name\` AS tool, toUInt32(count()) AS calls
+        SELECT part.\`response.name\` AS name, toUInt32(count()) AS calls
         FROM parts
         WHERE variant = 'tool-call'
-        GROUP BY tool
+        GROUP BY name
       )
-      ORDER BY calls DESC, tool
+      ORDER BY calls DESC, name
     `;
 
     const models = yield* ch<Model>`
-      SELECT model, responses, round(responses / sum(responses) OVER (), 4) AS share
+      SELECT modelId, responses, round(responses / sum(responses) OVER (), 4) AS share
       FROM (
-        SELECT part.\`response.modelId\` AS model, toUInt32(count()) AS responses
+        SELECT part.\`response.modelId\` AS modelId, toUInt32(count()) AS responses
         FROM parts
         WHERE variant = 'response-metadata'
-        GROUP BY model
+        GROUP BY modelId
       )
-      ORDER BY responses DESC, model
+      ORDER BY responses DESC, modelId
     `;
 
-    const [tokens] = yield* ch<{ input: number; output: number }>`
+    const [tokens] = yield* ch<{ inputTokens: number; outputTokens: number }>`
       SELECT
-        round(avg(part.\`response.usage.inputTokens.total\`), 2) AS input,
-        round(avg(part.\`response.usage.outputTokens.total\`), 2) AS output
+        round(avg(part.\`response.usage.inputTokens.total\`), 2) AS inputTokens,
+        round(avg(part.\`response.usage.outputTokens.total\`), 2) AS outputTokens
       FROM parts
       WHERE variant = 'finish'
     `;
@@ -109,7 +109,7 @@ const main = () =>
       )
     `;
 
-    const [subAgents] = yield* ch<{ share: number }>`
+    const [subSessions] = yield* ch<{ share: number }>`
       SELECT round(countIf(sessions > 1) / count(), 4) AS share
       FROM (
         SELECT trajectory_id, uniqExact(session_id) AS sessions
@@ -135,9 +135,12 @@ const main = () =>
         rows: counted?.rows ?? 0,
         tools,
         models,
-        tokens: { input: tokens?.input ?? 0, output: tokens?.output ?? 0 },
+        tokens: {
+          inputTokens: tokens?.inputTokens ?? 0,
+          outputTokens: tokens?.outputTokens ?? 0,
+        },
         promptsPerSession: sessions?.prompts ?? 0,
-        subAgentShare: subAgents?.share ?? 0,
+        subSessionShare: subSessions?.share ?? 0,
         days,
       },
     } satisfies Report;
@@ -146,11 +149,11 @@ const main = () =>
 const expectNear = (observed: number, expected: number, tolerance: number) =>
   expect(Math.abs(observed - expected)).toBeLessThan(tolerance);
 
-const toolShare = (analysis: Analysis, tool: string): number =>
-  analysis.tools.find((row) => row.tool === tool)?.share ?? 0;
+const toolShare = (analysis: Analysis, name: string): number =>
+  analysis.tools.find((row) => row.name === name)?.share ?? 0;
 
-const modelShare = (analysis: Analysis, model: string): number =>
-  analysis.models.find((row) => row.model === model)?.share ?? 0;
+const modelShare = (analysis: Analysis, modelId: string): number =>
+  analysis.models.find((row) => row.modelId === modelId)?.share ?? 0;
 
 it.effect("main", () =>
   Effect.gen(function* () {
@@ -158,20 +161,20 @@ it.effect("main", () =>
 
     expect(analysis.rows).toBe(written);
 
-    for (const [tool, weight] of Object.entries(generation.tools)) {
-      expectNear(toolShare(analysis, tool), weight, 0.04);
+    for (const [name, weight] of Object.entries(generation.tools)) {
+      expectNear(toolShare(analysis, name), weight, 0.04);
     }
 
-    for (const [model, weight] of Object.entries(generation.models)) {
-      expectNear(modelShare(analysis, model), weight, 0.05);
+    for (const [modelId, weight] of Object.entries(generation.models)) {
+      expectNear(modelShare(analysis, modelId), weight, 0.05);
     }
 
-    expectNear(analysis.tokens.input, meanOf(generation.tokens.input), 3);
-    expectNear(analysis.tokens.output, meanOf(generation.tokens.output), 2);
+    expectNear(analysis.tokens.inputTokens, meanOf(generation.tokens.inputTokens), 3);
+    expectNear(analysis.tokens.outputTokens, meanOf(generation.tokens.outputTokens), 2);
 
-    expectNear(analysis.promptsPerSession, meanOf(generation.turns), 0.1);
+    expectNear(analysis.promptsPerSession, meanOf(generation.prompts), 0.1);
 
-    expectNear(analysis.subAgentShare, generation.subAgents, 0.05);
+    expectNear(analysis.subSessionShare, generation.subSessions, 0.05);
 
     expect(analysis.days).toHaveLength(generation.days);
 
