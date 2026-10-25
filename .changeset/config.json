@@ -6,6 +6,15 @@
   "baseBranch": "main",
   "updateInternalDependencies": "patch",
   "privatePackages": false,
-  "ignore": ["@trajs/ui-*"],
-  "fixed": [["@trajs/*", "!@trajs/extension-*", "!@trajs/ui-*"]]
+  "ignore": ["@trajs/cli", "@trajs/extension-*", "@trajs/ui-*"],
+  "fixed": [
+    [
+      "@trajs/core",
+      "@trajs/olap",
+      "@trajs/platform-browser",
+      "@trajs/platform-bun",
+      "@trajs/platform-node",
+      "@trajs/utils"
+    ]
+  ]
 }

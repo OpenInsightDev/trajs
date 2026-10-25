@@ -1,57 +1,122 @@
 name: Release
 
-# Publishes the packages in this repository to npm. Versioning is driven by
-# Changesets: every push to `main` either opens or updates the "Version
-# Packages" pull request, and merging that pull request publishes the release.
+# Publishes the core libraries under `packages/` to npm. The release set comes
+# from `.changeset/config.json`: `fixed` names the six core packages, which share
+# one version, and `ignore` keeps the CLI, the extensions and the UI packages out
+# until they are ready to be published.
 #
-# Authentication is npm trusted publishing: the publish exchanges this
-# workflow's GitHub OIDC token for a short-lived npm credential, so no npm token
-# is stored in the repository. npm only accepts publishes from a workflow that the
-# published package lists as a trusted publisher: repository `OpenInsightDev/trajs`,
-# workflow `release.yml`, no environment, and `npm publish` allowed.
+# The jobs follow the Changesets trusted publishing flow: on a push to `main`,
+# either a "Version Packages" pull request is opened or updated, or the packages
+# the version merge left unpublished are packed and published. `id-token: write`
+# is granted to the publish job alone, and npm exchanges that OIDC token for a
+# short-lived credential, so the repository stores no npm token. `pre.json` keeps
+# Changesets in pre mode, so the release is an `X.Y.Z-alpha.N` prerelease
+# published under the `alpha` dist-tag.
 
 on:
-  # FIXME: re-add the `push` trigger to `main` once the release flow is no
-  # longer being debugged. Disabled so a push neither publishes nor opens a
-  # "Version Packages" PR; the workflow currently runs only on manual dispatch.
-  # push:
-  #   branches: [main]
-  workflow_dispatch:
+  push:
+    branches: [main]
 
-permissions:
-  contents: read
+# Nothing is granted by default; each job asks for what it needs.
+permissions: {}
 
 concurrency:
-  group: release
-  cancel-in-progress: false
+  group: ${{ github.workflow }}-${{ github.ref }}
 
 jobs:
-  release:
+  select-mode:
     runs-on: ubuntu-latest
+    outputs:
+      mode: ${{ steps.select-mode.outputs.mode }}
+      publish-plan-artifact-id: ${{ steps.select-mode.outputs.publish-plan-artifact-id }}
     permissions:
-      contents: write # push the release commit and tags
-      pull-requests: write # open and update the "Version Packages" pull request
-      id-token: write # authenticate the publish with npm trusted publishing
+      contents: read # check out the repository
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
-          # The release commit and tags are pushed with the token handed to
-          # changesets/action, not with credentials kept by checkout.
           persist-credentials: false
       - uses: pnpm/action-setup@v4
         with:
           version: 12.10.1
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
-          node-version: 24
-          cache: pnpm
+          node-version: 26.11.1
       - run: pnpm install --frozen-lockfile
-      - run: pnpm exec vp check && pnpm exec vp run -r test --passWithNoTests && pnpm exec vp run -r build
-      # `changeset publish` runs `pnpm publish` in each package with an
-      # unpublished version, which rewrites `catalog:` ranges and publishes
-      # through the OIDC credential. These commands run directly rather than
-      # through `vp run`, which would strip their environment.
-      - uses: changesets/action@v2.1.2
+      - id: select-mode
+        uses: changesets/action/select-mode@v2
+
+  version:
+    if: needs.select-mode.outputs.mode == 'version'
+    needs: select-mode
+    runs-on: ubuntu-latest
+    outputs:
+      version-dir-artifact-id: ${{ steps.version.outputs.version-dir-artifact-id }}
+    permissions:
+      contents: write # commit the version changes
+      pull-requests: write # open or update the "Version Packages" pull request
+    steps:
+      - uses: actions/checkout@v7
         with:
-          version-script: pnpm exec changeset version
-          publish-script: pnpm exec changeset publish
+          persist-credentials: false
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 12.10.1
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 26.11.1
+          package-manager-cache: false # avoid cache poisoning
+      - run: pnpm install --frozen-lockfile
+      - id: version
+        uses: changesets/action/version@v2
+
+  pack:
+    if: needs.select-mode.outputs.mode == 'publish'
+    needs: select-mode
+    runs-on: ubuntu-latest
+    outputs:
+      pack-dir-artifact-id: ${{ steps.pack.outputs.pack-dir-artifact-id }}
+    permissions:
+      contents: read # check out the repository
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 12.10.1
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 26.11.1
+          package-manager-cache: false # avoid cache poisoning
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec vp check
+      - run: pnpm exec vp run -r test --passWithNoTests
+      - run: pnpm exec vp run -r build
+      - id: pack
+        uses: changesets/action/pack@v2
+        with:
+          publish-plan-artifact-id: ${{ needs.select-mode.outputs.publish-plan-artifact-id }}
+
+  publish:
+    needs: pack
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # create the release tags and GitHub releases
+      id-token: write # authenticate the publish with npm trusted publishing
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 12.10.1
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 26.11.1
+          package-manager-cache: false # avoid cache poisoning
+      # `pnpm publish` then runs against the tarballs from the pack job, which
+      # already carry the resolved `catalog:` and `workspace:` ranges.
+      - run: pnpm install --frozen-lockfile
+      - uses: changesets/action/publish@v2
+        with:
+          pack-dir-artifact-id: ${{ needs.pack.outputs.pack-dir-artifact-id }}
