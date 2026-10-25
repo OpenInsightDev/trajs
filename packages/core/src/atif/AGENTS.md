@@ -1,7 +1,7 @@
-# extensions/atif
+# core/atif
 
 ATIF — the Agent Trajectory Interchange Format — and `@trajs/core` trajectories,
-read as each other. `README.md` states what the package offers; this file records
+read as each other. `README.md` states what the module offers; this file records
 where the mapping of the two stands.
 
 ## Mapping
@@ -47,8 +47,8 @@ concrete ATIF form may differ.
   session's `enqueuePrompt`/`enqueueResponse`); the format typed in `Document.ts`
   (`Metrics`, `FinalMetrics`, `ToolDefinition`, `SubagentTrajectoryRef`,
   `SchemaVersion`, `ProducerFields`, recursive `subagent_trajectories`); the extra
-  data declared in `Extras.ts`; the context management convention declared as an
-  event in `Events.ts`.
+  data declared in `Extra.ts`; the context management convention declared as an
+  event in `Event.ts`.
 - Done: the reading as it stands — `Encode.encode` produces the steps of a
   document as the turns of a trajectory, and `Step.steps` reads a trajectory back
   as the steps it was read from. A step that states a message opens a turn with
@@ -80,6 +80,6 @@ concrete ATIF form may differ.
 
 ## Checks
 
-- `vp check` in `packages/core` and `extensions/atif`.
-- No tests cover this: `extensions/atif` has no test file and the repository has
-  one (`extensions/tokenize/tests/Metric.test.ts`). Do not add tests unless asked.
+- `vp check` in `packages/core`.
+- No tests cover this: the repository has one (`extensions/tokenize/tests/Metric.test.ts`).
+  Do not add tests unless asked.

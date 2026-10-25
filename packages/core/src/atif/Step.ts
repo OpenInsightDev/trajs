@@ -2,17 +2,18 @@
  * A trajectory read as the steps ATIF exchanges.
  *
  * {@link steps} reads a session's steps on ATIF's terms, and {@link Step} says what a
- * step holds. What ATIF states of a step beyond what it says is extra data this package
+ * step holds. What ATIF states of a step beyond what it says is extra data this module
  * carries, which the reading does not fold back into a step yet.
  */
 
-import { View } from "@trajs/core";
-import type { Response } from "@trajs/core";
-import * as Config from "@trajs/core/Config";
-import type * as Session from "@trajs/core/Session";
-import type { TrajectoryError } from "@trajs/core/TrajectoryError";
 import { Option, Stream } from "effect";
 import type { Prompt, Tool } from "effect/ai";
+
+import * as Config from "#/Config.ts";
+import type * as Response from "#/Response.ts";
+import type * as Session from "#/Session.ts";
+import type { TrajectoryError } from "#/TrajectoryError.ts";
+import * as View from "#/View.ts";
 
 /**
  * Who contributed a step: the system prompt a model was given, the user, or the agent

@@ -1,6 +1,5 @@
 ---
 "@trajs/core": minor
-"@trajs/extension-atif": patch
 ---
 
 What a trajectory is read with is stated once, by `Trajectory.config`: a config built of the

@@ -1,12 +1,12 @@
 ---
-"@trajs/extension-atif": minor
+"@trajs/core": minor
 ---
 
 `Encode.encode` reads what an ATIF document states beside its conversation: the media
 a step states by a path, as a `file` part of the step, read through the file system
 the reading runs on under the directory `Options.cwd` names; the tools the document
 says its agent was given, as the toolkit the trajectory names; and what the document
-states of a run and of its steps, as the extra data this package's kit carries, with
+states of a run and of its steps, as the extra data this module's kit carries, with
 the moment a step happened as the `timestamp` of its part.
 
 `Encode.fromFile` reads a `trajectory.json` from a path, decoding it before the

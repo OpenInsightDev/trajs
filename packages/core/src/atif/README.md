@@ -1,4 +1,4 @@
-# @trajs/extension-atif
+# @trajs/core/atif
 
 A trajectory in the terms of [ATIF](https://docs.harborframework.com/agents/atif),
 the Agent Trajectory Interchange Format Harbor writes its agents' runs with.
@@ -20,7 +20,7 @@ step.
 
 ```ts
 import { Effect, Stream } from "effect";
-import { Step } from "@trajs/extension-atif";
+import { Step } from "@trajs/core/atif";
 
 const steps = await Effect.runPromise(Stream.runCollect(Step.steps(trajectory)));
 
@@ -48,7 +48,7 @@ file holds is decoded before it is read.
 ```ts
 import { NodeServices } from "@effect/platform-node";
 import { Effect, Stream } from "effect";
-import { Encode, Step } from "@trajs/extension-atif";
+import { Encode, Step } from "@trajs/core/atif";
 
 const steps = await Effect.runPromise(
   Effect.gen(function* () {
@@ -71,7 +71,7 @@ it with `Encode.encode`, and names the directory its paths are read from:
 import { readFile } from "node:fs/promises";
 import { dirname } from "node:path";
 import { Schema } from "effect";
-import { Document, Encode } from "@trajs/extension-atif";
+import { Document, Encode } from "@trajs/core/atif";
 
 const path = "runs/one/trajectory.json";
 const json = await readFile(path, "utf8");
@@ -122,14 +122,14 @@ and reads them off the part with their types:
 
 ```ts
 import { Effect, Stream } from "effect";
-import { documentExtra, stepExtra } from "@trajs/extension-atif";
+import { Extra } from "@trajs/core/atif";
 
 const parts = Array.from(await Effect.runPromise(Stream.runCollect(trajectory)));
 const session = parts.find((part) => part._tag === "Session");
 const answered = parts.find((part) => part._tag === "Response");
 
-session?.extra[documentExtra.tag]?.agent.name; // => "claude-code"
-answered?.extra[stepExtra.tag]?.model_name; // => "claude-sonnet-4"
+session?.extra[Extra.documentExtra.tag]?.agent.name; // => "claude-code"
+answered?.extra[Extra.stepExtra.tag]?.model_name; // => "claude-sonnet-4"
 ```
 
 What a document states in the terms of a kit the reading does not name is left out,
@@ -144,7 +144,7 @@ rather than a producer's account of a run:
   step of the document that states it and the marker is not carried.
 - what a system step is answered with, which is an operation of the run rather than
   of the conversation.
-- the context management a system step declares, which this package produces as an
+- the context management a system step declares, which this module produces as an
   event of its own rather than as a field of a document.
 
 ## Context management events
@@ -153,30 +153,34 @@ ATIF produces what happens of a run, rather than what is said, as system steps,
 and states what some of them do as a convention of its own. The one ATIF v1.8
 defines is context management: a step that transforms the agent's context window
 declares a `context_management` object of a `type` — `compaction`, `pruning` or
-`injection` — and a `boundary` — `replace`, `append` or `truncate`. The package
-declares that convention as the `org.js.tra.atif` extension, so a run that
+`injection` — and a `boundary` — `replace`, `append` or `truncate`. The module
+declares that convention as the `ContextManagement` event, so a run that
 transforms its context produces the event among the parts of its own trajectory
 rather than in a field of the ATIF document.
 
 ```ts
 import { Stream } from "effect";
-import { Extensionkit, Produce, Trajectory } from "@trajs/core";
-import { contextManagement, extensions } from "@trajs/extension-atif";
+import { Config, MetricKit, Produce, Trajectory } from "@trajs/core";
+import { Event } from "@trajs/core/atif";
 
-const extkit = Extensionkit.toProducers(Extensionkit.make(extensions), {});
+const config = Config.config({
+  eventkit: Event.eventkit,
+  metrickit: MetricKit.toProducers(MetricKit.empty, {}),
+});
 
 // The event is what a system part carries, and the session produces it where it
 // happened.
-const part = Trajectory.SystemPart(extkit).make({
-  system: contextManagement({ type: "compaction", boundary: "replace" }),
-});
+const part = Trajectory.parts(config).event(
+  Event.contextManagement({ type: "compaction", boundary: "replace" }),
+);
 
-const produced = Produce.transform({ toolkit, extkit, metadata })(Stream.make(part));
+const produced = Produce.fromSession(config)(Stream.make(part));
 ```
 
-A reader installs `extensions` in the kit it reads the trajectory with, and the
-event is read back as `ContextManagement` data: a reading that names no event reads
-no event part at all. The event states the transformation rather than the context it left:
+A reader installs `Event.eventkit` in the config it reads the trajectory with, and
+the event is read back as `ContextManagement` data: a reading that names no event
+reads no event part at all. The event states the transformation rather than the
+context it left:
 what a `replace` bound leaves is what the messages after it carry, and ATIF's
 boundary rule is what says so.
 
@@ -204,7 +208,7 @@ above for how a reader gets it back:
   state are not stated.
 - `observation.subagent_trajectory_ref`, and the `subagent_trajectories` a
   reference resolves against. A trajectory of delegated work is a trajectory of
-  another session, which this package does not read as one document yet.
+  another session, which this module does not read as one document yet.
 
 Two readings of a trajectory also deviate from the shape ATIF writes: an agent
 step holds its tool results as `observations` rather than in the `observation`
@@ -218,20 +222,5 @@ it.
 
 ## Development
 
-- Install dependencies:
-
-```bash
-vp install
-```
-
-- Run the unit tests:
-
-```bash
-vp test
-```
-
-- Build the library:
-
-```bash
-vp pack
-```
+The module is part of `@trajs/core`, so it is developed and checked from
+`packages/core`: `vp check` reads it and `vp pack` builds it with the package.

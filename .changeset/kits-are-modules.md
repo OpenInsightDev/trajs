@@ -1,7 +1,6 @@
 ---
 "@trajs/core": minor
 "@trajs/extension-anthropic": minor
-"@trajs/extension-atif": minor
 "@trajs/extension-openai-compat": minor
 "@trajs/extension-tokenize": minor
 ---

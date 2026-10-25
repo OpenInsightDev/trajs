@@ -18,7 +18,6 @@
   "dependencies": {
     "@effect/platform-node": "catalog:",
     "@trajs/core": "workspace:*",
-    "@trajs/extension-atif": "workspace:*",
     "@trajs/extension-tokenize": "workspace:*",
     "@trajs/olap": "workspace:*",
     "@trajs/platform-node": "workspace:*",

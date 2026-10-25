@@ -1,7 +1,7 @@
 import { expect, it } from "@effect/vitest";
 import { Cache, Prompt, Response, Session, Tool, Toolkit, Trajectory, View } from "@trajs/core";
+import { Event } from "@trajs/core/atif";
 import * as Config from "@trajs/core/Config";
-import { contextManagement, eventkit } from "@trajs/extension-atif";
 import { Effect, Match, Schema, Stream } from "effect";
 
 const toolkit = Toolkit.make(
@@ -20,7 +20,7 @@ const toolkit = Toolkit.make(
 );
 
 // The eventkit must sit on the config, or this event cannot be stored.
-const config = Config.config({ stream: false, toolkit, eventkit });
+const config = Config.config({ stream: false, toolkit, eventkit: Event.eventkit });
 
 interface Phase {
   /** What opened the phase: `"run"`, or the type of an event. */
@@ -132,8 +132,8 @@ const trajectory = Trajectory.make(config)(
     finished("stop", 2_140, 210),
 
     // The run compacts its context here.
-    // contextManagement records that compaction as an event, not a message.
-    part.event(contextManagement({ type: "compaction", boundary: "replace" })),
+    // Event.contextManagement records that compaction as an event, not a message.
+    part.event(Event.contextManagement({ type: "compaction", boundary: "replace" })),
 
     part.prompt(Prompt.make("Continue and fix the failing test.")),
     read("call_read_2", "src/config.ts"),

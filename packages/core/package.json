@@ -18,17 +18,21 @@
   },
   "exports": {
     ".": "./src/index.ts",
+    "./atif": "./src/atif/index.ts",
     "./package.json": "./package.json",
     "./*": "./src/*.ts",
     "./internal/*": null,
+    "./atif/internal/*": null,
     "./*/index": null
   },
   "publishConfig": {
     "exports": {
       ".": "./dist/index.mjs",
+      "./atif": "./dist/atif/index.mjs",
       "./package.json": "./package.json",
       "./*": "./dist/*.mjs",
       "./internal/*": null,
+      "./atif/internal/*": null,
       "./*/index": null
     },
     "access": "public"

@@ -1,5 +1,5 @@
 /**
- * ATIF — the Agent Trajectory Interchange Format — as this package states it.
+ * ATIF — the Agent Trajectory Interchange Format — as this module states it.
  *
  * The format stated here is ATIF RFC 0001 at v1.8, kept at
  * `references/harbor/rfcs/0001-trajectory-format.md`. Every schema below names the

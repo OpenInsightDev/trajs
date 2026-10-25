@@ -5,18 +5,21 @@
  * states, and {@link fromFile} does the same for the `trajectory.json` a path names.
  */
 
-import { EventKit, MetricKit, Produce, type Toolkit, Trajectory } from "@trajs/core";
-import * as Config from "@trajs/core/Config";
-import { TrajectoryError } from "@trajs/core/TrajectoryError";
 import { Effect, FileSystem, Path, Schema } from "effect";
 import type { PlatformError } from "effect";
 
-import { produce } from "#/internal/reading.ts";
-import { toolkitOf } from "#/internal/toolkit.ts";
-
-import { FromJson } from "./Document.ts";
-import type { Document } from "./Document.ts";
-import { extrakit } from "./Extras.ts";
+import { FromJson } from "#/atif/Document.ts";
+import type { Document } from "#/atif/Document.ts";
+import { extrakit } from "#/atif/Extra.ts";
+import { produce } from "#/atif/internal/reading.ts";
+import { toolkitOf } from "#/atif/internal/toolkit.ts";
+import * as Config from "#/Config.ts";
+import * as EventKit from "#/EventKit.ts";
+import * as MetricKit from "#/MetricKit.ts";
+import * as Produce from "#/Produce.ts";
+import type * as Toolkit from "#/Toolkit.ts";
+import * as Trajectory from "#/Trajectory.ts";
+import { TrajectoryError } from "#/TrajectoryError.ts";
 
 /**
  * What a document is read with beside the document itself.
@@ -93,7 +96,7 @@ export const fromFile = (
 
 /**
  * The config a document is produced with: the toolkit it says its agent was given, and
- * the extra data this package carries.
+ * the extra data this module carries.
  */
 const kits = (document: Document) =>
   Produce.produce(
@@ -104,7 +107,7 @@ const kits = (document: Document) =>
       // A kit that names no metric derives nothing, so the trajectory holds the parts
       // its steps were read as and no metric part.
       metrickit: MetricKit.toProducers(MetricKit.empty, {}),
-      // The extra data of this package, so what a document states of a run and of its
+      // The extra data of this module, so what a document states of a run and of its
       // steps reads back as the fields they are rather than as the JSON they were written
       // as.
       extrakit,

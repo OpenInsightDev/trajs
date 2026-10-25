@@ -1,6 +1,5 @@
 ---
 "@trajs/core": minor
-"@trajs/extension-atif": minor
 "@trajs/extension-tokenize": minor
 "@trajs/olap": minor
 ---
@@ -36,6 +35,6 @@ and the extra data it states of it — and declares them in that order of fork.
 
 Where a part states no session, `@trajs/olap` writes the main session's id as the
 row's `session_id`, and `@trajs/olap`'s `Row` docs say so; `@trajs/extension-tokenize`
-counts such a part as a part of the main session. `@trajs/extension-atif` produces a
+counts such a part as a part of the main session. `@trajs/core/atif` produces a
 document's run as a session forked from the main one, with what the document states
 of the run declared with it.

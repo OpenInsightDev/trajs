@@ -5,10 +5,10 @@
  * which a dynamic tool is built from.
  */
 
-import { Toolkit } from "@trajs/core";
 import { Tool } from "effect/ai";
 
-import type { Document, ToolDefinition } from "#/Document.ts";
+import type { Document, ToolDefinition } from "#/atif/Document.ts";
+import * as Toolkit from "#/Toolkit.ts";
 
 /**
  * The tools a document names, keyed by the name each is called by.

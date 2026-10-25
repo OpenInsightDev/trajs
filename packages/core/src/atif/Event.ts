@@ -2,14 +2,16 @@
  * The events ATIF's own conventions are produced as.
  *
  * ATIF v1.8 defines one: a system step that transforms the agent's context declares a
- * `context_management` object. The package produces that convention as an event, so a
+ * `context_management` object. The module produces that convention as an event, so a
  * run that transforms its context produces it among the events of its trajectory.
  */
 
-import { Event, EventKit, VersionedSchema } from "@trajs/core";
 import { Schema } from "effect";
 
-import { packageName } from "#/internal/package.ts";
+import { packageName } from "#/atif/internal/package.ts";
+import * as Event from "#/Event.ts";
+import * as EventKit from "#/EventKit.ts";
+import * as VersionedSchema from "#/VersionedSchema.ts";
 
 /** The kinds of context transformation ATIF names for a `type`. */
 const types = ["compaction", "pruning", "injection"] as const;
@@ -39,7 +41,7 @@ export type ContextManagementType = (typeof types)[number];
 export type ContextManagementBoundary = (typeof boundaries)[number];
 
 /**
- * The event the package produces ATIF's context management convention as.
+ * The event the module produces ATIF's context management convention as.
  *
  * @category constants
  */
@@ -70,7 +72,7 @@ export const contextManagementEvent = new Event.Event({
 export const ContextManagement = contextManagementEvent.schema.self;
 
 /**
- * A context management event as the package produces it, at the newest version of
+ * A context management event as the module produces it, at the newest version of
  * the event's data.
  *
  * @category models
@@ -93,7 +95,7 @@ export const contextManagement = (
 });
 
 /**
- * The events this package produces with, collected into a kit.
+ * The events this module produces with, collected into a kit.
  *
  * @category constants
  */

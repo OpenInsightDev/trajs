@@ -6,12 +6,13 @@
  * what a step states beyond what it says.
  */
 
-import { Extra, ExtraKit, VersionedSchema } from "@trajs/core";
 import { Schema } from "effect";
 
-import { packageName } from "#/internal/package.ts";
-
-import { FinalMetrics, Metrics, ProducerFields, SchemaVersion } from "./Document.ts";
+import { FinalMetrics, Metrics, ProducerFields, SchemaVersion } from "#/atif/Document.ts";
+import { packageName } from "#/atif/internal/package.ts";
+import * as Extra from "#/Extra.ts";
+import * as ExtraKit from "#/ExtraKit.ts";
+import * as VersionedSchema from "#/VersionedSchema.ts";
 
 /**
  * The fields ATIF states of a step, at data version `1.8`.
@@ -94,7 +95,7 @@ export const stepExtra = new Extra.Extra({
 export const DocumentFields = document180.self;
 
 /**
- * A document's fields as the package carries them, at the newest version of their
+ * A document's fields as the module carries them, at the newest version of their
  * shape.
  *
  * @category models
@@ -111,14 +112,14 @@ export type DocumentFields = Schema.Schema.Type<typeof DocumentFields>;
 export const StepFields = step180.self;
 
 /**
- * A step's fields as the package carries them, at the newest version of their shape.
+ * A step's fields as the module carries them, at the newest version of their shape.
  *
  * @category models
  */
 export type StepFields = Schema.Schema.Type<typeof StepFields>;
 
 /**
- * The extra data this package carries, collected into a kit.
+ * The extra data this module carries, collected into a kit.
  *
  * @category constants
  */
