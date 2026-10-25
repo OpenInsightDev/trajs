@@ -1,7 +1,7 @@
 import { ByteStore } from "@trajs/utils";
 import { Effect, Option, Stream } from "effect";
 
-import type * as Cache from "#/Cache.ts";
+import * as Cache from "#/Cache.ts";
 import type * as Config from "#/Config.ts";
 import { decodePart, encodePart } from "#/internal/exchange.ts";
 import { attach, configOf } from "#/internal/trajectory.ts";
@@ -23,13 +23,16 @@ const capacityOf = (options: Cache.Options | undefined): number => {
 
 const keyOf = (id: string, index: number): string => `${id}/${index}`;
 
+const failure = (id: string, index: number, operation: "read" | "write") =>
+  Effect.mapError((cause: unknown) => new Cache.CacheError({ id, index, operation, cause }));
+
 const keep = Effect.fn(function* <Id extends string, Config extends Config.AnyConfig, E, R>(
   store: ByteStore.ByteStore,
   capacity: number,
   trajectory: Trajectory.Trajectory<Id, Config, E, R>,
 ): Effect.fn.Return<
   Cache.Cached<Id, Config>,
-  E | TrajectoryError | ByteStore.ByteStoreError,
+  E | TrajectoryError | Cache.CacheError,
   R | Config.EncodingServices<Config>
 > {
   const encode = encodePart<Config>(trajectory);
@@ -37,9 +40,10 @@ const keep = Effect.fn(function* <Id extends string, Config extends Config.AnyCo
 
   const readAt = (index: number) =>
     Effect.gen(function* () {
-      const bytes = yield* store
-        .read(keyOf(trajectory.id, index))
-        .pipe(Effect.flatMap((bytes) => bytes.readAlloc()));
+      const bytes = yield* store.read(keyOf(trajectory.id, index)).pipe(
+        Effect.flatMap((bytes) => bytes.readAlloc()),
+        failure(trajectory.id, index, "read"),
+      );
 
       return yield* decode(bytes);
     });
@@ -49,7 +53,7 @@ const keep = Effect.fn(function* <Id extends string, Config extends Config.AnyCo
       const frame = yield* encode(part);
       const sink = store.write(keyOf(trajectory.id, index));
 
-      yield* Stream.make(frame).pipe(Stream.run(sink));
+      yield* Stream.make(frame).pipe(Stream.run(sink), failure(trajectory.id, index, "write"));
     });
 
   let parts: Array<Trajectory.Part<Config>> = [];
@@ -120,7 +124,7 @@ export const make = (store: ByteStore.ByteStore, options?: Cache.Options): Cache
       trajectory: Trajectory.Trajectory<Id, Config, E, R>,
     ): Effect.Effect<
       Cache.Cached<Id, Config>,
-      E | TrajectoryError | ByteStore.ByteStoreError,
+      E | TrajectoryError | Cache.CacheError,
       R | Config.EncodingServices<Config>
     > =>
       Effect.suspend(() => {
@@ -130,7 +134,7 @@ export const make = (store: ByteStore.ByteStore, options?: Cache.Options): Cache
           // SAFETY: an id names one trajectory, so the kept effect is that trajectory.
           return cached as Effect.Effect<
             Cache.Cached<Id, Config>,
-            E | TrajectoryError | ByteStore.ByteStoreError,
+            E | TrajectoryError | Cache.CacheError,
             R | Config.EncodingServices<Config>
           >;
         }

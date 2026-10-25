@@ -1,4 +1,3 @@
-import type { ByteStore } from "@trajs/utils";
 import { Effect, type Option, type Stream } from "effect";
 
 import * as Cache from "#/Cache.ts";
@@ -115,12 +114,8 @@ export type AnySession<Config extends Config.AnyConfig, E, R> =
 export const main = Effect.fn(function* <Config extends Config.AnyConfig, E, R>(
   trajectory: Trajectory.Trajectory<string, Config, E, R>,
 ): Effect.fn.Return<
-  MainSession<
-    Config,
-    E | TrajectoryError | ByteStore.ByteStoreError,
-    R | Config.DecodingServices<Config>
-  >,
-  E | TrajectoryError | ByteStore.ByteStoreError,
+  MainSession<Config, E | TrajectoryError | Cache.CacheError, R | Config.DecodingServices<Config>>,
+  E | TrajectoryError | Cache.CacheError,
   R | Config.EncodingServices<Config> | Config.DecodingServices<Config> | Cache.Cache
 > {
   const cache = yield* Cache.Cache;

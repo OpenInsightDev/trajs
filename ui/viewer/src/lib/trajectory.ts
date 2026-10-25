@@ -22,15 +22,14 @@ import * as Exchange from "@trajs/core/Exchange";
 import type { TrajectoryError } from "@trajs/core/TrajectoryError";
 import { BrowserServices } from "@trajs/platform-browser";
 import { makeByte } from "@trajs/utils/Byte";
-import { type ByteStoreError } from "@trajs/utils/ByteStore";
 import { Storage, StorageError } from "@trajs/utils/Storage";
 import { Effect, Layer, Option, Sink, Stream } from "effect";
 
 /**
- * What reading a trajectory fails with: the trajectory's own failure, or the store its
+ * What reading a trajectory fails with: the trajectory's own failure, or the cache its
  * parts are kept in while its sessions are read.
  */
-type Failure = TrajectoryError | StorageError | ByteStoreError;
+type Failure = TrajectoryError | StorageError | Cache.CacheError;
 
 /** Empty kits. A part a kit made is stepped over, and response parts stay streamed. */
 const config = Config.config();

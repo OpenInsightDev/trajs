@@ -1,5 +1,5 @@
 import { ByteStore } from "@trajs/utils";
-import { Context, Effect, Layer } from "effect";
+import { Context, Data, Effect, Formatter, Layer } from "effect";
 import type { FileSystem, Option, Path } from "effect";
 import type { PlatformError } from "effect/PlatformError";
 
@@ -48,6 +48,36 @@ export interface Options {
 }
 
 /**
+ * What a cache failed with: a part it could not read from or write to its store.
+ *
+ * **When to use**
+ *
+ * Use to tell the failure of the cache's store apart from the failure of the trajectory
+ * it read: a store that refused or was cut short fails as this error, where bytes that
+ * do not hold a part fail as a {@link TrajectoryError}.
+ *
+ * **Details**
+ *
+ * - `id` names the trajectory whose part could not be kept.
+ * - `index` is the index of that part in the trajectory.
+ * - `operation` says whether the part was being read or written.
+ * - `cause` is what the store failed with, as it reported it.
+ *
+ * @see {@link Cached} for the trajectory whose parts are read.
+ * @category errors
+ */
+export class CacheError extends Data.TaggedError("CacheError")<{
+  id: string;
+  index: number;
+  operation: "read" | "write";
+  cause: unknown;
+}> {
+  override get message(): string {
+    return `Failed to ${this.operation} part ${this.index} of '${this.id}': ${Formatter.format(this.cause)}`;
+  }
+}
+
+/**
  * A trajectory a cache keeps: the parts it read from the source, read again as often as
  * asked and served one at a time by their index.
  *
@@ -59,12 +89,13 @@ export interface Options {
  * - It is read for as long as the cache lives.
  *
  * @see {@link Service.cache} for the reading that keeps a trajectory.
+ * @see {@link CacheError} for a part the store could not serve or keep.
  * @category models
  */
 export type Cached<Id extends string, Config extends Config.AnyConfig> = Trajectory.Trajectory<
   Id,
   Config,
-  TrajectoryError | ByteStore.ByteStoreError,
+  TrajectoryError | CacheError,
   Config.DecodingServices<Config>
 > &
   Readonly<{
@@ -73,7 +104,7 @@ export type Cached<Id extends string, Config extends Config.AnyConfig> = Traject
       index: number,
     ) => Effect.Effect<
       Option.Option<Trajectory.Part<Config>>,
-      TrajectoryError | ByteStore.ByteStoreError,
+      TrajectoryError | CacheError,
       Config.DecodingServices<Config>
     >;
   }>;
@@ -112,7 +143,7 @@ export interface Service {
     trajectory: Trajectory.Trajectory<Id, Config, E, R>,
   ) => Effect.Effect<
     Cached<Id, Config>,
-    E | TrajectoryError | ByteStore.ByteStoreError,
+    E | TrajectoryError | CacheError,
     R | Config.EncodingServices<Config>
   >;
 }
