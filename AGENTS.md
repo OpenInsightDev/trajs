@@ -39,23 +39,6 @@ release. Add a tool name to select part of the graph. For example, run
 
 - Keep a public module's private logic in the package's `src/internal/` (lowercase files, imported as `#/internal/*.ts`, never re-exported), and block `"./internal/*"` from the public surface.
 
-## Comment Style
-
-Short technical sentences, one per line, at most 20 words.
-
-- `packages/core/src/Trajectory.ts` is the reference for this style. Match its comments.
-- No relative clauses, no em dashes, no rhetorical colons. `SAFETY:` keeps its colon, the anti-slop linter requires it.
-- Write only what the code and the types cannot say.
-- Use terminology already established in the project or Effect. Verify usage against existing APIs, documentation, and implementation.
-- Name concrete APIs and concepts directly. Do not invent umbrella terms or replace established names with vague synonyms.
-- Link every type a comment names with `{@link}`, and link the concrete type rather than its `Any` alias.
-- Every public export has a JSDoc block with an `@category` tag.
-- `**When to use**`, `**Details**` and `**Example**` sections are allowed. Never grow one for a small change.
-- Section order is a description, `**When to use**`, `**Details**`, `**Example**`, then tags.
-- A description opens with a verb for a function, and with a noun phrase for a value or type.
-- An `**Example**` must run as written and end with `// =>` giving the result.
-- `@see` contrasts a sibling export and says how the two differ.
-
 ## Command Execution
 
 - DO NOT USE `timeout`.

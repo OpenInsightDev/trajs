@@ -30,7 +30,7 @@ blockers listed under Gates and Divergence.
 
 ## 2. Comment pass (required)
 
-Before committing, apply the rules in `.agents/skills/clear-comments/SKILL.md` to
+Before committing, apply the rules in `.agents/skills/comments/SKILL.md` to
 the files being landed: delete filler comments and comments that restate what the
 code already makes clear, keep only comments that explain why, and leave the
 public API documentation alone. Report what was removed. This runs before the
