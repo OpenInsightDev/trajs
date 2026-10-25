@@ -1,7 +1,7 @@
 import { expect, it } from "@effect/vitest";
 import { Cache, Prompt, Response, Session, Tool, Toolkit, Trajectory, View } from "@trajs/core";
-import { Event } from "@trajs/core/atif";
 import * as Config from "@trajs/core/Config";
+import { Event } from "@trajs/core/unstable/atif";
 import { Effect, Match, Schema, Stream } from "effect";
 
 const toolkit = Toolkit.make(

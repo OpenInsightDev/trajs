@@ -13,7 +13,7 @@
  * @stability stable
  * @category re-exports
  */
-export * as Document from "#/atif/Document.ts";
+export * as Document from "#/unstable/atif/Document.ts";
 
 /**
  * ATIF document and JSON-file import into trajectory parts.
@@ -21,7 +21,7 @@ export * as Document from "#/atif/Document.ts";
  * @stability stable
  * @category re-exports
  */
-export * as Encode from "#/atif/Encode.ts";
+export * as Encode from "#/unstable/atif/Encode.ts";
 
 /**
  * ATIF context-management event declarations and constructors.
@@ -29,7 +29,7 @@ export * as Encode from "#/atif/Encode.ts";
  * @stability stable
  * @category re-exports
  */
-export * as Event from "#/atif/Event.ts";
+export * as Event from "#/unstable/atif/Event.ts";
 
 /**
  * Versioned ATIF run and step extras.
@@ -37,7 +37,7 @@ export * as Event from "#/atif/Event.ts";
  * @stability stable
  * @category re-exports
  */
-export * as Extra from "#/atif/Extra.ts";
+export * as Extra from "#/unstable/atif/Extra.ts";
 
 /**
  * Text-oriented ATIF step views over session streams.
@@ -45,4 +45,4 @@ export * as Extra from "#/atif/Extra.ts";
  * @stability stable
  * @category re-exports
  */
-export * as Step from "#/atif/Step.ts";
+export * as Step from "#/unstable/atif/Step.ts";

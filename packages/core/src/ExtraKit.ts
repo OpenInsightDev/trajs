@@ -21,7 +21,7 @@ type ExtrasByTag<Xs> = IndexByKey<Xs, "tag">;
  * @stability stable
  * @category models
  */
-export type Kit<Extras extends Record<string, Extra.Any>> = Readonly<{
+export type ExtraKit<Extras extends Record<string, Extra.Any>> = Readonly<{
   extra: Extras;
 }>;
 
@@ -47,16 +47,16 @@ export const make = <Xs extends ReadonlyArray<Extra.Any>>(...extra: Xs) => {
 
   // SAFETY: `output` holds the extra data of every tag in `Xs`, which is what
   // `ExtrasByTag` reads the extra data given as.
-  return { extra: output } as Kit<ExtrasByTag<Xs>>;
+  return { extra: output } as ExtraKit<ExtrasByTag<Xs>>;
 };
 
 /**
- * A {@link Kit} without specific extra types.
+ * An {@link ExtraKit} without specific extra types.
  *
  * @stability stable
  * @category utility types
  */
-export type Any = Kit<Record<string, Extra.Any>>;
+export type Any = ExtraKit<Record<string, Extra.Any>>;
 
 /**
  * An extra kit with no declarations.
@@ -76,13 +76,13 @@ export const empty = make();
 export type Empty = typeof empty;
 
 /**
- * Extra declarations of a {@link Kit}, or `never` for another type.
+ * Extra declarations of an {@link ExtraKit}, or `never` for another type.
  *
  * @see {@link Extra.ExtraRecord} for the corresponding extra fields.
  * @stability stable
  * @category utility types
  */
-export type Extras<K> = K extends Kit<infer Extras> ? Extras : never;
+export type Extras<K> = K extends ExtraKit<infer Extras> ? Extras : never;
 
 type Schemas<K extends Any> = Exclude<
   | K["extra"][keyof K["extra"]]["prompt"]
@@ -92,7 +92,7 @@ type Schemas<K extends Any> = Exclude<
 >;
 
 /**
- * Schema requirements for decoding prompt, response, and session extras of a {@link Kit}.
+ * Schema requirements for decoding prompt, response, and session extras of an {@link ExtraKit}.
  *
  * @see {@link EncodingServices} for writing the same extras.
  * @stability stable
@@ -101,7 +101,7 @@ type Schemas<K extends Any> = Exclude<
 export type DecodingServices<K extends Any> = Schema.Codec.DecodingServices<Schemas<K>>;
 
 /**
- * Schema requirements for encoding prompt, response, and session extras of a {@link Kit}.
+ * Schema requirements for encoding prompt, response, and session extras of an {@link ExtraKit}.
  *
  * @see {@link DecodingServices} for reading the same extras.
  * @stability stable
@@ -117,13 +117,13 @@ type ExtrasMerged<Ks extends ReadonlyArray<Any>> = Ks extends readonly [
   : {};
 
 /**
- * The {@link Kit} produced by merging kits in tuple order.
+ * The {@link ExtraKit} produced by merging kits in tuple order.
  *
  * @see {@link merge} for duplicate-tag behavior.
  * @stability stable
  * @category utility types
  */
-export type Merged<Ks extends ReadonlyArray<Any>> = Kit<ExtrasMerged<Ks>>;
+export type Merged<Ks extends ReadonlyArray<Any>> = ExtraKit<ExtrasMerged<Ks>>;
 
 /**
  * Combines the declarations of existing extra kits.

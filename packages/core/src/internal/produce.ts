@@ -9,7 +9,7 @@ import type { TrajectoryError } from "#/TrajectoryError.ts";
 export const produceParts =
   <Config extends Config.AnyConfig, Metrics extends Record<string, Metric.Any>>(
     config: Config,
-    metrickit: MetricKit.WithProducers<MetricKit.Kit<Metrics>>,
+    metrickit: MetricKit.WithProducers<MetricKit.MetricKit<Metrics>>,
   ) =>
   <E, R>(
     stream: Trajectory.TrajectoryStream<Config, E, R>,

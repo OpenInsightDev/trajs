@@ -1,4 +1,4 @@
-# @trajs/core/atif
+# @trajs/core/unstable/atif
 
 A trajectory in the terms of [ATIF](https://docs.harborframework.com/agents/atif),
 the Agent Trajectory Interchange Format Harbor writes its agents' runs with.
@@ -20,7 +20,7 @@ step.
 
 ```ts
 import { Effect, Stream } from "effect";
-import { Step } from "@trajs/core/atif";
+import { Step } from "@trajs/core/unstable/atif";
 
 const steps = await Effect.runPromise(Stream.runCollect(Step.steps(trajectory)));
 
@@ -40,7 +40,7 @@ interleaves several sessions is read one session at a time.
 states, and `Encode.encode` reads a document that is decoded already — the same
 reading either way: the steps of the document are produced as the turns of a
 trajectory with `Produce.produce`, so a `trajectory.json` a program that ran
-elsewhere wrote is a trajectory like any other — `View`, `Session.toSessions`, the codec
+elsewhere wrote is a trajectory like any other — `View`, `Session.main`, the codec
 extensions and the metric kits read it as one, and `Step.steps` reads back the steps
 it was read from. The document is stated as the schemas ATIF states it in, so what a
 file holds is decoded before it is read.
@@ -48,7 +48,7 @@ file holds is decoded before it is read.
 ```ts
 import { NodeServices } from "@effect/platform-node";
 import { Effect, Stream } from "effect";
-import { Encode, Step } from "@trajs/core/atif";
+import { Encode, Step } from "@trajs/core/unstable/atif";
 
 const steps = await Effect.runPromise(
   Effect.gen(function* () {
@@ -71,7 +71,7 @@ it with `Encode.encode`, and names the directory its paths are read from:
 import { readFile } from "node:fs/promises";
 import { dirname } from "node:path";
 import { Schema } from "effect";
-import { Document, Encode } from "@trajs/core/atif";
+import { Document, Encode } from "@trajs/core/unstable/atif";
 
 const path = "runs/one/trajectory.json";
 const json = await readFile(path, "utf8");
@@ -122,7 +122,7 @@ and reads them off the part with their types:
 
 ```ts
 import { Effect, Stream } from "effect";
-import { Extra } from "@trajs/core/atif";
+import { Extra } from "@trajs/core/unstable/atif";
 
 const parts = Array.from(await Effect.runPromise(Stream.runCollect(trajectory)));
 const session = parts.find((part) => part._tag === "Session");
@@ -161,7 +161,7 @@ rather than in a field of the ATIF document.
 ```ts
 import { Stream } from "effect";
 import { Config, MetricKit, Produce, Trajectory } from "@trajs/core";
-import { Event } from "@trajs/core/atif";
+import { Event } from "@trajs/core/unstable/atif";
 
 const config = Config.config({
   eventkit: Event.eventkit,

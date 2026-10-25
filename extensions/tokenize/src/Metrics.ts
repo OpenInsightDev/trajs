@@ -358,7 +358,7 @@ export const makeProducer = (
  *
  * **Details**
  *
- * The kit is a `MetricKit.Kit` of every metric this package declares, each held under
+ * The kit is a `MetricKit.MetricKit` of every metric this package declares, each held under
  * the tag it is produced under — here {@link tokenEstimate}, the one metric the
  * package reports. It is extended rather than replaced when other packages' metrics
  * are produced with the same trajectory, and it is what a reader installs to get the

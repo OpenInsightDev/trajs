@@ -22,7 +22,7 @@ type MetricsByTag<Ms> = IndexByKey<Ms, "tag">;
  * @stability stable
  * @category models
  */
-export type Kit<Metrics extends Record<string, Metric.Any>> = Readonly<{
+export type MetricKit<Metrics extends Record<string, Metric.Any>> = Readonly<{
   metrics: Metrics;
 }>;
 
@@ -49,16 +49,16 @@ export const make = <Ms extends ReadonlyArray<Metric.Any>>(...metrics: Ms) => {
 
   // SAFETY: `output` holds the metric of every tag in `Ms`, which is what `MetricsByTag`
   // reads the metrics given as.
-  return { metrics: output } as Kit<MetricsByTag<Ms>>;
+  return { metrics: output } as MetricKit<MetricsByTag<Ms>>;
 };
 
 /**
- * A {@link Kit} without specific metric types.
+ * A {@link MetricKit} without specific metric types.
  *
  * @stability stable
  * @category utility types
  */
-export type Any = Kit<Record<string, Metric.Any>>;
+export type Any = MetricKit<Record<string, Metric.Any>>;
 
 /**
  * A metric kit with no declarations or producers.
@@ -78,16 +78,16 @@ export const empty = make();
 export type Empty = typeof empty;
 
 /**
- * Metric declarations of a {@link Kit}, or `never` for another type.
+ * Metric declarations of a {@link MetricKit}, or `never` for another type.
  *
  * @see {@link Metric.MetricParts} for the corresponding tagged reports.
  * @stability stable
  * @category utility types
  */
-export type Metrics<K> = K extends Kit<infer Metrics> ? Metrics : never;
+export type Metrics<K> = K extends MetricKit<infer Metrics> ? Metrics : never;
 
 /**
- * Schema requirements for decoding metric outputs and failures of a {@link Kit}.
+ * Schema requirements for decoding metric outputs and failures of a {@link MetricKit}.
  *
  * @see {@link EncodingServices} for writing the same reports.
  * @stability stable
@@ -98,7 +98,7 @@ export type DecodingServices<K extends Any> = Schema.Codec.DecodingServices<
 >;
 
 /**
- * Schema requirements for encoding metric outputs and failures of a {@link Kit}.
+ * Schema requirements for encoding metric outputs and failures of a {@link MetricKit}.
  *
  * @see {@link DecodingServices} for reading the same reports.
  * @stability stable
@@ -123,7 +123,7 @@ type ProducersMerged<Ks extends ReadonlyArray<WithProducers<Any>>> = Ks extends 
   : {};
 
 /**
- * The {@link Kit} produced by merging kits in tuple order.
+ * The {@link MetricKit} produced by merging kits in tuple order.
  *
  * **Details**
  *
@@ -135,8 +135,8 @@ type ProducersMerged<Ks extends ReadonlyArray<WithProducers<Any>>> = Ks extends 
  */
 export type Merged<Ks extends ReadonlyArray<Any>> =
   Ks extends ReadonlyArray<WithProducers<Any>>
-    ? Kit<MetricsMerged<Ks>> & { readonly producers: ProducersMerged<Ks> }
-    : Kit<MetricsMerged<Ks>>;
+    ? MetricKit<MetricsMerged<Ks>> & { readonly producers: ProducersMerged<Ks> }
+    : MetricKit<MetricsMerged<Ks>>;
 
 /**
  * Combines the declarations of existing metric kits.
@@ -198,7 +198,7 @@ export type Producers<Metrics extends Record<string, Metric.Any>> = Readonly<{
 }>;
 
 /**
- * A {@link Kit} with a producer for every declared metric.
+ * A {@link MetricKit} with a producer for every declared metric.
  *
  * @see {@link toProducers} for construction.
  * @see {@link Metric.produce} for running the producers.

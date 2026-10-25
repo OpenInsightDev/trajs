@@ -10,11 +10,6 @@
 import { Effect, FileSystem, Path, Schema } from "effect";
 import type { PlatformError } from "effect";
 
-import { FromJson } from "#/atif/Document.ts";
-import type { Document } from "#/atif/Document.ts";
-import { extrakit } from "#/atif/Extra.ts";
-import { produce } from "#/atif/internal/reading.ts";
-import { toolkitOf } from "#/atif/internal/toolkit.ts";
 import * as Config from "#/Config.ts";
 import * as EventKit from "#/EventKit.ts";
 import * as MetricKit from "#/MetricKit.ts";
@@ -22,6 +17,11 @@ import * as Produce from "#/Produce.ts";
 import type * as Toolkit from "#/Toolkit.ts";
 import * as Trajectory from "#/Trajectory.ts";
 import { TrajectoryError } from "#/TrajectoryError.ts";
+import { FromJson } from "#/unstable/atif/Document.ts";
+import type { Document } from "#/unstable/atif/Document.ts";
+import { extrakit } from "#/unstable/atif/Extra.ts";
+import { produce } from "#/unstable/atif/internal/reading.ts";
+import { toolkitOf } from "#/unstable/atif/internal/toolkit.ts";
 
 /**
  * Base-directory options for ATIF media files.
@@ -111,7 +111,13 @@ export const fromFile = (
 ): Effect.Effect<
   Trajectory.Trajectory<
     string,
-    Config.Config<true, Toolkit.Any, EventKit.Empty, MetricKit.Empty, typeof extrakit>,
+    Config.Config<
+      true,
+      Toolkit.Any,
+      EventKit.Empty,
+      MetricKit.WithProducers<MetricKit.Empty>,
+      typeof extrakit
+    >,
     TrajectoryError | PlatformError.PlatformError,
     FileSystem.FileSystem | Path.Path
   >,

@@ -9,10 +9,10 @@
 
 import { Schema } from "effect";
 
-import { FinalMetrics, Metrics, ProducerFields, SchemaVersion } from "#/atif/Document.ts";
-import { packageName } from "#/atif/internal/package.ts";
 import * as Extra from "#/Extra.ts";
 import * as ExtraKit from "#/ExtraKit.ts";
+import { FinalMetrics, Metrics, ProducerFields, SchemaVersion } from "#/unstable/atif/Document.ts";
+import { packageName } from "#/unstable/atif/internal/package.ts";
 import * as VersionedSchema from "#/VersionedSchema.ts";
 
 /**

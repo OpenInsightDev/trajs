@@ -18,25 +18,31 @@
   },
   "exports": {
     ".": "./src/index.ts",
-    "./atif": "./src/atif/index.ts",
     "./codec": "./src/codec/index.ts",
+    "./unstable/atif": "./src/unstable/atif/index.ts",
+    "./unstable/Indexing": "./src/unstable/Indexing.ts",
+    "./unstable/otel": "./src/unstable/otel/index.ts",
     "./package.json": "./package.json",
     "./*": "./src/*.ts",
     "./internal/*": null,
-    "./atif/internal/*": null,
     "./codec/internal/*": null,
+    "./unstable/atif/internal/*": null,
+    "./unstable/otel/internal/*": null,
     "./*/index": null
   },
   "publishConfig": {
     "exports": {
       ".": "./dist/index.mjs",
-      "./atif": "./dist/atif/index.mjs",
       "./codec": "./dist/codec/index.mjs",
+      "./unstable/atif": "./dist/unstable/atif/index.mjs",
+      "./unstable/Indexing": "./dist/unstable/Indexing.mjs",
+      "./unstable/otel": "./dist/unstable/otel/index.mjs",
       "./package.json": "./package.json",
       "./*": "./dist/*.mjs",
       "./internal/*": null,
-      "./atif/internal/*": null,
       "./codec/internal/*": null,
+      "./unstable/atif/internal/*": null,
+      "./unstable/otel/internal/*": null,
       "./*/index": null
     },
     "access": "public"

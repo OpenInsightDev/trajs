@@ -21,7 +21,7 @@ type EventsByTag<Es> = IndexByKey<Es, "tag">;
  * @stability stable
  * @category models
  */
-export type Eventkit<Events extends Record<string, Event.Any>> = Readonly<{
+export type EventKit<Events extends Record<string, Event.Any>> = Readonly<{
   events: Events;
 }>;
 
@@ -47,16 +47,16 @@ export const make = <Es extends ReadonlyArray<Event.Any>>(...events: Es) => {
 
   // SAFETY: `output` holds the event of every tag in `Es`.
   // `EventsByTag` reads the events given as that record.
-  return { events: output } as Eventkit<EventsByTag<Es>>;
+  return { events: output } as EventKit<EventsByTag<Es>>;
 };
 
 /**
- * An {@link Eventkit} without specific event types.
+ * An {@link EventKit} without specific event types.
  *
  * @stability stable
  * @category utility types
  */
-export type Any = Eventkit<Record<string, Event.Any>>;
+export type Any = EventKit<Record<string, Event.Any>>;
 
 /**
  * An event kit with no declarations.
@@ -76,16 +76,16 @@ export const empty = make();
 export type Empty = typeof empty;
 
 /**
- * Event declarations of an {@link Eventkit}, or `never` for another type.
+ * Event declarations of an {@link EventKit}, or `never` for another type.
  *
  * @see {@link Event.EventParts} for the corresponding tagged payloads.
  * @stability stable
  * @category utility types
  */
-export type Events<K> = K extends Eventkit<infer Events> ? Events : never;
+export type Events<K> = K extends EventKit<infer Events> ? Events : never;
 
 /**
- * Schema requirements for decoding the events of an {@link Eventkit}.
+ * Schema requirements for decoding the events of an {@link EventKit}.
  *
  * @see {@link EncodingServices} for writing the same events.
  * @stability stable
@@ -96,7 +96,7 @@ export type DecodingServices<K extends Any> = Schema.Codec.DecodingServices<
 >;
 
 /**
- * Schema requirements for encoding the events of an {@link Eventkit}.
+ * Schema requirements for encoding the events of an {@link EventKit}.
  *
  * @see {@link DecodingServices} for reading the same events.
  * @stability stable
@@ -114,13 +114,13 @@ type EventsMerged<Ks extends ReadonlyArray<Any>> = Ks extends readonly [
   : {};
 
 /**
- * The {@link Eventkit} produced by merging kits in tuple order.
+ * The {@link EventKit} produced by merging kits in tuple order.
  *
  * @see {@link merge} for duplicate-tag behavior.
  * @stability stable
  * @category utility types
  */
-export type Merged<Ks extends ReadonlyArray<Any>> = Eventkit<EventsMerged<Ks>>;
+export type Merged<Ks extends ReadonlyArray<Any>> = EventKit<EventsMerged<Ks>>;
 
 /**
  * Combines the declarations of existing event kits.

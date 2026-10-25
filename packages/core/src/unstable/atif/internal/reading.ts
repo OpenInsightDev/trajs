@@ -9,15 +9,21 @@
 import { DateTime, Effect, FileSystem, Option, Path, Predicate, Schema } from "effect";
 import type { PlatformError } from "effect";
 
-import type { Content, Document, StepObject } from "#/atif/Document.ts";
-import { DocumentFields, documentExtra, extrakit, StepFields, stepExtra } from "#/atif/Extra.ts";
-import type { Tools } from "#/atif/internal/toolkit.ts";
 import * as Config from "#/Config.ts";
 import type * as Extra from "#/Extra.ts";
 import * as Produce from "#/Produce.ts";
 import * as Prompt from "#/Prompt.ts";
 import * as Response from "#/Response.ts";
 import type { TrajectoryError } from "#/TrajectoryError.ts";
+import type { Content, Document, StepObject } from "#/unstable/atif/Document.ts";
+import {
+  DocumentFields,
+  documentExtra,
+  extrakit,
+  StepFields,
+  stepExtra,
+} from "#/unstable/atif/Extra.ts";
+import type { Tools } from "#/unstable/atif/internal/toolkit.ts";
 
 /** What the reading reads a document with: the files it serves, and the paths it names. */
 type Services = FileSystem.FileSystem | Path.Path;

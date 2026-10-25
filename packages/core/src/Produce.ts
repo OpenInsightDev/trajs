@@ -441,15 +441,17 @@ export type ProduceSession<
   enqueuePrompt: (
     message: Prompt.Prompt,
     options?: Extra.ExtraRecord<Extras, "prompt"> & Moments,
-  ) => Effect.Effect<Trajectory.PromptPart<ExtraKit.Kit<Extras>>>;
+  ) => Effect.Effect<Trajectory.PromptPart<ExtraKit.ExtraKit<Extras>>>;
   enqueueResponse: (
     response: Response.AllPartsView<Tools>,
     options?: Extra.ExtraRecord<Extras, "response"> & Moments,
-  ) => Effect.Effect<Trajectory.ResponsePart<Toolkit.Toolkit<Tools>, ExtraKit.Kit<Extras>, true>>;
+  ) => Effect.Effect<
+    Trajectory.ResponsePart<Toolkit.Toolkit<Tools>, ExtraKit.ExtraKit<Extras>, true>
+  >;
   enqueueEvent: (
     event: Event.EventParts<Events>,
     options?: Moments,
-  ) => Effect.Effect<Trajectory.EventPart<EventKit.Eventkit<Events>>>;
+  ) => Effect.Effect<Trajectory.EventPart<EventKit.EventKit<Events>>>;
   /**
    * Declares a child writer from an already enqueued fork target.
    *

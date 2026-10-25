@@ -2,7 +2,13 @@ import { defineConfig } from "vite-plus";
 
 export default defineConfig({
   pack: {
-    entry: ["src/index.ts", "src/atif/index.ts", "src/codec/index.ts"],
+    entry: [
+      "src/index.ts",
+      "src/codec/index.ts",
+      "src/unstable/Indexing.ts",
+      "src/unstable/atif/index.ts",
+      "src/unstable/otel/index.ts",
+    ],
     unbundle: true,
     dts: {
       generator: "tsgo",
@@ -13,8 +19,9 @@ export default defineConfig({
         ...exports,
         "./*": isPublish ? "./dist/*.mjs" : "./src/*.ts",
         "./internal/*": null,
-        "./atif/internal/*": null,
         "./codec/internal/*": null,
+        "./unstable/atif/internal/*": null,
+        "./unstable/otel/internal/*": null,
         "./*/index": null,
       }),
     },

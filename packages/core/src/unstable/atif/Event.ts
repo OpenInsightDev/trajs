@@ -9,9 +9,9 @@
 
 import { Schema } from "effect";
 
-import { packageName } from "#/atif/internal/package.ts";
 import * as Event from "#/Event.ts";
 import * as EventKit from "#/EventKit.ts";
+import { packageName } from "#/unstable/atif/internal/package.ts";
 import * as VersionedSchema from "#/VersionedSchema.ts";
 
 /** The kinds of context transformation ATIF names for a `type`. */
