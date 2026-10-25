@@ -3,12 +3,12 @@
   "version": "0.0.0-alpha.0",
   "private": true,
   "description": "The shader fills the trajs designs are painted with: the effects authored in Figma, as React components.",
-  "homepage": "https://github.com/OpenInsightDev/trajs",
+  "homepage": "https://github.com/trajs-ai/trajs",
   "license": "MIT",
   "author": "Bowei Wang <wozluohd@gmail.com>",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/OpenInsightDev/trajs.git"
+    "url": "git+https://github.com/trajs-ai/trajs.git"
   },
   "type": "module",
   "imports": {

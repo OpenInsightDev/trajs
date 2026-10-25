@@ -2,12 +2,12 @@
   "name": "@trajs/<%= it.name %>",
   "version": "0.0.0",
   "description": "<%= it.description %>",
-  "homepage": "https://github.com/OpenInsightDev/trajs",
+  "homepage": "https://github.com/trajs-ai/trajs",
   "license": "MIT",
   "author": "Bowei Wang <wozluohd@gmail.com>",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/OpenInsightDev/trajs.git"
+    "url": "git+https://github.com/trajs-ai/trajs.git"
   },
   "files": [
     "dist"

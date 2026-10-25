@@ -3,12 +3,12 @@
   "version": "0.0.0",
   "private": true,
   "description": "Worked examples of analysing trajectories with `@trajs/core`, a realistic scene or an API tutorial per directory.",
-  "homepage": "https://github.com/OpenInsightDev/trajs",
+  "homepage": "https://github.com/trajs-ai/trajs",
   "license": "MIT",
   "author": "Bowei Wang <wozluohd@gmail.com>",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/OpenInsightDev/trajs.git"
+    "url": "git+https://github.com/trajs-ai/trajs.git"
   },
   "type": "module",
   "scripts": {

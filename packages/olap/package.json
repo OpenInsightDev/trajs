@@ -2,12 +2,12 @@
   "name": "@trajs/olap",
   "version": "0.0.0-alpha.1",
   "description": "Trajectories read as the rows an OLAP store aggregates them in, and the ClickHouse they are asked of.",
-  "homepage": "https://github.com/OpenInsightDev/trajs",
+  "homepage": "https://github.com/trajs-ai/trajs",
   "license": "MIT",
   "author": "Bowei Wang <wozluohd@gmail.com>",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/OpenInsightDev/trajs.git"
+    "url": "git+https://github.com/trajs-ai/trajs.git"
   },
   "files": [
     "dist"

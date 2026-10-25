@@ -13,7 +13,7 @@ metadata:
 # Land
 
 Landing means the thread's work is committed and pushed to `origin`
-(`https://github.com/OpenInsightDev/trajs.git`). An explicit landing request —
+(`https://github.com/trajs-ai/trajs.git`). An explicit landing request —
 the Land Changes action or equivalent user language — is the trigger: proceed
 with this workflow instead of asking whether to merge. Stop only for the genuine
 blockers listed under Gates and Divergence.
@@ -91,7 +91,7 @@ success.
   in and push again; a stale branch is not a reason to stop.
 - If `main` is protected against direct pushes, push a branch and open a pull
   request with `gh pr create` instead. Check first with
-  `gh api repos/OpenInsightDev/trajs/branches/main/protection`.
+  `gh api repos/trajs-ai/trajs/branches/main/protection`.
 - Never force-push.
 
 ## 6. Confirm

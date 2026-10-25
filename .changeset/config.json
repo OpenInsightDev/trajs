@@ -1,6 +1,6 @@
 {
   "$schema": "https://unpkg.com/@changesets/config@4.0.1/schema.json",
-  "changelog": ["@changesets/changelog-github", { "repo": "OpenInsightDev/trajs" }],
+  "changelog": ["@changesets/changelog-github", { "repo": "trajs-ai/trajs" }],
   "commit": false,
   "access": "public",
   "baseBranch": "main",

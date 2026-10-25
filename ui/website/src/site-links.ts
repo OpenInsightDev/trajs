@@ -23,7 +23,7 @@ export const blogUrl = route("blog");
 export const changelogUrl = route("changelog");
 
 /** The source the site documents. */
-export const repositoryUrl = "https://github.com/OpenInsightDev/trajs";
+export const repositoryUrl = "https://github.com/trajs-ai/trajs";
 
 /** The navigation the floating header carries, in the order the design draws it. */
 export type NavigationItem = Readonly<{

@@ -17,7 +17,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/OpenInsightDev/trajs/actions/workflows/deploy.yml"><img alt="Docs" src="https://github.com/OpenInsightDev/trajs/actions/workflows/deploy.yml/badge.svg"></a>
+  <a href="https://github.com/trajs-ai/trajs/actions/workflows/deploy.yml"><img alt="Docs" src="https://github.com/trajs-ai/trajs/actions/workflows/deploy.yml/badge.svg"></a>
   <img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-blue.svg">
   <img alt="Node" src="https://img.shields.io/badge/node-%E2%89%A522.18-3c873a.svg">
   <img alt="pnpm" src="https://img.shields.io/badge/pnpm-12.10.1-f69220.svg">

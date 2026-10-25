@@ -66,7 +66,7 @@ const config = defineConfig({
     // the deploy hands `SITE_URL` what it answers on.
     baseUrl: process.env.SITE_URL ?? "https://tra.js.org",
     git: {
-      user: "OpenInsightDev",
+      user: "trajs-ai",
       repo: "trajs",
       branch: "main",
     },

@@ -2,12 +2,12 @@
   "name": "@trajs/extension-tokenize",
   "version": "0.0.0-alpha.0",
   "description": "Token counts, built on Effect AI's tokenizer service.",
-  "homepage": "https://github.com/OpenInsightDev/trajs",
+  "homepage": "https://github.com/trajs-ai/trajs",
   "license": "MIT",
   "author": "Bowei Wang <wozluohd@gmail.com>",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/OpenInsightDev/trajs.git"
+    "url": "git+https://github.com/trajs-ai/trajs.git"
   },
   "files": [
     "dist"
