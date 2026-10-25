@@ -23,7 +23,8 @@ export const PromptPart = <K extends ExtraKit.Any>(extrakit: K) =>
     extra: extraField(extrakit, "prompt"),
     sessionId: Schema.optional(Schema.String),
     uuid: Uuid,
-    timestamp: Schema.optional(Schema.DateTimeUtcFromString),
+    timestamp: Schema.optional(Timestamp),
+    startTimestamp: Schema.optional(Timestamp),
   });
 
 export type PromptPart<K extends ExtraKit.Any> = Schema.Schema.Type<
@@ -53,6 +54,7 @@ export type SessionPartEncoded = Schema.Codec.Encoded<ReturnType<typeof SessionP
 
 const responseFields = {
   timestamp: Timestamp,
+  startTimestamp: Schema.optional(Timestamp),
   sessionId: Schema.optional(Schema.String),
   uuid: Uuid,
 };
@@ -119,6 +121,7 @@ export const EventPart = <K extends EventKit.Any>(eventkit: K) =>
   Schema.TaggedStruct("Event", {
     event: Event.EventParts(eventkit),
     timestamp: Timestamp,
+    startTimestamp: Schema.optional(Timestamp),
     sessionId: Schema.optional(Schema.String),
     uuid: Uuid,
   });
@@ -130,7 +133,8 @@ export type EventPartEncoded = Schema.Codec.Encoded<ReturnType<typeof EventPart<
 export const MetricPart = <K extends MetricKit.Any>(metrickit: K) =>
   Schema.TaggedStruct("Metric", {
     metric: Metric.MetricParts(metrickit),
-    timestamp: Schema.optional(Schema.DateTimeUtcFromString),
+    timestamp: Schema.optional(Timestamp),
+    startTimestamp: Schema.optional(Timestamp),
   });
 
 export type MetricPart<K extends MetricKit.Any> = Schema.Schema.Type<
@@ -145,6 +149,7 @@ export interface Parts<Config extends Config.AnyConfig> {
     options?: {
       readonly sessionId?: string;
       readonly timestamp?: DateTime.Utc;
+      readonly startTimestamp?: DateTime.Utc;
       readonly uuid?: string;
     } & Extra.ExtraRecord<Config.ExtrasOf<Config>, "prompt">,
   ) => PromptPart<Config["extrakit"]>;
@@ -168,6 +173,7 @@ export interface Parts<Config extends Config.AnyConfig> {
     options?: {
       readonly sessionId?: string;
       readonly timestamp?: DateTime.Utc;
+      readonly startTimestamp?: DateTime.Utc;
       readonly uuid?: string;
     } & Extra.ExtraRecord<Config.ExtrasOf<Config>, "response">,
   ) => ResponsePart<Config["toolkit"], Config["extrakit"], Config["stream"]>;
@@ -177,13 +183,14 @@ export interface Parts<Config extends Config.AnyConfig> {
     options?: {
       readonly sessionId?: string;
       readonly timestamp?: DateTime.Utc;
+      readonly startTimestamp?: DateTime.Utc;
       readonly uuid?: string;
     },
   ) => EventPart<Config["eventkit"]>;
 
   readonly metric: (
     metric: Metric.MetricParts<Config.MetricsOf<Config>>,
-    options?: { readonly timestamp?: DateTime.Utc },
+    options?: { readonly timestamp?: DateTime.Utc; readonly startTimestamp?: DateTime.Utc },
   ) => MetricPart<Config["metrickit"]>;
 }
 
@@ -201,23 +208,34 @@ export const parts = <Config extends Config.AnyConfig>(config: Config): Parts<Co
   const Metric = MetricPart(config.metrickit);
 
   return {
-    prompt: (prompt, { sessionId, timestamp, uuid, ...extra } = {}) =>
-      Prompt.make({ messages: prompt.content, sessionId, extra, timestamp, uuid }),
+    prompt: (prompt, { sessionId, timestamp, startTimestamp, uuid, ...extra } = {}) =>
+      Prompt.make({
+        messages: prompt.content,
+        sessionId,
+        extra,
+        timestamp,
+        startTimestamp,
+        uuid,
+      }),
     mainSession: ({ uuid, ...extra } = {}) =>
       Session.make({ type: MainSession.make({ id: mainSessionId }), extra, uuid }),
     subSession: (id, { fork, uuid, ...extra }) =>
       Session.make({ type: SubSession.make({ id, fork }), extra, uuid }),
     // SAFETY: the schema uses the same configuration as the return type.
     // TypeScript cannot resolve the conditional response type for a generic configuration.
-    response: (response, { sessionId, timestamp, uuid, ...extra } = {}) =>
-      Response.make({ response, sessionId, extra, timestamp, uuid }) as ResponsePart<
-        Config["toolkit"],
-        Config["extrakit"],
-        Config["stream"]
-      >,
-    event: (event, { sessionId, timestamp, uuid } = {}) =>
-      Event.make({ event, sessionId, timestamp, uuid }),
-    metric: (metric, { timestamp } = {}) => Metric.make({ metric, timestamp }),
+    response: (response, { sessionId, timestamp, startTimestamp, uuid, ...extra } = {}) =>
+      Response.make({
+        response,
+        sessionId,
+        extra,
+        timestamp,
+        startTimestamp,
+        uuid,
+      }) as ResponsePart<Config["toolkit"], Config["extrakit"], Config["stream"]>,
+    event: (event, { sessionId, timestamp, startTimestamp, uuid } = {}) =>
+      Event.make({ event, sessionId, timestamp, startTimestamp, uuid }),
+    metric: (metric, { timestamp, startTimestamp } = {}) =>
+      Metric.make({ metric, timestamp, startTimestamp }),
   };
 };
 

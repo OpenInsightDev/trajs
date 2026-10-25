@@ -475,16 +475,18 @@ export const produce = (
     });
 
     for (const turn of yield* turnsOf(document, cwd)) {
-      yield* session.enqueuePrompt(
-        turn.prompt,
-        extraOf(turn.promptStates),
-        turn.promptStates?.moment,
-      );
+      yield* session.enqueuePrompt(turn.prompt, {
+        ...extraOf(turn.promptStates),
+        timestamp: turn.promptStates?.moment,
+      });
 
       for (const [at, part] of turn.response.entries()) {
         const states = at === 0 ? turn.answerStates : undefined;
 
-        yield* session.enqueueResponse(part, extraOf(states), states?.moment);
+        yield* session.enqueueResponse(part, {
+          ...extraOf(states),
+          timestamp: states?.moment,
+        });
       }
     }
   });

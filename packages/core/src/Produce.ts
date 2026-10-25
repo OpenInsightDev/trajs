@@ -255,6 +255,12 @@ export function fromSessions<
   };
 }
 
+/** The span `startTimestamp` begins runs to `timestamp`. */
+type Moments = {
+  readonly timestamp?: DateTime.Utc;
+  readonly startTimestamp?: DateTime.Utc;
+};
+
 export type ProduceSession<
   Tools extends Record<string, Tool.Any>,
   Events extends Record<string, Event.Any>,
@@ -263,16 +269,15 @@ export type ProduceSession<
   id: string;
   enqueuePrompt: (
     message: Prompt.Prompt,
-    options?: Extra.ExtraRecord<Extras, "prompt">,
-    timestamp?: DateTime.Utc,
+    options?: Extra.ExtraRecord<Extras, "prompt"> & Moments,
   ) => Effect.Effect<Trajectory.PromptPart<ExtraKit.Kit<Extras>>>;
   enqueueResponse: (
     response: Response.AllPartsView<Tools>,
-    options?: Extra.ExtraRecord<Extras, "response">,
-    timestamp?: DateTime.Utc,
+    options?: Extra.ExtraRecord<Extras, "response"> & Moments,
   ) => Effect.Effect<Trajectory.ResponsePart<Toolkit.Toolkit<Tools>, ExtraKit.Kit<Extras>, true>>;
   enqueueEvent: (
     event: Event.EventParts<Events>,
+    options?: Moments,
   ) => Effect.Effect<Trajectory.EventPart<EventKit.Eventkit<Events>>>;
   forkSession: (
     options: { id: string; fork?: string } & Extra.ExtraRecord<Extras, "session">,
@@ -391,11 +396,14 @@ export function produce<
         declaration: string,
       ): ProduceSession<Toolkit["tools"], Events["events"], Extras["extra"]> => ({
         id: stated ?? Trajectory.mainSessionId,
-        enqueuePrompt: (prompt, extra = {}, timestamp) =>
-          enqueue(part.prompt(prompt, { sessionId: stated, timestamp, ...extra })),
-        enqueueResponse: (response, extra = {}, timestamp) =>
-          enqueue(part.response(response, { sessionId: stated, timestamp, ...extra })),
-        enqueueEvent: (event) => enqueue(part.event(event, { sessionId: stated })),
+        enqueuePrompt: (prompt, { timestamp, startTimestamp, ...extra } = {}) =>
+          enqueue(part.prompt(prompt, { sessionId: stated, timestamp, startTimestamp, ...extra })),
+        enqueueResponse: (response, { timestamp, startTimestamp, ...extra } = {}) =>
+          enqueue(
+            part.response(response, { sessionId: stated, timestamp, startTimestamp, ...extra }),
+          ),
+        enqueueEvent: (event, { timestamp, startTimestamp } = {}) =>
+          enqueue(part.event(event, { sessionId: stated, timestamp, startTimestamp })),
         forkSession: ({ id: sessionId, fork, ...extra }) =>
           Effect.gen(function* () {
             // A session is declared before the parts it produces, so a declaration of
