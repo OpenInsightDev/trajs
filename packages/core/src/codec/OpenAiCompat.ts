@@ -6,7 +6,7 @@
  * `Trajectory` of `@trajs/core` — and what a chat completions API is handed is not
  * that stream: it is one conversation per session, holding the messages the
  * session's model was given and answered in the order they were produced, and what
- * the session inherited from the one it continues from. {@link makeOpenAiCompat}
+ * the session inherited from the one it continues from. {@link make}
  * reads a trajectory as those conversations.
  *
  * The conversations are read with `View.prompt` of `@trajs/core`, one session
@@ -30,27 +30,30 @@
  */
 
 import type { OpenAiClient } from "@effect/ai-openai-compat";
-import { Session, View } from "@trajs/core";
-import * as Config from "@trajs/core/Config";
 import { Effect, Predicate } from "effect";
 import type { Prompt } from "effect/ai";
 import * as Base64 from "effect/encoding/Base64";
 
+import { imagesOf, mediaTypeOf, resultText, textOf } from "#/codec/internal/prompt.ts";
+import * as Config from "#/Config.ts";
+import * as Session from "#/Session.ts";
+import * as View from "#/View.ts";
+
 /**
  * A message of the chat completions API of an OpenAI-compatible client.
  *
- * @see {@link makeOpenAiCompat} for the operation that reads a trajectory as them.
+ * @see {@link make} for the operation that reads a trajectory as them.
  * @category models
  */
-export type OpenAiCompatMessage = OpenAiClient.ChatCompletionRequestMessage;
+export type Message = OpenAiClient.ChatCompletionRequestMessage;
 
 /**
  * The messages of every session of a trajectory, keyed by the id of the session.
  *
- * @see {@link makeOpenAiCompat} for the operation that reads a trajectory as them.
+ * @see {@link make} for the operation that reads a trajectory as them.
  * @category models
  */
-export type OpenAiCompatSessions = Record<string, OpenAiCompatMessage[]>;
+export type Sessions = Record<string, Message[]>;
 
 /**
  * Reads the sessions of a trajectory as the conversations a chat completions API of an
@@ -85,7 +88,7 @@ export type OpenAiCompatSessions = Record<string, OpenAiCompatMessage[]>;
  * **Example** (Reading a trajectory as the messages of a call and its answer)
  *
  * ```ts import.meta.vitest
- * import { Codec } from "@trajs/extension-openai-compat"
+ * import { OpenAiCompat } from "@trajs/core/codec"
  * import { Cache, Config, EventKit, ExtraKit, MetricKit, Prompt, Response, Session, Toolkit, Trajectory } from "@trajs/core"
  * import { Effect, Stream } from "effect"
  *
@@ -143,21 +146,21 @@ export type OpenAiCompatSessions = Record<string, OpenAiCompatMessage[]>;
  * const trajectory = Trajectory.make(config)(Stream.fromIterable(parts))
  *
  * const root = await Effect.runPromise(Session.main(trajectory).pipe(Effect.provide(Cache.layer())))
- * const conversations = await Effect.runPromise(Codec.makeOpenAiCompat(root))
+ * const conversations = await Effect.runPromise(OpenAiCompat.make(root))
  *
  * conversations[sessionId]?.map((message) => message.role) // => ["user", "assistant", "tool", "assistant"]
  * ```
  *
- * @see {@link OpenAiCompatSessions} for the messages it reads to.
+ * @see {@link Sessions} for the messages it reads to.
  * @see {@link View.prompt} for the messages of one session.
  * @see {@link Session.main} for the tree it is given.
  * @category constructors
  */
-export const makeOpenAiCompat = <Config extends Config.AnyConfig, E, R>(
+export const make = <Config extends Config.AnyConfig, E, R>(
   main: Session.MainSession<Config, E, R>,
-): Effect.Effect<OpenAiCompatSessions, E, R> =>
+): Effect.Effect<Sessions, E, R> =>
   Effect.gen(function* () {
-    const encoded: OpenAiCompatSessions = {};
+    const encoded: Sessions = {};
 
     for (const session of Session.all(main)) {
       const prompt = yield* View.prompt(Session.stream(session));
@@ -168,47 +171,11 @@ export const makeOpenAiCompat = <Config extends Config.AnyConfig, E, R>(
     return encoded;
   });
 
-/** The text of the parts given. */
-const textOf = (parts: ReadonlyArray<Prompt.Part>): string => {
-  let text = "";
-
-  for (const part of parts) {
-    if (part.type === "text") text += part.text;
-  }
-
-  return text;
-};
-
-/** The images of the parts given, which this model states as file parts. */
-const imagesOf = (parts: ReadonlyArray<Prompt.Part>): ReadonlyArray<Prompt.FilePart> => {
-  const images: Prompt.FilePart[] = [];
-
-  for (const part of parts) {
-    if (part.type === "file" && part.mediaType.startsWith("image/")) images.push(part);
-  }
-
-  return images;
-};
-
-/**
- * The result of a tool as the text a provider is handed it as: the string a result
- * already is, and the JSON of every other value.
- */
-const resultText = (result: Prompt.ToolResultPart["result"]): string =>
-  Predicate.isString(result) ? result : (JSON.stringify(result) ?? String(result));
-
-/**
- * The media type an image is stated as: the one the part produces, and JPEG where it
- * produces only that the part is an image.
- */
-const mediaTypeOf = (part: Prompt.FilePart): string =>
-  part.mediaType === "image/*" ? "image/jpeg" : part.mediaType;
-
 /** A location or a data URL an image part already states, which this API takes as one. */
 const referenced = /^(data:|https?:\/\/)/i;
 
-const openAiCompatMessages = (messages: ReadonlyArray<Prompt.Message>): OpenAiCompatMessage[] => {
-  const encoded: OpenAiCompatMessage[] = [];
+const openAiCompatMessages = (messages: ReadonlyArray<Prompt.Message>): Message[] => {
+  const encoded: Message[] = [];
 
   for (const message of messages) {
     switch (message.role) {
@@ -282,9 +249,7 @@ const openAiImageUrl = (url: string): OpenAiImagePart => ({
  * The messages an assistant message is stated as: what the model answered with,
  * and a `tool` message for each result it stated of a call no provider ran itself.
  */
-const openAiAssistantMessages = (
-  parts: ReadonlyArray<Prompt.AssistantMessagePart>,
-): OpenAiCompatMessage[] => {
+const openAiAssistantMessages = (parts: ReadonlyArray<Prompt.AssistantMessagePart>): Message[] => {
   const text = textOf(parts);
   const toolCalls: OpenAiToolCall[] = [];
 
@@ -314,8 +279,8 @@ const openAiToolCall = (part: Prompt.ToolCallPart): OpenAiToolCall => ({
 });
 
 /** The messages the tool results of a message are stated as, one per result. */
-const openAiToolMessages = (parts: ReadonlyArray<Prompt.Part>): OpenAiCompatMessage[] => {
-  const messages: OpenAiCompatMessage[] = [];
+const openAiToolMessages = (parts: ReadonlyArray<Prompt.Part>): Message[] => {
+  const messages: Message[] = [];
 
   for (const part of parts) {
     if (part.type === "tool-result" && !part.providerExecuted) {

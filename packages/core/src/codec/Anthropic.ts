@@ -5,9 +5,9 @@
  * `Trajectory` of `@trajs/core` — and what the API is handed is not that stream: it
  * is one conversation per session, holding the messages the session's model was given
  * and answered in the order they were produced, and what the session inherited from
- * the one it continues from. {@link makeAnthropic} reads the sessions of a trajectory
+ * the one it continues from. {@link make} reads the sessions of a trajectory
  * as those conversations; a trajectory read as the messages a chat completions API of
- * an OpenAI-compatible client takes is `@trajs/extension-openai-compat`.
+ * an OpenAI-compatible client takes is `@trajs/core/codec/OpenAiCompat`.
  *
  * The conversations are read with `View.prompt` of `@trajs/core`, one session
  * at a time, and each of their messages is then written as this API states it. A
@@ -31,19 +31,22 @@
  */
 
 import type { Generated } from "@effect/ai-anthropic";
-import { Session, View } from "@trajs/core";
-import * as Config from "@trajs/core/Config";
 import { Effect, Predicate } from "effect";
 import type { Prompt } from "effect/ai";
 import * as Base64 from "effect/encoding/Base64";
 
+import { imagesOf, mediaTypeOf, resultText, textOf } from "#/codec/internal/prompt.ts";
+import * as Config from "#/Config.ts";
+import * as Session from "#/Session.ts";
+import * as View from "#/View.ts";
+
 /**
  * A message of the Anthropic Messages API.
  *
- * @see {@link makeAnthropic} for the operation that reads a trajectory as them.
+ * @see {@link make} for the operation that reads a trajectory as them.
  * @category models
  */
-export type AnthropicMessage = Generated.BetaInputMessage;
+export type Message = Generated.BetaInputMessage;
 
 /**
  * One conversation of a trajectory as the Anthropic Messages API takes it: the
@@ -57,22 +60,22 @@ export type AnthropicMessage = Generated.BetaInputMessage;
  * conversation, so a system message produced among them is read here rather than
  * where it was produced.
  *
- * @see {@link makeAnthropic} for the operation that reads a trajectory as them.
+ * @see {@link make} for the operation that reads a trajectory as them.
  * @category models
  */
-export type AnthropicConversation = Readonly<{
+export type Conversation = Readonly<{
   system?: string | ReadonlyArray<Generated.BetaRequestTextBlock>;
-  messages: ReadonlyArray<AnthropicMessage>;
+  messages: ReadonlyArray<Message>;
 }>;
 
 /**
  * The conversations of every session of a trajectory, keyed by the id of the
  * session.
  *
- * @see {@link makeAnthropic} for the operation that reads a trajectory as them.
+ * @see {@link make} for the operation that reads a trajectory as them.
  * @category models
  */
-export type AnthropicSessions = Record<string, AnthropicConversation>;
+export type Sessions = Record<string, Conversation>;
 
 /**
  * Reads the sessions of a trajectory as the conversations the Anthropic Messages API takes,
@@ -93,7 +96,7 @@ export type AnthropicSessions = Record<string, AnthropicConversation>;
  *   part it continues from, from the root of the fork down.
  * - Every system message of a conversation is read as its `system`, since the API
  *   states the instructions of a call apart from the messages of the conversation
- *   ({@link AnthropicConversation}).
+ *   ({@link Conversation}).
  * - A tool result is read on the user's side of the conversation, which is where
  *   the API states one, whether the trajectory holds it as a tool message of a
  *   prompt or as part of a response; a user message and the tool results following
@@ -106,7 +109,7 @@ export type AnthropicSessions = Record<string, AnthropicConversation>;
  * **Example** (Reading a trajectory as the messages of a call and its answer)
  *
  * ```ts import.meta.vitest
- * import { Codec } from "@trajs/extension-anthropic"
+ * import { Anthropic } from "@trajs/core/codec"
  * import { Cache, Config, EventKit, ExtraKit, MetricKit, Prompt, Response, Session, Toolkit, Trajectory } from "@trajs/core"
  * import { Effect, Stream } from "effect"
  *
@@ -169,23 +172,23 @@ export type AnthropicSessions = Record<string, AnthropicConversation>;
  * const trajectory = Trajectory.make(config)(Stream.fromIterable(parts))
  *
  * const root = await Effect.runPromise(Session.main(trajectory).pipe(Effect.provide(Cache.layer())))
- * const conversations = await Effect.runPromise(Codec.makeAnthropic(root))
+ * const conversations = await Effect.runPromise(Anthropic.make(root))
  * const conversation = conversations[sessionId]
  *
  * conversation?.messages.map((message) => message.role) // => ["user", "assistant", "user", "assistant"]
  * Array.isArray(conversation?.system) ? conversation.system.length : 0 // => 1
  * ```
  *
- * @see {@link AnthropicSessions} for the conversations it reads to.
+ * @see {@link Sessions} for the conversations it reads to.
  * @see {@link View.prompt} for the messages of one session.
  * @see {@link Session.main} for the tree it is given.
  * @category constructors
  */
-export const makeAnthropic = <Config extends Config.AnyConfig, E, R>(
+export const make = <Config extends Config.AnyConfig, E, R>(
   main: Session.MainSession<Config, E, R>,
-): Effect.Effect<AnthropicSessions, E, R> =>
+): Effect.Effect<Sessions, E, R> =>
   Effect.gen(function* () {
-    const encoded: AnthropicSessions = {};
+    const encoded: Sessions = {};
 
     for (const session of Session.all(main)) {
       const prompt = yield* View.prompt(Session.stream(session));
@@ -196,46 +199,10 @@ export const makeAnthropic = <Config extends Config.AnyConfig, E, R>(
     return encoded;
   });
 
-/** The text of the parts given. */
-const textOf = (parts: ReadonlyArray<Prompt.Part>): string => {
-  let text = "";
-
-  for (const part of parts) {
-    if (part.type === "text") text += part.text;
-  }
-
-  return text;
-};
-
-/** The images of the parts given, which this model states as file parts. */
-const imagesOf = (parts: ReadonlyArray<Prompt.Part>): ReadonlyArray<Prompt.FilePart> => {
-  const images: Prompt.FilePart[] = [];
-
-  for (const part of parts) {
-    if (part.type === "file" && part.mediaType.startsWith("image/")) images.push(part);
-  }
-
-  return images;
-};
-
-/**
- * The result of a tool as the text a provider is handed it as: the string a result
- * already is, and the JSON of every other value.
- */
-const resultText = (result: Prompt.ToolResultPart["result"]): string =>
-  Predicate.isString(result) ? result : (JSON.stringify(result) ?? String(result));
-
-/**
- * The media type an image is stated as: the one the part produces, and JPEG where it
- * produces only that the part is an image.
- */
-const mediaTypeOf = (part: Prompt.FilePart): string =>
-  part.mediaType === "image/*" ? "image/jpeg" : part.mediaType;
-
 /** A location an image part names, as opposed to the bytes it holds, which the API reads as an image's URL. */
 const located = /^https?:\/\//i;
 
-const anthropicConversation = (messages: ReadonlyArray<Prompt.Message>): AnthropicConversation => {
+const anthropicConversation = (messages: ReadonlyArray<Prompt.Message>): Conversation => {
   const system: Generated.BetaRequestTextBlock[] = [];
   const entries: AnthropicEntry[] = [];
 

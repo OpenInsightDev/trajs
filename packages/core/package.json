@@ -19,20 +19,24 @@
   "exports": {
     ".": "./src/index.ts",
     "./atif": "./src/atif/index.ts",
+    "./codec": "./src/codec/index.ts",
     "./package.json": "./package.json",
     "./*": "./src/*.ts",
     "./internal/*": null,
     "./atif/internal/*": null,
+    "./codec/internal/*": null,
     "./*/index": null
   },
   "publishConfig": {
     "exports": {
       ".": "./dist/index.mjs",
       "./atif": "./dist/atif/index.mjs",
+      "./codec": "./dist/codec/index.mjs",
       "./package.json": "./package.json",
       "./*": "./dist/*.mjs",
       "./internal/*": null,
       "./atif/internal/*": null,
+      "./codec/internal/*": null,
       "./*/index": null
     },
     "access": "public"
@@ -45,6 +49,8 @@
     "prepublishOnly": "vp run build"
   },
   "dependencies": {
+    "@effect/ai-anthropic": "catalog:",
+    "@effect/ai-openai-compat": "catalog:",
     "@trajs/utils": "workspace:*",
     "effect": "catalog:",
     "uuid": "catalog:"
