@@ -17,5 +17,5 @@ Add those re-reads into every agent's total and the parent conversation is charg
 The `task` calls belong to the parent. Hiring a sub-agent is the parent's action.
 
 ```sh
-vp test cases/sessions
+vp test tutorials/sessions
 ```

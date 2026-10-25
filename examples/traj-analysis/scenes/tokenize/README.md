@@ -11,5 +11,5 @@ The last prompt splits into the question text, the model's own reasoning played 
 That is an estimate of the text. It is not the bill the provider sent.
 
 ```sh
-vp test cases/tokenize
+vp test scenes/tokenize
 ```

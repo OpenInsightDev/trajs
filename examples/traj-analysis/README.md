@@ -2,17 +2,32 @@
 
 Worked examples of analysing a trajectory with `@trajs/core`.
 
-Each case is a directory under [`cases/`](./cases). The analysis is `main` in `main.test.ts`, and the test directly under it asserts what `main` returns. The case README is the situation and the result. Open `main` for the code. Comments there cover the API choices.
+Each case is one directory under [`scenes/`](./scenes) or [`tutorials/`](./tutorials). The analysis
+is `main` in `main.test.ts`, and the test directly under it asserts what `main` returns. The case
+README is the situation and the result. Open `main` for the code. Comments there cover the API
+choices.
 
-## Cases
+## Scenes
 
-- [turns](./cases/turns/README.md) — count prompts, text, and tool calls, one turn at a time.
-- [sessions](./cases/sessions/README.md) — attribute cost to the main agent and the sub-agents it forked, without billing inherited context twice.
-- [repeated-tool-calls](./cases/repeated-tool-calls/README.md) — report a tool call that was made again and again with the same arguments.
-- [compaction](./cases/compaction/README.md) — split a run at a context compaction, and list the files the agent had to read again.
-- [toolkit](./cases/toolkit/README.md) — count calls by the fields your tools take, and keep calls the toolkit does not describe.
-- [tokenize](./cases/tokenize/README.md) — read token counts stored with the trajectory: how the session grew, and what the last prompt was made of.
-- [olap](./cases/olap/README.md) — load hundreds of trajectories into embedded ClickHouse and answer with SQL.
+- [compaction](./scenes/compaction/README.md) — split a run at a context compaction, and list the
+  files the agent had to read again.
+- [repeated-tool-calls](./scenes/repeated-tool-calls/README.md) — report a tool call that was made
+  again and again with the same arguments.
+- [tokenize](./scenes/tokenize/README.md) — read token counts stored with the trajectory: how the
+  session grew, and what the last prompt was made of.
+- [usage-across-runs](./scenes/usage-across-runs/README.md) — load hundreds of trajectories into
+  embedded ClickHouse and answer with SQL.
+
+## Tutorials
+
+- [steps](./tutorials/steps/README.md) — count prompts, replies, text, and tool calls, one step at
+  a time.
+- [sessions](./tutorials/sessions/README.md) — attribute cost to the main agent and the sub-agents
+  it forked, without billing inherited context twice.
+- [toolkit](./tutorials/toolkit/README.md) — count calls by the fields your tools take, and keep
+  calls the toolkit does not describe.
+- [olap](./tutorials/olap/README.md) — write two short runs into the parts table and answer their
+  calls and billing with SQL.
 
 ## Running
 
@@ -31,5 +46,6 @@ vp test
 One case is named by its directory:
 
 ```sh
-vp test cases/turns
+vp test scenes/compaction
+vp test tutorials/steps
 ```

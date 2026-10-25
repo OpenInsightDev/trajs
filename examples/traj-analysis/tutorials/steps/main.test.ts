@@ -6,7 +6,9 @@ import { Effect, Match, Stream } from "effect";
 const config = Config.config({ stream: false });
 
 interface Report {
+  readonly steps: number;
   readonly prompts: number;
+  readonly responses: number;
   readonly messages: number;
   readonly characters: number;
   readonly toolCalls: Readonly<Record<string, number>>;
@@ -35,36 +37,50 @@ const main = Effect.fn(function* () {
   // Parts are flat. View.steps emits one prompt, then the responses before the next prompt.
   return yield* View.steps(session.stream).pipe(
     Stream.runFold(
-      (): Report => ({ prompts: 0, messages: 0, characters: 0, toolCalls: {} }),
-      (report, step) =>
-        Match.value(step).pipe(
+      (): Report => ({
+        steps: 0,
+        prompts: 0,
+        responses: 0,
+        messages: 0,
+        characters: 0,
+        toolCalls: {},
+      }),
+      (report, step) => {
+        const counted = { ...report, steps: report.steps + 1 };
+
+        return Match.value(step).pipe(
           Match.tag("Prompt", ({ prompt }) => ({
-            ...report,
-            prompts: report.prompts + 1,
-            messages: report.messages + prompt.messages.length,
+            ...counted,
+            prompts: counted.prompts + 1,
+            messages: counted.messages + prompt.messages.length,
           })),
-          Match.tag("Response", ({ response }) =>
-            response.reduce(
-              (report, responsePart) =>
-                Match.value(responsePart).pipe(
-                  Match.when({ type: "text" }, ({ text }) => ({
-                    ...report,
-                    characters: report.characters + text.length,
-                  })),
-                  Match.when({ type: "tool-call" }, ({ name }) => ({
-                    ...report,
-                    toolCalls: {
-                      ...report.toolCalls,
-                      [name]: (report.toolCalls[name] ?? 0) + 1,
-                    },
-                  })),
-                  Match.orElse(() => report),
-                ),
-              report,
-            ),
-          ),
-          Match.orElse(() => report),
-        ),
+          Match.tag("Response", ({ response }) => {
+            let folded = { ...counted, responses: counted.responses + 1 };
+
+            for (const responsePart of response) {
+              const withMessage = { ...folded, messages: folded.messages + 1 };
+
+              folded = Match.value(responsePart).pipe(
+                Match.when({ type: "text" }, ({ text }) => ({
+                  ...withMessage,
+                  characters: withMessage.characters + text.length,
+                })),
+                Match.when({ type: "tool-call" }, ({ name }) => ({
+                  ...withMessage,
+                  toolCalls: {
+                    ...withMessage.toolCalls,
+                    [name]: (withMessage.toolCalls[name] ?? 0) + 1,
+                  },
+                })),
+                Match.orElse(() => withMessage),
+              );
+            }
+
+            return folded;
+          }),
+          Match.orElse(() => counted),
+        );
+      },
     ),
   );
 });
@@ -73,8 +89,10 @@ it.effect("main", () =>
   main().pipe(
     Effect.map((report) =>
       expect(report).toEqual({
+        steps: 4,
         prompts: 2,
-        messages: 2,
+        responses: 2,
+        messages: 6,
         characters: 26,
         toolCalls: { get_weather: 2 },
       } satisfies Report),

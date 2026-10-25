@@ -1,7 +1,7 @@
 # examples/traj-analysis
 
-`README.md` states what the example is and lists its cases; this file is how a case is
-written.
+`README.md` states what the example is and lists its scenes and tutorials; this file is how a
+case is written.
 
 A case is written against `@trajs/core` alone — the services a trajectory is carried
 through, a storage, a compression and a hash, are re-exported there — so no case imports
@@ -11,16 +11,33 @@ A case's `main` is an `Effect`, so its assertion is registered with `it.effect` 
 [`@effect/vitest`](https://github.com/Effect-TS/effect/tree/main/packages/vitest): the
 Effect runs as the test, and failing or dying is what fails it.
 
+## Scenes and tutorials
+
+A case is filed by what it answers.
+
+- `scenes/<name>/` answers a question a real run asks, over a trajectory shaped like the one it
+  comes from: a run that delegates, a context compacted mid-session, a session read for its
+  tokens, hundreds of runs answered in one pass. The reading may be long and take several
+  modules, because the question is not simplified to fit one.
+- `tutorials/<name>/` shows one API on a short, simple trajectory, so a reader who learns it is
+  not also reading an analysis. The trajectory is the smallest one the API is visible on.
+
+A case that would only be a shorter scene belongs in `tutorials/`. A case whose question would
+be contrived on a two-turn trajectory belongs in `scenes/`. A question worth both is filed twice,
+as [`scenes/usage-across-runs`](./scenes/usage-across-runs) and
+[`tutorials/olap`](./tutorials/olap) are: the scene answers it at scale, the tutorial shows the
+API on two runs.
+
 ## Adding a case
 
-1. Create `cases/<name>/main.test.ts`.
+1. Create `scenes/<name>/main.test.ts` or `tutorials/<name>/main.test.ts`.
 2. Write the analysis as a `main` in it, and what it is made of in modules beside
    it — what it reads, what it is of, and the layers it runs with.
 3. Assert what `main` returns, right below it, in `it.effect`.
 4. Write `README.md` as the scenario, in plain language.
    Say what the run was, what question the analysis answers, and what it finds.
    Do not explain an API there. Put that in a short comment in `main.test.ts`, next to the call, and only where the call is not obvious from its name.
-   Say how to run the case (`vp test cases/<name>`).
+   Say how to run the case (`vp test scenes/<name>` or `vp test tutorials/<name>`).
    Do not use a "What it shows" / "When you need it" outline, and do not invent products the case could feed.
 
 `main` is read in one pass: its steps stay in it rather than becoming functions of their own,
@@ -29,8 +46,8 @@ so a reader never leaves it to finish a thought.
 A case that generates what it reads writes it under its own `fixtures/`, which
 `.gitignore` keeps out of the repository.
 
-Cases share this one package: a case is a directory under `cases/`, not a package of its
-own.
+Cases share this one package: a case is a directory under `scenes/` or `tutorials/`, not a
+package of its own.
 
 ## Reading a case
 
@@ -56,4 +73,5 @@ A case meets this before it is added, whatever its assertion proves.
 
 - `vp test` in `examples/traj-analysis`, or
   `vp run --filter @trajs/example-traj-analysis test` from the root.
+- One case is `vp test scenes/<name>` or `vp test tutorials/<name>`.
 - `vp check` in `examples/traj-analysis`.
