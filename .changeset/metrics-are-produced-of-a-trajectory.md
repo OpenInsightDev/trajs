@@ -3,19 +3,20 @@
 ---
 
 The metrics of a trajectory are produced by the kit of the run that writes it, so a
-trajectory read later states only what that kit derived. `Produce.withMetrics` produces
-the metrics of a kit over a trajectory that is already written, and answers with a
-trajectory that holds the parts of the one given, in order and unchanged, followed by the
-parts the metrics of the kit produce of them. It is dual, so the trajectory is stated
-first — `Produce.withMetrics(trajectory, metrickit)` — or piped into the kit —
-`trajectory.pipe(Produce.withMetrics(metrickit))`.
+trajectory read later states only what that kit derived. `Produce.produceMetrics`
+produces the metrics of a kit over a trajectory that is already written, and answers
+with a trajectory that holds the parts of the one given, in order and unchanged, with
+the parts the metrics of the kit produce of them merged in. It is dual, so the
+trajectory is stated first — `Produce.produceMetrics(trajectory, metrickit)` — or piped
+into the kit — `trajectory.pipe(Produce.produceMetrics(metrickit))`.
 
-The metric parts follow the parts of the trajectory rather than interleaving with them,
-because a metric part is read by the part it names: `Session` and `View` hold one by the
-parts read before it, so one that came before its part would be read by nothing. The
-trajectory is read twice — as its parts, and by the producers of the kit — over one
-subscription, since a trajectory of a run is read once and is not asked again for what it
-holds.
+The metric parts are produced while the trajectory is read, and each is merged in as it
+is produced: a producer has read the parts a metric part names before producing it, so
+`Session` and `View` hold what it states. The trajectory is read twice — as its parts,
+and by the producers of the kit — over one subscription, since a trajectory of a run is
+read once and is not asked again for what it holds. A run that is produced rather than
+read again (`Produce.produce`, `Produce.fromSession`) merges the metric parts it derives
+the same way.
 
 The trajectory answered with states a `MetricKit.Merged` kit of the one it was read with
 and the one given, so the metrics it already holds and the ones added are read with the

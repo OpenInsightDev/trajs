@@ -1,12 +1,12 @@
-import { Cause, DateTime, Effect, Exit, Fiber, Function, Queue, Stream } from "effect";
+import { Cause, DateTime, Effect, Exit, Function, Queue, Stream } from "effect";
 
 import * as Config from "#/Config.ts";
 import * as Event from "#/Event.ts";
 import * as EventKit from "#/EventKit.ts";
 import * as Extra from "#/Extra.ts";
 import * as ExtraKit from "#/ExtraKit.ts";
+import { produceParts } from "#/internal/produce.ts";
 import { configOf, uuid } from "#/internal/trajectory.ts";
-import * as Metric from "#/Metric.ts";
 import * as MetricKit from "#/MetricKit.ts";
 import * as Prompt from "#/Prompt.ts";
 import * as Response from "#/Response.ts";
@@ -69,37 +69,8 @@ const produceWith =
   ) =>
   <E, R>(
     stream: Trajectory.TrajectoryStream<ProducedConfig<Toolkit, Events, Metrics, Extras>, E, R>,
-  ): Trajectory.Trajectory<
-    string,
-    ProducedConfig<Toolkit, Events, Metrics, Extras>,
-    E | TrajectoryError,
-    R
-  > => {
-    const parts = Trajectory.parts(config);
-
-    return stream.pipe(
-      // The trajectory is read twice — as the parts of the trajectory, and by the
-      // producers the metric kit runs over it — so one subscription is shared
-      // between the two readings rather than the producer behind them, which may drive a
-      // model, being run twice.
-      Stream.broadcastN({ n: 2, capacity: "unbounded" }),
-      Effect.map(([produced, producing]) =>
-        Stream.merge(
-          produced,
-          producing.pipe(
-            // The config here streams, and a producer reads whole parts:
-            // `Metric.produce` folds the increments before a producer reads them.
-            Metric.produce(config.metrickit),
-            // What a kit derived is produced as the part of an event-less kind it is,
-            // built the way every part of the trajectory is.
-            Stream.map((metric) => parts.metric(metric)),
-          ),
-        ),
-      ),
-      Stream.unwrap,
-      Trajectory.make(id ?? uuid(), config),
-    );
-  };
+  ) =>
+    produceParts(config, config.metrickit)(stream).pipe(Trajectory.make(id ?? uuid(), config));
 
 export function fromSession<
   Id extends string,
@@ -255,70 +226,17 @@ export function fromSessions<
   };
 }
 
-type WithMetrics<Read extends Config.AnyConfig, Metrics extends MetricKit.Any> = Config.Config<
-  Read["stream"],
-  Read["toolkit"],
-  Read["eventkit"],
-  MetricKit.Merged<readonly [Read["metrickit"], Metrics]>,
-  Read["extrakit"]
+/**
+ * The config a trajectory states once the metrics of `Metrics` are produced of it: the
+ * config it is read with, with a metric kit of both.
+ */
+type WithMetrics<Config extends Config.AnyConfig, Metrics extends MetricKit.Any> = Config.Config<
+  Config["stream"],
+  Config["toolkit"],
+  Config["eventkit"],
+  MetricKit.Merged<readonly [Config["metrickit"], Metrics]>,
+  Config["extrakit"]
 >;
-
-const withMetricsImpl = <Read extends Config.AnyConfig, Metrics extends MetricKit.Any, E, R>(
-  trajectory: Trajectory.Trajectory<string, Read, E, R>,
-  metrickit: MetricKit.WithProducers<Metrics>,
-): Trajectory.Trajectory<string, WithMetrics<Read, Metrics>, E | TrajectoryError, R> => {
-  const stated = configOf(trajectory);
-
-  const config: WithMetrics<Read, Metrics> = {
-    ...stated,
-    // SAFETY: `merge` answers with the kit the kits given make, which is the kit `Merged`
-    // reads them as.
-    metrickit: MetricKit.merge(stated.metrickit, metrickit) as MetricKit.Merged<
-      readonly [Read["metrickit"], Metrics]
-    >,
-  };
-
-  const parts = Trajectory.parts(config);
-
-  // SAFETY: a part of the trajectory given is a part of the one that states the metrics of
-  // its own kit and the ones added beside them, which is the config stated above.
-  const given = trajectory as Trajectory.TrajectoryStream<WithMetrics<Read, Metrics>, E, R>;
-
-  return given.pipe(
-    // The trajectory is read twice — as its parts, and by the producers of the metrics —
-    // so one subscription is shared between the two readings rather than the source
-    // being read again, which a trajectory of a run cannot be.
-    Stream.broadcastN({ n: 2, capacity: "unbounded" }),
-    Effect.map(([held, producing]) =>
-      Effect.gen(function* () {
-        // A metric part is read after the part it names, so the metrics are read while the
-        // trajectory is read and emitted once it ends.
-        const metrics = yield* producing.pipe(
-          Metric.produce(metrickit),
-          // SAFETY: a metric part of the kit given is a part of the trajectory that states
-          // its metrics beside the ones it already states.
-          Stream.map((metric) =>
-            parts.metric(
-              metric as Metric.MetricParts<Config.MetricsOf<WithMetrics<Read, Metrics>>>,
-            ),
-          ),
-          Stream.runCollect,
-          Effect.forkScoped,
-        );
-
-        return Stream.concat(
-          held,
-          Fiber.join(metrics).pipe(
-            Effect.map((collected) => Stream.fromIterable(collected)),
-            Stream.unwrap,
-          ),
-        );
-      }).pipe(Stream.unwrap),
-    ),
-    Stream.unwrap,
-    Trajectory.make(config),
-  );
-};
 
 /**
  * Produces the metrics of `metrickit` over `trajectory`, and answers with a trajectory that
@@ -331,28 +249,53 @@ const withMetricsImpl = <Read extends Config.AnyConfig, Metrics extends MetricKi
  *
  * **Details**
  *
- * The trajectory is read once. Its parts are held unchanged and in order, the producers of
- * `metrickit` read them as they arrive, and the metric parts they produce follow them, so a
- * metric part is read after the part it names.
+ * The trajectory is read once, and its parts are held unchanged and in order. The producers
+ * of `metrickit` read it as it is read, and the metric parts they produce are merged in as
+ * they are produced. A producer has read the parts a metric part names before it produces
+ * it, so a reading of the trajectory holds it.
  *
  * The trajectory answered with states a metric kit of the metrics it was read with and the
- * ones given, and is named by a new id: an id names one trajectory, and these are not the
- * parts that id was read for.
- *
- * A metric part the trajectory already holds is kept, and the metric of its tag is produced
- * again beside it.
+ * ones given. It is named by a new id: an id names one trajectory, and these are not the
+ * parts that id was read for. A metric part the trajectory already holds is kept, and the
+ * metric of its tag is produced again beside it.
  *
  * @see {@link fromSession} for producing the metrics of a run as it is written.
  * @category combinators
  */
-export const withMetrics = Function.dual<
+export const produceMetrics: {
   <Metrics extends MetricKit.Any>(
     metrickit: MetricKit.WithProducers<Metrics>,
-  ) => <Read extends Config.AnyConfig, E, R>(
-    trajectory: Trajectory.Trajectory<string, Read, E, R>,
-  ) => Trajectory.Trajectory<string, WithMetrics<Read, Metrics>, E | TrajectoryError, R>,
-  typeof withMetricsImpl
->(2, withMetricsImpl);
+  ): <Config extends Config.AnyConfig, E, R>(
+    trajectory: Trajectory.Trajectory<string, Config, E, R>,
+  ) => Trajectory.Trajectory<string, WithMetrics<Config, Metrics>, E | TrajectoryError, R>;
+  <Config extends Config.AnyConfig, Metrics extends MetricKit.Any, E, R>(
+    trajectory: Trajectory.Trajectory<string, Config, E, R>,
+    metrickit: MetricKit.WithProducers<Metrics>,
+  ): Trajectory.Trajectory<string, WithMetrics<Config, Metrics>, E | TrajectoryError, R>;
+} = Function.dual(
+  2,
+  <Config extends Config.AnyConfig, Metrics extends MetricKit.Any, E, R>(
+    trajectory: Trajectory.Trajectory<string, Config, E, R>,
+    metrickit: MetricKit.WithProducers<Metrics>,
+  ): Trajectory.Trajectory<string, WithMetrics<Config, Metrics>, E | TrajectoryError, R> => {
+    const stated = configOf(trajectory);
+
+    const config: WithMetrics<Config, Metrics> = {
+      ...stated,
+      // SAFETY: `merge` answers with the kit the kits given make, which is the kit `Merged`
+      // reads them as.
+      metrickit: MetricKit.merge(stated.metrickit, metrickit) as MetricKit.Merged<
+        readonly [Config["metrickit"], Metrics]
+      >,
+    };
+
+    // SAFETY: a part of the trajectory given is a part of the one that states the metrics of
+    // its own kit and the ones added beside them, which is the config stated above.
+    const given = trajectory as Trajectory.TrajectoryStream<WithMetrics<Config, Metrics>, E, R>;
+
+    return given.pipe(produceParts(config, metrickit), Trajectory.make(config));
+  },
+);
 
 /** The span `startTimestamp` begins runs to `timestamp`. */
 type Moments = {

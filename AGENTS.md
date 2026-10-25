@@ -30,6 +30,11 @@ release. Add a tool name to select part of the graph. For example, run
 
 - Prefer `.pipe()` over function composition.
 
+## Stream Algorithms
+
+- Write an algorithm over a stream with Stream combinators, not by collecting it (`Stream.runCollect`, `Stream.runFold`, a replaying queue) unless the user agrees.
+- An inefficient implementation, and leaving one unreported, is a serious error.
+
 ## Package Layout
 
 - Keep a public module's private logic in the package's `src/internal/` (lowercase files, imported as `#/internal/*.ts`, never re-exported), and block `"./internal/*"` from the public surface.
