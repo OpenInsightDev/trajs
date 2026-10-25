@@ -26,6 +26,8 @@ choices.
   it forked, without billing inherited context twice.
 - [toolkit](./tutorials/toolkit/README.md) — count calls by the fields your tools take, and keep
   calls the toolkit does not describe.
+- [metric](./tutorials/metric/README.md) — measure the text each tool result handed back, and read
+  what the metric could not measure.
 - [olap](./tutorials/olap/README.md) — write two short runs into the parts table and answer their
   calls and billing with SQL.
 
