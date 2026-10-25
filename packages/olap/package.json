@@ -1,6 +1,6 @@
 {
   "name": "@trajs/olap",
-  "version": "0.0.0-alpha.0",
+  "version": "0.0.0-alpha.1",
   "description": "Trajectories read as the rows an OLAP store aggregates them in, and the ClickHouse they are asked of.",
   "homepage": "https://github.com/OpenInsightDev/trajs",
   "license": "MIT",
