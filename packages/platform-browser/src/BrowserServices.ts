@@ -5,7 +5,7 @@
  * JavaScript hash of `@trajs/utils` read a digest with.
  *
  * {@link layer} is the layer a program that runs where `node:zlib` is not provides
- * `@trajs/core`'s `Exchange.layer` with, beside where it keeps its trajectories.
+ * the exchange layer of `@trajs/core` with, beside where it keeps its trajectories.
  */
 
 import { type Compression, type Options as CompressionOptions } from "@trajs/utils/Compression";
@@ -57,7 +57,7 @@ export interface Options {
 
 /**
  * The service implementations a program that runs where WebAssembly does provides
- * `Exchange.layer` with.
+ * the exchange layer of `@trajs/core` with.
  *
  * **When to use**
  *

@@ -1,4 +1,4 @@
-import { Predicate } from "effect";
+import { Predicate, type Schema } from "effect";
 
 import type { IndexByKey } from "#/internal/types.ts";
 import type * as Metric from "#/Metric.ts";
@@ -28,6 +28,34 @@ export type Any = Kit<Record<string, Metric.Any>>;
 export const empty = make();
 
 export type Empty = typeof empty;
+
+/**
+ * A utility type which extracts the metrics from a {@link Kit}.
+ *
+ * @see {@link Metric.MetricParts} for the part schema those metrics make
+ * @category models
+ */
+export type Metrics<K> = K extends Kit<infer Metrics> ? Metrics : never;
+
+/**
+ * The services that decoding the metric schemas of a {@link Kit} requires.
+ *
+ * @see {@link EncodingServices} for the services of writing the same schemas
+ * @category models
+ */
+export type DecodingServices<K extends Any> = Schema.Codec.DecodingServices<
+  K["metrics"][keyof K["metrics"]]["output"] | K["metrics"][keyof K["metrics"]]["failure"]
+>;
+
+/**
+ * The services that encoding the metric schemas of a {@link Kit} requires.
+ *
+ * @see {@link DecodingServices} for the services of reading the same schemas
+ * @category models
+ */
+export type EncodingServices<K extends Any> = Schema.Codec.EncodingServices<
+  K["metrics"][keyof K["metrics"]]["output"] | K["metrics"][keyof K["metrics"]]["failure"]
+>;
 
 type MetricsMerged<Ks extends ReadonlyArray<Any>> = Ks extends readonly [
   infer Head extends Any,

@@ -6,7 +6,7 @@
 import { Effect, Schema, Sink } from "effect";
 import { KeyValueStore } from "effect/persistence";
 
-import { type Bytes, makeBytes } from "#/Bytes.ts";
+import { type Byte, makeByte } from "#/Byte.ts";
 import {
   type ByteStore,
   ByteStoreError,
@@ -160,8 +160,8 @@ const bytesOf = (
   store: KeyValueStore.KeyValueStore,
   id: string,
   meta: Meta,
-): Bytes<ByteStoreError> =>
-  makeBytes({
+): Byte<ByteStoreError> =>
+  makeByte({
     length: Effect.succeed(meta.length),
     read: (buffer, { offset = 0n, size = buffer.length } = {}) =>
       readInto(store, id, meta, buffer, offset, size),

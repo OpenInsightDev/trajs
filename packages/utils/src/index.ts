@@ -3,9 +3,9 @@
  * its parts are carried in, the hash it is named by, the byte sequence a storage
  * serves it as, and the storage itself.
  *
- * Every module is re-exported as a namespace — `Bytes.Bytes`,
+ * Every module is re-exported as a namespace — `Byte.Byte`,
  * `Storage.Storage` — and each is also available as a subpath import such as
- * `@trajs/utils/Bytes`.
+ * `@trajs/utils/Byte`.
  *
  * Where a trajectory is kept and what reads a digest are stated here over what any
  * platform provides — `Storage.layerFileSystem`, `Storage.layerS3` and
@@ -16,7 +16,7 @@
  * ({@link ByteStore.layerKVStore}) or over the one in memory ({@link ByteStore.layer}).
  */
 
-export * as Bytes from "#/Bytes.ts";
+export * as Byte from "#/Byte.ts";
 
 export * as ByteStore from "#/ByteStore.ts";
 

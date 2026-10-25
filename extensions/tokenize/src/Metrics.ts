@@ -378,7 +378,7 @@ export const metrickit = MetricKit.make(tokenEstimate);
  * worth is measured in terms of the schemas of `Tokens`, and what a trajectory
  * holds of it is in terms of the metric's versioned output.
  */
-const outputOf = (measured: Measured): Metric.ProducerOutput<typeof tokenEstimate> =>
+const outputOf = (measured: Measured): Metric.Output<typeof tokenEstimate> =>
   Metric.makeOutput<typeof tokenEstimate>(
     Estimate.make({
       version: Estimate.fields.version.literal,
@@ -391,10 +391,7 @@ const outputOf = (measured: Measured): Metric.ProducerOutput<typeof tokenEstimat
 /**
  * The failure of one part that could not be counted, naming the part it is about.
  */
-const uncounted = (
-  attach: string,
-  reason: AiError.AiError,
-): Metric.ProducerFailure<typeof tokenEstimate> =>
+const uncounted = (attach: string, reason: AiError.AiError): Metric.Failure<typeof tokenEstimate> =>
   Metric.makeFailure<typeof tokenEstimate>(
     Uncounted.make({ version: Uncounted.fields.version.literal, reason }),
     { attach: [attach] },

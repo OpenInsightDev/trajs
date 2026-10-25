@@ -5,11 +5,11 @@
 
 import { Effect, FileSystem, Sink } from "effect";
 
-import { type Bytes, makeBytes } from "#/Bytes.ts";
+import { type Byte, makeByte } from "#/Byte.ts";
 import { type Storage, StorageError } from "#/Storage.ts";
 
-const fileBytes = (fs: FileSystem.FileSystem, path: string): Bytes<StorageError> =>
-  makeBytes({
+const fileBytes = (fs: FileSystem.FileSystem, path: string): Byte<StorageError> =>
+  makeByte({
     length: fs.stat(path).pipe(
       Effect.map((info) => info.size),
       Effect.mapError((cause) => new StorageError({ id: path, cause })),

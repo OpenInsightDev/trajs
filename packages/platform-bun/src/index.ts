@@ -6,8 +6,8 @@
  *
  * Every module is re-exported as a namespace — `BunCompression.layer` — and each is
  * also available as a subpath import such as
- * `@trajs/platform-bun/BunCompression`. `BunServices` aggregates them into the layer
- * `@trajs/core`'s `Exchange.layer` is provided with.
+ * `@trajs/platform-bun/BunCompression`. `BunServices` aggregates them into
+ * what the exchange layer of `@trajs/core` is provided with.
  *
  * The modules here import each other relatively rather than through the `imports`
  * field's `#/*`: Bun resolves that field's exact keys but not its wildcards, so a

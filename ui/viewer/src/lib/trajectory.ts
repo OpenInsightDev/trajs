@@ -18,10 +18,10 @@
 
 import { Session, SessionTree, Trajectory, View } from "@trajs/core";
 import * as Config from "@trajs/core/Config";
-import { Exchange } from "@trajs/core/Exchange";
+import * as Exchange from "@trajs/core/Exchange";
 import type { TrajectoryError } from "@trajs/core/TrajectoryError";
 import { BrowserServices } from "@trajs/platform-browser";
-import { makeBytes } from "@trajs/utils/Bytes";
+import { makeByte } from "@trajs/utils/Byte";
 import { type ByteStoreError } from "@trajs/utils/ByteStore";
 import { Storage, StorageError } from "@trajs/utils/Storage";
 import { Effect, Layer, Option, Sink, type Scope, Stream } from "effect";
@@ -43,7 +43,7 @@ const Handed = "handed";
 const handed = (bytes: Uint8Array): Storage => ({
   read: () =>
     Effect.succeed(
-      makeBytes({
+      makeByte({
         length: Effect.succeed(BigInt(bytes.length)),
         read: (buffer, { offset = 0n } = {}) =>
           Effect.sync(() => {
@@ -62,7 +62,10 @@ const handed = (bytes: Uint8Array): Storage => ({
 const browserExchange = Layer.provide(Exchange.layer, BrowserServices.layer());
 
 /** One turn of a session's conversation: what a model was given, and what it answered. */
-export type Turn = View.PromptTurn<Config.AnyConfig>;
+export type Turn = Readonly<{
+  prompt: View.PromptStep<Config.AnyConfig>["prompt"];
+  response: View.ResponseStep<Config.AnyConfig>["response"];
+}>;
 
 /**
  * One stretch of a conversation: the turns one session produced.
@@ -109,13 +112,48 @@ export interface Trajectory {
   readonly roots: ReadonlyArray<TrajectorySession>;
 }
 
+/** The turns read so far, and the turn the latest prompt opened. */
+interface Assembly {
+  readonly turns: ReadonlyArray<Turn>;
+  readonly open: Option.Option<Turn>;
+}
+
 /** The parts of one session, as the turns they were produced in. */
 const turnsOf = (
   stream: Session.SessionStream<Config.AnyConfig, Failure>,
 ): Effect.Effect<ReadonlyArray<Turn>, Failure> =>
-  View.promptTurns(stream).pipe(
-    Stream.runCollect,
-    Effect.map((turns): ReadonlyArray<Turn> => Array.from(turns)),
+  View.steps(stream).pipe(
+    Stream.runFold(
+      (): Assembly => ({ turns: [], open: Option.none() }),
+      (assembly, step) => {
+        switch (step._tag) {
+          case "Prompt":
+            return {
+              turns: Option.isSome(assembly.open)
+                ? [...assembly.turns, assembly.open.value]
+                : assembly.turns,
+              open: Option.some({ prompt: step.prompt, response: [] }),
+            };
+
+          case "Response":
+            return Option.isNone(assembly.open)
+              ? assembly
+              : {
+                  turns: assembly.turns,
+                  open: Option.some({
+                    prompt: assembly.open.value.prompt,
+                    response: [...assembly.open.value.response, ...step.response],
+                  }),
+                };
+
+          case "Event":
+            return assembly;
+        }
+      },
+    ),
+    Effect.map(({ turns, open }): ReadonlyArray<Turn> =>
+      Option.isSome(open) ? [...turns, open.value] : turns,
+    ),
   );
 
 /**
@@ -170,7 +208,7 @@ const readSession = (
  */
 export const read = (bytes: Uint8Array): Effect.Effect<Trajectory, Failure, Scope.Scope> =>
   Effect.gen(function* () {
-    const exchange = yield* Exchange;
+    const exchange = yield* Exchange.Exchange;
 
     const loaded = yield* exchange.load(Handed);
 

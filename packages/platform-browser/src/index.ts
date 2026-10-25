@@ -7,7 +7,7 @@
  * Every module is re-exported as a namespace — `BrowserCompression.layer`,
  * `BrowserStreamHash.layer` — and each is also available as a subpath import such
  * as `@trajs/platform-browser/BrowserCompression`. `BrowserServices` aggregates
- * them into the one layer `@trajs/core`'s `Exchange.layer` is provided with.
+ * them into what the exchange layer of `@trajs/core` is provided with.
  */
 
 export * as BrowserCompression from "#/BrowserCompression.ts";

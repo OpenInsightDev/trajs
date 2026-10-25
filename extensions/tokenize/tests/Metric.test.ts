@@ -155,9 +155,11 @@ const report = async (): Promise<Map<string, Estimate>> => {
 
     for (const { _tag, data } of reported) {
       expect(_tag).toBe("@trajs/extension-tokenize/Estimate");
-      expect(data._tag).toBe("ProducerOutput");
+      expect(data._tag).toBe("Output");
 
-      if (data._tag === "ProducerOutput") byPart.set(data.attach[0], data.output);
+      if (data._tag === "Output" && data.attach !== undefined) {
+        byPart.set(data.attach[0], data.output);
+      }
     }
 
     return byPart;

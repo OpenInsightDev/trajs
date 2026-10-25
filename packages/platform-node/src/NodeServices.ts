@@ -3,8 +3,8 @@
  * `node:zlib` writes and reads a frame with, and the digest the Rust binding
  * `@napi-rs/blake-hash` and `node:crypto` compute.
  *
- * {@link layer} is what a program that runs on Node provides `@trajs/core`'s
- * `Exchange.layer` with, beside where it keeps a trajectory.
+ * {@link layer} is what a program that runs on Node provides the exchange layer
+ * of `@trajs/core` with, beside where it keeps a trajectory.
  */
 
 import type { Compression, Options as CompressionOptions } from "@trajs/utils/Compression";
@@ -54,12 +54,13 @@ export interface Options {
 }
 
 /**
- * The service implementations a program on Node provides `Exchange.layer` with.
+ * The service implementations a program on Node provides the exchange layer of
+ * `@trajs/core` with.
  *
  * **When to use**
  *
- * Use when a program runs on Node: it is the layer `Exchange.layer` is provided
- * with, beside the storage where a trajectory is kept.
+ * Use when a program runs on Node: it is what the exchange layer of `@trajs/core`
+ * is provided with, beside the storage where a trajectory is kept.
  *
  * **Details**
  *

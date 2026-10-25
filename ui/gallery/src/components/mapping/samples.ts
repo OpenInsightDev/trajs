@@ -19,13 +19,13 @@ import { Prompt, Response } from "effect/ai";
 export const markdown = [
   "A trajectory is a **stream of parts** in one total order: the messages a model was given, the parts it returned, session declarations and extension data.",
   "",
-  "A prompt part opens a turn, and every response part that follows it is part of that turn:",
+  "A prompt part is a step of its own, and the response parts that follow it are read as a step once the run ends:",
   "",
   "- the increments of a streamed response are folded into the part they complete",
-  "- a response part that no prompt precedes belongs to no turn",
+  "- a run of response parts ends at the prompt or event that follows it",
   "",
   "```ts",
-  "const steps = await Effect.runPromise(Stream.runCollect(Step.steps(trajectory)))",
+  "const steps = await Effect.runPromise(Stream.runCollect(View.steps(trajectory)))",
   "```",
 ].join("\n");
 
@@ -34,10 +34,10 @@ export const streamedAnswer = [
   "A trajectory is a **stream of parts** in one total order, so the exchange it produces is read by grouping the parts that follow one another:",
   "",
   "- the increments of a streamed response are folded into the part they complete",
-  "- a response part that no prompt precedes belongs to no turn",
+  "- a run of response parts ends at the prompt or event that follows it",
   "",
   "```ts",
-  "const turns = await Effect.runPromise(Stream.runCollect(View.promptTurns(trajectory)))",
+  "const steps = await Effect.runPromise(Stream.runCollect(View.steps(trajectory)))",
   "```",
 ].join("\n");
 
@@ -57,7 +57,7 @@ export const fragments = (text: string, size: number): ReadonlyArray<string> => 
 export const textPart = Prompt.makePart("text", { text: markdown });
 
 export const closingTextPart = Prompt.makePart("text", {
-  text: "Read one turn at a time with `View.promptTurns`, or fold a trajectory back into the prompt its model was given with `View.prompt`.",
+  text: "Read one step at a time with `View.steps`, or fold a trajectory back into the prompt its model was given with `View.prompt`.",
 });
 
 export const reasoningPart = Prompt.makePart("reasoning", {
@@ -84,7 +84,7 @@ export const toolResultPart = Prompt.makePart("tool-result", {
   result: {
     term: "trajectory",
     summary: "A trajectory of what a program did with a model.",
-    readWith: ["View.promptTurns", "Step.steps"],
+    readWith: ["View.steps", "Step.steps"],
   },
   providerExecuted: false,
 });

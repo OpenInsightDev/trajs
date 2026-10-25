@@ -4,7 +4,7 @@
  *
  * What a trajectory is read and written through is a {@link Storage}, so where
  * trajectories are kept is a storage's to say rather than the format's: what a
- * storage serves a trajectory as is a {@link Bytes}, and what it takes one through
+ * storage serves a trajectory as is a {@link Byte}, and what it takes one through
  * is a sink, so the exchange never holds the bytes of a trajectory itself. A storage
  * is of a place — a directory of files, a bucket, a map in memory — and what this
  * package states is a storage of a file system ({@link layerFileSystem}), which
@@ -18,7 +18,7 @@
 import type { S3Client } from "@aws-sdk/client-s3";
 import { Context, Data, Effect, FileSystem, Formatter, Layer, type Scope, Sink } from "effect";
 
-import { type Bytes, type ReadOptions } from "#/Bytes.ts";
+import { type Byte, type ReadOptions } from "#/Byte.ts";
 import { fileSystemStorage } from "#/internal/file-system.ts";
 import { s3Storage } from "#/internal/s3.ts";
 
@@ -51,12 +51,12 @@ export interface WriteOptions {
  * **When to use**
  *
  * Use to say where trajectories are kept — a directory of `.trajs` files, a bucket,
- * a map in memory — and provide the layer to `Exchange.layer`, which reads and
- * writes trajectories through it.
+ * a map in memory — and provide the layer to the exchange of `@trajs/core`, which reads
+ * and writes trajectories through it.
  *
  * **Details**
  *
- * - `read` serves the bytes held under an id as a {@link Bytes}, which what reads
+ * - `read` serves the bytes held under an id as a {@link Byte}, which what reads
  *   them takes what it needs from: the exchange reads the head of a trajectory for
  *   the header and its tail for the metadata, without reading the frame the
  *   parts between them are carried in. An id that holds nothing fails as a
@@ -72,7 +72,7 @@ export interface WriteOptions {
  * bytes are kept is the storage's to say, and the programs that read and write
  * trajectories through an exchange are the same whichever storage is provided.
  *
- * @see {@link Bytes} for what a read serves.
+ * @see {@link Byte} for what a read serves.
  */
 export interface Storage {
   /**
@@ -92,7 +92,7 @@ export interface Storage {
   readonly read: (
     id: string,
     options?: ReadOptions,
-  ) => Effect.Effect<Bytes<StorageError>, StorageError>;
+  ) => Effect.Effect<Byte<StorageError>, StorageError>;
 
   /**
    * The sink a trajectory is written into `id` through.
@@ -112,8 +112,8 @@ export interface Storage {
  *
  * **When to use**
  *
- * Use to require a storage of a program, and `Exchange.layer` to read and write
- * trajectories through it. A program that keeps its trajectories as files provides
+ * Use to require a storage of a program, and the exchange of `@trajs/core` to read and
+ * write trajectories through it. A program that keeps its trajectories as files provides
  * {@link layerFileSystem}, and one that keeps them somewhere else — a bucket, a
  * store in a page — provides a layer of its own.
  *
@@ -179,7 +179,7 @@ export class StorageError extends Data.TaggedError("StorageError")<{
  * What a read serves holds no file open: a read opens the file, takes what it was
  * asked for and closes it again, so what {@link Storage.read} gives out is read at
  * random without a scope of its own, and a trajectory too large to hold is read where
- * the parts of it are wanted ({@link Bytes}).
+ * the parts of it are wanted ({@link Byte}).
  *
  * A trajectory is written through the file system's own sink, so its bytes are
  * written as they are produced; `overwrite` states whether a file that is already
@@ -244,7 +244,7 @@ export interface S3Options {
  * it, and what a read asks for is a range of it, so the head of a trajectory is read
  * for the header and its tail for the metadata without the frame between them being
  * read. A range that begins at or past the end of the object is a read that takes
- * nothing ({@link Bytes}) rather than a storage that failed, which is what a bucket
+ * nothing ({@link Byte}) rather than a storage that failed, which is what a bucket
  * states of such a range.
  *
  * A trajectory is written in parts: the bytes are held as they arrive, a part is

@@ -3,7 +3,7 @@
 The generic services a trajectory is carried and kept through, stated once so a
 platform package can say what each is over.
 
-- `Bytes` — a byte sequence read at random, and the sequence built from the reads
+- `Byte` — a byte sequence read at random, and the sequence built from the reads
   a source serves.
 - `Storage` — where a trajectory is kept, what a place that could not serve one
   failed with (`StorageError`), and the storages this package ships: a directory of
@@ -12,7 +12,7 @@ platform package can say what each is over.
 - `ByteStore` — the bytes a program keeps between readings, held in chunks in the
   key/value store of `effect/persistence` (`ByteStore.layerKVStore`), in memory
   (`ByteStore.layer`), or in a temporary directory of the file system that goes
-  with the scope (`ByteStore.layerFsTemp`), read back as a `Bytes` and written a
+  with the scope (`ByteStore.layerFsTemp`), read back as a `Byte` and written a
   chunk at a time.
 - `Compression` — what carries a trajectory's parts in a frame: zstd, gzip,
   deflate, or the bytes as they are, stated where the layer is built
@@ -23,7 +23,7 @@ platform package can say what each is over.
   ships for all three.
 
 `@trajs/platform-node` and `@trajs/platform-browser` provide the layers these
-services are read through, and [`@trajs/core`](../core)'s `Exchange.layer` is built
+services are read through, and the exchange layer of [`@trajs/core`](../core) is built
 over them. A `ByteStore` is provided by a program instead — in memory with
 `ByteStore.layer`, in the key/value store it keeps its bytes in with
 `ByteStore.layerKVStore`, or in a temporary directory with `ByteStore.layerFsTemp`

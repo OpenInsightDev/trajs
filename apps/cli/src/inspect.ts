@@ -13,7 +13,7 @@
  * than coded ({@link metadataJson}).
  */
 
-import { Exchange, Header, Metadata } from "@trajs/core/Exchange";
+import * as Exchange from "@trajs/core/Exchange";
 import { NodeServices } from "@trajs/platform-node";
 import { Algorithm as CompressionAlgorithm } from "@trajs/utils/Compression";
 import { layerFileSystem } from "@trajs/utils/Storage";
@@ -22,8 +22,8 @@ import { Console, Effect, Layer, Schema } from "effect";
 import { Argument, CliError, Command, Flag } from "effect/cli";
 
 /** What the format encodes a trajectory's header to, printed as JSON at `indent`. */
-const headerJson = (header: Header, indent: number): string =>
-  JSON.stringify(Schema.encodeSync(Header)(header), null, indent);
+const headerJson = (header: Exchange.Header, indent: number): string =>
+  JSON.stringify(Schema.encodeSync(Exchange.Header)(header), null, indent);
 
 /**
  * The names each compression algorithm goes by, keyed by the code the format carries
@@ -54,8 +54,8 @@ const nameOf = (names: ReadonlyMap<number, string>, code: number): string =>
  * What the format encodes a trajectory's metadata to, printed as JSON at `indent`,
  * with the algorithm each of its two coded fields states named rather than coded.
  */
-const metadataJson = (metadata: Metadata, indent: number): string => {
-  const stated = Schema.encodeSync(Metadata)(metadata);
+const metadataJson = (metadata: Exchange.Metadata, indent: number): string => {
+  const stated = Schema.encodeSync(Exchange.Metadata)(metadata);
 
   return JSON.stringify(
     {
@@ -92,7 +92,7 @@ export const inspect = Command.make(
   },
   ({ file, indent, metadata }) =>
     Effect.gen(function* () {
-      const exchange = yield* Exchange;
+      const exchange = yield* Exchange.Exchange;
 
       const loaded = yield* exchange.load(file);
 

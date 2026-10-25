@@ -3,8 +3,8 @@
  * writes and reads a frame with, and the digest the Rust binding
  * `@napi-rs/blake-hash` and `node:crypto` compute.
  *
- * {@link layer} is what a program that runs on Bun provides `@trajs/core`'s
- * `Exchange.layer` with, beside where it keeps a trajectory.
+ * {@link layer} is what a program that runs on Bun provides the exchange layer
+ * of `@trajs/core` with, beside where it keeps a trajectory.
  */
 
 import * as NodeStreamHash from "@trajs/platform-node/NodeStreamHash";
@@ -53,12 +53,13 @@ export interface Options {
 }
 
 /**
- * The service implementations a program on Bun provides `Exchange.layer` with.
+ * The service implementations a program on Bun provides the exchange layer of
+ * `@trajs/core` with.
  *
  * **When to use**
  *
- * Use when a program runs on Bun: it is the layer `Exchange.layer` is provided with,
- * beside the storage where a trajectory is kept.
+ * Use when a program runs on Bun: it is what the exchange layer of `@trajs/core`
+ * is provided with, beside the storage where a trajectory is kept.
  *
  * **Details**
  *

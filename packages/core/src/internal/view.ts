@@ -1,164 +1,107 @@
 /**
- * The reading behind {@link View.promptTurns}, {@link View.prompt},
- * {@link View.conversations} and {@link View.toolTurns}: one pass over the parts of a
- * session groups them into the turns they were produced in, folding the increments of a
- * streamed response into the parts they complete, and the turns are folded back into the
- * prompt its model was given — or, session by session, into the conversation each of them
- * ran in. A tool call is held by the id it is answered with, so the calls a session made
- * are read as the tool turns they are answered in.
+ * The states {@link View.steps} folds the parts of a session through: the run of
+ * responses being assembled and the fold of their streams. The grouping itself is
+ * stated by the reader.
  *
- * Nothing here is published: a program reaches the reading through those four.
+ * Nothing here is published: a program reaches the reading through {@link View}.
  */
 
-import { Effect, Option, Stream } from "effect";
-import { Prompt } from "effect/ai";
+import { Effect, Stream, SubscriptionRef } from "effect";
+import type { Tool } from "effect/ai";
 
-import * as Config from "#/Config.ts";
-import { collapse, initial, type State } from "#/internal/folding.ts";
+import type * as Config from "#/Config.ts";
+import { initial, type State } from "#/internal/folding.ts";
 import type * as Response from "#/Response.ts";
-import type * as Session from "#/Session.ts";
-import * as Trajectory from "#/Trajectory.ts";
-import { TrajectoryError } from "#/TrajectoryError.ts";
-import type { Conversation, PromptTurn, ToolTurn } from "#/View.ts";
+import type * as Trajectory from "#/Trajectory.ts";
+import type * as View from "#/View.ts";
 
-/** The turn being assembled from the parts of a session read so far, and the folding of its responses. */
-interface Assembly<Config extends Config.AnyConfig> {
-  readonly turn: Option.Option<PromptTurn<Config>>;
+/** The responses produced together from the parts read so far, and the folding of their stream. */
+export interface Run<Tools extends Record<string, Tool.Any>> {
+  readonly response: ReadonlyArray<Response.PartView<Tools>>;
   readonly folding: State;
 }
 
-const closed = <Config extends Config.AnyConfig>(): Assembly<Config> => ({
-  turn: Option.none(),
+/** The run a reading starts from: no response produced. */
+export const idle = <Tools extends Record<string, Tool.Any>>(): Run<Tools> => ({
+  response: [],
   folding: initial(),
 });
 
-/** The turn a prompt opens: what a model was given, with nothing answered yet. */
-const opened = <Config extends Config.AnyConfig>(
-  prompt: Trajectory.PromptPart<Config["extrakit"]>,
-): Assembly<Config> => ({ turn: Option.some({ prompt, response: [] }), folding: initial() });
+export interface Metrics<Config extends Config.AnyConfig> {
+  readonly parts: ReadonlyArray<Trajectory.MetricPartOf<Config>>;
+  readonly ended: boolean;
+}
 
-const turnsOf = <Config extends Config.AnyConfig>(
-  turn: Option.Option<PromptTurn<Config>>,
-): ReadonlyArray<PromptTurn<Config>> => (Option.isSome(turn) ? [turn.value] : []);
+export type Attachment<Config extends Config.AnyConfig> = Map<
+  string,
+  SubscriptionRef.SubscriptionRef<Metrics<Config>>
+>;
 
-const assemble = <Config extends Config.AnyConfig>(
-  assembly: Assembly<Config>,
-  part: Exclude<Trajectory.Part<Config>, Trajectory.SessionPart<Config["extrakit"]>>,
-): readonly [Assembly<Config>, ReadonlyArray<PromptTurn<Config>>] => {
-  switch (part._tag) {
-    case "Prompt":
-      // A prompt opens a turn and closes the one before it, whether or not that one
-      // was answered, so the turns are emitted in the order they were produced in.
-      return [opened(part), turnsOf(assembly.turn)];
+export const attachment = <Config extends Config.AnyConfig>(): Attachment<Config> => new Map();
 
-    case "Response": {
-      const open = assembly.turn;
+const refOf = <Config extends Config.AnyConfig>(
+  attached: Attachment<Config>,
+  uuid: string,
+): Effect.Effect<SubscriptionRef.SubscriptionRef<Metrics<Config>>> => {
+  const existing = attached.get(uuid);
 
-      // A response is on the turn the prompt before it opened; one no prompt precedes is on no
-      // turn, and is dropped. A part that states no session belongs to the main session, as one
-      // stating `"main"` does.
-      const session = part.sessionId ?? Trajectory.mainSessionId;
-
-      if (
-        Option.isNone(open) ||
-        (open.value.prompt.sessionId ?? Trajectory.mainSessionId) !== session
-      ) {
-        return [assembly, []];
-      }
-
-      const [folding, folded] = collapse(assembly.folding, session, part.response);
-      const response = [...open.value.response, ...folded];
-
-      return [{ turn: Option.some({ prompt: open.value.prompt, response }), folding }, []];
-    }
-
-    default:
-      return [assembly, []];
+  if (existing !== undefined) {
+    return Effect.succeed(existing);
   }
-};
 
-/**
- * Reads the parts of a session as the turns its conversation was produced in: a prompt part
- * opens a turn, the response parts that follow it are folded into that turn, and a turn is
- * closed by the prompt after it, or by the parts ending.
- */
-export const readTurns = <Config extends Config.AnyConfig, E, R>(
-  stream: Session.SessionStream<Config, E, R>,
-): Stream.Stream<PromptTurn<Config>, E, R> =>
-  stream.pipe(
-    Stream.mapAccum(closed<Config>, assemble, {
-      // The turn the parts end in has no prompt after it to close it, so the parts ending is
-      // what closes it.
-      onHalt: (assembly) => turnsOf(assembly.turn),
+  return SubscriptionRef.make<Metrics<Config>>({ parts: [], ended: false }).pipe(
+    Effect.map((ref) => {
+      attached.set(uuid, ref);
+
+      return ref;
     }),
   );
+};
 
-/**
- * Folds the parts of a session back into the prompt its model was given: the turns they were
- * produced in, concatenated in the order they were produced.
- */
-export const readPrompt = <Config extends Config.AnyConfig, E, R>(
-  stream: Session.SessionStream<Config, E, R>,
-): Effect.Effect<Prompt.Prompt, E, R> =>
-  readTurns(stream).pipe(
-    Stream.runFold(
-      () => Prompt.empty,
-      (folded, turn) =>
-        folded.pipe(
-          Prompt.concat(Prompt.fromMessages(turn.prompt.messages)),
-          Prompt.concat(Prompt.fromResponseParts(turn.response)),
-        ),
-    ),
-  );
-
-/** The conversation of every session, by session id: the messages each of them ran on. */
-export const readConversations = <Config extends Config.AnyConfig, E, R>(
-  sessions: Session.Sessions<Config, E, R>,
-): Effect.Effect<Record<string, Conversation>, E | TrajectoryError, R> =>
-  Effect.forEach(sessions, (session) =>
-    readPrompt(session.stream).pipe(
-      Effect.map((prompt) => ({ id: session.id, conversation: prompt.content })),
-    ),
-  ).pipe(
-    Effect.map((read) => Object.fromEntries(read.map((entry) => [entry.id, entry.conversation]))),
-  );
-
-/**
- * Reads the parts of a session as the tool turns they hold: a call is held by the id it carries
- * from where it is read to where the result that answers it arrives, and the two are emitted as
- * one turn there.
- */
-export const readToolTurns = <Config extends Config.AnyConfig, E, R>(
-  stream: Session.SessionStream<Config, E, R>,
-): Stream.Stream<ToolTurn<Config>, E, R> =>
-  stream.pipe(
+const metricsOf = <Config extends Config.AnyConfig>(
+  ref: SubscriptionRef.SubscriptionRef<Metrics<Config>>,
+): Stream.Stream<Trajectory.MetricPartOf<Config>> =>
+  SubscriptionRef.changes(ref).pipe(
+    Stream.takeUntil((metrics) => metrics.ended),
     Stream.mapAccum(
-      () => new Map<string, Response.ToolCallPartsView<Config["toolkit"]["tools"]>>(),
-      (calls, part) => {
-        if (part._tag !== "Response") return [calls, []];
-
-        const response = part.response;
-
-        switch (response.type) {
-          case "tool-call":
-            calls.set(response.id, response);
-
-            return [calls, []];
-          case "tool-result": {
-            if (response.preliminary) return [calls, []];
-
-            const call = calls.get(response.id);
-
-            if (call === undefined) return [calls, []];
-
-            calls.delete(response.id);
-
-            return [calls, [{ call, result: response }]];
-          }
-
-          default:
-            return [calls, []];
-        }
-      },
+      () => 0,
+      (seen, metrics) => [metrics.parts.length, metrics.parts.slice(seen)] as const,
     ),
   );
+
+export const attachPart = <Config extends Config.AnyConfig>(
+  attached: Attachment<Config>,
+  value: Trajectory.Part<Config>,
+): Effect.Effect<
+  readonly [Attachment<Config>, ReadonlyArray<View.MetricTrajectoryPart<Config>>]
+> => {
+  if (value._tag === "Metric") {
+    const attach = value.metric.data.attach;
+
+    if (attach === undefined) {
+      return Effect.succeed([attached, [value]] as const);
+    }
+
+    return Effect.forEach(new Set(attach), (uuid) =>
+      refOf(attached, uuid).pipe(
+        Effect.flatMap((ref) =>
+          SubscriptionRef.update(ref, (metrics) => ({
+            ...metrics,
+            parts: [...metrics.parts, value],
+          })),
+        ),
+      ),
+    ).pipe(Effect.as([attached, []] as const));
+  }
+
+  return refOf(attached, value.uuid).pipe(
+    Effect.map((ref) => [attached, [{ ...value, metrics: metricsOf(ref) }]] as const),
+  );
+};
+
+export const endAttachment = <Config extends Config.AnyConfig>(
+  attached: Attachment<Config>,
+): Effect.Effect<void> =>
+  Effect.forEach(attached.values(), (ref) =>
+    SubscriptionRef.update(ref, (metrics) => ({ ...metrics, ended: true })),
+  ).pipe(Effect.asVoid);

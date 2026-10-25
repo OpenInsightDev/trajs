@@ -1,25 +1,11 @@
+import type { Schema } from "effect";
+import { Tool } from "effect/ai";
+
 import * as EventKit from "#/EventKit.ts";
 import * as ExtraKit from "#/ExtraKit.ts";
 import * as MetricKit from "#/MetricKit.ts";
 import * as Toolkit from "#/Toolkit.ts";
 
-/**
- * The kits for trajectory parts and the flag permitting streaming response parts.
- *
- * **Details**
- *
- * - `toolkit` supplies schemas for tool calls and results through {@link Toolkit.Toolkit}.
- * - `eventkit` declares application events through {@link EventKit.Kit}.
- * - `metrickit` supplies schemas for metric outputs and producer failures through {@link MetricKit.Kit}.
- * - `extrakit` declares prompt, response, and session extra data through {@link ExtraKit.Kit}.
- * - `stream: true` permits both streaming and non-streaming response parts.
- * - `stream: false` permits only non-streaming response parts.
- *
- * The `stream` flag selects response parts; it does not control when the trajectory is consumed.
- *
- * @see {@link config} for defaults
- * @category models
- */
 export interface Config<
   Stream extends boolean = never,
   Toolkit extends Toolkit.Any = never,
@@ -34,34 +20,10 @@ export interface Config<
   extrakit: Extras;
 }
 
-/**
- * A {@link Config} accepting either `stream` setting and any kits.
- *
- * Use a concrete {@link Config} to retain the types declared by its kits.
- *
- * @category models
- */
 export type AnyConfig = Config<boolean, Toolkit.Any, EventKit.Any, MetricKit.Any, ExtraKit.Any>;
 
-/**
- * A {@link Config} restricted to non-streaming response parts, with any kits.
- *
- * The trajectory remains a stream and may emit parts over time.
- *
- * @category models
- */
 export type NonStreamConfig = Config<false, Toolkit.Any, EventKit.Any, MetricKit.Any, ExtraKit.Any>;
 
-/**
- * A {@link Config} with empty kits, permitting streaming and non-streaming response parts.
- *
- * Empty kits declare no events, metrics, or extra data.
- * Tool call parameters and tool results are typed as `unknown`.
- * Decoding event and metric parts requires kits declaring those events and metrics.
- *
- * @see {@link config} for supplying kits
- * @category models
- */
 export type UnknownConfig = Config<
   true,
   Toolkit.Empty,
@@ -70,15 +32,6 @@ export type UnknownConfig = Config<
   ExtraKit.Empty
 >;
 
-/**
- * The default configuration for decoding parts without caller-supplied kits.
- *
- * It permits streaming and non-streaming response parts and supplies empty kits.
- * Its {@link Config} annotation does not retain the precise empty-kit types.
- *
- * @see {@link config} for a configuration retaining the types of its kits
- * @category constants
- */
 export const anyConfig: AnyConfig = {
   stream: true,
   toolkit: Toolkit.empty,
@@ -87,18 +40,6 @@ export const anyConfig: AnyConfig = {
   extrakit: ExtraKit.empty,
 };
 
-/**
- * Creates a configuration with defaults for omitted kits and the `stream` flag.
- *
- * **Details**
- *
- * `stream` defaults to `true`, and omitted kits default to empty kits.
- * Use `stream: false` when consumers require non-streaming response parts.
- * Creating a configuration does not transform a stream or decode any parts.
- *
- * @see {@link anyConfig} for the default configuration without specific kit types
- * @category constructors
- */
 export const config = <
   const Stream extends boolean = true,
   Toolkit extends Toolkit.Any = Toolkit.Empty,
@@ -117,15 +58,6 @@ export const config = <
     extrakit: config.extrakit ?? ExtraKit.empty,
   }) as Config<Stream, Toolkit, Events, Metrics, Extras>;
 
-/**
- * The {@link Config} of two merged trajectories.
- *
- * Kits combine their declarations, with right-hand definitions winning on duplicate names or tags.
- * The result permits streaming response parts if either input permits them.
- * Merging kits does not convert existing parts to the merged schemas.
- *
- * @category models
- */
 export type MergedConfig<Left extends AnyConfig, Right extends AnyConfig> = Config<
   Left["stream"] | Right["stream"],
   Toolkit.Toolkit<Toolkit.MergedTools<readonly [Left["toolkit"], Right["toolkit"]]>>,
@@ -134,38 +66,28 @@ export type MergedConfig<Left extends AnyConfig, Right extends AnyConfig> = Conf
   ExtraKit.Merged<readonly [Left["extrakit"], Right["extrakit"]]>
 >;
 
-/**
- * The tools a {@link Config} states, keyed by name.
- *
- * **When to use**
- *
- * Use to type a tool call or a tool result read from a trajectory rather than from one of its kits.
- *
- * @see {@link EventsOf} for the events the same configuration declares
- * @category models
- */
 export type ToolsOf<C extends AnyConfig> = C["toolkit"]["tools"];
 
-/**
- * The events a {@link Config} states, keyed by tag.
- *
- * @see {@link ToolsOf} for the tools the same configuration declares
- * @category models
- */
 export type EventsOf<C extends AnyConfig> = C["eventkit"]["events"];
 
-/**
- * The metrics a {@link Config} states, keyed by tag.
- *
- * @see {@link ToolsOf} for the tools the same configuration declares
- * @category models
- */
 export type MetricsOf<C extends AnyConfig> = C["metrickit"]["metrics"];
 
-/**
- * The extra data a {@link Config} states, keyed by tag.
- *
- * @see {@link ToolsOf} for the tools the same configuration declares
- * @category models
- */
 export type ExtrasOf<C extends AnyConfig> = C["extrakit"]["extra"];
+
+type ToolOf<C extends AnyConfig> = ToolsOf<C>[keyof ToolsOf<C>];
+
+export type DecodingServices<C extends AnyConfig> =
+  | Schema.Codec.DecodingServices<Tool.ParametersSchema<ToolOf<C>>>
+  | Tool.ResultDecodingServices<ToolOf<C>>
+  | EventKit.DecodingServices<C["eventkit"]>
+  | MetricKit.DecodingServices<C["metrickit"]>
+  | ExtraKit.DecodingServices<C["extrakit"]>;
+
+export type EncodingServices<C extends AnyConfig> =
+  | Tool.ParametersEncodingServices<ToolOf<C>>
+  | Tool.ResultEncodingServices<ToolOf<C>>
+  | EventKit.EncodingServices<C["eventkit"]>
+  | MetricKit.EncodingServices<C["metrickit"]>
+  | ExtraKit.EncodingServices<C["extrakit"]>;
+
+export type SchemaServices<C extends AnyConfig> = DecodingServices<C> & EncodingServices<C>;

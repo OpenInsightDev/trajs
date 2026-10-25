@@ -1,6 +1,6 @@
 /**
  * The bytes a program keeps between readings: a store of byte sequences, cut into
- * chunks as they are written and read back as a {@link Bytes}.
+ * chunks as they are written and read back as a {@link Byte}.
  *
  * What holds them is the key/value store of `effect/persistence`
  * (`KeyValueStore`) — memory, a file system, a database — so where the bytes live
@@ -18,7 +18,7 @@ import { Context, Data, Effect, FileSystem, Formatter, Layer, Path, Sink } from 
 import { KeyValueStore } from "effect/persistence";
 import type { PlatformError } from "effect/PlatformError";
 
-import { type Bytes } from "#/Bytes.ts";
+import { type Byte } from "#/Byte.ts";
 import { keyValueStoreBytes } from "#/internal/byte-store.ts";
 
 /**
@@ -72,7 +72,7 @@ export interface Options {
 
 /**
  * How many bytes of a sequence are kept under one key where a store states no size:
- * 64 KiB, the size {@link Bytes.stream} reads a sequence in by default.
+ * 64 KiB, the size {@link Byte.stream} reads a sequence in by default.
  *
  * **When to use**
  *
@@ -81,7 +81,7 @@ export interface Options {
  *
  * **Details**
  *
- * It is the size a read takes at once ({@link Bytes.stream}), so a store keeping a
+ * It is the size a read takes at once ({@link Byte.stream}), so a store keeping a
  * sequence in chunks of it serves the chunks a reader asks for rather than cutting
  * them again, and a chunk of a sequence is read with the size one read of it takes.
  *
@@ -92,7 +92,7 @@ export const defaultChunkSize = 64 * 1024;
 
 /**
  * A store of byte sequences: the bytes kept under an id, read back as a
- * {@link Bytes}, and the sink a sequence is written through.
+ * {@link Byte}, and the sink a sequence is written through.
  *
  * **When to use**
  *
@@ -102,7 +102,7 @@ export const defaultChunkSize = 64 * 1024;
  *
  * **Details**
  *
- * - `read` serves the bytes kept under an id as a {@link Bytes}, which what reads
+ * - `read` serves the bytes kept under an id as a {@link Byte}, which what reads
  *   them takes what it needs from: the head of a sequence is answered with the chunk
  *   it falls in, and the chunks after it are not read. An id that holds nothing
  *   fails as a {@link ByteStoreError}.
@@ -144,7 +144,7 @@ export const defaultChunkSize = 64 * 1024;
  */
 export interface ByteStore {
   /**
-   * Serves the bytes kept under `id` as a {@link Bytes}.
+   * Serves the bytes kept under `id` as a {@link Byte}.
    *
    * What it serves is read at random rather than at once, so a reader takes the part
    * of the sequence it came for: the chunks a read reaches are read out of the store
@@ -156,7 +156,7 @@ export interface ByteStore {
    * states that the store no longer holds fails the read rather than serving fewer
    * bytes than the sequence states.
    */
-  readonly read: (id: string) => Effect.Effect<Bytes<ByteStoreError>, ByteStoreError>;
+  readonly read: (id: string) => Effect.Effect<Byte<ByteStoreError>, ByteStoreError>;
 
   /**
    * The sink a sequence is written into `id` through.

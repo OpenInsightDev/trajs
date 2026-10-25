@@ -32,10 +32,6 @@ export class Metric<
 
 export type Any = Metric<string, string, VersionedSchema.Any, VersionedSchema.Any>;
 
-export type Output<Ext extends Any> = Ext["output"];
-
-export type Failure<Ext extends Any> = Ext["failure"];
-
 export type MetricPart<Tag extends string, Data> = Readonly<{ _tag: Tag; data: Data }>;
 
 export const MetricPart = <Tag extends string, S extends Schema.Top>(
@@ -43,51 +39,51 @@ export const MetricPart = <Tag extends string, S extends Schema.Top>(
   schema: S,
 ): Schema.TaggedStruct<Tag, { readonly data: S }> => Schema.TaggedStruct(tag, { data: schema });
 
-export class ProducerOutput<Ext extends Any> extends Data.TaggedClass("ProducerOutput")<{
-  readonly output: Output<Ext>["Type"];
+export class Output<Ext extends Any> extends Data.TaggedClass("Output")<{
+  readonly output: Ext["output"]["Type"];
   readonly timestamp?: DateTime.Utc;
-  readonly attach: NonEmptyArray<string>;
+  readonly attach?: NonEmptyArray<string>;
 }> {}
 
 const reported = {
   timestamp: Schema.optional(Schema.DateTimeUtcFromString),
-  attach: Schema.NonEmptyArray(Schema.String),
+  attach: Schema.optional(Schema.NonEmptyArray(Schema.String)),
 };
 
 const outputSchemaOf = <Ext extends Any>(metric: Ext): OutputSchema<Ext> =>
-  Schema.TaggedStruct("ProducerOutput", { output: metric.output, ...reported });
+  Schema.TaggedStruct("Output", { output: metric.output, ...reported });
 
 const failureSchemaOf = <Ext extends Any>(metric: Ext): FailureSchema<Ext> =>
-  Schema.TaggedStruct("ProducerFailure", { failure: metric.failure, ...reported });
+  Schema.TaggedStruct("Failure", { failure: metric.failure, ...reported });
 
 export const makeOutput = <Ext extends Any>(
-  output: Output<Ext>["Type"],
-  { timestamp, attach }: { timestamp?: DateTime.Utc; attach: NonEmptyArray<string> },
-): ProducerOutput<Ext> => new ProducerOutput<Ext>({ output, timestamp, attach });
+  output: Ext["output"]["Type"],
+  { timestamp, attach }: { timestamp?: DateTime.Utc; attach?: NonEmptyArray<string> },
+): Output<Ext> => new Output<Ext>({ output, timestamp, attach });
 
-export class ProducerFailure<Ext extends Any> extends Data.TaggedClass("ProducerFailure")<{
-  readonly failure: Failure<Ext>["Type"];
+export class Failure<Ext extends Any> extends Data.TaggedClass("Failure")<{
+  readonly failure: Ext["failure"]["Type"];
   readonly timestamp?: DateTime.Utc;
-  readonly attach: NonEmptyArray<string>;
+  readonly attach?: NonEmptyArray<string>;
 }> {}
 
 export const makeFailure = <Ext extends Any>(
-  failure: Failure<Ext>["Type"],
-  { timestamp, attach }: { timestamp?: DateTime.Utc; attach: NonEmptyArray<string> },
-): ProducerFailure<Ext> => new ProducerFailure<Ext>({ failure, timestamp, attach });
+  failure: Ext["failure"]["Type"],
+  { timestamp, attach }: { timestamp?: DateTime.Utc; attach?: NonEmptyArray<string> },
+): Failure<Ext> => new Failure<Ext>({ failure, timestamp, attach });
 
 export type Producer<Ext extends Any> = <E, R>(
   trajectory: Trajectory.TrajectoryStream<Config.NonStreamConfig, E, R>,
-) => Stream.Stream<ProducerOutput<Ext>, E | TrajectoryError | ProducerFailure<Ext>, R>;
+) => Stream.Stream<Output<Ext>, E | TrajectoryError | Failure<Ext>, R>;
 
 type OutputSchema<Ext extends Any> = Schema.TaggedStruct<
-  "ProducerOutput",
-  { readonly output: Output<Ext> } & typeof reported
+  "Output",
+  { readonly output: Ext["output"] } & typeof reported
 >;
 
 type FailureSchema<Ext extends Any> = Schema.TaggedStruct<
-  "ProducerFailure",
-  { readonly failure: Failure<Ext> } & typeof reported
+  "Failure",
+  { readonly failure: Ext["failure"] } & typeof reported
 >;
 
 type ProducedSchema<Ext extends Any> = Schema.Union<
@@ -106,7 +102,7 @@ type MetricPartSchemas<Metrics extends Record<string, Any>> = MetricPartSchema<
 >;
 
 type MetricPartOf<Ext> = Ext extends Any
-  ? MetricPart<Ext["tag"], ProducerOutput<Ext> | ProducerFailure<Ext>>
+  ? MetricPart<Ext["tag"], Output<Ext> | Failure<Ext>>
   : never;
 
 export type MetricParts<Metrics extends Record<string, Any>> = MetricPartOf<Metrics[keyof Metrics]>;

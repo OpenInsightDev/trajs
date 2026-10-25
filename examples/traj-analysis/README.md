@@ -11,11 +11,14 @@ right below it, so what the code does and what it expects are read together.
 
 - [turns](./cases/turns/README.md) — reads a trajectory as the turns its
   conversation was produced in and summarises it.
-- [session-tree](./cases/session-tree/README.md) — reads a run as the sessions it was forked
-  into: what each inherited from the session it continues from, what it did, and what it and
-  the sessions forked off it cost.
+- [sessions](./cases/sessions/README.md) — reads a run as the sessions it declares: what each
+  inherited from the session it continues from, what it did, and what the mainline spent against
+  what it delegated.
 - [repeated-tool-calls](./cases/repeated-tool-calls/README.md) — reads a trajectory
   as the tool calls it holds and reports the ones made over and over.
+- [compaction](./cases/compaction/README.md) — reads a run as the steps it happened in,
+  split into the phases either side of a context compaction, and reports what the agent had
+  to read again.
 - [toolkit](./cases/toolkit/README.md) — reads a trajectory typed with the toolkit
   its responses were returned by, so each call is counted in the terms its own tool's
   parameters state.

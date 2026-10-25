@@ -28,12 +28,11 @@ const steps = await Effect.runPromise(Stream.runCollect(Step.steps(trajectory)))
 steps.map((step) => step.source); // => ["user", "agent"]
 ```
 
-`Step.steps` reads the turns of `View.promptTurns` of `@trajs/core`, so a step is
-derived from a turn rather than from the parts a trajectory arrived in: the
-increments of a streamed response are folded into the parts they complete, and a
-response part that no prompt precedes belongs to no turn and is dropped. As in
-`View.promptTurns`, a trajectory that interleaves several sessions is read one
-session at a time.
+`Step.steps` reads the steps of `View.steps` of `@trajs/core`, so a step is
+derived from the parts a trajectory arrived in: the increments of a streamed
+response are folded into the parts they complete, and a run of response parts ends
+at the prompt or event that follows it. As in `View.steps`, a trajectory that
+interleaves several sessions is read one session at a time.
 
 ## Reading a document
 

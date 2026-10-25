@@ -9,4 +9,4 @@ Node runs with.
   `@napi-rs/blake-hash` and `node:crypto` compute.
 - `NodeServices` — the two as one layer, at the algorithms it is built with,
   provided beside the storage where a program on Node keeps a trajectory
-  ([`@trajs/core`](../core)'s `Exchange.layer` takes all three).
+  (the exchange layer of [`@trajs/core`](../core) takes all three).

@@ -29,6 +29,26 @@ A case that generates what it reads writes it under its own `fixtures/`, which
 Cases share this one package: a case is a directory under `cases/`, not a package of its
 own.
 
+## Reading a case
+
+A case is read before it is run, so it is written for a reader with no context beyond the
+case directory.
+
+- A concept is defined before it is used. A reader who meets a name follows it to its
+  definition, not to a search.
+- The file answers in order: what it produces, what it reads, how it reads it, and what
+  the assertion proves.
+- A name states what it holds. A shape and the state it is filled from read as a pair, not
+  as two unrelated things.
+- One rule is one concept. A structure that exists only to support another is removed, not
+  documented.
+- A field or helper whose meaning the name does not carry states it in one JSDoc line.
+- Comments stand where the code and the types cannot speak: a fixture step whose purpose
+  the code does not show, a rule the analysis depends on, a convention the source format
+  does not carry.
+
+A case meets this before it is added, whatever its assertion proves.
+
 ## Checks
 
 - `vp test` in `examples/traj-analysis`, or

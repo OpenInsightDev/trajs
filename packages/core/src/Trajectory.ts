@@ -1,22 +1,18 @@
-import { type ByteStore, type ByteStoreError } from "@trajs/utils/ByteStore";
-import { DateTime, Effect, Schema, Scope, Stream } from "effect";
+import { DateTime, Effect, Schema, Stream } from "effect";
 
 import * as Config from "#/Config.ts";
 import * as Event from "#/Event.ts";
 import * as EventKit from "#/EventKit.ts";
 import * as Extra from "#/Extra.ts";
 import * as ExtraKit from "#/ExtraKit.ts";
-import { cached } from "#/internal/cache.ts";
-import type { EncodingServices, Readable } from "#/internal/parts.ts";
 import { Timestamp, Uuid } from "#/internal/schema.ts";
-import { attach } from "#/internal/trajectory.ts";
+import { attach, uuid } from "#/internal/trajectory.ts";
 import type { Select } from "#/internal/types.ts";
 import * as Metric from "#/Metric.ts";
 import * as MetricKit from "#/MetricKit.ts";
 import * as Prompt from "#/Prompt.ts";
 import * as Response from "#/Response.ts";
 import * as Toolkit from "#/Toolkit.ts";
-import type { TrajectoryError } from "#/TrajectoryError.ts";
 
 const extraField = <K extends ExtraKit.Any, P extends Extra.Part>(extrakit: K, part: P) =>
   Extra.ExtraRecord(extrakit, part).pipe(Schema.withDecodingDefault(Effect.succeed({})));
@@ -192,36 +188,36 @@ export interface Parts<Config extends Config.AnyConfig> {
 }
 
 export const parts = <Config extends Config.AnyConfig>(config: Config): Parts<Config> => {
-  const prompt = PromptPart(config.extrakit);
-  const session = SessionPart(config.extrakit);
+  const Prompt = PromptPart(config.extrakit);
+  const Session = SessionPart(config.extrakit);
 
-  const response = ResponsePart({
+  const Response = ResponsePart({
     toolkit: config.toolkit,
     extrakit: config.extrakit,
     stream: config.stream,
   });
 
-  const event = EventPart(config.eventkit);
-  const metric = MetricPart(config.metrickit);
+  const Event = EventPart(config.eventkit);
+  const Metric = MetricPart(config.metrickit);
 
   return {
-    prompt: (asked, { sessionId, timestamp, uuid, ...extra } = {}) =>
-      prompt.make({ messages: asked.content, sessionId, extra, timestamp, uuid }),
+    prompt: (prompt, { sessionId, timestamp, uuid, ...extra } = {}) =>
+      Prompt.make({ messages: prompt.content, sessionId, extra, timestamp, uuid }),
     mainSession: ({ uuid, ...extra } = {}) =>
-      session.make({ type: MainSession.make({ id: mainSessionId }), extra, uuid }),
+      Session.make({ type: MainSession.make({ id: mainSessionId }), extra, uuid }),
     subSession: (id, { fork, uuid, ...extra }) =>
-      session.make({ type: SubSession.make({ id, fork }), extra, uuid }),
+      Session.make({ type: SubSession.make({ id, fork }), extra, uuid }),
     // SAFETY: the schema uses the same configuration as the return type.
     // TypeScript cannot resolve the conditional response type for a generic configuration.
-    response: (answered, { sessionId, timestamp, uuid, ...extra } = {}) =>
-      response.make({ response: answered, sessionId, extra, timestamp, uuid }) as ResponsePart<
+    response: (response, { sessionId, timestamp, uuid, ...extra } = {}) =>
+      Response.make({ response, sessionId, extra, timestamp, uuid }) as ResponsePart<
         Config["toolkit"],
         Config["extrakit"],
         Config["stream"]
       >,
-    event: (given, { sessionId, timestamp, uuid } = {}) =>
-      event.make({ event: given, sessionId, timestamp, uuid }),
-    metric: (given, { timestamp } = {}) => metric.make({ metric: given, timestamp }),
+    event: (event, { sessionId, timestamp, uuid } = {}) =>
+      Event.make({ event, sessionId, timestamp, uuid }),
+    metric: (metric, { timestamp } = {}) => Metric.make({ metric, timestamp }),
   };
 };
 
@@ -231,6 +227,50 @@ export type Part<Config extends Config.AnyConfig> =
   | ResponsePart<Config["toolkit"], Config["extrakit"], Config["stream"]>
   | EventPart<Config["eventkit"]>
   | MetricPart<Config["metrickit"]>;
+
+/**
+ * The prompt part of a trajectory read with `Config`.
+ *
+ * @see {@link PromptPart} for the part read with its extras alone.
+ * @category models
+ */
+export type PromptPartOf<Config extends Config.AnyConfig> = PromptPart<Config["extrakit"]>;
+
+/**
+ * The session part of a trajectory read with `Config`.
+ *
+ * @see {@link SessionPart} for the part read with its extras alone.
+ * @category models
+ */
+export type SessionPartOf<Config extends Config.AnyConfig> = SessionPart<Config["extrakit"]>;
+
+/**
+ * The response part of a trajectory read with `Config`.
+ *
+ * @see {@link ResponsePart} for the part read with its kits alone.
+ * @category models
+ */
+export type ResponsePartOf<Config extends Config.AnyConfig> = ResponsePart<
+  Config["toolkit"],
+  Config["extrakit"],
+  Config["stream"]
+>;
+
+/**
+ * The event part of a trajectory read with `Config`.
+ *
+ * @see {@link EventPart} for the part read with its event kit alone.
+ * @category models
+ */
+export type EventPartOf<Config extends Config.AnyConfig> = EventPart<Config["eventkit"]>;
+
+/**
+ * The metric part of a trajectory read with `Config`.
+ *
+ * @see {@link MetricPart} for the part read with its metric kit alone.
+ * @category models
+ */
+export type MetricPartOf<Config extends Config.AnyConfig> = MetricPart<Config["metrickit"]>;
 
 export type TrajectoryStream<Config extends Config.AnyConfig, E = never, R = never> = Stream.Stream<
   Part<Config>,
@@ -244,9 +284,10 @@ export type Trajectory<
   E = never,
   R = never,
 > = TrajectoryStream<Config, E, R> &
-  Readonly<Config> & {
-    readonly id: Id;
-  };
+  Readonly<{
+    id: Id;
+  }> &
+  Readonly<Config>;
 
 export function make<Id extends string, Config extends Config.AnyConfig>(
   id: Id,
@@ -261,53 +302,10 @@ export function make<Config extends Config.AnyConfig>(
   if (args.length === 1) {
     const [config] = args;
 
-    return attach(undefined, config);
+    return attach(uuid(), config);
   }
 
   const [id, config] = args;
 
   return attach(id, config);
-}
-
-export interface CacheOptions {
-  readonly capacity?: number | "unbounded" | undefined;
-}
-
-type Cached<Id extends string, Config extends Config.AnyConfig, E, R> = Effect.Effect<
-  Trajectory<Id, Config, E | TrajectoryError | ByteStoreError, never>,
-  E | TrajectoryError | ByteStoreError,
-  Scope.Scope | R | EncodingServices<Config> | ByteStore
->;
-
-export function cache<Id extends string, Config extends Config.AnyConfig, E, R>(
-  trajectory: Trajectory<Id, Config, E, R> & Readable<Config>,
-  options?: CacheOptions,
-): Cached<Id, Config, E, R>;
-export function cache(
-  options?: CacheOptions,
-): <Id extends string, Config extends Config.AnyConfig, E, R>(
-  trajectory: Trajectory<Id, Config, E, R> & Readable<Config>,
-) => Cached<Id, Config, E, R>;
-export function cache<Config extends Config.AnyConfig, E, R>(
-  ...args:
-    | [
-        trajectory: Trajectory<string, Config, E, R> & Readable<Config>,
-        options?: CacheOptions | undefined,
-      ]
-    | [options?: CacheOptions | undefined]
-) {
-  if (args.length === 2) {
-    const [trajectory, options] = args;
-
-    return cached(trajectory, options);
-  }
-
-  const [given] = args;
-
-  if (given !== undefined && Stream.isStream(given)) {
-    return cached(given);
-  }
-
-  return (trajectory: Trajectory<string, Config, E, R> & Readable<Config>) =>
-    cached(trajectory, given);
 }

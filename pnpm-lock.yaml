@@ -357,6 +357,9 @@ importers:
       '@trajs/core':
         specifier: workspace:*
         version: link:../../packages/core
+      '@trajs/extension-atif':
+        specifier: workspace:*
+        version: link:../../extensions/atif
       '@trajs/extension-tokenize':
         specifier: workspace:*
         version: link:../../extensions/tokenize

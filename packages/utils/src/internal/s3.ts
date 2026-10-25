@@ -6,7 +6,7 @@
 import type { CompletedPart, S3Client } from "@aws-sdk/client-s3";
 import { Effect, Sink } from "effect";
 
-import { type Bytes, makeBytes } from "#/Bytes.ts";
+import { type Byte, makeByte } from "#/Byte.ts";
 import { type Storage, StorageError, type WriteOptions } from "#/Storage.ts";
 
 /** What a bucket answered where the id holds no object. */
@@ -14,7 +14,7 @@ const NotFound = 404;
 
 /**
  * What a bucket answered where a range begins at or past the end of the object: a
- * read that takes nothing rather than a bucket that failed ({@link Bytes}).
+ * read that takes nothing rather than a bucket that failed ({@link Byte}).
  */
 const NotSatisfiable = 416;
 
@@ -95,15 +95,15 @@ const refuse = (bucket: Bucket, id: string): Effect.Effect<void, StorageError> =
  * The bytes a bucket holds under an id: how long the object is, as the head of it, and
  * the range of it a read asks for.
  */
-const bytesOf = (bucket: Bucket, id: string): Bytes<StorageError> =>
-  makeBytes({
+const bytesOf = (bucket: Bucket, id: string): Byte<StorageError> =>
+  makeByte({
     length: head(bucket, id).pipe(Effect.map((held) => BigInt(held.ContentLength ?? 0))),
     read: (buffer, { offset = 0n, size = buffer.length } = {}) =>
       Effect.gen(function* () {
         const wanted = Math.min(size, buffer.length);
 
         // A read that asks for nothing reaches the bucket for nothing: what lies from
-        // an offset at or past the end of an object is none of it ({@link Bytes}).
+        // an offset at or past the end of an object is none of it ({@link Byte}).
         if (wanted <= 0) {
           return 0;
         }

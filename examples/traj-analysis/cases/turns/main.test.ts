@@ -1,40 +1,10 @@
-/**
- * A short conversation, read as the turns it was produced in and summarised.
- *
- * The parts of one session are read as the turns they were produced in — every prompt, with
- * the response that answered it — and each turn is counted into the summary: the messages it
- * was asked and answered with, the characters of the text it holds, and the tools it called.
- *
- * The parts are built here rather than read from a `.trajs` file so the case stands on its
- * own; a real analysis reads the same parts as the `stream` of a session
- * `Session.toSessions` read of a trajectory an `Exchange` loaded.
- */
-
 import { expect, it } from "@effect/vitest";
-import {
-  EventKit,
-  ExtraKit,
-  MetricKit,
-  Prompt,
-  Response,
-  Session,
-  Toolkit,
-  Trajectory,
-  View,
-} from "@trajs/core";
+import { Cache, Prompt, Response, Session, Trajectory, View } from "@trajs/core";
 import * as Config from "@trajs/core/Config";
 import { Effect, Stream } from "effect";
 
-/** What the parts are built and read with: no tool, event, metric or extra datum. */
-const config = Config.config({
-  stream: false,
-  toolkit: Toolkit.empty,
-  eventkit: EventKit.empty,
-  metrickit: MetricKit.empty,
-  extrakit: ExtraKit.empty,
-});
+const config = Config.config({ stream: false });
 
-/** The conversation counted: messages of both sides, text characters, and tools called. */
 interface Summary {
   readonly turns: number;
   readonly messages: number;
@@ -45,18 +15,10 @@ interface Summary {
 const part = Trajectory.parts(config);
 
 const makeTurn = (id: string, { city, answer }: { city: string; answer: string }) => [
-  part.response(
-    Response.anyToolCallPart({
-      id,
-      name: "get_weather",
-      params: { city },
-      providerExecuted: false,
-    }),
-  ),
+  part.response(Response.anyToolCallPart({ id, name: "get_weather", params: { city } })),
   part.response(Response.makePart("text", { text: answer })),
 ];
 
-/** What the trajectory holds: what one session's model was given and answered. */
 const trajectory = Trajectory.make(config)(
   Stream.fromArray([
     part.prompt(Prompt.make("What is the weather in Paris?")),
@@ -67,31 +29,37 @@ const trajectory = Trajectory.make(config)(
 );
 
 const main = Effect.fn(function* () {
-  const sessions = yield* Session.toSessions(trajectory);
-  // The mainline is the one session a reading holds first.
-  const [session] = sessions;
+  const session = yield* Session.main(trajectory);
 
-  const turns = yield* View.promptTurns(session.stream).pipe(Stream.runCollect);
+  const steps = yield* View.steps(session.stream).pipe(Stream.runCollect);
 
+  let turns = 0;
   let messages = 0;
   let characters = 0;
   const toolCalls: Record<string, number> = {};
 
-  for (const { prompt, response } of turns) {
-    messages += prompt.messages.length;
+  for (const step of steps) {
+    if (step._tag === "Prompt") {
+      turns += 1;
+      messages += step.prompt.messages.length;
 
-    for (const part of response) {
+      continue;
+    }
+
+    if (step._tag !== "Response") continue;
+
+    for (const responsePart of step.response) {
       messages += 1;
 
-      if (part.type === "text") {
-        characters += part.text.length;
-      } else if (part.type === "tool-call") {
-        toolCalls[part.name] = (toolCalls[part.name] ?? 0) + 1;
+      if (responsePart.type === "text") {
+        characters += responsePart.text.length;
+      } else if (responsePart.type === "tool-call") {
+        toolCalls[responsePart.name] = (toolCalls[responsePart.name] ?? 0) + 1;
       }
     }
   }
 
-  return { turns: turns.length, messages, characters, toolCalls } satisfies Summary;
+  return { turns, messages, characters, toolCalls } satisfies Summary;
 });
 
 it.effect("main", () =>
@@ -104,5 +72,6 @@ it.effect("main", () =>
         toolCalls: { get_weather: 2 },
       } satisfies Summary),
     ),
+    Effect.provide(Cache.layer()),
   ),
 );

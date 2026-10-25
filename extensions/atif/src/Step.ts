@@ -4,10 +4,9 @@
  * ATIF — the Agent Trajectory Interchange Format — carries an agent's run as one
  * ordered list of steps, each of them a system prompt, a user message or a
  * complete agent turn. This module derives that list from a trajectory:
- * {@link steps} groups the parts of a trajectory into the turns they were
- * produced as, with `View.promptTurns` of `@trajs/core`, and reads one step per
- * message of a turn and one more for the turn itself. {@link Step} says what a
- * step holds and {@link StepSource} who contributed one.
+ * {@link steps} reads what `View.steps` of `@trajs/core` states: one step per
+ * message a prompt carries, and one more for each run of responses. {@link Step}
+ * says what a step holds and {@link StepSource} who contributed one.
  *
  * A step holds what a trajectory holds of the turn it is read from, which is less
  * than ATIF's `StepObject` states: what the step says, and the parts it answered
@@ -75,9 +74,8 @@ export type StepSource = "system" | "user" | "agent";
  * and `observations` the results those calls were answered with, each result
  * naming the call it answers by the same id the call carries.
  *
- * What the steps are read from are the turns of `View.promptTurns`, so a step
- * reads the conversation rather than the increments a streamed response arrived
- * in.
+ * What the steps are read from is `View.steps`, so a step reads the conversation
+ * rather than the increments a streamed response arrived in.
  *
  * A step carries what a trajectory holds of the turn it is read from. What ATIF
  * states of a step beyond that — a model's name, the tokens or the cost of a turn,
@@ -148,54 +146,62 @@ const textOf = (parts: ReadonlyArray<Prompt.Part>): string => {
 const messageOf = (message: Prompt.Message): string =>
   message.role === "system" ? message.content : textOf(message.content);
 
-/** The steps one turn is read as. */
+/** The steps one step of a session is read as. */
 const stepsOf = <Config extends Config.AnyConfig>(
-  turn: View.PromptTurn<Config>,
+  step: View.Step<Config>,
 ): ReadonlyArray<Step<Tools<Config>>> => {
-  const steps: Step<Tools<Config>>[] = turn.prompt.messages.map((message) => ({
-    source: sources[message.role],
-    message: messageOf(message),
-    reasoning: Option.none(),
-    toolCalls: [],
-    observations: [],
-  }));
+  switch (step._tag) {
+    case "Prompt":
+      return step.prompt.messages.map((message) => ({
+        source: sources[message.role],
+        message: messageOf(message),
+        reasoning: Option.none(),
+        toolCalls: [],
+        observations: [],
+      }));
 
-  // A turn that produced nothing answers its messages with no step of its own.
-  if (turn.response.length === 0) return steps;
+    case "Response": {
+      // A run that produced nothing answers with no step of its own.
+      if (step.response.length === 0) return [];
 
-  let message = "";
-  let reasoning = "";
-  const toolCalls: Response.ToolCallPartsView<Tools<Config>>[] = [];
-  const observations: Response.ToolResultPartsView<Tools<Config>>[] = [];
+      let message = "";
+      let reasoning = "";
+      const toolCalls: Response.ToolCallPartsView<Tools<Config>>[] = [];
+      const observations: Response.ToolResultPartsView<Tools<Config>>[] = [];
 
-  for (const part of turn.response) {
-    switch (part.type) {
-      case "text":
-        message += part.text;
-        break;
-      case "reasoning":
-        reasoning += part.text;
-        break;
-      case "tool-call":
-        toolCalls.push(part);
-        break;
-      case "tool-result":
-        observations.push(part);
-        break;
-      default:
-        break;
+      for (const part of step.response) {
+        switch (part.type) {
+          case "text":
+            message += part.text;
+            break;
+          case "reasoning":
+            reasoning += part.text;
+            break;
+          case "tool-call":
+            toolCalls.push(part);
+            break;
+          case "tool-result":
+            observations.push(part);
+            break;
+          default:
+            break;
+        }
+      }
+
+      return [
+        {
+          source: "agent",
+          message,
+          reasoning: reasoning === "" ? Option.none() : Option.some(reasoning),
+          toolCalls,
+          observations,
+        },
+      ];
     }
+
+    case "Event":
+      return [];
   }
-
-  steps.push({
-    source: "agent",
-    message,
-    reasoning: reasoning === "" ? Option.none() : Option.some(reasoning),
-    toolCalls,
-    observations,
-  });
-
-  return steps;
 };
 
 /**
@@ -213,14 +219,14 @@ const stepsOf = <Config extends Config.AnyConfig>(
  * - What it reads is the parts of one session ({@link Session.SessionStream}), which
  *   `Session.toSessions` reads of a trajectory: the steps of a document are the steps
  *   of one run, so a trajectory of several sessions is read one session at a time.
- * - One turn is read as a step for each message of its prompt, followed by one `agent`
- *   step for the parts the turn produced — where it produced any — so the steps are in
- *   the order the conversation was produced in: the system prompt and the user message
- *   a model was given, then the turn that answered them.
- * - A step is derived from a turn, so it inherits how a turn is read: the increments of
- *   a streamed response are folded into the parts they complete, a prompt part with no
- *   response reads as its messages alone, and a response part that no prompt precedes
- *   belongs to no turn and is dropped.
+ * - A `Prompt` step is read as a step for each message of its prompt. A `Response`
+ *   step is read as one `agent` step for the parts it holds — where it holds any — so
+ *   the steps are in the order the conversation was produced in: the system prompt and
+ *   the user message a model was given, then the run that answered them.
+ * - An `Event` step is read as no step.
+ * - A step is derived from `View.steps`, so it inherits how the parts are read: the
+ *   increments of a streamed response are folded into the parts they complete, and a
+ *   response part with no completed part of its own is read past.
  *
  * ATIF numbers the steps of a document from `1` and requires the numbers to stay
  * sequential; what is read here holds no such number, so the steps are emitted in order
@@ -259,11 +265,11 @@ const stepsOf = <Config extends Config.AnyConfig>(
  * ```
  *
  * @see {@link Step} — the steps that are emitted.
- * @see {@link View.promptTurns} — the turns they are read from.
+ * @see {@link View.steps} — the steps they are read from.
  * @see {@link Session.Session.stream} — the parts a session is read by.
  * @category combinators
  */
 export const steps = <Config extends Config.AnyConfig, E, R>(
   stream: Session.SessionStream<Config, E, R>,
 ): Stream.Stream<Step<Tools<Config>>, E | TrajectoryError, R> =>
-  View.promptTurns(stream).pipe(Stream.flatMap((turn) => Stream.fromIterable(stepsOf(turn))));
+  View.steps(stream).pipe(Stream.flatMap((step) => Stream.fromIterable(stepsOf(step))));

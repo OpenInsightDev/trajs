@@ -18,7 +18,7 @@ import { fileURLToPath } from "node:url";
 import { NodeServices as PlatformNode } from "@effect/platform-node";
 import { EventKit, ExtraKit, MetricKit, Prompt, Response, Toolkit, Trajectory } from "@trajs/core";
 import * as Config from "@trajs/core/Config";
-import { Exchange } from "@trajs/core/Exchange";
+import * as Exchange from "@trajs/core/Exchange";
 import { NodeServices } from "@trajs/platform-node";
 import { layerFileSystem } from "@trajs/utils/Storage";
 import { DateTime, Effect, Formatter, Layer, Stream } from "effect";
@@ -328,7 +328,7 @@ const parts = [
 const trajectory = Trajectory.make(config)(Stream.fromIterable(parts));
 
 const program = Effect.gen(function* () {
-  const exchange = yield* Exchange;
+  const exchange = yield* Exchange.Exchange;
 
   const id = fileURLToPath(new URL("../public/sample.trajs", import.meta.url));
 

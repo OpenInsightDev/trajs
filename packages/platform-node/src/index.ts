@@ -7,7 +7,7 @@
  * Every module is re-exported as a namespace — `NodeCompression.layer`,
  * `NodeStreamHash.layer` — and each is also available as a subpath import such
  * as `@trajs/platform-node/NodeCompression`. `NodeServices` aggregates them into
- * the layer `@trajs/core`'s `Exchange.layer` is provided with.
+ * what the exchange layer of `@trajs/core` is provided with.
  */
 
 export * as NodeCompression from "#/NodeCompression.ts";
