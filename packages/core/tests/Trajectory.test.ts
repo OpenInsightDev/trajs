@@ -1,9 +1,11 @@
 /**
- * `Trajectory.cache` as a reading of a trajectory a program can read again: one pass
- * keeps a window of parts in memory and writes the rest to the store, and every
- * reading after it answers with the same parts in the same order.
+ * `Cache.Service.cache` reads a trajectory once.
+ * The newest parts stay in memory.
+ * The parts before them are written to the store.
+ * Every later reading answers with the same parts, in the same order.
  */
 
+import * as Cache from "@trajs/core/Cache";
 import * as Config from "@trajs/core/Config";
 import * as EventKit from "@trajs/core/EventKit";
 import * as ExtraKit from "@trajs/core/ExtraKit";
@@ -12,10 +14,9 @@ import * as Prompt from "@trajs/core/Prompt";
 import * as Toolkit from "@trajs/core/Toolkit";
 import * as Trajectory from "@trajs/core/Trajectory";
 import { ByteStore } from "@trajs/utils";
-import { DateTime, Effect, Scope, Stream } from "effect";
+import { DateTime, Effect, Stream } from "effect";
 import { expect, it } from "vite-plus/test";
 
-/** The kits the trajectories below are built with: no tools, events, or metrics. */
 const config = Config.config({
   stream: false,
   toolkit: Toolkit.empty,
@@ -24,16 +25,13 @@ const config = Config.config({
   extrakit: ExtraKit.empty,
 });
 
-/** The id every trajectory below is named by, which is what its spilled frames are keyed under. */
+/** Spilled frames are stored under this id. */
 const id = "01890a5d-ac96-774b-bcce-b302099a8058";
 
-/** When the conversations below were produced. */
 const at = DateTime.makeUnsafe("2026-01-01T00:00:00.000Z");
 
-/** The builders of the parts below, under the config they are read with. */
 const part = Trajectory.parts(config);
 
-/** A conversation of `count` prompts, after the main session part that opens it. */
 const conversation = (count: number): ReadonlyArray<Trajectory.Part<typeof config>> => [
   part.mainSession(),
   ...Array.from({ length: count }, (_, index) =>
@@ -41,55 +39,61 @@ const conversation = (count: number): ReadonlyArray<Trajectory.Part<typeof confi
   ),
 ];
 
-/** The trajectory the parts given make, named by {@link id}. */
 const trajectoryOf = (parts: ReadonlyArray<Trajectory.Part<typeof config>>) =>
   Trajectory.make(id, config)(Stream.fromIterable(parts));
 
-/** What the trajectories below require besides the store: the scope a cache is made in. */
-type Program<A, E> = Effect.Effect<A, E, ByteStore.ByteStore | Scope.Scope>;
-
-/** Runs a program against a store of its own, so no test reads another's frames. */
-const run = <A, E>(program: Program<A, E>) =>
-  program.pipe(Effect.provide(ByteStore.layer()), Effect.scoped, Effect.runPromise);
+/** Runs `program` against its own in-memory store and cache. */
+const run = <A, E>(
+  program: Effect.Effect<A, E, Cache.Cache | ByteStore.ByteStore>,
+  options?: Cache.Options,
+) =>
+  program.pipe(
+    Effect.provide(Cache.layerKVStore(options)),
+    Effect.provide(ByteStore.layer()),
+    Effect.runPromise,
+  );
 
 it("replays the parts of a trajectory on every reading", async () => {
   const parts = conversation(3);
 
-  const { first, second, cache } = await run(
+  const { first, second, cached } = await run(
     Effect.gen(function* () {
-      const cache = yield* Trajectory.cache(trajectoryOf(parts));
+      const cache = yield* Cache.Cache;
+      const cached = yield* cache.cache(trajectoryOf(parts));
 
       return {
-        cache,
-        first: [...(yield* cache.pipe(Stream.runCollect))],
-        second: [...(yield* cache.pipe(Stream.runCollect))],
+        cached,
+        first: [...(yield* cached.pipe(Stream.runCollect))],
+        second: [...(yield* cached.pipe(Stream.runCollect))],
       };
     }),
   );
 
   expect(first).toEqual(parts);
   expect(second).toEqual(parts);
-  expect(cache.id).toBe(id);
-  expect(cache.extrakit).toBe(config.extrakit);
+  expect(cached.id).toBe(id);
+  expect(cached.extrakit).toBe(config.extrakit);
 });
 
-it("keeps the window in memory and writes the parts after it to the store", async () => {
+it("keeps the newest parts in memory and writes the earlier ones to the store", async () => {
   const parts = conversation(4);
 
   const { held, read } = await run(
     Effect.gen(function* () {
       const store = yield* ByteStore.ByteStore;
-      const cache = yield* Trajectory.cache(trajectoryOf(parts), { capacity: 2 });
+      const cache = yield* Cache.Cache;
+      const cached = yield* cache.cache(trajectoryOf(parts));
 
       const held = yield* Effect.forEach(parts, (_, index) => store.has(`${id}/${index}`), {
         discard: false,
       });
 
-      return { held, read: [...(yield* cache.pipe(Stream.runCollect))] };
+      return { held, read: [...(yield* cached.pipe(Stream.runCollect))] };
     }),
+    { capacity: 2 },
   );
 
-  expect(held).toEqual([false, false, true, true, true]);
+  expect(held).toEqual([true, true, true, false, false]);
   expect(read).toEqual(parts);
 });
 
@@ -99,14 +103,16 @@ it("writes every part to the store where the window holds none", async () => {
   const { held, read } = await run(
     Effect.gen(function* () {
       const store = yield* ByteStore.ByteStore;
-      const cache = yield* Trajectory.cache(trajectoryOf(parts), { capacity: 0 });
+      const cache = yield* Cache.Cache;
+      const cached = yield* cache.cache(trajectoryOf(parts));
 
       const held = yield* Effect.forEach(parts, (_, index) => store.has(`${id}/${index}`), {
         discard: false,
       });
 
-      return { held, read: [...(yield* cache.pipe(Stream.runCollect))] };
+      return { held, read: [...(yield* cached.pipe(Stream.runCollect))] };
     }),
+    { capacity: 0 },
   );
 
   expect(held).toEqual([true, true, true]);
@@ -124,25 +130,28 @@ it("reads its source once, however many times the cache is read", async () => {
         config,
       )(Stream.fromIterable(parts).pipe(Stream.tap(() => Effect.sync(() => void (pulls += 1)))));
 
-      const cache = yield* Trajectory.cache(source);
+      const cache = yield* Cache.Cache;
+      const cached = yield* cache.cache(source);
 
-      yield* cache.pipe(Stream.runDrain);
-      yield* cache.pipe(Stream.runDrain);
+      yield* cached.pipe(Stream.runDrain);
+      yield* cached.pipe(Stream.runDrain);
     }),
   );
 
   expect(pulls).toBe(parts.length);
 });
 
-it("takes the capacity without the trajectory it is applied to", async () => {
+it("states the window where the cache is built, not where a trajectory is read", async () => {
   const parts = conversation(2);
 
   const read = await run(
     Effect.gen(function* () {
-      const cache = yield* trajectoryOf(parts).pipe(Trajectory.cache({ capacity: 1 }));
+      const cache = yield* Cache.Cache;
+      const cached = yield* cache.cache(trajectoryOf(parts));
 
-      return [...(yield* cache.pipe(Stream.runCollect))];
+      return [...(yield* cached.pipe(Stream.runCollect))];
     }),
+    { capacity: 1 },
   );
 
   expect(read).toEqual(parts);
@@ -152,8 +161,9 @@ it("fails where its source fails, before a cache is made", async () => {
   const error = await run(
     Effect.gen(function* () {
       const source = Trajectory.make(id, config)(Stream.fail("boom"));
+      const cache = yield* Cache.Cache;
 
-      return yield* Trajectory.cache(source).pipe(Effect.flip);
+      return yield* cache.cache(source).pipe(Effect.flip);
     }),
   );
 

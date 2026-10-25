@@ -9,9 +9,9 @@
  * as those conversations; a trajectory read as the messages a chat completions API of
  * an OpenAI-compatible client takes is `@trajs/extension-openai-compat`.
  *
- * The conversations are read with `View.conversations` of `@trajs/core`, one session
+ * The conversations are read with `View.prompt` of `@trajs/core`, one session
  * at a time, and each of their messages is then written as this API states it. A
- * trajectory is read as its sessions with `Session.toSessions`, which is what
+ * trajectory is read as its sessions with `Session.main`, which is what
  * reading one here is given: a trajectory whose sessions cannot be read fails that
  * reading — an unproduced fork, or a late declaration, is what reading one fails with.
  *
@@ -31,10 +31,8 @@
  */
 
 import type { Generated } from "@effect/ai-anthropic";
-import { View } from "@trajs/core";
+import { Session, View } from "@trajs/core";
 import * as Config from "@trajs/core/Config";
-import type * as Session from "@trajs/core/Session";
-import type { TrajectoryError } from "@trajs/core/TrajectoryError";
 import { Effect, Predicate } from "effect";
 import type { Prompt } from "effect/ai";
 import * as Base64 from "effect/encoding/Base64";
@@ -87,9 +85,9 @@ export type AnthropicSessions = Record<string, AnthropicConversation>;
  *
  * **Details**
  *
- * - What it is given is what `Session.toSessions` read of a trajectory, so a trajectory is
+ * - What it is given is what `Session.main` read of a trajectory, so a trajectory is
  *   read as its sessions before it is read as conversations: one reading of it serves every
- *   session it holds ({@link Session.Sessions}).
+ *   session it holds ({@link Session.MainSession}).
  * - The conversation of a session holds the messages the session produced and the
  *   messages it inherited: what the sessions it continues from produced up to the
  *   part it continues from, from the root of the fork down.
@@ -102,15 +100,14 @@ export type AnthropicSessions = Record<string, AnthropicConversation>;
  *   it are read as one message, since the API states the roles of a conversation
  *   alternating.
  *
- * The effect fails with what reading the parts of a session fails with — the
- * {@link TrajectoryError} a trajectory whose parts cannot be read fails with, on top of what
- * the store they are kept in fails with — and requires the services `R` names.
+ * The effect fails with what reading the parts of a session fails with, and requires
+ * the services `R` names.
  *
  * **Example** (Reading a trajectory as the messages of a call and its answer)
  *
  * ```ts import.meta.vitest
  * import { Codec } from "@trajs/extension-anthropic"
- * import { EventKit, ExtraKit, MetricKit, Prompt, Response, Toolkit, Trajectory } from "@trajs/core"
+ * import { Cache, Config, EventKit, ExtraKit, MetricKit, Prompt, Response, Session, Toolkit, Trajectory } from "@trajs/core"
  * import { Effect, Stream } from "effect"
  *
  * // The main session, which the parts below belong to.
@@ -171,8 +168,8 @@ export type AnthropicSessions = Record<string, AnthropicConversation>;
  *
  * const trajectory = Trajectory.make(config)(Stream.fromIterable(parts))
  *
- * const sessions = await Effect.runPromise(Session.toSessions(trajectory))
- * const conversations = await Effect.runPromise(Codec.makeAnthropic(sessions))
+ * const root = await Effect.runPromise(Session.main(trajectory).pipe(Effect.provide(Cache.layer())))
+ * const conversations = await Effect.runPromise(Codec.makeAnthropic(root))
  * const conversation = conversations[sessionId]
  *
  * conversation?.messages.map((message) => message.role) // => ["user", "assistant", "user", "assistant"]
@@ -180,24 +177,24 @@ export type AnthropicSessions = Record<string, AnthropicConversation>;
  * ```
  *
  * @see {@link AnthropicSessions} for the conversations it reads to.
- * @see {@link View.conversations} for the conversations it writes out.
- * @see {@link Session.toSessions} for the sessions it is given.
+ * @see {@link View.prompt} for the messages of one session.
+ * @see {@link Session.main} for the tree it is given.
  * @category constructors
  */
 export const makeAnthropic = <Config extends Config.AnyConfig, E, R>(
-  sessions: Session.Sessions<Config, E, R>,
-): Effect.Effect<AnthropicSessions, E | TrajectoryError, R> =>
-  View.conversations(sessions).pipe(
-    Effect.map((sessions) => {
-      const encoded: AnthropicSessions = {};
+  main: Session.MainSession<Config, E, R>,
+): Effect.Effect<AnthropicSessions, E, R> =>
+  Effect.gen(function* () {
+    const encoded: AnthropicSessions = {};
 
-      for (const [id, messages] of Object.entries(sessions)) {
-        encoded[id] = anthropicConversation(messages);
-      }
+    for (const session of Session.all(main)) {
+      const prompt = yield* View.prompt(Session.stream(session));
 
-      return encoded;
-    }),
-  );
+      encoded[session.id] = anthropicConversation(prompt.content);
+    }
+
+    return encoded;
+  });
 
 /** The text of the parts given. */
 const textOf = (parts: ReadonlyArray<Prompt.Part>): string => {
@@ -238,7 +235,7 @@ const mediaTypeOf = (part: Prompt.FilePart): string =>
 /** A location an image part names, as opposed to the bytes it holds, which the API reads as an image's URL. */
 const located = /^https?:\/\//i;
 
-const anthropicConversation = (messages: View.Conversation): AnthropicConversation => {
+const anthropicConversation = (messages: ReadonlyArray<Prompt.Message>): AnthropicConversation => {
   const system: Generated.BetaRequestTextBlock[] = [];
   const entries: AnthropicEntry[] = [];
 

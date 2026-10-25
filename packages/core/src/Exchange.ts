@@ -51,6 +51,21 @@ export type Metadata = Schema.Schema.Type<typeof Metadata>;
  */
 export const Part = <C extends Config.AnyConfig>(config: C) => ExchangePart(config);
 
+/**
+ * The header and the metadata of a trajectory.
+ *
+ * **When to use**
+ *
+ * Use to hold what {@link Service.inspect} reads, without the parts.
+ *
+ * @see {@link Loaded} for the same fields plus a reading of the parts.
+ * @category models
+ */
+export interface Inspected {
+  readonly header: Header;
+  readonly metadata: Metadata;
+}
+
 export interface Loaded<Config extends Config.AnyConfig = Config.AnyConfig> {
   readonly header: Header;
 
@@ -62,6 +77,22 @@ export interface Loaded<Config extends Config.AnyConfig = Config.AnyConfig> {
 }
 
 export interface Service {
+  /**
+   * Reads the header and the metadata stored under `id`.
+   *
+   * **When to use**
+   *
+   * Use to read what a trajectory states about itself without opening its parts.
+   *
+   * **Details**
+   *
+   * The header sits at the head of the bytes and the metadata at the tail.
+   * Neither is compressed, so the frame of parts is not read.
+   *
+   * @see {@link Service.load} for a reading of the parts as well.
+   */
+  readonly inspect: (id: string) => Effect.Effect<Inspected, TrajectoryError | StorageError>;
+
   readonly load: <Config extends Config.AnyConfig>(
     config: Config,
   ) => (
@@ -105,14 +136,28 @@ export const layer: Layer.Layer<Exchange, never, Storage | Compression | StreamH
     const compression = yield* Compression;
     const hasher = yield* StreamHash;
 
+    const endsOf = (id: string) =>
+      Effect.gen(function* () {
+        const bytes = yield* storage.read(id);
+        const stated = yield* headerOf(Header, bytes);
+        const trailing = yield* trailingOf(Metadata, Magic, bytes);
+
+        return { bytes, stated, trailing };
+      });
+
     return {
+      inspect: (id) =>
+        endsOf(id).pipe(
+          Effect.map(({ stated, trailing }) => ({
+            header: stated.header,
+            metadata: trailing.metadata,
+          })),
+        ),
       load:
         <Config extends Config.AnyConfig>(config: Config) =>
         (id: string) =>
           Effect.gen(function* () {
-            const bytes = yield* storage.read(id);
-            const stated = yield* headerOf(Header, bytes);
-            const trailing = yield* trailingOf(Metadata, Magic, bytes);
+            const { bytes, stated, trailing } = yield* endsOf(id);
 
             const frame = framed(
               framesOf<StorageError>({ from: stated.end, to: trailing.end })(bytes).pipe(

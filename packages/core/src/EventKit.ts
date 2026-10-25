@@ -10,12 +10,16 @@ export type Eventkit<Events extends Record<string, Event.Any>> = Readonly<{
 }>;
 
 export const make = <Es extends ReadonlyArray<Event.Any>>(...events: Es) => {
+  // SAFETY: every event given is inserted under its own tag below, so the record
+  // holds one event per tag the kit names.
   const output = {} as Record<string, Event.Any>;
 
   for (const event of events) {
     output[event.tag] = event;
   }
 
+  // SAFETY: `output` holds the event of every tag in `Es`.
+  // `EventsByTag` reads the events given as that record.
   return { events: output } as Eventkit<EventsByTag<Es>>;
 };
 
@@ -63,11 +67,16 @@ type EventsMerged<Ks extends ReadonlyArray<Any>> = Ks extends readonly [
 export type Merged<Ks extends ReadonlyArray<Any>> = Eventkit<EventsMerged<Ks>>;
 
 export const merge = <Ks extends ReadonlyArray<Any>>(...kits: Ks): Merged<Ks> => {
+  // SAFETY: every event of every kit is inserted under its own tag below, so the
+  // record holds one event per tag the kits name.
   const events = {} as Record<string, Event.Any>;
 
   for (const kit of kits) {
     Object.assign(events, kit.events);
   }
 
+  // SAFETY: `events` holds one event per tag in `Ks`.
+  // Where several kits name one tag, the latest kit keeps its event.
+  // `EventsMerged` reads the kits as that record.
   return { events } as Merged<Ks>;
 };

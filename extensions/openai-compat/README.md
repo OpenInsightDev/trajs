@@ -9,7 +9,7 @@ session, holding the messages the session's model was given and answered in the
 order they were produced, and what the session inherited from the one it continues
 from. `Codec.makeOpenAiCompat` reads the sessions of a trajectory as those
 conversations, stated the way that API takes them — the sessions
-`Session.toSessions` read of it. It is what the package is for, so it is
+`Session.main` read of it. It is what the package is for, so it is
 re-exported as a namespace; it is also available as the subpath import
 `@trajs/extension-openai-compat/Codec`.
 
@@ -19,14 +19,14 @@ re-exported as a namespace; it is also available as the subpath import
 import { Effect } from "effect";
 import { Codec } from "@trajs/extension-openai-compat";
 
-const sessions = await Effect.runPromise(Session.toSessions(trajectory));
-const conversations = await Effect.runPromise(Codec.makeOpenAiCompat(sessions));
+const root = await Effect.runPromise(Session.main(trajectory).pipe(Effect.provide(Cache.layer())));
+const conversations = await Effect.runPromise(Codec.makeOpenAiCompat(root));
 
 // One conversation per session, keyed by the id of the session.
 conversations[sessionId]?.map((message) => message.role);
 ```
 
-The conversations are read with `View.conversations` of `@trajs/core` — a session's
+The conversations are read with `View.prompt` of `@trajs/core` — a session's
 messages, preceded by what the sessions it continues from produced up to the part it
 continues from — and each message is then written as the API states it:
 

@@ -4,9 +4,8 @@
  * printed as JSON.
  *
  * A trajectory carries its header at the head of the file and its metadata at its
- * tail, and neither is compressed, so loading one does not read the trajectory: the
- * exchange reads the head for the header and the tail for the metadata, and stops
- * before the frame the parts are carried in.
+ * tail, and neither is compressed. `Exchange.inspect` reads them and stops before
+ * the frame the parts are carried in.
  *
  * What is printed is what the file states — the header as the format encodes it, and
  * the metadata with the algorithm each of its two coded fields states named rather
@@ -94,11 +93,11 @@ export const inspect = Command.make(
     Effect.gen(function* () {
       const exchange = yield* Exchange.Exchange;
 
-      const loaded = yield* exchange.load(file);
+      const inspected = yield* exchange.inspect(file);
 
       const stated = metadata
-        ? metadataJson(loaded.metadata, indent)
-        : headerJson(loaded.header, indent);
+        ? metadataJson(inspected.metadata, indent)
+        : headerJson(inspected.header, indent);
 
       yield* Console.log(stated);
     }).pipe(
