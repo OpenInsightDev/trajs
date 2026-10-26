@@ -30,6 +30,8 @@ choices.
   calls the toolkit does not describe.
 - [metric](./tutorials/metric/README.md) — measure the text each tool result handed back, and read
   what the metric could not measure.
+- [extras](./tutorials/extras/README.md) — read the model, the effort, and the agent a harness
+  recorded beside a run, and read a record written before a rename.
 - [olap](./tutorials/olap/README.md) — write two short runs into the parts table and answer their
   calls and billing with SQL.
 
