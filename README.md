@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="./assets/banner-dark.webp" alt="TRAJS — Record. Analysis. Exchange." width="1200" />
+  <img src="./assets/banner-dark.webp" alt="TRAJS — Ecosystem for Trajectory" width="1200" />
 </p>
 
 <h1 align="center">TRAJS</h1>
