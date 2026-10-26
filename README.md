@@ -5,22 +5,22 @@
 <h1 align="center">TRAJS</h1>
 
 <p align="center">
-  <!-- One sentence: what TRAJS is, who it is for, and the single promise it keeps. -->
+  Record, analyze and exchange agent trajectories.
 </p>
 
 <p align="center">
+  <a href="https://tra.js.org/"><b>Docs</b></a> &nbsp;·&nbsp;
   <a href="#quickstart"><b>Quickstart</b></a> &nbsp;·&nbsp;
-  <a href="https://openinsightdev.github.io/trajs/"><b>Docs</b></a> &nbsp;·&nbsp;
-  <a href="#architecture"><b>Architecture</b></a> &nbsp;·&nbsp;
+  <a href="#packages"><b>Packages</b></a> &nbsp;·&nbsp;
   <a href="#examples"><b>Examples</b></a> &nbsp;·&nbsp;
   <a href="#contributing"><b>Contributing</b></a>
 </p>
 
 <p align="center">
-  <a href="https://github.com/trajs-ai/trajs/actions/workflows/deploy.yml"><img alt="Docs" src="https://github.com/trajs-ai/trajs/actions/workflows/deploy.yml/badge.svg"></a>
-  <img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-blue.svg">
+  <a href="https://tra.js.org/"><img alt="Documentation" src="https://img.shields.io/badge/docs-tra.js.org-1f6feb.svg"></a>
+  <a href="https://www.npmjs.com/package/@trajs/core"><img alt="npm @trajs/core" src="https://img.shields.io/npm/v/@trajs/core?label=%40trajs%2Fcore&color=cb3837"></a>
+  <a href="./LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-blue.svg"></a>
   <img alt="Node" src="https://img.shields.io/badge/node-%E2%89%A522.18-3c873a.svg">
-  <img alt="pnpm" src="https://img.shields.io/badge/pnpm-12.10.1-f69220.svg">
 </p>
 
 <details>
