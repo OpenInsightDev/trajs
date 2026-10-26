@@ -9,7 +9,10 @@ name: Snapshot
 #
 # Only a pull request from a branch in this repository publishes. A fork's token
 # cannot comment the links, and its code should not be packaged under this
-# repository's name before a maintainer has taken it over.
+# repository's name before a maintainer has taken it over. The version pull
+# request is left out too: it only moves versions and changelogs, so there is
+# nothing to install from it, and the pushes that update it come from the
+# `GITHUB_TOKEN` GitHub holds for approval.
 
 on:
   push:
@@ -30,7 +33,8 @@ jobs:
   snapshot:
     if: >-
       github.event_name == 'push' ||
-      github.event.pull_request.head.repo.full_name == github.repository
+      (github.event.pull_request.head.repo.full_name == github.repository &&
+      !startsWith(github.head_ref, 'changeset-release/'))
     runs-on: ubuntu-latest
     permissions:
       contents: read # check out the repository
