@@ -108,21 +108,34 @@ const stated = (part: Trajectory.Part<Config.AnyConfig>) =>
   });
 
 /**
- * The row `part` makes at `position` of `trajectoryId`, carrying the payload it
- * was encoded to.
+ * The row `part` makes at `position` of `trajectoryId`, carrying the payload JSON
+ * states of it.
  */
 const rowOf = (
   trajectoryId: string,
   position: number,
   part: Trajectory.Part<Config.AnyConfig>,
-  encoded: Encoded,
-): Row => ({ trajectory_id: trajectoryId, position, ...stated(part), part: encoded });
+  payload: Encoded,
+): Row => ({ trajectory_id: trajectoryId, position, ...stated(part), part: payload });
 
-/** The parts of `trajectory` as the rows of {@link name}, in the order they arrive. */
+/**
+ * The parts of `trajectory` as the rows of {@link name}, in the order they arrive.
+ *
+ * The payload of a row is written as JSON, so a part becomes one as JSON states it
+ * rather than as the exchange writes it: `Schema.toCodecJson` is the canonical JSON
+ * form of a schema, which is what states a value JSON has no form of — the bytes
+ * of a media part, a moment — as a string rather than as an object of its fields.
+ *
+ * TODO: the bytes of a media part travel inline, as the base64 string a `JSON`
+ * column holds them as. A storage service a program gives {@link Parts.rows} —
+ * the way the exchange is given one to keep the bytes of a `.trajs` file — would
+ * hold them outside the row, and a payload would carry the reference a query
+ * reaches them by.
+ */
 export const rowsOf = <C extends Config.AnyConfig, E, R>(
   trajectory: Trajectory.Trajectory<string, C, E, R>,
 ): Stream.Stream<Row, E | TrajectoryError, R | Config.EncodingServices<C>> => {
-  const encode = partSchema(trajectory).pipe(Schema.encodeEffect);
+  const encode = partSchema(trajectory).pipe(Schema.toCodecJson, Schema.encodeEffect);
 
   // Every row of one reading is of the trajectory it is read from, named by the id
   // that trajectory carries.
@@ -133,7 +146,9 @@ export const rowsOf = <C extends Config.AnyConfig, E, R>(
     Stream.mapEffect(([part, position]) =>
       encode(part).pipe(
         Effect.mapError(TrajectoryError.parse),
-        Effect.map((encoded) => rowOf(id, position, part, encoded)),
+        // SAFETY: what a part encodes to is an object — the part with its `_tag` —
+        // so the JSON it states is a JSON object rather than any JSON value.
+        Effect.map((encoded) => rowOf(id, position, part, encoded as Encoded)),
       ),
     ),
   );
