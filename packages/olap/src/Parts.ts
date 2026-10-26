@@ -21,14 +21,14 @@
  * starts — so `trajectory_id` and `session_id` group the same rows two ways.
  *
  * What a part is of its kind is the payload the rest is read off
- * ({@link Row.part}): the part exactly as {@link Exchange.Service.save} encodes
- * it, typed on the paths a query aggregates over — `response.modelId`,
- * `response.name` and the two totals of `response.usage` — and dynamic
- * everywhere else, since a part of a kit a program does not know the schema of
- * is still one a query can read. The table is a `MergeTree` as ClickHouse's
- * semi-structured data wants it: a `JSON` column stores the paths that are
- * typed separately from the ones that are not, so reading one is reading a
- * subcolumn rather than parsing a document.
+ * ({@link Row.part}): the part as JSON states it, where the bytes of a media part
+ * are a base64 string rather than an object of a key per byte, typed on the paths
+ * a query aggregates over — `response.modelId`, `response.name` and the two
+ * totals of `response.usage` — and dynamic everywhere else, since a part of a kit
+ * a program does not know the schema of is still one a query can read. The table
+ * is a `MergeTree` as ClickHouse's semi-structured data wants it: a `JSON` column
+ * stores the paths that are typed separately from the ones that are not, so
+ * reading one is reading a subcolumn rather than parsing a document.
  *
  * The rows of a trajectory are replaced rather than duplicated when the trajectory
  * of the same id is written twice, and no row is written for a part a reading did
@@ -36,7 +36,6 @@
  */
 
 import * as Config from "@trajs/core/Config";
-import { Part as partSchema } from "@trajs/core/Exchange";
 import type * as Trajectory from "@trajs/core/Trajectory";
 import { TrajectoryError } from "@trajs/core/TrajectoryError";
 import { Effect, Schema } from "effect";
@@ -79,7 +78,7 @@ export const name = table;
 export const ddl = statement;
 
 /**
- * A part as the exchange encodes it: the `part` column's payload.
+ * A part as JSON states it: the `part` column's payload.
  *
  * **When to use**
  *
@@ -87,16 +86,20 @@ export const ddl = statement;
  *
  * **Details**
  *
- * It is the encoded form of the parts a trajectory is stored as: the parts
- * `@trajs/core`'s `Exchange.Part` writes into a `.trajs` file — a response
- * part's response as the schema of its own state states it rather than as the
- * toolkit it was produced with does.
+ * It is the encoded form of the parts a trajectory is stored as — the parts
+ * `@trajs/core`'s `Exchange.Part` writes into a `.trajs` file — in the canonical
+ * JSON form of the same schema: a response part's response is the schema of its
+ * own state rather than the toolkit it was produced with, and a value JSON has no
+ * form of is the string JSON states it as. The bytes of a media part are a base64
+ * string, which is one path of a `JSON` column rather than a path per byte; a
+ * moment is an ISO 8601 string; and a field the part does not state is `null`. A
+ * value of the part's schema that is `unknown` — a param of a tool no toolkit
+ * declares, say — is written as it is, so a part carrying one that is not JSON
+ * fails to encode rather than writing a payload no `JSON` column can hold.
  *
  * @category models
  */
-export type Encoded<C extends Config.AnyConfig = Config.AnyConfig> = Schema.Codec.Encoded<
-  ReturnType<typeof partSchema<C>>
->;
+export type Encoded = Schema.JsonObject;
 
 /**
  * A part of a trajectory as a row of {@link name}.
@@ -145,7 +148,7 @@ export interface Row {
   /** When the part was produced, as an ISO 8601 moment, and `null` where it states none. */
   readonly time: string | null;
 
-  /** The part as the exchange encodes it, which is what the rest of a query reads. */
+  /** The part as JSON states it, which is what the rest of a query reads. */
   readonly part: Encoded;
 }
 
@@ -184,11 +187,12 @@ export const create = (): Effect.Effect<void, SqlError, Client> =>
  * Every row states the id `trajectory` carries ({@link Row.trajectory_id}), so a
  * whole trajectory is the rows of one `trajectory_id`.
  *
- * Each part is encoded as the exchange encodes it before it is a row, so what
- * the payload column carries is the part as a trajectory states it rather than
- * as the toolkit it was produced with does: a tool result travels as its
- * encoded form, not as the decoded one. Encoding is what a toolkit states of
- * its own tools' results, so the stream takes {@link Config.EncodingServices} beside
+ * Each part is stated as its canonical JSON form before it is a row, so what the
+ * payload column carries is the part as a trajectory states it rather than as the
+ * toolkit it was produced with does: a tool result travels as its encoded form,
+ * not as the decoded one, and the bytes of a media part are the base64 string
+ * JSON states them as ({@link Encoded}). Encoding is what a toolkit states of its
+ * own tools' results, so the stream takes {@link Config.EncodingServices} beside
  * the services the trajectory is read with.
  *
  * @see {@link ingest} for writing the rows this stream makes.

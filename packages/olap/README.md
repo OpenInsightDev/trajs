@@ -50,9 +50,14 @@ own.
 
 Every column but the payload is a fact the part states of itself, so a query
 groups and filters without reaching into a document; the payload is the part as
-the exchange encodes it, with the paths a query reads most stated as subcolumns
-of their own — a `JSON` column infers the type of every other path it holds, so a
-part of a kit this package has no schema for is still one a query can read.
+JSON states it, with the paths a query reads most stated as subcolumns of their
+own — a `JSON` column infers the type of every other path it holds, so a part of
+a kit this package has no schema for is still one a query can read.
+
+The payload is the canonical JSON of the part rather than the bytes the exchange
+writes: the bytes of a media part are the base64 string JSON states them as
+rather than an object of a key per byte, a moment is an ISO 8601 string, and a
+field the part does not state is `null`.
 
 ```sql
 SELECT

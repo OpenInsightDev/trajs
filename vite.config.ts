@@ -4,9 +4,13 @@ import { defineConfig } from "vite-plus";
 // plugin, which are copied sources rather than project code, and the shadcn/ui
 // components in `ui/shadcn/src`, which are copied sources for the same reason —
 // they are re-added with `shadcn add`, so leaving them as written keeps that a
-// no-op. The rest is written by a build.
+// no-op. The rest is written by a build, or by `changeset version`.
 const ignoredByFmtAndLint = [
   ".agents/**",
+  // Changesets indents a changelog entry by the two spaces of the list marker it
+  // sits under, including the blank lines inside a multi-paragraph entry, so
+  // every release writes trailing whitespace the formatter would strip again.
+  "**/CHANGELOG.md",
   "tools/oxlint/anti-slop/**",
   "ui/shadcn/src/**",
   // The shader runtime the fills are drawn with, copied from
