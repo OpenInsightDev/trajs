@@ -7,8 +7,10 @@ name: Release
 #
 # The jobs follow the Changesets trusted publishing flow: on a push to `main`,
 # either a "Version Packages" pull request is opened or updated, or the packages
-# the version merge left unpublished are packed and published. `id-token: write`
-# is granted to the publish job alone, and npm exchanges that OIDC token for a
+# the version merge left unpublished are packed and published. A push therefore
+# never publishes anything by itself — merging that pull request is the release,
+# and `.changeset/AGENTS.md` states how often one is cut. `id-token: write` is
+# granted to the publish job alone, and npm exchanges that OIDC token for a
 # short-lived credential, so the repository stores no npm token. `pre.json` keeps
 # Changesets in pre mode, so the release is an `X.Y.Z-alpha.N` prerelease
 # published under the `alpha` dist-tag.

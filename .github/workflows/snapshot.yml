@@ -1,0 +1,60 @@
+name: Snapshot
+
+# Publishes an installable build of every commit with pkg-pr-new, so a change can
+# be used before the next release window instead of shipping a release for it.
+# pkg.pr.new hosts the tarballs itself — nothing here touches npm — and the pull
+# request comment names the URL to install from. This is what lets
+# `.changeset/AGENTS.md` release every other day: the wait never blocks anyone
+# from consuming a change.
+#
+# Only a pull request from a branch in this repository publishes. A fork's token
+# cannot comment the links, and its code should not be packaged under this
+# repository's name before a maintainer has taken it over.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# Nothing is granted by default; the job asks for what it needs.
+permissions: {}
+
+# A newer commit makes the snapshot of the older one pointless, so it is
+# cancelled rather than finished.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  snapshot:
+    if: >-
+      github.event_name == 'push' ||
+      github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read # check out the repository
+      pull-requests: write # comment the install links on the pull request
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 12.10.1
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 26.11.1
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      # The packages are packed from their build output, as they are for a
+      # release.
+      - run: pnpm exec vp run -r build
+      # `--pnpm` packs with `pnpm pack`, which is what resolves the `catalog:`
+      # protocol in these manifests. `--previewVersion` states the tarball as
+      # `0.0.0-preview-<sha>`, so a lockfile cannot mistake it for the `alpha`
+      # version npm serves. `--commentWithSha` links the commit instead of the
+      # pull request, so a URL keeps naming the build it was made for.
+      - run: >-
+          pnpm exec pkg-pr-new publish --pnpm --previewVersion
+          --packageManager=pnpm --commentWithSha ./packages/*

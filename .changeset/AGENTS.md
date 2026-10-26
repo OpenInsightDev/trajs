@@ -9,4 +9,15 @@
   - An `experimental` export may break on a minor.
   - Removing a `deprecated` export that was `stable` is still a major.
 - A library outside `packages/` keeps its independent semver. It declares each core library it needs in `peerDependencies`, with the core version range it supports.
-- A pull request publishes snapshot builds of the publishable packages with [pkg-pr-new](https://github.com/stackblitz-labs/pkg.pr.new).
+- Releases are cut on a cadence, not per change. While the packages are in
+  `alpha`, a maintainer merges the open "Version Packages" pull request every
+  other day, and each merge is one release. Changesets accumulate on that pull
+  request in between, so a release carries everything that landed since the last
+  one and the `fixed` group still moves a single `alpha` version. Nothing merges
+  it automatically: when a release ships stays a decision a maintainer makes.
+- Every push to `main` and every pull request from a branch in this repository
+  publishes a snapshot of the publishable packages with
+  [pkg-pr-new](https://github.com/stackblitz-labs/pkg-pr-new), in
+  `.github/workflows/snapshot.yml`. That is what makes the cadence affordable: a
+  change is installable before the next release window, so the wait never forces
+  a release of its own.

@@ -12,6 +12,7 @@
     "@changesets/cli": "catalog:",
     "@oxlint/plugins": "1.85.0",
     "oxlint": "1.85.0",
+    "pkg-pr-new": "catalog:",
     "vite-plus": "catalog:"
   },
   "devEngines": {
