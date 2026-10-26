@@ -2,7 +2,7 @@
  * Conversation steps, tool turns, and metric views over trajectory parts.
  *
  * {@link steps} groups one session's responses and {@link prompt} reconstructs its conversation.
- * {@link metricTrajectory} exposes reports through streams attached to their target parts.
+ * {@link metricTrajectory} attaches reports to the parts they name.
  *
  * @stability stable
  */
@@ -10,13 +10,15 @@
 import { Data, Effect, Result, Stream } from "effect";
 import { Prompt } from "effect/ai";
 
+import * as Cache from "#/Cache.ts";
 import * as Config from "#/Config.ts";
 import { foldResponse } from "#/internal/folding.ts";
-import { attachment, attachPart, endAttachment, idle, type Run } from "#/internal/view.ts";
+import { idle, metricStream, type Run } from "#/internal/view.ts";
 import type * as Metric from "#/Metric.ts";
 import type * as Response from "#/Response.ts";
 import type * as Session from "#/Session.ts";
 import * as Trajectory from "#/Trajectory.ts";
+import type { TrajectoryError } from "#/TrajectoryError.ts";
 
 type Tools<Config extends Config.AnyConfig> = Config["toolkit"]["tools"];
 
@@ -224,18 +226,34 @@ export const produced =
     );
 
 /**
- * Reports attached to one part, including reports already encountered during the outer reading.
+ * The metric part of the metric `Tag` names, carrying that metric's payload.
+ */
+type ReportOf<Config extends Config.AnyConfig, Tag extends keyof Config.MetricsOf<Config>> = Omit<
+  Trajectory.MetricPartOf<Config>,
+  "metric"
+> &
+  Readonly<{
+    metric: Extract<Trajectory.MetricPartOf<Config>["metric"], { readonly _tag: Tag }>;
+  }>;
+
+/**
+ * The reports attached to one part, keyed by metric tag, each list in trajectory order.
  *
- * @see {@link metricTrajectory} for lifetime and consumption rules.
+ * **Details**
+ *
+ * A key is present only for a metric that reported on the part.
+ * Each list holds the reports of the metric of that tag.
+ *
+ * @see {@link metricTrajectory} for how reports reach a part.
  * @stability stable
  * @category models
  */
-export type AttachedMetrics<Config extends Config.AnyConfig> = Stream.Stream<
-  Trajectory.MetricPartOf<Config>
->;
+export type AttachedMetrics<Config extends Config.AnyConfig> = Readonly<{
+  [Tag in keyof Config.MetricsOf<Config>]?: ReadonlyArray<ReportOf<Config, Tag>>;
+}>;
 
 /**
- * A part with an attached report stream, or an unattached metric part.
+ * A part with the reports attached to it, or a report without attachments.
  *
  * @see {@link metricTrajectory} for routing reports to target parts.
  * @stability stable
@@ -252,7 +270,7 @@ type AttachablePart<Config extends Config.AnyConfig> =
   | Trajectory.EventPartOf<Config>;
 
 /**
- * A trajectory view exposing attached report streams on non-metric parts.
+ * A trajectory view carrying the reports attached to each part.
  *
  * @see {@link MetricTrajectoryPart} for each emitted value.
  * @see {@link metricTrajectory} for construction.
@@ -266,44 +284,51 @@ export type MetricTrajectoryStream<
 > = Stream.Stream<MetricTrajectoryPart<Config>, E, R>;
 
 /**
- * Routes attached metric reports into streams on their target parts.
+ * Reads a trajectory into parts carrying the reports attached to them.
  *
  * **When to use**
  *
- * Use to display a part before all its metric reports arrive.
+ * Use to display a part together with the reports that name it.
  *
  * **Details**
  *
- * Non-metric parts gain a `metrics` stream keyed by their uuid.
- * Reports without `attach` remain in the outer stream.
- * Reports with `attach` leave the outer stream and enter each named target's stream.
- * Repeated target ids within one report are deduplicated.
- * Inner streams replay encountered reports and close when the outer stream ends.
+ * {@link Cache.Cache} reads the trajectory to completion before any part is emitted.
+ * A scan of the cached parts indexes each report by the uuid of the parts it names.
+ * A non-metric part carries `metrics`, a record from metric tag to the reports naming its uuid.
+ * Reading one metric's reports needs only `metrics[tag]`.
+ * Reports without `attach` remain in the stream.
+ * Reports with `attach` leave the stream for the `metrics` of the parts they name.
+ * Repeated target ids within one report attach once.
  *
  * **Gotchas**
  *
- * Keep consuming the outer stream while reading inner streams.
- * Waiting for an inner stream to end inside a sequential outer read can stall indefinitely.
+ * The entire trajectory is read before the first part is emitted.
+ * An infinite trajectory never emits.
  * Attachments match part uuids only, not session ids.
- * Unknown targets do not fail and produce no outer report.
- * Attachment state retains encountered reports without a capacity limit.
- * Inner streams close without propagating the outer stream's error.
+ * An unknown target attaches nothing.
+ * Reading requires the cache's backing store to remain available.
  *
  * @see {@link produced} for selecting metric outputs directly.
+ * @see {@link Cache.Cache} for the service the reading runs in.
  * @stability stable
  * @category transforming
  */
-export const metricTrajectory = <Config extends Config.AnyConfig, E, R>(
-  stream: Trajectory.TrajectoryStream<Config, E, R>,
-): MetricTrajectoryStream<Config, E, R> =>
-  Stream.suspend(() => {
-    const attached = attachment<Config>();
+export const metricTrajectory = Effect.fn(function* <Config extends Config.AnyConfig, E, R>(
+  trajectory: Trajectory.Trajectory<string, Config, E, R>,
+): Effect.fn.Return<
+  MetricTrajectoryStream<
+    Config,
+    TrajectoryError | Cache.CacheError,
+    Config.DecodingServices<Config>
+  >,
+  E | TrajectoryError | Cache.CacheError,
+  R | Cache.Cache | Config.SchemaServices<Config>
+> {
+  const cache = yield* Cache.Cache;
+  const cached = yield* cache.cache(trajectory);
 
-    return stream.pipe(
-      Stream.mapAccumEffect(() => attached, attachPart<Config>),
-      Stream.onExit(() => endAttachment(attached)),
-    );
-  });
+  return yield* metricStream(cached);
+});
 
 /**
  * Selects tool calls from response parts in session order.

@@ -128,7 +128,7 @@ export const main = Effect.fn(function* <Config extends Config.AnyConfig, E, R>(
 ): Effect.fn.Return<
   MainSession<Config, E | TrajectoryError | Cache.CacheError, R | Config.DecodingServices<Config>>,
   E | TrajectoryError | Cache.CacheError,
-  R | Config.EncodingServices<Config> | Config.DecodingServices<Config> | Cache.Cache
+  R | Config.SchemaServices<Config> | Cache.Cache
 > {
   const cache = yield* Cache.Cache;
   const cached = yield* cache.cache(trajectory);

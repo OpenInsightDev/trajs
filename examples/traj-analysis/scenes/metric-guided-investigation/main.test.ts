@@ -1,5 +1,6 @@
 import { expect, it } from "@effect/vitest";
 import {
+  Cache,
   Metric,
   MetricKit,
   Prompt,
@@ -9,7 +10,7 @@ import {
   View,
 } from "@trajs/core";
 import * as Config from "@trajs/core/Config";
-import { Effect, Option, Predicate, Result, Schema, Stream } from "effect";
+import { Effect, Predicate, Result, Schema, Stream } from "effect";
 
 interface Evidence {
   readonly version: "0.1.0";
@@ -169,32 +170,28 @@ const main = Effect.fn(function* () {
     Stream.map((metric) => part.metric(metric)),
   );
 
-  // View.metricTrajectory attaches a report to the part it names.
-  // Inner streams replay what they hold, so the reports come first.
-  const runs = yield* Stream.concat(reports, trajectory).pipe(
+  // View.metricTrajectory reads the trajectory into the cache, then carries each
+  // report to the part it names, under that report's metric tag.
+  const view = yield* Stream.concat(reports, trajectory).pipe(
+    Trajectory.make(config),
     View.metricTrajectory,
-    Stream.mapEffect((value) => {
-      if (
-        value._tag !== "Response" ||
-        value.response.type !== "tool-result" ||
-        value.response.name !== "bash"
-      ) {
-        return Effect.succeed(undefined);
-      }
+  );
 
-      return value.metrics.pipe(
-        Stream.filterMap((metric) =>
-          metric.metric._tag === testEvidence.tag && metric.metric.data._tag === "Output"
-            ? Result.succeed(metric.metric.data.output)
-            : Result.failVoid,
-        ),
-        Stream.runHead,
-        Effect.map((evidence) => Option.getOrUndefined(evidence)?.finding),
-      );
-    }),
-    Stream.filterMap((finding) =>
-      finding === undefined ? Result.failVoid : Result.succeed(finding),
+  const runs = yield* view.pipe(
+    Stream.filterMap((value) =>
+      value._tag === "Response" &&
+      value.response.type === "tool-result" &&
+      value.response.name === "bash"
+        ? Result.succeed(value.metrics)
+        : Result.failVoid,
     ),
+    Stream.filterMap((metrics) => {
+      const report = metrics[testEvidence.tag]?.[0];
+
+      return report === undefined || report.metric.data._tag !== "Output"
+        ? Result.failVoid
+        : Result.succeed(report.metric.data.output.finding);
+    }),
     Stream.runFold(
       (): Report => ({ findings: [], resolvedOnRun: undefined, redundantRuns: [] }),
       (report, finding) => {
@@ -215,6 +212,7 @@ const main = Effect.fn(function* () {
 
 it.effect("main", () =>
   main().pipe(
+    Effect.provide(Cache.layer()),
     Effect.map((report) =>
       expect(report).toEqual({
         findings: ["timeout-unset", "tests-pass", "repeat"],

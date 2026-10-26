@@ -211,14 +211,20 @@ export type EncodingServices<C extends AnyConfig> =
   | ExtraKit.EncodingServices<C["extrakit"]>;
 
 /**
- * The intersection of {@link DecodingServices} and {@link EncodingServices}.
+ * Schema requirements for both reading and writing the tools, events, metrics, and extras of a
+ * {@link Config}.
  *
- * **Gotchas**
+ * **When to use**
  *
- * This is not the union of requirements for running both operations.
- * An empty requirement on either side makes the intersection `never`.
+ * Use for the requirement of an operation that both reads and writes parts.
  *
+ * **Details**
+ *
+ * The union keeps an empty side from dropping the other side's requirement.
+ *
+ * @see {@link DecodingServices} for reading alone.
+ * @see {@link EncodingServices} for writing alone.
  * @stability stable
  * @category utility types
  */
-export type SchemaServices<C extends AnyConfig> = DecodingServices<C> & EncodingServices<C>;
+export type SchemaServices<C extends AnyConfig> = DecodingServices<C> | EncodingServices<C>;
