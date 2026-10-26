@@ -58,7 +58,6 @@ const attachPart = <Config extends Config.AnyConfig>(
   }
 };
 
-/** Indexes the reports of a cached trajectory by the uuids they attach to. */
 const record = <Config extends Config.AnyConfig>(
   cached: Cache.Cached<string, Config>,
 ): Reading<Config, Attachment> =>
