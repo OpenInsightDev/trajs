@@ -190,6 +190,11 @@ const resolveForks = <Config extends Config.AnyConfig, E, R>(
               case "Event":
               case "Metric":
                 return;
+
+              // A part kind added to a trajectory stops this compiling rather than
+              // going unread here.
+              default:
+                return part satisfies never;
             }
           }),
         ),

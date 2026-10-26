@@ -10,7 +10,7 @@ import {
   View,
 } from "@trajs/core";
 import * as Config from "@trajs/core/Config";
-import { Effect, Predicate, Result, Schema, Stream } from "effect";
+import { Effect, Match, Predicate, Result, Schema, Stream } from "effect";
 
 interface Evidence {
   readonly version: "0.1.0";
@@ -178,20 +178,22 @@ const main = Effect.fn(function* () {
   );
 
   const runs = yield* view.pipe(
+    // A run is one bash test result, so other parts are dropped here.
     Stream.filterMap((value) =>
-      value._tag === "Response" &&
-      value.response.type === "tool-result" &&
-      value.response.name === "bash"
-        ? Result.succeed(value.metrics)
-        : Result.failVoid,
+      Match.value(value).pipe(
+        Match.when(
+          { _tag: "Response", response: { type: "tool-result", name: "bash" } },
+          ({ metrics }) => Result.succeed(metrics),
+        ),
+        Match.orElse(() => Result.failVoid),
+      ),
     ),
-    Stream.filterMap((metrics) => {
-      const report = metrics[testEvidence.tag]?.[0];
-
-      return report === undefined || report.metric.data._tag !== "Output"
-        ? Result.failVoid
-        : Result.succeed(report.metric.data.output.finding);
-    }),
+    Stream.filterMap((metrics) =>
+      Match.value(metrics[testEvidence.tag]?.[0]?.metric.data).pipe(
+        Match.tag("Output", ({ output }) => Result.succeed(output.finding)),
+        Match.orElse(() => Result.failVoid),
+      ),
+    ),
     Stream.runFold(
       (): Report => ({ findings: [], resolvedOnRun: undefined, redundantRuns: [] }),
       (report, finding) => {

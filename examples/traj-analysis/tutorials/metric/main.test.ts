@@ -1,7 +1,7 @@
 import { expect, it } from "@effect/vitest";
 import { Metric, MetricKit, Prompt, Response, Trajectory, VersionedSchema } from "@trajs/core";
 import * as Config from "@trajs/core/Config";
-import { Effect, Predicate, Schema, Stream } from "effect";
+import { Effect, Match, Predicate, Schema, Stream } from "effect";
 
 const config = Config.config({ stream: false });
 
@@ -140,9 +140,12 @@ const counted = MetricKit.toProducers(MetricKit.make(toolText), {
 // The call each result answers, by the uuid a datum attaches to.
 const calls = new Map<string, string>(
   parts.flatMap((value) =>
-    value._tag === "Response" && value.response.type === "tool-result"
-      ? [[value.uuid, value.response.name] as const]
-      : [],
+    Match.value(value).pipe(
+      Match.when({ _tag: "Response", response: { type: "tool-result" } }, ({ uuid, response }) => [
+        [uuid, response.name] as const,
+      ]),
+      Match.orElse(() => []),
+    ),
   ),
 );
 
@@ -155,16 +158,17 @@ const main = Effect.fn(function* () {
       (report, { data }) => {
         const call = calls.get(data.attach?.[0] ?? "") ?? "unknown";
 
-        return data._tag === "Failure"
-          ? {
-              ...report,
-              unmeasured: [...report.unmeasured, { call, reason: data.failure.reason }],
-            }
-          : {
-              ...report,
-              results: [...report.results, { call, characters: data.output.characters }],
-              characters: report.characters + data.output.characters,
-            };
+        return Match.valueTags(data, {
+          Output: ({ output }) => ({
+            ...report,
+            results: [...report.results, { call, characters: output.characters }],
+            characters: report.characters + output.characters,
+          }),
+          Failure: ({ failure }) => ({
+            ...report,
+            unmeasured: [...report.unmeasured, { call, reason: failure.reason }],
+          }),
+        });
       },
     ),
   );

@@ -1,6 +1,6 @@
 import { expect, it } from "@effect/vitest";
 import { Cache, Session } from "@trajs/core";
-import { Effect, Stream } from "effect";
+import { Effect, Predicate, Stream } from "effect";
 
 import { trajectory } from "./fixture.ts";
 
@@ -88,7 +88,7 @@ const main = Effect.fn(function* () {
       // Inherited prompts equal this count minus the produced prompt count.
       // Do not sum tokens here. Each fork would bill the prefix again.
       const prompts = yield* Session.stream(session).pipe(
-        Stream.filter((part) => part._tag === "Prompt"),
+        Stream.filter(Predicate.isTagged("Prompt")),
         Stream.runCount,
       );
 

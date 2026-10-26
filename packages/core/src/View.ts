@@ -7,7 +7,7 @@
  * @stability stable
  */
 
-import { Data, Effect, Result, Stream } from "effect";
+import { Data, Effect, Match, Result, Stream } from "effect";
 import { Prompt } from "effect/ai";
 
 import * as Cache from "#/Cache.ts";
@@ -52,10 +52,12 @@ export const prompt = <Config extends Config.AnyConfig, E, R>(
     Stream.runFold(
       () => Prompt.empty,
       (folded, step) =>
-        folded.pipe(
-          Prompt.concat(Prompt.fromMessages(step._tag === "Prompt" ? step.prompt.messages : [])),
-          Prompt.concat(Prompt.fromResponseParts(step._tag === "Response" ? step.response : [])),
-        ),
+        Match.valueTags(step, {
+          Prompt: ({ prompt }) => folded.pipe(Prompt.concat(Prompt.fromMessages(prompt.messages))),
+          Response: ({ response }) =>
+            folded.pipe(Prompt.concat(Prompt.fromResponseParts(response))),
+          Event: () => folded,
+        }),
     ),
   );
 
@@ -146,7 +148,8 @@ const assembleStep = <Config extends Config.AnyConfig>(
       return [{ response: [...run.response, ...folded], folding }, []];
     }
 
-    default:
+    case "Metric":
+      // A report names a part of an earlier step, so it neither starts nor ends one.
       return [run, []];
   }
 };

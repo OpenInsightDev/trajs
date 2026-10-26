@@ -65,6 +65,9 @@ export default defineConfig({
       "anti-slop-effect/no-manual-effect-error-tag": "error",
       // TypeScript leaves a conditional type over an unresolved type parameter
       // unevaluated, so a member typed that way has no literal tag to branch on.
+      // Where the tag is literal, matching replaces the comparison: `Match` for a
+      // shape, `Match.valueTags` for one branch per tag, `Predicate.isTagged` for a
+      // test.
       // "anti-slop-effect/no-manual-tag-comparison": "error",
       "anti-slop-effect/no-manual-tagged-construction": "error",
       "anti-slop-effect/no-service-constructor-imports": "error",
