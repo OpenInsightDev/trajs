@@ -34,11 +34,21 @@ API on two runs.
 2. Write the analysis as a `main` in it, and what it is made of in modules beside
    it — what it reads, what it is of, and the layers it runs with.
 3. Assert what `main` returns, right below it, in `it.effect`.
-4. Write `README.md` as the scenario, in plain language.
-   Say what the run was, what question the analysis answers, and what it finds.
-   Do not explain an API there. Put that in a short comment in `main.test.ts`, next to the call, and only where the call is not obvious from its name.
-   Say how to run the case (`vp test scenes/<name>` or `vp test tutorials/<name>`).
-   Do not use a "What it shows" / "When you need it" outline, and do not invent products the case could feed.
+4. Write `README.md` in plain language, for the reader the directory is filed for.
+
+   A scene README is the scenario: what the run was, what question the analysis answers, and what
+   it finds. It does not explain an API. That belongs in a short comment in `main.test.ts`, next to
+   the call, and only where the call is not obvious from its name.
+
+   A tutorial README teaches the API first: what it does, how it is called, and what to watch out
+   for, shown on the shortest code that makes the call. The case comes last — the small trajectory,
+   why the analysis needs this API, and what reading it proves. A fenced snippet is formatted like
+   the code it holds, so it has to parse as it stands: put the calls inside the `Effect.gen` they
+   run in rather than leaving a bare `yield*` at the top.
+
+   Both say how to run the case (`vp test scenes/<name>` or `vp test tutorials/<name>`), neither
+   uses a "What it shows" / "When you need it" outline or invents products the case could feed, and
+   neither describes what `main.test.ts` already shows line by line.
 
 `main` is read in one pass: its steps stay in it rather than becoming functions of their own,
 so a reader never leaves it to finish a thought.

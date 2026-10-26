@@ -1,10 +1,40 @@
-# Case: steps
+# Reading a conversation as steps
 
-Someone asks for the weather in Paris, then in Berlin. The model looks each city up and answers with one sentence.
+`View.steps` groups a session's flat parts into turns: one step per prompt, one
+per reply. A reply is several parts — text, a tool call, its result, more text —
+so a count over parts counts pieces, not replies. `View.steps` folds the run
+into finished parts before it emits, so a step is one whole turn.
 
-You want a summary of that conversation: how many prompts, how much text came back, and which tools were used. The log is not stored in those units, though. One reply is several pieces in a row, and a summary that counts pieces will treat one reply as many.
+```ts
+const main = Effect.gen(function* () {
+  const session = yield* Session.main(trajectory);
 
-Read as steps, the session is 2 prompts and 2 replies. Together they hold 6 messages, 26 characters of answer text ("It is sunny." and "It is raining."), and `get_weather` twice.
+  const steps = View.steps(session.stream);
+  // Prompt, Response, Prompt, Response, ...
+});
+```
+
+A prompt is a step of its own. The response parts that arrive before the next
+prompt or event are one `Response` step; that prompt, that event, or the end of
+input closes it. Metric reports and session declarations are not steps.
+
+`View.steps` reads one session, so give it `session.stream` for that session
+alone, or `Session.stream(session)` to put the inherited conversation in front.
+`Session.main` reads the trajectory through `Cache` and replays it, so the
+effect needs a layer: `Cache.layer()` keeps the parts in memory,
+`Cache.layerFsTemp()` spills them to a temporary directory.
+
+What a step does not keep: the uuid, timestamp, and extra fields of the response
+parts, because the step holds the folded parts and not the trajectory parts. A
+`Prompt` step does keep its prompt part. Text and reasoning increments become
+one finished part at their end marker; an increment still open when the input
+ends is dropped, and a new prompt discards open increments. When you want the
+whole conversation rather than its turns — to build the next model call —
+`View.prompt` folds a session into one prompt.
+
+The trajectory here is two turns of weather questions. Counting steps instead of
+parts gives 2 prompts and 2 replies, 6 messages, 26 characters of answer text,
+and two `get_weather` calls.
 
 ```sh
 vp test tutorials/steps

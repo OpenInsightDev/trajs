@@ -3,9 +3,12 @@
 Worked examples of analysing a trajectory with `@trajs/core`.
 
 Each case is one directory under [`scenes/`](./scenes) or [`tutorials/`](./tutorials). The analysis
-is `main` in `main.test.ts`, and the test directly under it asserts what `main` returns. The case
-README is the situation and the result. Open `main` for the code. Comments there cover the API
-choices.
+is `main` in `main.test.ts`, and the test directly under it asserts what `main` returns. Open `main`
+for the code.
+
+A scene README is the situation and the result: what the run was, what the analysis answers, and
+what it finds. A tutorial README teaches the API first — what it does, how to call it, what to watch
+out for — and ends with the short case that exercises it.
 
 ## Scenes
 
@@ -22,18 +25,18 @@ choices.
 
 ## Tutorials
 
-- [steps](./tutorials/steps/README.md) — count prompts, replies, text, and tool calls, one step at
-  a time.
-- [sessions](./tutorials/sessions/README.md) — attribute cost to the main agent and the sub-agents
-  it forked, without billing inherited context twice.
-- [toolkit](./tutorials/toolkit/README.md) — count calls by the fields your tools take, and keep
-  calls the toolkit does not describe.
-- [metric](./tutorials/metric/README.md) — measure the text each tool result handed back, and read
-  what the metric could not measure.
-- [extras](./tutorials/extras/README.md) — read the model, the effort, and the agent a harness
-  recorded beside a run, and read a record written before a rename.
-- [olap](./tutorials/olap/README.md) — write two short runs into the parts table and answer their
-  calls and billing with SQL.
+- [steps](./tutorials/steps/README.md) — read a session as prompts and replies with `View.steps`,
+  instead of counting the parts a reply is made of.
+- [sessions](./tutorials/sessions/README.md) — split a delegating run into sessions with
+  `Session.main`, and charge each agent for its own parts.
+- [toolkit](./tutorials/toolkit/README.md) — declare tools on the config so a call's params are
+  typed, and keep the calls to tools it does not declare.
+- [metric](./tutorials/metric/README.md) — declare a metric, measure parts with a producer, and read
+  what it could not measure.
+- [extras](./tutorials/extras/README.md) — write a harness's own fields onto parts, versioned so a
+  record written before a rename still reads.
+- [olap](./tutorials/olap/README.md) — write runs into ClickHouse and answer their calls and billing
+  with SQL.
 
 ## Running
 
