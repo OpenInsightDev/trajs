@@ -2,23 +2,24 @@ name: Snapshot
 
 # Publishes an installable build of every commit with pkg-pr-new, so a change can
 # be used before the next release window instead of shipping a release for it.
-# pkg.pr.new hosts the tarballs itself — nothing here touches npm — and the pull
-# request comment names the URL to install from. This is what lets
-# `.changeset/AGENTS.md` release every other day: the wait never blocks anyone
-# from consuming a change.
+# pkg.pr.new hosts the tarballs itself — nothing here touches npm — and it comments
+# the install URLs on the pull request of the branch it built.
 #
-# Only a pull request from a branch in this repository publishes. A fork's token
-# cannot comment the links, and its code should not be packaged under this
-# repository's name before a maintainer has taken it over. The version pull
-# request is left out too: it only moves versions and changelogs, so there is
-# nothing to install from it, and the pushes that update it come from the
-# `GITHUB_TOKEN` GitHub holds for approval.
+# The trigger is the push rather than the pull request. A preview then exists from
+# a branch's first commit instead of from the moment its pull request opens, and —
+# what settled it — a push made with `GITHUB_TOKEN` starts no run at all, so the
+# version pull request's branch never lands in GitHub's approval queue the way a
+# `pull_request` run on it did. `branches-ignore` names that branch anyway: it only
+# moves versions and changelogs, so there is nothing to install from it. A fork
+# cannot push to this repository, so a fork's code is never packaged under this
+# repository's name.
+#
+# This is what lets `.changeset/AGENTS.md` release every other day: the wait never
+# blocks anyone from consuming a change.
 
 on:
   push:
-    branches: [main]
-  pull_request:
-    branches: [main]
+    branches-ignore: [changeset-release/**]
 
 # Nothing is granted by default; the job asks for what it needs.
 permissions: {}
@@ -31,14 +32,9 @@ concurrency:
 
 jobs:
   snapshot:
-    if: >-
-      github.event_name == 'push' ||
-      (github.event.pull_request.head.repo.full_name == github.repository &&
-      !startsWith(github.head_ref, 'changeset-release/'))
     runs-on: ubuntu-latest
     permissions:
       contents: read # check out the repository
-      pull-requests: write # comment the install links on the pull request
     steps:
       - uses: actions/checkout@v7
         with:
