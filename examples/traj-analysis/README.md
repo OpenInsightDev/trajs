@@ -33,6 +33,8 @@ out for — and ends with the short case that exercises it.
   typed, and keep the calls to tools it does not declare.
 - [metric](./tutorials/metric/README.md) — declare a metric, measure parts with a producer, and read
   what it could not measure.
+- [metric-trajectory](./tutorials/metric-trajectory/README.md) — read a trajectory into parts that
+  carry the reports naming them with `View.metricTrajectory`.
 - [extras](./tutorials/extras/README.md) — write a harness's own fields onto parts, versioned so a
   record written before a rename still reads.
 - [olap](./tutorials/olap/README.md) — write runs into ClickHouse and answer their calls and billing
