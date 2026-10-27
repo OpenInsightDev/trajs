@@ -1,7 +1,6 @@
 import { Effect, Predicate, Stream } from "effect";
 
 import * as Config from "#/Config.ts";
-import { foldParts } from "#/internal/folding.ts";
 import type { Any, MetricParts, Producer, Failure } from "#/Metric.ts";
 import type { Producers } from "#/MetricKit.ts";
 import type * as Trajectory from "#/Trajectory.ts";
@@ -29,7 +28,7 @@ export const runProducers = <
   // SAFETY: each report uses the tag of its metric.
   // That tag is the metric part the kit holds.
   // The kit has one part per metric.
-  return foldParts(produced).pipe(
+  return produced.pipe(
     Stream.broadcastN({ n: tags.length, capacity: "unbounded" }),
     Effect.map((streams) =>
       Stream.mergeAll(

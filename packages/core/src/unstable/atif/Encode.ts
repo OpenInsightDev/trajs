@@ -29,7 +29,6 @@ import { toolkitOf } from "#/unstable/atif/internal/toolkit.ts";
  * A reader installs the same kits to read the parts back.
  */
 type AtifConfig = Config.Config<
-  true,
   Toolkit.Any,
   typeof AtifEvent.eventkit,
   MetricKit.WithProducers<MetricKit.Empty>,
@@ -147,7 +146,6 @@ export const fromFile = (
 const kits = (document: Document) =>
   Produce.produce(
     Config.config({
-      stream: true,
       toolkit: toolkitOf(document),
       // The events this module declares, so the trajectory names the kit its events are
       // read with. No step is read as an event yet.

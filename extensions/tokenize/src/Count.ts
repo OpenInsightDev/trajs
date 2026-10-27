@@ -204,7 +204,6 @@ export const promptPart = (
  *
  * const sessionId = "01890a5d-ac96-774b-bcce-b302099a8057"
  * const config = Config.config({
- *   stream: false,
  *   toolkit: Toolkit.empty,
  *   eventkit: EventKit.empty,
  *   metrickit: MetricKit.empty,

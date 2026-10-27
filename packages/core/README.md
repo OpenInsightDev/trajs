@@ -28,7 +28,7 @@ without a conversion step.
 - `Exchange` — the stored form: a JSON header, a compressed and hashed binary part
   frame, and a JSON metadata tail, inspected, loaded, and saved through `Storage`.
 - `Config` — the kit record, the services a config needs to encode or decode, and
-  the `ProducedConfig` a produced trajectory declares.
+  the kits a trajectory declares.
 - `Tool` and `Toolkit` — tool declarations, handlers, and the toolkit a trajectory
   names.
 - `Event` and `EventKit` — versioned event declarations and their collections.
@@ -69,7 +69,6 @@ import {
 import { Effect, Stream } from "effect";
 
 const config = Config.config({
-  stream: true,
   toolkit: Toolkit.empty,
   eventkit: EventKit.empty,
   metrickit: MetricKit.toProducers(MetricKit.empty, {}),

@@ -1,5 +1,5 @@
 /**
- * Kits and response variants for reading trajectory parts.
+ * Kits for reading trajectory parts.
  *
  * {@link config} supplies defaults for omitted fields.
  * The service types describe schema requirements for storage operations.
@@ -16,11 +16,10 @@ import * as MetricKit from "#/MetricKit.ts";
 import * as Toolkit from "#/Toolkit.ts";
 
 /**
- * The response variant and kits of one trajectory.
+ * The kits of one trajectory.
  *
  * **Details**
  *
- * `stream` selects streaming increments or finished response parts.
  * The kits declare tools, events, metrics, and extras for decoding.
  *
  * @see {@link config} for defaulted construction.
@@ -28,13 +27,11 @@ import * as Toolkit from "#/Toolkit.ts";
  * @category configuration
  */
 export interface Config<
-  Stream extends boolean = never,
   Toolkit extends Toolkit.Any = never,
   Events extends EventKit.Any = never,
   Metrics extends MetricKit.Any = never,
   Extras extends ExtraKit.Any = never,
 > {
-  stream: Stream;
   toolkit: Toolkit;
   eventkit: Events;
   metrickit: Metrics;
@@ -42,39 +39,15 @@ export interface Config<
 }
 
 /**
- * A {@link Config} without specific kit or response types.
+ * A {@link Config} without specific kit types.
  *
  * @stability stable
  * @category utility types
  */
-export type AnyConfig = Config<boolean, Toolkit.Any, EventKit.Any, MetricKit.Any, ExtraKit.Any>;
+export type AnyConfig = Config<Toolkit.Any, EventKit.Any, MetricKit.Any, ExtraKit.Any>;
 
 /**
- * A {@link Config} for finished response parts.
- *
- * @see {@link Config} for the streaming variant.
- * @stability stable
- * @category configuration
- */
-export type NonStreamConfig = Config<false, Toolkit.Any, EventKit.Any, MetricKit.Any, ExtraKit.Any>;
-
-/**
- * A streaming {@link Config} with no declared tools, events, metrics, or extras.
- *
- * @see {@link config} for constructing this default.
- * @stability stable
- * @category configuration
- */
-export type UnknownConfig = Config<
-  true,
-  Toolkit.Empty,
-  EventKit.Empty,
-  MetricKit.Empty,
-  ExtraKit.Empty
->;
-
-/**
- * A default streaming config with widened kit types.
+ * A default config with widened kit types.
  *
  * **Gotchas**
  *
@@ -86,7 +59,6 @@ export type UnknownConfig = Config<
  * @category constants
  */
 export const anyConfig: AnyConfig = {
-  stream: true,
   toolkit: Toolkit.empty,
   eventkit: EventKit.empty,
   metrickit: MetricKit.empty,
@@ -98,7 +70,6 @@ export const anyConfig: AnyConfig = {
  *
  * **Details**
  *
- * `stream` defaults to `true`.
  * Each omitted kit defaults to its empty kit.
  * Supplied kits keep their specific types.
  *
@@ -107,31 +78,28 @@ export const anyConfig: AnyConfig = {
  * @category constructors
  */
 export const config = <
-  const Stream extends boolean = true,
-  Toolkit extends Toolkit.Any = Toolkit.Empty,
+  const Toolkit extends Toolkit.Any = Toolkit.Empty,
   Events extends EventKit.Any = EventKit.Empty,
   Metrics extends MetricKit.Any = MetricKit.Empty,
   Extras extends ExtraKit.Any = ExtraKit.Empty,
 >(
-  config: Partial<Config<Stream, Toolkit, Events, Metrics, Extras>> = {},
-): Config<Stream, Toolkit, Events, Metrics, Extras> =>
+  config: Partial<Config<Toolkit, Events, Metrics, Extras>> = {},
+): Config<Toolkit, Events, Metrics, Extras> =>
   // SAFETY: omitted fields use the defaults mirrored by the default type arguments.
   ({
-    stream: config.stream ?? true,
     toolkit: config.toolkit ?? Toolkit.empty,
     eventkit: config.eventkit ?? EventKit.empty,
     metrickit: config.metrickit ?? MetricKit.empty,
     extrakit: config.extrakit ?? ExtraKit.empty,
-  }) as Config<Stream, Toolkit, Events, Metrics, Extras>;
+  }) as Config<Toolkit, Events, Metrics, Extras>;
 
 /**
- * The combined kits and response variants of two configs.
+ * The combined kits of two configs.
  *
  * **Details**
  *
  * Event, metric, and extra declarations from `Right` replace matching declarations from `Left`.
  * Tool declarations with matching keys retain the union of both types.
- * The response variant is the union of both `stream` types.
  *
  * **Gotchas**
  *
@@ -141,7 +109,6 @@ export const config = <
  * @category utility types
  */
 export type MergedConfig<Left extends AnyConfig, Right extends AnyConfig> = Config<
-  Left["stream"] | Right["stream"],
   Toolkit.Toolkit<Toolkit.MergedTools<readonly [Left["toolkit"], Right["toolkit"]]>>,
   EventKit.Merged<readonly [Left["eventkit"], Right["eventkit"]]>,
   MetricKit.Merged<readonly [Left["metrickit"], Right["metrickit"]]>,

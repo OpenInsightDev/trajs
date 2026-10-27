@@ -22,7 +22,7 @@ import {
   Trajectory,
 } from "@trajs/core";
 import * as Config from "@trajs/core/Config";
-import { Effect, Stream } from "effect";
+import { Effect, Predicate, Stream } from "effect";
 import { describe, expect, it } from "vite-plus/test";
 
 import { makeProducer, metrickit, Tokenizer, tokenEstimate } from "../src/index.ts";
@@ -33,7 +33,6 @@ const answering = "01890a5d-ac96-774b-bcce-b302099a8058";
 
 /** What the trajectory is built and read with: no tool, event, metric or extra datum. */
 const config = Config.config({
-  stream: false,
   toolkit: Toolkit.empty,
   eventkit: EventKit.empty,
   metrickit: MetricKit.empty,
@@ -129,9 +128,8 @@ const parts = [declared, question, answer, call, result, stopped, forked, carrie
 /**
  * What the metric is run over: the parts above, as the trajectory they make.
  *
- * Its response parts are whole — `Config.NonStreamConfig` — because that is the
- * trajectory a producer is given: the increments a streamed response arrived in are
- * folded into the parts they complete before a kit counts one.
+ * A trajectory carries finished response parts, which is what a producer is
+ * given.
  */
 const trajectory = Trajectory.make(config)(Stream.fromIterable(parts));
 
@@ -157,7 +155,7 @@ const report = async (): Promise<Map<string, Estimate>> => {
       expect(_tag).toBe("@trajs/extension-tokenize/Estimate");
       expect(data._tag).toBe("Output");
 
-      if (data._tag === "Output" && data.attach !== undefined) {
+      if (Predicate.isTagged("Output")(data) && data.attach !== undefined) {
         byPart.set(data.attach[0], data.output);
       }
     }
@@ -203,7 +201,7 @@ describe("the metric over a trajectory", () => {
 
     expect(asked._tag).toBe("prompt");
 
-    if (asked._tag !== "prompt") return;
+    if (!Predicate.isTagged("prompt")(asked)) return;
 
     expect(asked.text).toBeGreaterThan(0);
     expect(asked.reasoning).toBe(0);
@@ -221,7 +219,7 @@ describe("the metric over a trajectory", () => {
 
     expect(carriedOver._tag).toBe("prompt");
 
-    if (carriedOver._tag !== "prompt") return;
+    if (!Predicate.isTagged("prompt")(carriedOver)) return;
 
     // The prompt holds the result of a tool and nothing else.
     expect(carriedOver.toolResult).toBeGreaterThan(0);
@@ -235,7 +233,7 @@ describe("the metric over a trajectory", () => {
 
     expect(answered._tag).toBe("text");
 
-    if (answered._tag !== "text") return;
+    if (!Predicate.isTagged("text")(answered)) return;
 
     expect(answered.tokens).toBeGreaterThan(0);
     expect(answered.mediaTokens).toBe(0);
@@ -249,7 +247,7 @@ describe("the metric over a trajectory", () => {
 
     expect(returned._tag).toBe("tool-result");
 
-    if (returned._tag !== "tool-result") return;
+    if (!Predicate.isTagged("tool-result")(returned)) return;
 
     expect(returned.tokens).toBeGreaterThan(0);
     expect(returned.toolCallTokens).toBe(called.tokens + returned.tokens);
@@ -261,7 +259,7 @@ describe("the metric over a trajectory", () => {
 
     expect(given._tag).toBe("file");
 
-    if (given._tag !== "file") return;
+    if (!Predicate.isTagged("file")(given)) return;
 
     // A 512px image at the tile-based rule of the family: 85 tokens plus one tile.
     expect(given.tokens).toBe(255);

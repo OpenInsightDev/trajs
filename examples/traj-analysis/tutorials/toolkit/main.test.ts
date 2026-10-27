@@ -23,7 +23,7 @@ const toolkit = Toolkit.make(
 
 // A toolkit on the config types params.
 // city stays a string, not an unknown payload.
-const config = Config.config({ stream: false, toolkit });
+const config = Config.config({ toolkit });
 
 interface Report {
   readonly cities: ReadonlyArray<string>;

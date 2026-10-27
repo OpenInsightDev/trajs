@@ -21,7 +21,7 @@ export const markdown = [
   "",
   "A prompt part is a step of its own, and the response parts that follow it are read as a step once the run ends:",
   "",
-  "- the increments of a streamed response are folded into the part they complete",
+  "- a response is carried as the finished part, not as the increments it arrived in",
   "- a run of response parts ends at the prompt or event that follows it",
   "",
   "```ts",
@@ -33,7 +33,7 @@ export const markdown = [
 export const streamedAnswer = [
   "A trajectory is a **stream of parts** in one total order, so the exchange it produces is read by grouping the parts that follow one another:",
   "",
-  "- the increments of a streamed response are folded into the part they complete",
+  "- a response is carried as the finished part, not as the increments it arrived in",
   "- a run of response parts ends at the prompt or event that follows it",
   "",
   "```ts",

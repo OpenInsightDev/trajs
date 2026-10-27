@@ -32,7 +32,7 @@ becomes one `Failure` report instead of a measurement.
 A `Failure` ends the producer that raised it, and the other producers keep
 running, but the parts after the one it could not read are not measured either.
 A metric that should skip bad input has to skip it rather than fail on it.
-`Metric.produce` folds streaming increments before producers run, so a producer
+`Metric.produce` runs a producer over the parts of a trajectory, so a producer
 only ever sees finished parts.
 
 Both schemas are versioned, so a stored report stays readable when a field is

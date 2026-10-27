@@ -3,7 +3,7 @@ import { Cache, Prompt, Response, Session, Trajectory, View } from "@trajs/core"
 import * as Config from "@trajs/core/Config";
 import { Effect, Stream } from "effect";
 
-const config = Config.config({ stream: false });
+const config = Config.config();
 
 interface RepeatedToolCall {
   readonly name: string;

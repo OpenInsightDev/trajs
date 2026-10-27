@@ -251,7 +251,7 @@ const textOfContent = (content: Content): string => {
 
 /** A response part the reading produces, and the extra data the document states of it. */
 interface ProducedPart {
-  readonly part: Response.AllPartsView<{}>;
+  readonly part: Response.PartView<{}>;
   readonly extra: Extra.ExtraRecord<(typeof extrakit)["extra"], "response">;
 }
 

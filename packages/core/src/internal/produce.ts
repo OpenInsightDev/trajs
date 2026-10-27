@@ -23,7 +23,6 @@ export const produceParts =
         Stream.merge(
           trajectory,
           copy.pipe(
-            // Producers read whole parts, so streamed increments are folded first.
             Metric.produce(metrickit),
             // SAFETY: every metric of the kit given is one the config given states.
             Stream.map((metric) =>

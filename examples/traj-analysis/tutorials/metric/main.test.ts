@@ -3,7 +3,7 @@ import { Metric, MetricKit, Prompt, Response, Trajectory, VersionedSchema } from
 import * as Config from "@trajs/core/Config";
 import { Effect, Match, Predicate, Schema, Stream } from "effect";
 
-const config = Config.config({ stream: false });
+const config = Config.config();
 
 const part = Trajectory.parts(config);
 
@@ -99,29 +99,29 @@ const toolText = new Metric.Metric({
 
 /** The datum one part is worth: its count, or the failure of a result with no text to count. */
 const datumOf = (
-  value: Trajectory.Part<Config.NonStreamConfig>,
+  value: Trajectory.Part<Config.AnyConfig>,
 ): Effect.Effect<
   ReadonlyArray<Metric.Output<typeof toolText>>,
   Metric.Failure<typeof toolText>
 > => {
-  if (value._tag !== "Response" || value.response.type !== "tool-result") {
+  if (!Predicate.isTagged("Response")(value) || value.response.type !== "tool-result") {
     return Effect.succeed([]);
   }
 
-  const result = value.response;
+  const { uuid, response } = value;
 
-  if (!Predicate.isString(result.result)) {
+  if (!Predicate.isString(response.result)) {
     return Effect.fail(
       Metric.makeFailure<typeof toolText>(notText.make({ version: "0.1.0", reason: "not-text" }), {
-        attach: [value.uuid],
+        attach: [uuid],
       }),
     );
   }
 
   return Effect.succeed([
     Metric.makeOutput<typeof toolText>(
-      characters.make({ version: "0.1.0", characters: result.result.length }),
-      { attach: [value.uuid] },
+      characters.make({ version: "0.1.0", characters: response.result.length }),
+      { attach: [uuid] },
     ),
   ]);
 };

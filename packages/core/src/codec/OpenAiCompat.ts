@@ -65,7 +65,7 @@ export type Sessions = Record<string, Message[]>;
  * import { Cache, Config, Prompt, Response, Session, Trajectory } from "@trajs/core"
  * import { Effect, Stream } from "effect"
  *
- * const config = Config.config({ stream: false })
+ * const config = Config.config()
  * const part = Trajectory.parts(config)
  *
  * const parts = [

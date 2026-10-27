@@ -1,9 +1,7 @@
-import { Predicate, Stream } from "effect";
+import { Option, Predicate } from "effect";
 import type { Tool } from "effect/ai";
 
-import * as Config from "#/Config.ts";
 import * as Response from "#/Response.ts";
-import * as Trajectory from "#/Trajectory.ts";
 
 interface Open {
   text: string;
@@ -12,6 +10,12 @@ interface Open {
 
 type OpenBySession = Map<string, Map<string, Open>>;
 
+/**
+ * The text and reasoning chunks a response has opened, by session and by chunk id.
+ *
+ * A chunk is opened by the part that starts it, added to by its deltas, and closed
+ * by the part that ends it, which is the part the chunk is written as.
+ */
 export interface State {
   readonly text: OpenBySession;
   readonly reasoning: OpenBySession;
@@ -48,16 +52,21 @@ const mergeMetadata = (
   return merged;
 };
 
+/**
+ * Folds one part into the finished part it belongs to.
+ *
+ * Returns none for an increment, and for a part a trajectory does not hold.
+ */
 export const foldResponse = <Tools extends Record<string, Tool.Any>>(
   state: State,
   id: string,
   part: Response.AllPartsView<Tools>,
-): readonly [State, ReadonlyArray<Response.PartView<Tools>>] => {
+): readonly [State, Option.Option<Response.PartView<Tools>>] => {
   switch (part.type) {
     case "text-start":
       openOf(state.text, id).set(part.id, { text: "", metadata: part.metadata });
 
-      return [state, []];
+      return [state, Option.none()];
     case "text-delta": {
       const text = openOf(state.text, id).get(part.id);
 
@@ -66,7 +75,7 @@ export const foldResponse = <Tools extends Record<string, Tool.Any>>(
         text.metadata = mergeMetadata(text.metadata, part.metadata);
       }
 
-      return [state, []];
+      return [state, Option.none()];
     }
 
     case "text-end": {
@@ -74,7 +83,7 @@ export const foldResponse = <Tools extends Record<string, Tool.Any>>(
       const text = open.get(part.id);
 
       if (text === undefined) {
-        return [state, []];
+        return [state, Option.none()];
       }
 
       open.delete(part.id);
@@ -84,13 +93,13 @@ export const foldResponse = <Tools extends Record<string, Tool.Any>>(
         metadata: mergeMetadata(text.metadata, part.metadata),
       });
 
-      return [state, [completed]];
+      return [state, Option.some(completed)];
     }
 
     case "reasoning-start":
       openOf(state.reasoning, id).set(part.id, { text: "", metadata: part.metadata });
 
-      return [state, []];
+      return [state, Option.none()];
     case "reasoning-delta": {
       const text = openOf(state.reasoning, id).get(part.id);
 
@@ -99,7 +108,7 @@ export const foldResponse = <Tools extends Record<string, Tool.Any>>(
         text.metadata = mergeMetadata(text.metadata, part.metadata);
       }
 
-      return [state, []];
+      return [state, Option.none()];
     }
 
     case "reasoning-end": {
@@ -107,7 +116,7 @@ export const foldResponse = <Tools extends Record<string, Tool.Any>>(
       const text = open.get(part.id);
 
       if (text === undefined) {
-        return [state, []];
+        return [state, Option.none()];
       }
 
       open.delete(part.id);
@@ -117,80 +126,15 @@ export const foldResponse = <Tools extends Record<string, Tool.Any>>(
         metadata: mergeMetadata(text.metadata, part.metadata),
       });
 
-      return [state, [completed]];
+      return [state, Option.some(completed)];
     }
 
     case "tool-params-start":
     case "tool-params-delta":
     case "tool-params-end":
     case "error":
-      return [state, []];
+      return [state, Option.none()];
     default:
-      return [state, [part]];
+      return [state, Option.some(part)];
   }
-};
-
-type FoldedConfig<Config extends Config.AnyConfig> = Config.Config<
-  false,
-  Config["toolkit"],
-  Config["eventkit"],
-  Config["metrickit"],
-  Config["extrakit"]
->;
-
-type StreamingConfig<Config extends Config.AnyConfig> = Config.Config<
-  true,
-  Config["toolkit"],
-  Config["eventkit"],
-  Config["metrickit"],
-  Config["extrakit"]
->;
-
-type FoldablePart<Config extends Config.AnyConfig> =
-  | Trajectory.Part<Config>
-  | Trajectory.Part<StreamingConfig<Config>>;
-
-const StreamingTypes: ReadonlySet<string> = new Set([
-  "text-start",
-  "text-delta",
-  "text-end",
-  "reasoning-start",
-  "reasoning-delta",
-  "reasoning-end",
-  "tool-params-start",
-  "tool-params-delta",
-  "tool-params-end",
-  "error",
-]);
-
-const isStreaming = <Config extends Config.AnyConfig>(
-  part: FoldablePart<Config>,
-): part is Trajectory.Part<StreamingConfig<Config>> =>
-  part._tag === "Response" && StreamingTypes.has(part.response.type);
-
-const foldPart = <Config extends Config.AnyConfig>(
-  state: State,
-  part: Trajectory.Part<StreamingConfig<Config>>,
-): readonly [State, ReadonlyArray<Trajectory.Part<FoldedConfig<Config>>>] => {
-  if (part._tag !== "Response") return [state, [part]];
-
-  const [folding, completed] = foldResponse(
-    state,
-    part.sessionId ?? Trajectory.mainSessionId,
-    part.response,
-  );
-
-  return [folding, completed.map((response) => ({ ...part, response }))];
-};
-
-export const foldParts = <Config extends Config.AnyConfig, E, R>(
-  parts: Stream.Stream<FoldablePart<Config>, E, R>,
-): Stream.Stream<Trajectory.Part<FoldedConfig<Config>>, E, R> => {
-  const folded = parts.pipe(
-    Stream.mapAccum(initial, (state, part) =>
-      isStreaming(part) ? foldPart<Config>(state, part) : [state, [part]],
-    ),
-  );
-
-  return folded;
 };

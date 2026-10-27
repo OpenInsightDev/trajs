@@ -13,7 +13,6 @@ export const attach =
 export const configOf = <Config extends Config.AnyConfig>(trajectory: Readonly<Config>): Config =>
   // SAFETY: these fields are the config. The trajectory carries that config.
   ({
-    stream: trajectory.stream,
     toolkit: trajectory.toolkit,
     eventkit: trajectory.eventkit,
     metrickit: trajectory.metrickit,

@@ -32,9 +32,8 @@ const session = Trajectory.mainSessionId;
 /** No extra data is declared, since none of it is stated of the parts below. */
 const extrakit = ExtraKit.empty;
 
-/** The kits the trajectory is built with: no tools, no events, and whole response parts. */
+/** The kits the trajectory is built with: no tools and no events. */
 const config = Config.config({
-  stream: false,
   toolkit: Toolkit.empty,
   eventkit: EventKit.empty,
   metrickit: MetricKit.empty,

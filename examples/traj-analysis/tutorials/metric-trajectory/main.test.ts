@@ -46,7 +46,6 @@ const toolText = new Metric.Metric({
 // The declaration is on the config, so the trajectory's metric parts decode as
 // this metric's reports.
 const config = Config.config({
-  stream: false,
   metrickit: MetricKit.make(toolText),
 });
 

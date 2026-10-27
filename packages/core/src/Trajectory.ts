@@ -17,7 +17,6 @@ import * as Extra from "#/Extra.ts";
 import * as ExtraKit from "#/ExtraKit.ts";
 import { Timestamp, Uuid } from "#/internal/schema.ts";
 import { attach, uuid } from "#/internal/trajectory.ts";
-import type { Select } from "#/internal/types.ts";
 import * as Metric from "#/Metric.ts";
 import * as MetricKit from "#/MetricKit.ts";
 import * as Prompt from "#/Prompt.ts";
@@ -168,79 +167,48 @@ const responseFields = {
   uuid: Uuid,
 };
 
-const NonStreamResponsePart = <T extends Toolkit.Any, K extends ExtraKit.Any>(
-  toolkit: T,
-  extrakit: K,
-) =>
-  Schema.TaggedStruct("Response", {
-    response: Schema.Union([Response.Part(toolkit), Response.Part()]),
-    extra: extraField(extrakit, "response"),
-    ...responseFields,
-  });
-
-const StreamResponsePart = <T extends Toolkit.Any, K extends ExtraKit.Any>(
-  toolkit: T,
-  extrakit: K,
-) =>
-  Schema.TaggedStruct("Response", {
-    response: Schema.Union([Response.AllParts(toolkit), Response.AllParts()]),
-    extra: extraField(extrakit, "response"),
-    ...responseFields,
-  });
-
-type AllResponseParts<
-  Toolkit extends Toolkit.Any,
-  Extras extends ExtraKit.Any,
-  Stream extends boolean,
-> = Select<
-  Stream,
-  ReturnType<typeof StreamResponsePart<Toolkit, Extras>>,
-  ReturnType<typeof NonStreamResponsePart<Toolkit, Extras>>
->;
-
 /**
  * Schema for a response part of `toolkit` and `extrakit`.
  *
  * **When to use**
  *
- * Use when decoding must follow the `stream` variant.
+ * Use when a response part must be read with the tools and extras of one config.
  *
  * **Details**
  *
- * `stream: true` reads {@link Response.AllParts}, streaming increments included.
- * `stream: false` reads a finished {@link Response.Part}.
- * Both variants also accept parts built for tools beyond `toolkit`.
+ * `response` is one finished response part, a {@link Response.Part}.
+ * The schema also accepts parts built for tools beyond `toolkit`.
  * `extra` decodes as `{}` when the payload omits it.
  * `timestamp` is required. Construction uses the current time when the caller omits it.
  * A missing `startTimestamp` leaves that moment alone.
  * A missing `sessionId` means {@link mainSessionId}.
  * `uuid` is a uuid v7. Construction fills one when the caller omits it.
  *
+ * **Gotchas**
+ *
+ * A streamed answer is many parts while it is written.
+ * A trajectory holds the part the answer ended in, not those increments.
+ *
  * @see {@link parts} for building a response part.
  * @see {@link ResponsePartOf} for the response part of a config.
  * @stability stable
  * @category schemas
  */
-export const ResponsePart = <
-  Toolkit extends Toolkit.Any,
-  Extras extends ExtraKit.Any,
-  Stream extends boolean,
->({
+export const ResponsePart = <Toolkit extends Toolkit.Any, Extras extends ExtraKit.Any>({
   toolkit,
   extrakit,
-  stream,
 }: {
   toolkit: Toolkit;
   extrakit: Extras;
-  stream: Stream;
-}): AllResponseParts<Toolkit, Extras, Stream> =>
-  // SAFETY: the conditional return type and runtime branch both select response parts using `stream`.
-  (stream
-    ? StreamResponsePart(toolkit, extrakit)
-    : NonStreamResponsePart(toolkit, extrakit)) as AllResponseParts<Toolkit, Extras, Stream>;
+}) =>
+  Schema.TaggedStruct("Response", {
+    response: Schema.Union([Response.Part(toolkit), Response.Part()]),
+    extra: extraField(extrakit, "response"),
+    ...responseFields,
+  });
 
 /**
- * A response part decoded for `Toolkit`, `Extras`, and `Stream`.
+ * A response part decoded for `Toolkit` and `Extras`.
  *
  * @see {@link ResponsePart} for the schema.
  * @stability stable
@@ -249,22 +217,21 @@ export const ResponsePart = <
 export type ResponsePart<
   Toolkit extends Toolkit.Any,
   Extras extends ExtraKit.Any,
-  Stream extends boolean,
-> = Schema.Schema.Type<AllResponseParts<Toolkit, Extras, Stream>>;
+> = Schema.Schema.Type<ReturnType<typeof ResponsePart<Toolkit, Extras>>>;
 
 /**
- * The wire form of a streaming {@link ResponsePart}.
+ * The wire form of a {@link ResponsePart}.
  *
- * **Gotchas**
+ * **Details**
  *
- * The alias always uses `stream: true`.
- * A finished response is not a separate wire type.
+ * The alias is not generic.
+ * Each response payload stays unknown under {@link Toolkit.Any}.
  *
  * @stability stable
  * @category encoding
  */
 export type ResponsePartEncoded = Schema.Codec.Encoded<
-  ReturnType<typeof ResponsePart<Toolkit.Any, ExtraKit.Any, true>>
+  ReturnType<typeof ResponsePart<Toolkit.Any, ExtraKit.Any>>
 >;
 
 /**
@@ -424,14 +391,14 @@ export interface Parts<Config extends Config.AnyConfig> {
   ) => SessionPart<Config["extrakit"]>;
 
   readonly response: (
-    response: ResponsePart<Config["toolkit"], Config["extrakit"], Config["stream"]>["response"],
+    response: ResponsePart<Config["toolkit"], Config["extrakit"]>["response"],
     options?: {
       readonly sessionId?: string;
       readonly timestamp?: DateTime.Utc;
       readonly startTimestamp?: DateTime.Utc;
       readonly uuid?: string;
     } & Extra.ExtraRecord<Config.ExtrasOf<Config>, "response">,
-  ) => ResponsePart<Config["toolkit"], Config["extrakit"], Config["stream"]>;
+  ) => ResponsePart<Config["toolkit"], Config["extrakit"]>;
 
   readonly event: (
     event: Event.EventParts<Config.EventsOf<Config>>,
@@ -467,7 +434,6 @@ export const parts = <Config extends Config.AnyConfig>(config: Config): Parts<Co
   const Response = ResponsePart({
     toolkit: config.toolkit,
     extrakit: config.extrakit,
-    stream: config.stream,
   });
 
   const Event = EventPart(config.eventkit);
@@ -488,7 +454,6 @@ export const parts = <Config extends Config.AnyConfig>(config: Config): Parts<Co
     subSession: (id, { fork, uuid, ...extra }) =>
       Session.make({ type: SubSession.make({ id, fork }), extra, uuid }),
     // SAFETY: the schema uses the same configuration as the return type.
-    // TypeScript cannot resolve the conditional response type for a generic configuration.
     response: (response, { sessionId, timestamp, startTimestamp, uuid, ...extra } = {}) =>
       Response.make({
         response,
@@ -497,7 +462,7 @@ export const parts = <Config extends Config.AnyConfig>(config: Config): Parts<Co
         timestamp,
         startTimestamp,
         uuid,
-      }) as ResponsePart<Config["toolkit"], Config["extrakit"], Config["stream"]>,
+      }) as ResponsePart<Config["toolkit"], Config["extrakit"]>,
     event: (event, { sessionId, timestamp, startTimestamp, uuid } = {}) =>
       Event.make({ event, sessionId, timestamp, startTimestamp, uuid }),
     metric: (metric, { timestamp, startTimestamp } = {}) =>
@@ -519,7 +484,7 @@ export const parts = <Config extends Config.AnyConfig>(config: Config): Parts<Co
 export type Part<Config extends Config.AnyConfig> =
   | PromptPart<Config["extrakit"]>
   | SessionPart<Config["extrakit"]>
-  | ResponsePart<Config["toolkit"], Config["extrakit"], Config["stream"]>
+  | ResponsePart<Config["toolkit"], Config["extrakit"]>
   | EventPart<Config["eventkit"]>
   | MetricPart<Config["metrickit"]>;
 
@@ -550,8 +515,7 @@ export type SessionPartOf<Config extends Config.AnyConfig> = SessionPart<Config[
  */
 export type ResponsePartOf<Config extends Config.AnyConfig> = ResponsePart<
   Config["toolkit"],
-  Config["extrakit"],
-  Config["stream"]
+  Config["extrakit"]
 >;
 
 /**
@@ -636,14 +600,13 @@ export type Trajectory<
  * import { Stream } from "effect"
  * import { Config, Prompt, Trajectory } from "@trajs/core"
  *
- * const config = Config.config({ stream: false })
+ * const config = Config.config()
  * const part = Trajectory.parts(config)
  * const trajectory = Trajectory.make("run-1", config)(
  *   Stream.make(part.prompt(Prompt.make("Hello"))),
  * )
  *
  * trajectory.id // => "run-1"
- * trajectory.stream // => false
  * ```
  *
  * @see {@link parts} for building the parts.

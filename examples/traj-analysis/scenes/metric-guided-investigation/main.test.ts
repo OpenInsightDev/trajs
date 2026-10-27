@@ -36,7 +36,7 @@ const testEvidence = new Metric.Metric({
   failure: evidenceSchema,
 });
 
-const config = Config.config({ stream: false, metrickit: MetricKit.make(testEvidence) });
+const config = Config.config({ metrickit: MetricKit.make(testEvidence) });
 const part = Trajectory.parts(config);
 
 const prompt = (text: string) => part.prompt(Prompt.make(text));
@@ -135,7 +135,7 @@ const measure: Metric.Producer<typeof testEvidence> = (input) =>
     Stream.mapAccum(
       () => false,
       (hasPassingResult, value) => {
-        if (value._tag !== "Response" || value.response.type !== "tool-result") {
+        if (!Predicate.isTagged("Response")(value) || value.response.type !== "tool-result") {
           return [hasPassingResult, []];
         }
 

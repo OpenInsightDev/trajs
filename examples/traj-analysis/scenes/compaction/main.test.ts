@@ -20,7 +20,7 @@ const toolkit = Toolkit.make(
 );
 
 // The eventkit must sit on the config, or this event cannot be stored.
-const config = Config.config({ stream: false, toolkit, eventkit: Event.eventkit });
+const config = Config.config({ toolkit, eventkit: Event.eventkit });
 
 interface Phase {
   /** What opened the phase: `"run"`, or the type of an event. */
@@ -188,29 +188,23 @@ const main = Effect.fn(function* () {
         // Steps state no ordinal, so the counts number them.
         const at = draft.steps.prompt + draft.steps.response + draft.steps.event + 1;
 
-        switch (step._tag) {
-          case "Event": {
+        Match.value(step).pipe(
+          Match.tag("Event", ({ event }) => {
             draft.steps.event += 1;
 
             // An event ends the phase it happened in.
-            draft.phases.push(open(step.event.event.data.type, at + 1));
-
-            return draft;
-          }
-
-          case "Prompt": {
+            draft.phases.push(open(event.event.data.type, at + 1));
+          }),
+          Match.tag("Prompt", () => {
             draft.steps.prompt += 1;
             phase.prompts += 1;
-
-            return draft;
-          }
-
-          case "Response": {
+          }),
+          Match.tag("Response", ({ response: parts }) => {
             draft.steps.response += 1;
             phase.responses += 1;
-            phase.parts += step.response.length;
+            phase.parts += parts.length;
 
-            for (const responsePart of step.response) {
+            for (const responsePart of parts) {
               if (responsePart.type !== "tool-call") continue;
 
               phase.tools.set(responsePart.name, (phase.tools.get(responsePart.name) ?? 0) + 1);
@@ -227,10 +221,11 @@ const main = Effect.fn(function* () {
 
               phase.paths.add(path);
             }
+          }),
+          Match.exhaustive,
+        );
 
-            return draft;
-          }
-        }
+        return draft;
       },
     ),
   );

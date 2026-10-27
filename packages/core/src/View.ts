@@ -7,12 +7,11 @@
  * @stability stable
  */
 
-import { Data, Effect, Match, Result, Stream } from "effect";
+import { Data, Effect, Match, Predicate, Result, Stream } from "effect";
 import { Prompt } from "effect/ai";
 
 import * as Cache from "#/Cache.ts";
 import * as Config from "#/Config.ts";
-import { foldResponse } from "#/internal/folding.ts";
 import { idle, metricStream, type Run } from "#/internal/view.ts";
 import type * as Metric from "#/Metric.ts";
 import type * as Response from "#/Response.ts";
@@ -40,7 +39,7 @@ type Tools<Config extends Config.AnyConfig> = Config["toolkit"]["tools"];
  * The entire conversation is retained until the input ends.
  * An infinite session never returns a prompt.
  *
- * @see {@link steps} for incremental step access and response-folding limits.
+ * @see {@link steps} for incremental step access.
  * @see {@link Session.stream} for including inherited context.
  * @stability stable
  * @category converting
@@ -96,7 +95,7 @@ export class PromptStep<Config extends Config.AnyConfig> extends Data.TaggedClas
  *
  * The group does not retain trajectory part uuids, timestamps, or extras.
  *
- * @see {@link steps} for group boundaries and folding.
+ * @see {@link steps} for group boundaries.
  * @stability stable
  * @category models
  */
@@ -121,59 +120,52 @@ const stepsOf = <Config extends Config.AnyConfig>(
 ): ReadonlyArray<Step<Config>> =>
   run.response.length === 0 ? [] : [new ResponseStep<Config>({ response: run.response })];
 
+/** The responses a part leaves open, and the steps it closed. */
+type Assembly<Config extends Config.AnyConfig> = readonly [
+  Run<Tools<Config>>,
+  ReadonlyArray<Step<Config>>,
+];
+
 const assembleStep = <Config extends Config.AnyConfig>(
   run: Run<Tools<Config>>,
   part: Exclude<Trajectory.Part<Config>, Trajectory.SessionPart<Config["extrakit"]>>,
-): readonly [Run<Tools<Config>>, ReadonlyArray<Step<Config>>] => {
-  switch (part._tag) {
-    case "Prompt":
-      // A prompt ends the run of responses before it, and opens a folding of its own.
-      return [idle<Tools<Config>>(), [...stepsOf(run), new PromptStep<Config>({ prompt: part })]];
-
-    case "Event":
-      // An event ends the run of responses before it.
-      // Open text and reasoning stay open.
-      return [
-        { response: [], folding: run.folding },
-        [...stepsOf(run), new EventStep<Config>({ event: part })],
-      ];
-
-    case "Response": {
-      const [folding, folded] = foldResponse(
-        run.folding,
-        part.sessionId ?? Trajectory.mainSessionId,
-        part.response,
-      );
-
-      return [{ response: [...run.response, ...folded], folding }, []];
-    }
-
-    case "Metric":
-      // A report names a part of an earlier step, so it neither starts nor ends one.
-      return [run, []];
-  }
-};
+): Assembly<Config> =>
+  Match.value(part).pipe(
+    // A prompt ends the run of responses before it.
+    Match.tag("Prompt", (prompt): Assembly<Config> => [
+      idle<Tools<Config>>(),
+      [...stepsOf(run), new PromptStep<Config>({ prompt })],
+    ]),
+    // An event ends the run of responses before it.
+    Match.tag("Event", (event): Assembly<Config> => [
+      idle<Tools<Config>>(),
+      [...stepsOf(run), new EventStep<Config>({ event })],
+    ]),
+    Match.tag("Response", (response): Assembly<Config> => [
+      { response: [...run.response, response.response] },
+      [],
+    ]),
+    // A report names a part of an earlier step, so it neither starts nor ends one.
+    Match.tag("Metric", (): Assembly<Config> => [run, []]),
+    Match.exhaustive,
+  );
 
 /**
  * Groups one session's parts into prompt, response, and event steps.
  *
  * **When to use**
  *
- * Use when displaying or converting a conversation by turn rather than by individual response increments.
+ * Use when displaying or converting a conversation by turn rather than by individual response parts.
  *
  * **Details**
  *
  * A prompt or event closes the current response group.
  * End of input also emits the remaining group.
  * Metric reports do not close a group.
- * Text and reasoning increments become finished parts at their matching end markers.
  *
  * **Gotchas**
  *
  * Input must contain only one session.
- * Tool parameter increments and response error payloads are omitted.
- * Unfinished text and reasoning are not emitted at end of input.
- * A new prompt discards open increments; an event leaves them open.
  * The current response group remains in memory until its boundary.
  *
  * @see {@link Step} for the output variants.
@@ -216,9 +208,9 @@ export const produced =
     stream.pipe(
       Stream.filterMap((part) => {
         if (
-          part._tag !== "Metric" ||
+          !Predicate.isTagged("Metric")(part) ||
           part.metric._tag !== metric.tag ||
-          part.metric.data._tag !== "Output"
+          !Predicate.isTagged("Output")(part.metric.data)
         ) {
           return Result.failVoid;
         }
@@ -355,7 +347,7 @@ export const toolCalls = <Config extends Config.AnyConfig, E, R>(
 ): Stream.Stream<Response.ToolCallOf<Config>, E, R> =>
   stream.pipe(
     Stream.filterMap((part) =>
-      part._tag === "Response" && part.response.type === "tool-call"
+      Predicate.isTagged("Response")(part) && part.response.type === "tool-call"
         ? Result.succeed(part.response)
         : Result.failVoid,
     ),
@@ -400,7 +392,7 @@ export const toolTurns = <Config extends Config.AnyConfig, E, R>(
     Stream.mapAccum(
       () => new Map<string, Response.ToolCallPartsView<Tools<Config>>>(),
       (calls, part) => {
-        if (part._tag !== "Response") return [calls, []];
+        if (!Predicate.isTagged("Response")(part)) return [calls, []];
 
         const response = part.response;
 

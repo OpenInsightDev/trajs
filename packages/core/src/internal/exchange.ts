@@ -7,7 +7,6 @@ import type * as Config from "#/Config.ts";
 import * as Event from "#/Event.ts";
 import type * as Exchange from "#/Exchange.ts";
 import type * as ExtraKit from "#/ExtraKit.ts";
-import { foldParts } from "#/internal/folding.ts";
 import { readFrames } from "#/internal/frames.ts";
 import * as Metric from "#/Metric.ts";
 import * as Prompt from "#/Prompt.ts";
@@ -63,73 +62,41 @@ const Messages = Schema.Array(
 const PromptPart = <K extends ExtraKit.Any>(extrakit: K) =>
   Trajectory.PromptPart(extrakit).mapFields((fields) => ({ ...fields, messages: Messages }));
 
-const exchangePart = <C extends Config.AnyConfig, Stream extends boolean>(
-  config: C,
-  stream: Stream,
-) =>
+const exchangePart = <C extends Config.AnyConfig>(config: C) =>
   Schema.Union([
     PromptPart<C["extrakit"]>(config.extrakit),
     Trajectory.SessionPart<C["extrakit"]>(config.extrakit),
-    Trajectory.ResponsePart<C["toolkit"], C["extrakit"], Stream>({
-      toolkit: config.toolkit,
-      extrakit: config.extrakit,
-      stream,
-    }),
+    Trajectory.ResponsePart({ toolkit: config.toolkit, extrakit: config.extrakit }),
     Trajectory.EventPart<C["eventkit"]>(config.eventkit),
     Trajectory.MetricPart<C["metrickit"]>(config.metrickit),
   ]);
 
-type Part<C extends Config.AnyConfig, Stream extends boolean = true> = Schema.Schema.Type<
-  ReturnType<typeof exchangePart<C, Stream>>
->;
-
-type PartEncoded<C extends Config.AnyConfig, Stream extends boolean = true> = Schema.Codec.Encoded<
-  ReturnType<typeof exchangePart<C, Stream>>
+type PartEncoded<C extends Config.AnyConfig> = Schema.Codec.Encoded<
+  ReturnType<typeof exchangePart<C>>
 >;
 
 export const ExchangePart = <C extends Config.AnyConfig>(
   config: C,
-): Schema.Codec<Part<C>, PartEncoded<C>, Config.DecodingServices<C>, Config.EncodingServices<C>> =>
-  // The exchange always writes streaming parts.
-  // A non-streaming read folds them.
+): Schema.Codec<
+  Trajectory.Part<C>,
+  PartEncoded<C>,
+  Config.DecodingServices<C>,
+  Config.EncodingServices<C>
+> =>
   // SAFETY: the exchange's schemas are the config's own, so the config's services cover them.
+  // The prompt schema differs only in accepting a file a store states as a URL, which
+  // decodes to the same file data.
   // Effect omits tool parameter services from response part types; see
   // https://github.com/Effect-TS/effect/issues/9867.
-  exchangePart(config, true) as Schema.Codec<
-    Part<C>,
+  exchangePart(config) as Schema.Codec<
+    Trajectory.Part<C>,
     PartEncoded<C>,
     Config.DecodingServices<C>,
     Config.EncodingServices<C>
   >;
 
-export const TrajectoryPart = <C extends Config.AnyConfig>(
-  config: C,
-): Schema.Codec<
-  Trajectory.Part<C>,
-  PartEncoded<C, C["stream"]>,
-  Config.DecodingServices<C>,
-  Config.EncodingServices<C>
-> =>
-  // SAFETY: the union selects a response part by `config.stream`, as `Trajectory.Part` does.
-  exchangePart(config, config.stream) as Schema.Codec<
-    Trajectory.Part<C>,
-    PartEncoded<C, C["stream"]>,
-    Config.DecodingServices<C>,
-    Config.EncodingServices<C>
-  >;
-
-export const encodeExchangePart = <C extends Config.AnyConfig>(config: C) => {
-  const encode = ExchangePart(config).pipe(SchemaBinary.toCodec, Schema.encodeEffect);
-
-  return (part: Part<C>) =>
-    encode(part).pipe(
-      Effect.mapError((cause) => TrajectoryError.parse(cause)),
-      Effect.map((frame) => frame.slice()),
-    );
-};
-
 export const encodePart = <C extends Config.AnyConfig>(config: C) => {
-  const encode = TrajectoryPart(config).pipe(SchemaBinary.toCodec, Schema.encodeEffect);
+  const encode = ExchangePart(config).pipe(SchemaBinary.toCodec, Schema.encodeEffect);
 
   return (part: Trajectory.Part<C>) =>
     encode(part).pipe(
@@ -139,7 +106,7 @@ export const encodePart = <C extends Config.AnyConfig>(config: C) => {
 };
 
 export const decodePart = <C extends Config.AnyConfig>(config: C) => {
-  const decode = TrajectoryPart(config).pipe(SchemaBinary.toCodec, Schema.decodeUnknownEffect);
+  const decode = ExchangePart(config).pipe(SchemaBinary.toCodec, Schema.decodeUnknownEffect);
 
   return (bytes: Uint8Array) =>
     decode(bytes).pipe(Effect.mapError((cause) => TrajectoryError.parse(cause)));
@@ -311,16 +278,5 @@ export const frameOf =
 export const trajectoryOf = <C extends Config.AnyConfig, E>(
   bytes: Stream.Stream<Uint8Array, E, never>,
   config: C,
-): Trajectory.Trajectory<string, C, E | TrajectoryError, Config.DecodingServices<C>> => {
-  const parts = readFrames(ExchangePart(config))(bytes);
-
-  // SAFETY: the exchange writes streaming parts.
-  // A non-streaming config folds them into whole parts.
-  const read = (config.stream ? parts : foldParts(parts)) as Stream.Stream<
-    Trajectory.Part<C>,
-    E | TrajectoryError,
-    Config.DecodingServices<C>
-  >;
-
-  return Trajectory.make(config)(read);
-};
+): Trajectory.Trajectory<string, C, E | TrajectoryError, Config.DecodingServices<C>> =>
+  Trajectory.make(config)(readFrames(ExchangePart(config))(bytes));
