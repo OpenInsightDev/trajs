@@ -11,7 +11,6 @@ import { Effect, FileSystem, Path, Schema } from "effect";
 import type { PlatformError } from "effect";
 
 import * as Config from "#/Config.ts";
-import * as EventKit from "#/EventKit.ts";
 import * as MetricKit from "#/MetricKit.ts";
 import * as Produce from "#/Produce.ts";
 import type * as Toolkit from "#/Toolkit.ts";
@@ -19,9 +18,23 @@ import * as Trajectory from "#/Trajectory.ts";
 import { TrajectoryError } from "#/TrajectoryError.ts";
 import { FromJson } from "#/unstable/atif/Document.ts";
 import type { Document } from "#/unstable/atif/Document.ts";
+import * as AtifEvent from "#/unstable/atif/Event.ts";
 import { extrakit } from "#/unstable/atif/Extra.ts";
 import { produce } from "#/unstable/atif/internal/reading.ts";
 import { toolkitOf } from "#/unstable/atif/internal/toolkit.ts";
+
+/**
+ * The config a document is read with: the kits this module declares.
+ *
+ * A reader installs the same kits to read the parts back.
+ */
+type AtifConfig = Config.Config<
+  true,
+  Toolkit.Any,
+  typeof AtifEvent.eventkit,
+  MetricKit.WithProducers<MetricKit.Empty>,
+  typeof extrakit
+>;
 
 /**
  * Base-directory options for ATIF media files.
@@ -49,16 +62,20 @@ export interface Options {
  *
  * **Details**
  *
- * The document becomes a child of the main session.
- * Its id uses `session_id`, then `trajectory_id`, then `"atif"`.
+ * The document becomes a child of the main session, named by its `trajectory_id`,
+ * or `"atif"` where it states none.
  * Agent tool definitions become the trajectory's toolkit.
  * System and user steps become prompts; agent steps become response parts.
- * Run and step metadata are carried as declared extras.
+ * What the document states of a run, a step, a tool call, a result and the media of a
+ * part is carried as the extra data this module declares, and its event declarations
+ * are installed in the config the trajectory names.
  * Valid step timestamps are attached to the prompt or first response part.
  *
  * **Gotchas**
  *
  * This conversion is not a lossless ATIF round trip.
+ * `session_id` names the run rather than the document, and every document of one run
+ * states the same value, so the reading does not use it.
  * Delegated documents and continuation references are not imported.
  * Copied-context flags do not suppress duplicated steps.
  * System observations and context-management conventions do not become events.
@@ -77,13 +94,7 @@ export const encode = (
   options?: Options,
 ): Trajectory.Trajectory<
   string,
-  Config.Config<
-    true,
-    Toolkit.Any,
-    EventKit.Empty,
-    MetricKit.WithProducers<MetricKit.Empty>,
-    typeof extrakit
-  >,
+  AtifConfig,
   TrajectoryError | PlatformError.PlatformError,
   FileSystem.FileSystem | Path.Path
 > => kits(document)((main) => produce(main, document, options?.cwd));
@@ -111,13 +122,7 @@ export const fromFile = (
 ): Effect.Effect<
   Trajectory.Trajectory<
     string,
-    Config.Config<
-      true,
-      Toolkit.Any,
-      EventKit.Empty,
-      MetricKit.WithProducers<MetricKit.Empty>,
-      typeof extrakit
-    >,
+    AtifConfig,
     TrajectoryError | PlatformError.PlatformError,
     FileSystem.FileSystem | Path.Path
   >,
@@ -137,20 +142,23 @@ export const fromFile = (
 
 /**
  * The config a document is produced with: the toolkit it says its agent was given, and
- * the extra data this module carries.
+ * the kits this module declares.
  */
 const kits = (document: Document) =>
   Produce.produce(
     Config.config({
       stream: true,
       toolkit: toolkitOf(document),
-      eventkit: EventKit.empty,
+      // The events this module declares, so the trajectory names the kit its events are
+      // read with. No step is read as an event yet.
+      eventkit: AtifEvent.eventkit,
       // A kit that names no metric derives nothing, so the trajectory holds the parts
-      // its steps were read as and no metric part.
+      // its steps were read as and no metric part. ATIF states its token counts, cost and
+      // confidence data as the fields of a step rather than as metrics derived of parts.
       metrickit: MetricKit.toProducers(MetricKit.empty, {}),
-      // The extra data of this module, so what a document states of a run and of its
-      // steps reads back as the fields they are rather than as the JSON they were written
-      // as.
+      // The extra data of this module, so what a document states of a run, of a step, of a
+      // call, of a result and of the media of a part reads back as the fields they are
+      // rather than as the JSON they were written as.
       extrakit,
     }),
   );

@@ -89,36 +89,46 @@ messages with the results of the calls in between, which are the parts produced
 before it. A result that names no call answers a call of its step that no result
 has answered yet, since the calls of a step are answered in the order they were
 made — a document that leaves the id of a result out still says which call was
-answered when a step made one call. The session of the trajectory is the run the
-document states, or the document's own id where it states no run.
+answered when a step made one call. The session of the trajectory is named by the
+document's `trajectory_id`, or `"atif"` where it states none. `session_id` is the
+identity of the run the document belongs to rather than of the document — every
+document of one run states the same value — so the reading does not use it yet.
 
 An image or a recording a step states is read from the path the document states it
 at and produced as the `file` part of the step it is stated on: a part of the
 message a model was given, of what the agent answered with, or of what a result was
 answered with. ATIF states such a path beside the document, so a document read from
 a file has its media read beside it, and one read from a document of your own is
-read with the directory its options name. A `system` message states text alone, so
-the media of one is not read.
+read with the directory its options name. The seconds a recording lasts is the
+`MediaFields` duration of that part, keyed by the ordinal of the media among the ones
+the part states. A `system` message states text alone, so the media of one is not
+read.
 
 The tools the document says its agent was given are read, as the toolkit the
 trajectory names: each tool definition becomes a dynamic tool — the name it is
 called by, what it does, and the JSON schema of the arguments it accepts — so a
 trajectory read from a document says what its agent was run with, and whoever writes
-the trajectory states the same tools in the header it starts with.
+the trajectory states the same tools in the header it starts with. What a definition
+states besides the tool — its `type`, its `strict` and the `extra` a producer wrote —
+is `DocumentFields`'s `agent.tool_definitions`, by the name each tool is called by.
 
-What a document states of a step beyond what it says, and of the run itself, is
-carried as extra data on the part it belongs to:
+What a document states of a step beyond what it says, of a call, of a result and of
+the run itself, is carried as extra data on the part it belongs to:
 
 - the ordinal of a step, the model that answered it, the effort it took, how many
   inferences it stands for, what it cost, and the `extra` a producer wrote of
   anything are the `StepFields` of the part of that step — the prompt part of a step
   that states a message, the first response part of a step that answered with parts.
   The moment a step happened times the part of that step.
+- the `extra` a producer wrote of a tool call is the `CallFields` of the response
+  part of that call, which a call is a part of its own.
+- the call a result states it answers and the `extra` a producer wrote of it are the
+  `ResultFields` of the response part of that result.
 - the version of the format, the agent that ran, the `notes` of the run, its
   `final_metrics` and its own `extra` are the `DocumentFields` of the session part.
 
-A reader installs the kit a trajectory declares those fields with — `extrakit` —
-and reads them off the part with their types:
+A reader installs the kits a trajectory declares with — `extrakit` and `eventkit` —
+and reads those fields off the part with their types:
 
 ```ts
 import { Effect, Stream } from "effect";
@@ -127,15 +137,20 @@ import { Extra } from "@trajs/core/unstable/atif";
 const parts = Array.from(await Effect.runPromise(Stream.runCollect(trajectory)));
 const session = parts.find((part) => part._tag === "Session");
 const answered = parts.find((part) => part._tag === "Response");
+const called = parts.find((part) => part._tag === "Response" && part.response.type === "tool-call");
 
 session?.extra[Extra.documentExtra.tag]?.agent.name; // => "claude-code"
 answered?.extra[Extra.stepExtra.tag]?.model_name; // => "claude-sonnet-4"
+called?.extra[Extra.callExtra.tag]?.extra; // => { retries: 1 }
 ```
 
 What a document states in the terms of a kit the reading does not name is left out,
 because a trajectory holds the parts a session ran on and what a kit derived of them
 rather than a producer's account of a run:
 
+- the identity of the run the document belongs to: every document of one run
+  states the same `session_id`, so it names no document and the reading leaves it
+  out. _Reading a document_ above says how the session is named instead.
 - the trajectory of a delegated or continued run, which a document states by another
   document rather than by a part of its own.
 - whether a step repeats an earlier trajectory, which the format states of a step a
@@ -204,8 +219,9 @@ above for how a reader gets it back:
   it and the marker is not carried.
 - Multimodal `message` and `content` parts, which ATIF added in v1.6. An image or
   a file is referenced by a path that sits beside the trajectory file, while a
-  trajectory holds the bytes themselves and no path, so the parts a step cannot
-  state are not stated.
+  trajectory holds the bytes themselves: the bytes are the `file` part of the step,
+  the seconds a recording lasts is the `MediaFields` of that part, and the path is
+  what neither states.
 - `observation.subagent_trajectory_ref`, and the `subagent_trajectories` a
   reference resolves against. A trajectory of delegated work is a trajectory of
   another session, which this module does not read as one document yet.

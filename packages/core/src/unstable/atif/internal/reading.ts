@@ -9,17 +9,23 @@
 import { DateTime, Effect, FileSystem, Option, Path, Predicate, Schema } from "effect";
 import type { PlatformError } from "effect";
 
-import * as Config from "#/Config.ts";
 import type * as Extra from "#/Extra.ts";
 import * as Produce from "#/Produce.ts";
 import * as Prompt from "#/Prompt.ts";
 import * as Response from "#/Response.ts";
 import type { TrajectoryError } from "#/TrajectoryError.ts";
 import type { Content, Document, StepObject } from "#/unstable/atif/Document.ts";
+import * as AtifEvent from "#/unstable/atif/Event.ts";
 import {
+  callExtra,
+  CallFields,
   DocumentFields,
   documentExtra,
   extrakit,
+  mediaExtra,
+  MediaFields,
+  resultExtra,
+  ResultFields,
   StepFields,
   stepExtra,
 } from "#/unstable/atif/Extra.ts";
@@ -31,8 +37,35 @@ type Services = FileSystem.FileSystem | Path.Path;
 /** The session a document's steps are produced in, where the document names none. */
 const unnamedSession = "atif";
 
-const sessionIdOf = (document: Document): string =>
-  document.session_id ?? document.trajectory_id ?? unnamedSession;
+/**
+ * The id of the session a document's steps are produced in.
+ *
+ * `session_id` names the run. Every document of one run states the same value, so
+ * it names no session.
+ */
+const sessionIdOf = (document: Document): string => document.trajectory_id ?? unnamedSession;
+
+/** What a document states of one tool definition beside the tool it names. */
+type ToolFields = NonNullable<DocumentFields["agent"]["tool_definitions"]>[string];
+
+/** What a document states of each tool definition beside the tool it names, by that name. */
+const toolFieldsOf = (agent: Document["agent"]): DocumentFields["agent"]["tool_definitions"] => {
+  const definitions = agent.tool_definitions ?? [];
+
+  if (definitions.length === 0) return undefined;
+
+  const stated: Record<string, ToolFields> = {};
+
+  for (const definition of definitions) {
+    stated[definition.function.name] = {
+      type: definition.type,
+      strict: definition.function.strict,
+      extra: definition.extra,
+    };
+  }
+
+  return stated;
+};
 
 /** What a document states of the run itself, held by the session part. */
 const documentFields = (document: Document): DocumentFields =>
@@ -43,6 +76,7 @@ const documentFields = (document: Document): DocumentFields =>
       name: document.agent.name,
       version: document.agent.version,
       model_name: document.agent.model_name,
+      tool_definitions: toolFieldsOf(document.agent),
       extra: document.agent.extra,
     },
     trajectory_id: document.trajectory_id,
@@ -97,7 +131,13 @@ const extraOf = (
  */
 type Piece =
   | { readonly kind: "text"; readonly text: string }
-  | { readonly kind: "file"; readonly mediaType: string; readonly data: Uint8Array };
+  | {
+      readonly kind: "file";
+      readonly mediaType: string;
+      readonly data: Uint8Array;
+      /** The seconds the recording lasts, where the document states one. */
+      readonly duration: number | null | undefined;
+    };
 
 /** The path a piece is read from, under the directory the reading is given where it is relative. */
 const pathOf = (stated: string, cwd: string | undefined, paths: Path.Path): string =>
@@ -135,6 +175,7 @@ const piecesOf = (
         kind: "file",
         mediaType: part.source.media_type,
         data: yield* fs.readFile(pathOf(part.source.path, cwd, paths)),
+        duration: part.type === "audio" ? part.source.duration_sec : undefined,
       });
     }
 
@@ -142,6 +183,47 @@ const piecesOf = (
 
     return pieces;
   });
+
+/**
+ * The durations a document states of the media of a part, by the ordinal of the media
+ * among the ones the part states.
+ */
+const durationsOf = (pieces: ReadonlyArray<Piece>): Record<string, number> | undefined => {
+  const stated: Record<string, number> = {};
+  let ordinal = 0;
+  let some = false;
+
+  for (const piece of pieces) {
+    if (piece.kind === "text") continue;
+
+    if (piece.duration !== undefined && piece.duration !== null) {
+      stated[String(ordinal)] = piece.duration;
+      some = true;
+    }
+
+    ordinal += 1;
+  }
+
+  return some ? stated : undefined;
+};
+
+/**
+ * What a part holds of the media it states, which the bytes of a recording do not say.
+ */
+const mediaOf = (
+  pieces: ReadonlyArray<Piece>,
+): Partial<Record<typeof mediaExtra.tag, MediaFields>> => {
+  const duration = durationsOf(pieces);
+
+  return duration === undefined
+    ? {}
+    : {
+        [mediaExtra.tag]: MediaFields.make({
+          version: MediaFields.fields.version.literal,
+          duration,
+        }),
+      };
+};
 
 /** The text of the pieces given, which is what they say of the step they are of. */
 const textOf = (pieces: ReadonlyArray<Piece>): string => {
@@ -167,6 +249,18 @@ const textOfContent = (content: Content): string => {
   return text;
 };
 
+/** A response part the reading produces, and the extra data the document states of it. */
+interface ProducedPart {
+  readonly part: Response.AllPartsView<{}>;
+  readonly extra: Extra.ExtraRecord<(typeof extrakit)["extra"], "response">;
+}
+
+/** The turn message a step states, and the extra data the document states of it. */
+interface StatedPrompt {
+  readonly prompt: Prompt.Prompt;
+  readonly extra: Extra.ExtraRecord<(typeof extrakit)["extra"], "prompt">;
+}
+
 /**
  * The turn a step opens, as the one message the step states.
  *
@@ -175,12 +269,15 @@ const textOfContent = (content: Content): string => {
 const promptOf = (
   step: StepObject,
   cwd: string | undefined,
-): Effect.Effect<Prompt.Prompt, PlatformError.PlatformError, Services> =>
+): Effect.Effect<StatedPrompt, PlatformError.PlatformError, Services> =>
   Effect.gen(function* () {
     if (step.source === "system") {
-      return Prompt.fromMessages([
-        Prompt.makeMessage("system", { content: textOfContent(step.message) }),
-      ]);
+      return {
+        prompt: Prompt.fromMessages([
+          Prompt.makeMessage("system", { content: textOfContent(step.message) }),
+        ]),
+        extra: {},
+      };
     }
 
     const pieces = yield* piecesOf(step.message, cwd);
@@ -194,7 +291,10 @@ const promptOf = (
               : Prompt.makePart("file", { mediaType: piece.mediaType, data: piece.data }),
           );
 
-    return Prompt.fromMessages([Prompt.makeMessage("user", { content })]);
+    return {
+      prompt: Prompt.fromMessages([Prompt.makeMessage("user", { content })]),
+      extra: mediaOf(pieces),
+    };
   });
 
 /** The id a result that answers no call is produced under. */
@@ -204,16 +304,17 @@ const resultId = (step: StepObject, at: number): string => `${step.step_id}-${at
  * The results a step was answered with, as tool results and the files they hold.
  *
  * A result that names no call answers the first unanswered call of its step. A result
- * that states nothing is not produced.
+ * that states neither content nor a call is not produced, so what a producer wrote of
+ * it is not carried either.
  */
 const resultsOf = (
   step: StepObject,
   cwd: string | undefined,
-): Effect.Effect<ReadonlyArray<Response.AllPartsView<{}>>, PlatformError.PlatformError, Services> =>
+): Effect.Effect<ReadonlyArray<ProducedPart>, PlatformError.PlatformError, Services> =>
   Effect.gen(function* () {
     const calls = step.tool_calls ?? [];
     const answered = new Set<string>();
-    const parts: Response.AllPartsView<{}>[] = [];
+    const parts: ProducedPart[] = [];
 
     for (const [at, result] of (step.observation?.results ?? []).entries()) {
       const stated = result.source_call_id ?? undefined;
@@ -231,8 +332,8 @@ const resultsOf = (
 
       if (call === undefined && content === "" && files.length === 0) continue;
 
-      parts.push(
-        Response.anyToolResultPart({
+      parts.push({
+        part: Response.anyToolResultPart({
           id: call?.tool_call_id ?? resultId(step, at),
           name: call?.function_name ?? "",
           isFailure: false,
@@ -241,10 +342,20 @@ const resultsOf = (
           providerExecuted: false,
           preliminary: false,
         }),
-      );
+        extra: {
+          [resultExtra.tag]: ResultFields.make({
+            version: ResultFields.fields.version.literal,
+            source_call_id: stated,
+            extra: result.extra,
+          }),
+        },
+      });
 
       for (const file of files) {
-        parts.push(Response.makePart("file", { mediaType: file.mediaType, data: file.data }));
+        parts.push({
+          part: Response.makePart("file", { mediaType: file.mediaType, data: file.data }),
+          extra: mediaOf([file]),
+        });
       }
     }
 
@@ -259,35 +370,51 @@ const resultsOf = (
 const responsesOf = (
   step: StepObject,
   cwd: string | undefined,
-): Effect.Effect<ReadonlyArray<Response.AllPartsView<{}>>, PlatformError.PlatformError, Services> =>
+): Effect.Effect<ReadonlyArray<ProducedPart>, PlatformError.PlatformError, Services> =>
   Effect.gen(function* () {
     if (step.source !== "agent") return [];
 
-    const parts: Response.AllPartsView<{}>[] = [];
+    const parts: ProducedPart[] = [];
 
     const reasoning = step.reasoning_content ?? "";
 
-    if (reasoning !== "") parts.push(Response.makePart("reasoning", { text: reasoning }));
+    if (reasoning !== "") {
+      parts.push({ part: Response.makePart("reasoning", { text: reasoning }), extra: {} });
+    }
 
     for (const piece of yield* piecesOf(step.message, cwd)) {
       if (piece.kind === "text") {
-        if (piece.text !== "") parts.push(Response.makePart("text", { text: piece.text }));
+        if (piece.text !== "") {
+          parts.push({ part: Response.makePart("text", { text: piece.text }), extra: {} });
+        }
 
         continue;
       }
 
-      parts.push(Response.makePart("file", { mediaType: piece.mediaType, data: piece.data }));
+      parts.push({
+        part: Response.makePart("file", { mediaType: piece.mediaType, data: piece.data }),
+        extra: mediaOf([piece]),
+      });
     }
 
     for (const call of step.tool_calls ?? []) {
-      parts.push(
-        Response.anyToolCallPart({
+      parts.push({
+        part: Response.anyToolCallPart({
           id: call.tool_call_id,
           name: call.function_name,
           params: call.arguments,
           providerExecuted: false,
         }),
-      );
+        extra:
+          call.extra === undefined
+            ? {}
+            : {
+                [callExtra.tag]: CallFields.make({
+                  version: CallFields.fields.version.literal,
+                  extra: call.extra,
+                }),
+              },
+      });
     }
 
     for (const result of yield* resultsOf(step, cwd)) parts.push(result);
@@ -298,9 +425,11 @@ const responsesOf = (
 /** One turn as {@link turnsOf} builds it, before it is produced. */
 interface Turn {
   prompt: Prompt.Prompt;
+  /** What the document states of the media the prompt holds. */
+  promptExtra: Extra.ExtraRecord<(typeof extrakit)["extra"], "prompt">;
   /** What the document states of the step that stated the prompt. */
   promptStates: Stated | undefined;
-  response: Array<Response.AllPartsView<{}>>;
+  response: Array<ProducedPart>;
   /** What the document states of the step that answered, held by the first response part. */
   answerStates: Stated | undefined;
   /** Whether an agent step has answered the turn already. */
@@ -339,8 +468,13 @@ const turnsOf = (
       const answered = step.source === "agent";
       const onResponse = answered && parts.length > 0;
 
+      const opened: StatedPrompt = answered
+        ? { prompt: Prompt.empty, extra: {} }
+        : yield* promptOf(step, cwd);
+
       turns.push({
-        prompt: answered ? Prompt.empty : yield* promptOf(step, cwd),
+        prompt: opened.prompt,
+        promptExtra: opened.extra,
         promptStates: onResponse ? undefined : states,
         response: [...parts],
         answerStates: onResponse ? states : undefined,
@@ -361,7 +495,7 @@ const turnsOf = (
 export const produce = (
   main: Produce.ProduceSession<
     Tools,
-    Config.UnknownConfig["eventkit"]["events"],
+    (typeof AtifEvent.eventkit)["events"],
     (typeof extrakit)["extra"]
   >,
   document: Document,
@@ -375,14 +509,16 @@ export const produce = (
 
     for (const turn of yield* turnsOf(document, cwd)) {
       yield* session.enqueuePrompt(turn.prompt, {
+        ...turn.promptExtra,
         ...extraOf(turn.promptStates),
         timestamp: turn.promptStates?.moment,
       });
 
-      for (const [at, part] of turn.response.entries()) {
+      for (const [at, produced] of turn.response.entries()) {
         const states = at === 0 ? turn.answerStates : undefined;
 
-        yield* session.enqueueResponse(part, {
+        yield* session.enqueueResponse(produced.part, {
+          ...produced.extra,
           ...extraOf(states),
           timestamp: states?.moment,
         });
