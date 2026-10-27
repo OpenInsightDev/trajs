@@ -35,5 +35,5 @@ parts gives 2 prompts and 2 replies, 6 messages, 26 characters of answer text,
 and two `get_weather` calls.
 
 ```sh
-vp test tutorials/steps
+vp test steps
 ```

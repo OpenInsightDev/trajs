@@ -34,8 +34,8 @@ dist-ssr
 
 # The trajectories an example case generates as its fixtures, which it writes again on
 # every run rather than keeping.
-examples/traj-analysis/scenes/*/fixtures/
-examples/traj-analysis/tutorials/*/fixtures/
+examples/traj-analysis/cases/*/fixtures/
+examples/tutorials/*/fixtures/
 
 # references/ holds symlinks to sibling checkouts created by .agents/prepare
 references/

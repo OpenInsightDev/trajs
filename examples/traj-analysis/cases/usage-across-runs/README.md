@@ -6,8 +6,9 @@ Walking every trajectory in the program to answer that does not stay cheap. This
 
 The runs are generated from known odds, so the test can check the answers. Tools should land near `grep` 50%, `read_file` 25%, `bash` 15%, `edit` 10%. Models near `gpt-5` 60% and `claude-sonnet-4-6` 40%. About a quarter of the runs have a sub-agent.
 
-The same questions on two short runs, without the generator, are [`tutorials/olap`](../../tutorials/olap/README.md).
+The same questions on two short runs, without the generator, are
+[`examples/tutorials/olap`](../../../tutorials/olap/README.md).
 
 ```sh
-vp test scenes/usage-across-runs
+vp test cases/usage-across-runs
 ```

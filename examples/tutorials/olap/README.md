@@ -48,5 +48,5 @@ tools (`bash` 2, `grep` 1, `read_file` 1) and 300 / 170 input tokens with 75 /
 35 output tokens for the two runs.
 
 ```sh
-vp test tutorials/olap
+vp test olap
 ```

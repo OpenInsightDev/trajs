@@ -46,5 +46,5 @@ almost all of it inherited context. The `task` calls are counted as the
 parent's, because hiring the sub-agent was the parent's action.
 
 ```sh
-vp test tutorials/sessions
+vp test sessions
 ```

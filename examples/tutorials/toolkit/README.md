@@ -40,5 +40,5 @@ largest `limit` asked for (20), and the file extensions (`ts`, `md`), plus one
 `web_fetch` counted as undescribed.
 
 ```sh
-vp test tutorials/toolkit
+vp test toolkit
 ```

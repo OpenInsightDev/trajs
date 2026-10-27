@@ -50,5 +50,5 @@ The third result is a PNG, so the producer reports `not-text` — the read says
 what it could not measure instead of quietly leaving it out.
 
 ```sh
-vp test tutorials/metric
+vp test metric
 ```

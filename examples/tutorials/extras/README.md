@@ -69,5 +69,5 @@ it decodes to the same shape as the other, so both read as today's fields:
 calling no tool. The run was `cline@3.1.0` for task `t-204`.
 
 ```sh
-vp test tutorials/extras
+vp test extras
 ```

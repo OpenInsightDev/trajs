@@ -7,5 +7,5 @@ You want the loops, not a list of every call. Reading the same file twice is ord
 Eight tool calls in all. The loops are the three searches (`call_1`, `call_2`, `call_3`) and the three test runs (`call_6`, `call_7`, `call_8`).
 
 ```sh
-vp test scenes/repeated-tool-calls
+vp test cases/repeated-tool-calls
 ```

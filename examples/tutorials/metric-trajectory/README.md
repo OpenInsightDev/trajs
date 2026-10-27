@@ -46,5 +46,5 @@ join: 16 characters on the `grep` result, 64 on the `read_file` result, and the
 Run the case:
 
 ```sh
-vp test tutorials/metric-trajectory
+vp test metric-trajectory
 ```

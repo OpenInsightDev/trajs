@@ -9,5 +9,5 @@ Three runs. The second one resolved the issue, and the third added nothing.
 Run this case with:
 
 ```sh
-vp test scenes/metric-guided-investigation
+vp test cases/metric-guided-investigation
 ```

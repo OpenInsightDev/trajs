@@ -2,7 +2,7 @@
   "name": "@trajs/example-traj-analysis",
   "version": "0.0.0",
   "private": true,
-  "description": "Worked examples of analysing trajectories with `@trajs/core`, a realistic scene or an API tutorial per directory.",
+  "description": "Worked examples of analysing trajectories with `@trajs/core`, a realistic case per directory.",
   "homepage": "https://github.com/trajs-ai/trajs",
   "license": "MIT",
   "author": "Bowei Wang <wozluohd@gmail.com>",

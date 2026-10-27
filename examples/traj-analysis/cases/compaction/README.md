@@ -5,5 +5,5 @@ The agent is chasing a timeout that fails on CI. It finds `readTimeout`, reads `
 You want the run split into before and after that compaction, plus the files that had to be opened a second time. Here that list is only `src/config.ts`. The run is 4 prompts, 4 replies, and 1 compaction.
 
 ```sh
-vp test scenes/compaction
+vp test cases/compaction
 ```
