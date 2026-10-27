@@ -34,15 +34,17 @@
  * can be read for what it cost at any point of it without summing what came
  * before.
  *
- * The metric is named by the package that declares it: the `package` of its tag
- * is the `name` of this package, so what a trajectory states of a count is the
- * package that wrote it rather than a name the package made up. The metric
- * declares two versioned schemas: the {@link Estimate} its producer yields for a
- * part, and the {@link Uncounted} failure of one it could not count. `0.1.0` is
- * written out as the oldest version of each, and is the only version stated so
- * far; {@link tokenEstimate} is the metric, {@link Estimate} and {@link Uncounted}
- * are its shapes — taken off the schemas rather than written again, so a version
- * moves them — and {@link metrickit} is the kit it is an entry of.
+ * The metric is named by the package that declares it: the `packageName` of its
+ * tag is the `name` of this package, so what a trajectory states of a count is the
+ * package that wrote it rather than a name the package made up, and the metric's
+ * `metadata` describes the metric itself while `packageMetadata` is what the same
+ * `package.json` states of that package. The metric declares two versioned schemas:
+ * the {@link Estimate} its producer yields for a part, and the {@link Uncounted}
+ * failure of one it could not count. `0.1.0` is written out as the oldest version of
+ * each, and is the only version stated so far; {@link tokenEstimate} is the metric,
+ * {@link Estimate} and {@link Uncounted} are its shapes — taken off the schemas
+ * rather than written again, so a version moves them — and {@link metrickit} is the
+ * kit it is an entry of.
  */
 
 import { Metric, MetricKit, VersionedSchema } from "@trajs/core";
@@ -161,11 +163,14 @@ const uncounted010 = Schema.Struct({
  *
  * **Details**
  *
- * `package` is the `name` of this package as `package.json` states it, and `id`
- * names the metric within the package, so the tag an estimate is produced under is
- * the package's own name followed by `Estimate`: what a trajectory states of a count
- * is the package that wrote it rather than a name the package made up. `metadata`
- * describes the metric itself, and `output` and `failure` are the two shapes it
+ * `packageName` is the `name` of this package, written out as a literal so the tag
+ * is typed as `"@trajs/extension-tokenize/Estimate"` rather than as a string, and
+ * `id` names the metric within the package, so the tag an estimate is produced
+ * under is the package's own name followed by `Estimate`: what a trajectory states
+ * of a count is the package that wrote it rather than a name the package made up.
+ * `metadata` describes the metric itself, `packageMetadata` is what that
+ * `package.json` states of the package, so a reader of a count finds the package
+ * and the release that wrote it, and `output` and `failure` are the two shapes it
  * states — what a producer yields of a part, and what it fails with for a part it
  * could not count — each at every version it was written at.
  *
@@ -174,12 +179,13 @@ const uncounted010 = Schema.Struct({
  * @category constants
  */
 export const tokenEstimate = new Metric.Metric({
-  package: pkg.name,
+  packageName: "@trajs/extension-tokenize",
   id: "Estimate",
   metadata: new Metric.Metadata({
     name: "Token estimate",
     description: "The estimated token count of a trajectory part.",
   }),
+  packageMetadata: pkg,
   output: estimate010,
   failure: uncounted010,
 });

@@ -64,7 +64,7 @@ export const Version = pkg.version;
  *
  * The uncompressed JSON record follows a four-byte big-endian length.
  * Tool entries include JSON Schema descriptions but no executable handlers or schema transformations.
- * Event, metric, and extra entries contain display metadata, not decoding schemas.
+ * Event, metric, and extra entries state what each declaration names of itself and the package it is in, not a decoding schema.
  *
  * @see {@link Metadata} for the tail.
  * @stability stable

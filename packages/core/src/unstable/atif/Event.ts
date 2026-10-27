@@ -11,7 +11,7 @@ import { Schema } from "effect";
 
 import * as Event from "#/Event.ts";
 import * as EventKit from "#/EventKit.ts";
-import { packageName } from "#/unstable/atif/internal/package.ts";
+import { packageMetadata, packageName } from "#/unstable/atif/internal/package.ts";
 import * as VersionedSchema from "#/VersionedSchema.ts";
 
 /** The kinds of context transformation ATIF names for a `type`. */
@@ -55,12 +55,13 @@ export type ContextManagementBoundary = (typeof boundaries)[number];
  * @category constants
  */
 export const contextManagementEvent = new Event.Event({
-  package: packageName,
+  packageName,
   id: "ContextManagement",
   metadata: new Event.Metadata({
     name: "Context management",
     description: "What ATIF states of a system step that transformed the agent's context.",
   }),
+  packageMetadata,
   schema: Schema.Struct({
     version: Schema.Literal("1.8"),
     type: Schema.Literals(types),

@@ -108,7 +108,7 @@ it("states a part as the row it is stored as", async () => {
 
 it("states what an event and a metric name, and the session a metric does not state", async () => {
   const step = new Event.Event({
-    package: "test",
+    packageName: "test",
     id: "step",
     metadata: new Event.Metadata({ name: "Step" }),
     schema: Schema.Struct({ version: Schema.Literal("0.1.0"), index: Schema.Number }).pipe(
@@ -117,7 +117,7 @@ it("states what an event and a metric name, and the session a metric does not st
   });
 
   const measured = new Metric.Metric({
-    package: "test",
+    packageName: "test",
     id: "tokens",
     metadata: new Metric.Metadata({ name: "Tokens" }),
     output: Schema.Struct({ version: Schema.Literal("0.1.0"), total: Schema.Number }).pipe(

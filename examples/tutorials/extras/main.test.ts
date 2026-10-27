@@ -35,12 +35,12 @@ const run = Schema.Struct({
   task: Schema.String,
 }).pipe(VersionedSchema.make);
 
-// `tag` is `package` and `id` joined, and the key a part's fields are held
+// `tag` is `packageName` and `id` joined, and the key a part's fields are held
 // under. This declaration states a payload for responses alone, so a prompt
 // carries no step field.
-const stepExtra = new Extra.Extra({ package: "tutorial", id: "Step", response: step });
+const stepExtra = new Extra.Extra({ packageName: "tutorial", id: "Step", response: step });
 
-const runExtra = new Extra.Extra({ package: "tutorial", id: "Run", session: run });
+const runExtra = new Extra.Extra({ packageName: "tutorial", id: "Run", session: run });
 
 // A kit is the set of declarations a trajectory is read with. A read with a kit
 // that does not declare a field leaves that field out.

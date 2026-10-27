@@ -80,6 +80,14 @@ export * as Metric from "#/Metric.ts";
 export * as MetricKit from "#/MetricKit.ts";
 
 /**
+ * The fields a `package.json` states about the package itself.
+ *
+ * @stability stable
+ * @category re-exports
+ */
+export { PackageMetadata } from "#/PackageMetadata.ts";
+
+/**
  * Live trajectory writers and metric enrichment.
  *
  * @stability stable

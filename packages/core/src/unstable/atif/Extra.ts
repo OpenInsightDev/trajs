@@ -15,7 +15,7 @@ import { Schema } from "effect";
 import * as Extra from "#/Extra.ts";
 import * as ExtraKit from "#/ExtraKit.ts";
 import { FinalMetrics, Metrics, ProducerFields, SchemaVersion } from "#/unstable/atif/Document.ts";
-import { packageName } from "#/unstable/atif/internal/package.ts";
+import { packageMetadata, packageName } from "#/unstable/atif/internal/package.ts";
 import * as VersionedSchema from "#/VersionedSchema.ts";
 
 /**
@@ -122,10 +122,11 @@ const document180 = Schema.Struct({
  * @category constants
  */
 export const documentExtra = new Extra.Extra({
-  package: packageName,
+  packageName,
   id: "Document",
   name: "Document fields",
   description: "The fields ATIF states of a document beyond its steps.",
+  packageMetadata,
   session: document180,
 });
 
@@ -143,10 +144,11 @@ export const documentExtra = new Extra.Extra({
  * @category constants
  */
 export const stepExtra = new Extra.Extra({
-  package: packageName,
+  packageName,
   id: "Step",
   name: "Step fields",
   description: "The fields ATIF states of a step beyond what it says.",
+  packageMetadata,
   prompt: step180,
   response: step180,
 });
@@ -165,10 +167,11 @@ export const stepExtra = new Extra.Extra({
  * @category constants
  */
 export const callExtra = new Extra.Extra({
-  package: packageName,
+  packageName,
   id: "Call",
   name: "Call fields",
   description: "The fields ATIF states of a tool call beyond the call itself.",
+  packageMetadata,
   response: call180,
 });
 
@@ -186,10 +189,11 @@ export const callExtra = new Extra.Extra({
  * @category constants
  */
 export const resultExtra = new Extra.Extra({
-  package: packageName,
+  packageName,
   id: "Result",
   name: "Result fields",
   description: "The fields ATIF states of an observation result beyond its content.",
+  packageMetadata,
   response: result180,
 });
 
@@ -206,10 +210,11 @@ export const resultExtra = new Extra.Extra({
  * @category constants
  */
 export const mediaExtra = new Extra.Extra({
-  package: packageName,
+  packageName,
   id: "Media",
   name: "Media fields",
   description: "The fields ATIF states of the media a part holds beyond its bytes.",
+  packageMetadata,
   prompt: media180,
   response: media180,
 });

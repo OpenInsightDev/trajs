@@ -36,7 +36,7 @@ const notText = Schema.Struct({
 }).pipe(VersionedSchema.make);
 
 const toolText = new Metric.Metric({
-  package: "tutorial",
+  packageName: "tutorial",
   id: "ToolText",
   metadata: new Metric.Metadata({ name: "Tool result text" }),
   output: characters,

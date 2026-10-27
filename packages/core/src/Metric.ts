@@ -13,6 +13,7 @@ import type { NonEmptyArray } from "effect/Array";
 import * as Config from "#/Config.ts";
 import { runProducers } from "#/internal/metric.ts";
 import type * as MetricKit from "#/MetricKit.ts";
+import type { PackageMetadata } from "#/PackageMetadata.ts";
 import type * as Trajectory from "#/Trajectory.ts";
 import type { TrajectoryError } from "#/TrajectoryError.ts";
 import * as VersionedSchema from "#/VersionedSchema.ts";
@@ -33,9 +34,10 @@ export class Metadata extends Schema.Class<Metadata>("Metadata")({
  *
  * **Details**
  *
- * `tag` joins `package` and `id` with `/`.
+ * `tag` joins `packageName` and `id` with `/`.
  * Kits and metric parts use this tag as the metric's identity.
  * The declaration does not contain a producer.
+ * `packageMetadata` is what the declaring package states of itself.
  *
  * @see {@link MetricKit.toProducers} for associating producers with declarations.
  * @see {@link Output} for successful reports.
@@ -49,14 +51,15 @@ export class Metric<
   Output extends VersionedSchema.Any,
   Failure extends VersionedSchema.Any,
 > extends Data.Class<{
-  package: Pkg;
+  packageName: Pkg;
   id: Id;
   metadata: Metadata;
+  packageMetadata?: PackageMetadata;
   output: Output;
   failure: Failure;
 }> {
   get tag(): `${Pkg}/${Id}` {
-    return `${this.package}/${this.id}`;
+    return `${this.packageName}/${this.id}`;
   }
 }
 

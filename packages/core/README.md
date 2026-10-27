@@ -31,6 +31,8 @@ without a conversion step.
   the kits a trajectory declares.
 - `Tool` and `Toolkit` — tool declarations, handlers, and the toolkit a trajectory
   names.
+- `PackageMetadata` — what a `package.json` states about the package itself,
+  which event, metric, and extra declarations state as their `packageMetadata`.
 - `Event` and `EventKit` — versioned event declarations and their collections.
 - `Metric` and `MetricKit` — metric reports, producers over trajectory parts, and
   their collections.

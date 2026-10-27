@@ -89,10 +89,12 @@ const notText = Schema.Struct({
 }).pipe(VersionedSchema.make);
 
 const toolText = new Metric.Metric({
-  // The tag a metric's parts are produced under is its package and its id.
-  package: "tutorial",
+  // The tag a metric's parts are produced under is its package name and its id.
+  packageName: "tutorial",
   id: "ToolText",
   metadata: new Metric.Metadata({ name: "Tool result text" }),
+  // What the package that declares the metric states of itself.
+  packageMetadata: { version: "0.0.0" },
   output: characters,
   failure: notText,
 });

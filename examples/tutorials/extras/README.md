@@ -8,13 +8,13 @@ and written under its own tag.
 
 ```ts
 const stepExtra = new Extra.Extra({
-  package: "tutorial",
+  packageName: "tutorial",
   id: "Step",
   response: step, // versioned schema of what a response carries
 });
 
 const runExtra = new Extra.Extra({
-  package: "tutorial",
+  packageName: "tutorial",
   id: "Run",
   session: run,
 });
@@ -23,7 +23,7 @@ const extrakit = ExtraKit.make(stepExtra, runExtra);
 const config = Config.config({ extrakit });
 ```
 
-The tag is `package` and `id` joined — `tutorial/Step` — and it is the key the
+The tag is `packageName` and `id` joined — `tutorial/Step` — and it is the key the
 fields sit under on the part: `part.extra["tutorial/Step"]`. Three part kinds
 take extras: `prompt`, `response`, and `session`. A declaration states a schema
 per kind it has fields for, and a kit is however many declarations the run

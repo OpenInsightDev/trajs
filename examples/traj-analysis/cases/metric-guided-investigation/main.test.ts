@@ -29,7 +29,7 @@ const evidenceSchema = Schema.Struct({
 }).pipe(VersionedSchema.make);
 
 const testEvidence = new Metric.Metric({
-  package: "case",
+  packageName: "case",
   id: "TestEvidence",
   metadata: new Metric.Metadata({ name: "Test result evidence" }),
   output: evidenceSchema,

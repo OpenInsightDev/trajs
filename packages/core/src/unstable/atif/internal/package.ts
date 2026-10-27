@@ -1,10 +1,17 @@
 /**
- * The name of this package, which every tag it states is namespaced by.
+ * What this package states of itself, which every declaration it makes states again.
  */
 
-import pkg from "../../../../package.json" with { type: "json" };
+import type { PackageMetadata } from "#/PackageMetadata.ts";
 
-// SAFETY: the name a package is published under is stated by its own `package.json` and
-// is a literal there; TypeScript widens it only because the file is read as JSON, so
-// what is asserted is the name that file holds rather than one of another package.
-export const packageName = pkg.name as "@trajs/core";
+import packageJson from "../../../../package.json" with { type: "json" };
+
+/**
+ * The name every tag this module states is namespaced by.
+ *
+ * Written out rather than read from `package.json`, which widens it to a string.
+ */
+export const packageName = "@trajs/core";
+
+/** The package every declaration this module states is in. */
+export const packageMetadata: PackageMetadata = packageJson;

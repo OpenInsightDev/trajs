@@ -10,6 +10,7 @@
 import { Data, Schema } from "effect";
 
 import type * as ExtraKit from "#/ExtraKit.ts";
+import type { PackageMetadata } from "#/PackageMetadata.ts";
 import * as VersionedSchema from "#/VersionedSchema.ts";
 
 /**
@@ -26,9 +27,10 @@ export type Part = "prompt" | "response" | "session";
  *
  * **Details**
  *
- * `tag` joins `package` and `id` with `/`.
+ * `tag` joins `packageName` and `id` with `/`.
  * Extra records use this tag as the field name.
  * An omitted schema leaves that part kind unsupported.
+ * `packageMetadata` is what the declaring package states of itself.
  *
  * @see {@link ExtraKit.make} for collecting declarations.
  * @see {@link ExtraRecord} for decoding their fields.
@@ -42,16 +44,17 @@ export class Extra<
   Response extends VersionedSchema.Any = never,
   Session extends VersionedSchema.Any = never,
 > extends Data.Class<{
-  package: Pkg;
+  packageName: Pkg;
   id: Id;
   name?: string;
   description?: string;
+  packageMetadata?: PackageMetadata;
   prompt?: Prompt;
   response?: Response;
   session?: Session;
 }> {
   get tag(): `${Pkg}/${Id}` {
-    return `${this.package}/${this.id}`;
+    return `${this.packageName}/${this.id}`;
   }
 }
 

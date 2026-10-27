@@ -10,6 +10,7 @@
 import { Data, Schema } from "effect";
 
 import type * as EventKit from "#/EventKit.ts";
+import type { PackageMetadata } from "#/PackageMetadata.ts";
 import * as VersionedSchema from "#/VersionedSchema.ts";
 
 /**
@@ -28,8 +29,9 @@ export class Metadata extends Schema.Class<Metadata>("Metadata")({
  *
  * **Details**
  *
- * `tag` joins `package` and `id` with `/`.
+ * `tag` joins `packageName` and `id` with `/`.
  * Kits and event parts use this tag as the event's identity.
+ * `packageMetadata` is what the declaring package states of itself.
  *
  * @see {@link EventKit.make} for collecting declarations.
  * @see {@link EventPart} for a tagged payload.
@@ -41,13 +43,14 @@ export class Event<
   Id extends string,
   S extends VersionedSchema.Any,
 > extends Data.Class<{
-  package: Pkg;
+  packageName: Pkg;
   id: Id;
   metadata: Metadata;
+  packageMetadata?: PackageMetadata;
   schema: S;
 }> {
   get tag(): `${Pkg}/${Id}` {
-    return `${this.package}/${this.id}`;
+    return `${this.packageName}/${this.id}`;
   }
 }
 

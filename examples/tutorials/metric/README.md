@@ -8,9 +8,10 @@ declaration in a `MetricKit`.
 
 ```ts
 const toolText = new Metric.Metric({
-  package: "tutorial",
+  packageName: "tutorial",
   id: "ToolText",
   metadata: new Metric.Metadata({ name: "Tool result text" }),
+  packageMetadata: { version: "0.0.0" },
   output: characters, // versioned schema
   failure: notText, // versioned schema
 });
@@ -21,6 +22,12 @@ const counted = MetricKit.toProducers(MetricKit.make(toolText), {
 
 const reports = Metric.produce(counted)(trajectory);
 ```
+
+`packageName` is written out as a literal, so `toolText.tag` is typed
+`"tutorial/ToolText"` rather than as a string. `metadata` describes the metric
+itself. `packageMetadata` is what the package that declares it states of itself in
+its `package.json`, which here is written out for the tutorial package: a stored
+report is traced back to the package and the release that produced it.
 
 A producer is a function from parts to a stream of measurements. Emit
 `Metric.makeOutput(value, { attach })` for a part you measured. `attach` names

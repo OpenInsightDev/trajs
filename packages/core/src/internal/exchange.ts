@@ -9,6 +9,7 @@ import type * as Exchange from "#/Exchange.ts";
 import type * as ExtraKit from "#/ExtraKit.ts";
 import { readFrames } from "#/internal/frames.ts";
 import * as Metric from "#/Metric.ts";
+import { PackageMetadata } from "#/PackageMetadata.ts";
 import * as Prompt from "#/Prompt.ts";
 import * as Toolkit from "#/Toolkit.ts";
 import * as Trajectory from "#/Trajectory.ts";
@@ -148,25 +149,39 @@ const decodeJson = <A>(
     Effect.mapError(TrajectoryError.parse),
   );
 
+const encodedPackageMetadata = (
+  packageMetadata: PackageMetadata | undefined,
+): Schema.Codec.Encoded<typeof PackageMetadata> | undefined =>
+  packageMetadata === undefined ? undefined : Schema.encodeSync(PackageMetadata)(packageMetadata);
+
 export const encodeHeader = (config: Config.AnyConfig): Uint8Array => {
   const json = JSON.stringify({
     toolkit: Toolkit.encode(config.toolkit),
     eventkit: Object.fromEntries(
       Object.entries(config.eventkit.events).map(([tag, event]) => [
         tag,
-        Schema.encodeSync(Event.Metadata)(event.metadata),
+        {
+          metadata: Schema.encodeSync(Event.Metadata)(event.metadata),
+          packageMetadata: encodedPackageMetadata(event.packageMetadata),
+        },
       ]),
     ),
     metrickit: Object.fromEntries(
       Object.entries(config.metrickit.metrics).map(([tag, metric]) => [
         tag,
-        Schema.encodeSync(Metric.Metadata)(metric.metadata),
+        {
+          metadata: Schema.encodeSync(Metric.Metadata)(metric.metadata),
+          packageMetadata: encodedPackageMetadata(metric.packageMetadata),
+        },
       ]),
     ),
     extrakit: Object.fromEntries(
       Object.entries(config.extrakit.extra).map(([tag, extra]) => [
         tag,
-        { name: extra.name, description: extra.description },
+        {
+          metadata: { name: extra.name, description: extra.description },
+          packageMetadata: encodedPackageMetadata(extra.packageMetadata),
+        },
       ]),
     ),
   });
