@@ -28,6 +28,21 @@ const frameLength = (bytes: Uint8Array): number | undefined => {
   return undefined;
 };
 
+export const splitFrames = (bytes: Uint8Array) => {
+  const frames: Array<Uint8Array> = [];
+  let offset = 0;
+  let size = frameLength(bytes);
+
+  while (size !== undefined) {
+    frames.push(bytes.subarray(offset, offset + size));
+
+    offset += size;
+    size = frameLength(bytes.subarray(offset));
+  }
+
+  return { frames, rest: bytes.subarray(offset) };
+};
+
 export const joined = (rest: Uint8Array, chunks: ReadonlyArray<Uint8Array>): Uint8Array => {
   if (rest.length === 0 && chunks.length === 1) {
     return chunks[0]!;
@@ -57,7 +72,7 @@ export const readFrames =
     Stream.suspend(() => {
       const decode = Schema.decodeUnknownEffect(SchemaBinary.toCodec(schema));
 
-      let rest: Uint8Array = new Uint8Array();
+      let carried: Uint8Array = new Uint8Array();
 
       return bytes.pipe(
         // Not `Stream.mapArray`: a chunk with no whole frame yields nothing.
@@ -65,15 +80,10 @@ export const readFrames =
           () => undefined,
           (_state, chunks) =>
             Effect.gen(function* () {
-              let pending = joined(rest, chunks);
+              const { frames, rest } = splitFrames(joined(carried, chunks));
               const values: Array<S["Type"]> = [];
-              let size = frameLength(pending);
 
-              while (size !== undefined) {
-                const frame = pending.subarray(0, size);
-
-                pending = pending.subarray(size);
-
+              for (const frame of frames) {
                 // A frame this schema does not decode is skipped.
                 // A defect in the schema still fails the read.
                 const decoded = yield* decode(frame).pipe(Effect.option);
@@ -81,18 +91,16 @@ export const readFrames =
                 if (Option.isSome(decoded)) {
                   values.push(decoded.value);
                 }
-
-                size = frameLength(pending);
               }
 
-              rest = pending;
+              carried = rest;
 
               return [undefined, values] as const;
             }),
         ),
         Stream.concat(
           Stream.suspend(() =>
-            rest.length === 0
+            carried.length === 0
               ? Stream.empty
               : Stream.fail(TrajectoryError.parse("the bytes end in the middle of a frame")),
           ),

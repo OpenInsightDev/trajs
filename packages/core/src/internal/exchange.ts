@@ -1,13 +1,14 @@
 import type { Byte } from "@trajs/utils/Byte";
 import type { StorageError } from "@trajs/utils/Storage";
-import { Effect, Schema, SchemaTransformation, Stream } from "effect";
+import { Effect, Result, Schema, SchemaTransformation, Stream } from "effect";
 import { SchemaBinary } from "effect/encoding";
 
 import type * as Config from "#/Config.ts";
 import * as Event from "#/Event.ts";
 import type * as Exchange from "#/Exchange.ts";
+import * as ExchangeIssue from "#/ExchangeIssue.ts";
 import type * as ExtraKit from "#/ExtraKit.ts";
-import { readFrames } from "#/internal/frames.ts";
+import { joined, readFrames, splitFrames } from "#/internal/frames.ts";
 import * as Metric from "#/Metric.ts";
 import { PackageMetadata } from "#/Package.ts";
 import * as Prompt from "#/Prompt.ts";
@@ -106,8 +107,11 @@ export const encodePart = <C extends Config.AnyConfig>(config: C) => {
     );
 };
 
+const partDecoder = <C extends Config.AnyConfig>(config: C) =>
+  ExchangePart(config).pipe(SchemaBinary.toCodec, Schema.decodeUnknownEffect);
+
 export const decodePart = <C extends Config.AnyConfig>(config: C) => {
-  const decode = ExchangePart(config).pipe(SchemaBinary.toCodec, Schema.decodeUnknownEffect);
+  const decode = partDecoder(config);
 
   return (bytes: Uint8Array) =>
     decode(bytes).pipe(Effect.mapError((cause) => TrajectoryError.parse(cause)));
@@ -295,3 +299,61 @@ export const trajectoryOf = <C extends Config.AnyConfig, E>(
   config: C,
 ): Trajectory.Trajectory<string, C, E | TrajectoryError, Config.DecodingServices<C>> =>
   Trajectory.make(config)(readFrames(ExchangePart(config))(bytes));
+
+/**
+ * The issues a stream of encoded parts holds, read in one pass.
+ *
+ * The first part the config cannot decode is reported, and later parts are only
+ * counted, so a corrupt trajectory cannot report every part it holds.
+ * Bytes of an unfinished part are reported once the stream ends.
+ */
+export const checkParts =
+  <C extends Config.AnyConfig>(config: C) =>
+  <E, R>(
+    bytes: Stream.Stream<Uint8Array, E, R>,
+  ): Stream.Stream<ExchangeIssue.Issue, E, R | Config.DecodingServices<C>> =>
+    Stream.suspend(() => {
+      const decode = partDecoder(config);
+
+      let carried: Uint8Array = new Uint8Array();
+      let index = 0;
+      let failed = false;
+
+      return bytes.pipe(
+        Stream.mapAccumArrayEffect(
+          () => undefined,
+          (_state, chunks) =>
+            Effect.gen(function* () {
+              const { frames, rest } = splitFrames(joined(carried, chunks));
+              const issues: Array<ExchangeIssue.Issue> = [];
+
+              for (const frame of frames) {
+                if (!failed) {
+                  const decoded = yield* decode(frame).pipe(Effect.result);
+
+                  if (Result.isFailure(decoded)) {
+                    failed = true;
+
+                    issues.push(
+                      new ExchangeIssue.UndecodablePart({ index, cause: decoded.failure }),
+                    );
+                  }
+                }
+
+                index += 1;
+              }
+
+              carried = rest;
+
+              return [undefined, issues] as const;
+            }),
+        ),
+        Stream.concat(
+          Stream.suspend(() =>
+            carried.length === 0
+              ? Stream.empty
+              : Stream.make(new ExchangeIssue.TruncatedFrame({ remaining: carried.length })),
+          ),
+        ),
+      );
+    });

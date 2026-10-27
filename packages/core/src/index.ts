@@ -48,6 +48,14 @@ export * as EventKit from "#/EventKit.ts";
 export * as Exchange from "#/Exchange.ts";
 
 /**
+ * The reasons a stored trajectory fails validation.
+ *
+ * @stability stable
+ * @category re-exports
+ */
+export * as ExchangeIssue from "#/ExchangeIssue.ts";
+
+/**
  * Versioned extras for prompt, response, and session parts.
  *
  * @stability stable

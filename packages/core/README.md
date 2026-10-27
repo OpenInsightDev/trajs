@@ -27,6 +27,10 @@ without a conversion step.
   layer and `Cache.layerFsTemp` spills to a temporary directory.
 - `Exchange` — the stored form: a JSON header, a compressed and hashed binary part
   frame, and a JSON metadata tail, inspected, loaded, and saved through `Storage`.
+  `Loaded.validate` checks that frame and digest before the parts are read.
+- `ExchangeIssue` — why a stored trajectory fails `Loaded.validate`: a frame that
+  does not decompress or decode, a frame that ends early, or a digest that does
+  not match the parts.
 - `Config` — the kit record, the services a config needs to encode or decode, and
   the kits a trajectory declares.
 - `Tool` and `Toolkit` — tool declarations, handlers, and the toolkit a trajectory

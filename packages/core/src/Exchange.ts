@@ -24,7 +24,9 @@ import {
 import { Context, Effect, Fiber, Layer, Schema, Stream } from "effect";
 
 import * as Config from "#/Config.ts";
+import * as ExchangeIssue from "#/ExchangeIssue.ts";
 import {
+  checkParts,
   encodeHeader,
   encodeMetadata,
   encodePart,
@@ -173,6 +175,31 @@ export interface Loaded<Config extends Config.AnyConfig = Config.AnyConfig> {
   readonly read: <C extends Config.AnyConfig = Config>(
     config?: C,
   ) => Trajectory.Trajectory<string, C, TrajectoryError | StorageError, Config.DecodingServices<C>>;
+
+  /**
+   * Verifies that the part frame holds whole decoded parts and the recorded digest.
+   *
+   * **When to use**
+   *
+   * Use when a trajectory must be known to be complete before it is read.
+   *
+   * **Details**
+   *
+   * Every part is decoded with the supplied or default config.
+   * The digest is computed over the encoded parts, as {@link Metadata} states.
+   * A trajectory that fails several checks reports them together as
+   * {@link ExchangeIssue.Composite}.
+   *
+   * **Gotchas**
+   *
+   * Validation reads and decompresses the whole frame.
+   * Session declarations and forks are not checked.
+   *
+   * @see {@link Service.load} for opening the stored trajectory.
+   */
+  readonly validate: <C extends Config.AnyConfig = Config>(
+    config?: C,
+  ) => Effect.Effect<void, ExchangeIssue.Issue | StorageError, Config.DecodingServices<C>>;
 }
 
 /**
@@ -227,6 +254,7 @@ export interface Service {
    * Inspection does not verify the part digest.
    *
    * @see {@link Service.load} for the parts as well.
+   * @see {@link Loaded.validate} for verifying the parts and the digest.
    */
   readonly inspect: (id: string) => Effect.Effect<Inspected, TrajectoryError | StorageError>;
 
@@ -249,6 +277,7 @@ export interface Service {
    * Loading does not verify the digest.
    *
    * @see {@link Service.inspect} for the header and the metadata alone.
+   * @see {@link Loaded.validate} for verifying the parts and the digest.
    * @see {@link Service.save} for writing a trajectory.
    */
   readonly load: <Config extends Config.AnyConfig>(
@@ -359,17 +388,65 @@ export const layer: Layer.Layer<Exchange, never, Storage | Compression | StreamH
           Effect.gen(function* () {
             const { bytes, header, metadata, from, to } = yield* headerAndMetadata(id);
 
-            const compressed = frameOf<StorageError>({ from, to })(bytes).pipe(
+            const decompressed = frameOf<StorageError>({ from, to })(bytes).pipe(
               compression.decompress({ algorithm: metadata.compression }),
             );
 
-            const body = catchCompression(compressed);
+            const body = catchCompression(decompressed);
 
             return {
               header,
               metadata,
               read: <C extends Config.AnyConfig = Config>(given?: C) =>
                 trajectoryOf(body, given ?? asConfig<C>(config)),
+              validate: <C extends Config.AnyConfig = Config>(given?: C) =>
+                Effect.gen(function* () {
+                  const selected = given ?? asConfig<C>(config);
+
+                  const frame = decompressed.pipe(
+                    Stream.catchTag("CompressionError", (cause) =>
+                      Stream.fail(new ExchangeIssue.CompressionFailure({ cause })),
+                    ),
+                  );
+
+                  // One pass over the part frame: hash the parts, and check their frames.
+                  // A bounded buffer keeps the slower branch from holding the whole frame.
+                  const [hashing, checking] = yield* Stream.broadcastN(frame, {
+                    n: 2,
+                    capacity: 16,
+                  });
+
+                  const [digest, found] = yield* Effect.all(
+                    [
+                      Stream.run(hashing, hasher.digest({ algorithm: metadata.hash })),
+                      checkParts(selected)(checking).pipe(Stream.runCollect),
+                    ],
+                    { concurrency: 2 },
+                  );
+
+                  const issues = [
+                    ...(digest === metadata.digest
+                      ? []
+                      : [
+                          new ExchangeIssue.DigestMismatch({
+                            algorithm: metadata.hash,
+                            expected: metadata.digest,
+                            actual: digest,
+                          }),
+                        ]),
+                    ...found,
+                  ];
+
+                  const [first, ...others] = issues;
+
+                  if (first === undefined) {
+                    return;
+                  }
+
+                  return yield* Effect.fail(
+                    others.length === 0 ? first : new ExchangeIssue.Composite({ issues }),
+                  );
+                }).pipe(Effect.scoped),
             };
           }),
       save:
