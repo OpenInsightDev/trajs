@@ -15,10 +15,10 @@ platform package can say what each is over.
   with the scope (`ByteStore.layerFsTemp`), read back as a `Byte` and written a
   chunk at a time.
 - `Compression` — what carries a trajectory's parts in a frame: zstd, gzip,
-  deflate, or the bytes as they are, stated where the layer is built
+  deflate, or the bytes as they are, stated at the call that writes or reads one
   (`Compression.Options`) and written into the metadata a trajectory ends with.
 - `StreamHash` — what reads the digest of a trajectory's parts: BLAKE3, BLAKE2b
-  or SHA-256, stated where the layer is built (`StreamHash.Options`) and written
+  or SHA-256, stated at the call that reads one (`StreamHash.Options`) and written
   into the metadata a trajectory ends with, and the JavaScript hash this package
   ships for all three.
 

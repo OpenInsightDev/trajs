@@ -38,7 +38,7 @@ interface Reading {
   readonly prompt: Tokens.PromptTokens | undefined;
 }
 
-const nodeFileSystem = Layer.merge(NodeServices.layer(), Storage.layerFileSystem);
+const nodeFileSystem = Layer.merge(NodeServices.layer, Storage.layerFileSystem);
 
 const layers = Layer.mergeAll(
   PlatformNodeServices.layer,

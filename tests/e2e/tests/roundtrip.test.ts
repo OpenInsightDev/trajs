@@ -68,7 +68,7 @@ const parts = [
 const trajectory = Trajectory.make(config)(Stream.fromIterable(parts));
 
 /** The file system a Node program reads and writes through, under the layer that states it. */
-const nodeFileSystem = Layer.merge(NodeServices.layer(), layerFileSystem);
+const nodeFileSystem = Layer.merge(NodeServices.layer, layerFileSystem);
 
 /**
  * What a program on Node is made of: the file system and the terminal the platform

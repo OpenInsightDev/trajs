@@ -47,7 +47,7 @@ interface Report {
   readonly analysis: Analysis;
 }
 
-const storage = Layer.merge(NodeServices.layer(), Storage.layerFileSystem);
+const storage = Layer.merge(NodeServices.layer, Storage.layerFileSystem);
 
 const Layers = Layer.mergeAll(
   PlatformNodeServices.layer,

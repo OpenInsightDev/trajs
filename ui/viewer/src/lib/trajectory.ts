@@ -71,7 +71,7 @@ const handed = (bytes: Uint8Array): Storage => ({
 });
 
 /** The exchange a page reads through: its own codecs, over the services a page runs. */
-const browserExchange = Layer.provide(Exchange.layer, BrowserServices.layer());
+const browserExchange = Layer.provide(Exchange.layer, BrowserServices.layer);
 
 /** One turn of a session's conversation: what a model was given, and what it answered. */
 export type Turn = Readonly<{

@@ -1,18 +1,17 @@
 /**
- * The hash a trajectory's bytes are digested with: the digest of the bytes it
- * carries its parts in.
+ * The digest of a trajectory's parts.
  *
- * What reads a digest off a stream of bytes is a {@link StreamHash}, and the
- * exchange is built over one, so what hashes a trajectory is a layer's to say
- * rather than the format's: nothing of how a digest is read changes when another
- * hash is provided. Which digest is read — BLAKE3, BLAKE2b or SHA-256
- * ({@link Algorithm}) — is stated where the layer is built ({@link Options}), and
- * what computes it is a platform package's to state: `@trajs/platform-node` and
- * `@trajs/platform-bun` are over the Rust binding `@napi-rs/blake-hash` and
- * `node:crypto`, and `@trajs/platform-browser` is over the WebAssembly BLAKE3
- * `blake3-wasm` carries, over WebCrypto and over the hash this package ships. The
- * digest of one algorithm is one every layer agrees with, so the digest one
- * platform reads off a trajectory is the one another reads off it.
+ * A {@link StreamHash} reads the digest of one stream. The exchange runs over a
+ * hash, so a platform package supplies the codecs. `@trajs/platform-node` and
+ * `@trajs/platform-bun` use `@napi-rs/blake-hash` and `node:crypto`.
+ * `@trajs/platform-browser` uses `blake3-wasm`, WebCrypto and the hash of this
+ * package.
+ *
+ * The algorithm is stated per call ({@link Options}). One algorithm yields one
+ * digest on every platform, so a digest read on one platform reads back on
+ * another.
+ *
+ * @stability stable
  */
 
 import { blake2b } from "@noble/hashes/blake2.js";
@@ -22,36 +21,28 @@ import { bytesToHex } from "@noble/hashes/utils.js";
 import { Context, Layer, Schema, Sink } from "effect";
 
 /**
- * The algorithm a trajectory's digest is read with.
+ * The digest algorithm of a trajectory's parts.
  *
  * **When to use**
  *
- * Use to state the digest a hash layer is built over, where a program states one
- * ({@link Options}).
+ * Use to state the digest of one call ({@link Options}), or to read the recorded
+ * digest of a trajectory.
  *
  * **Details**
  *
- * - `Blake3` (0) is BLAKE3, which is what {@link defaultAlgorithm} names: it is the
- *   digest a trajectory has always been digested with, and the one every platform
- *   package states a codec for.
- * - `Blake2b` (1) is BLAKE2b with a digest of 32 bytes — the same length as
- *   BLAKE3's, which is not the 64 bytes an unconfigured BLAKE2b computes — so a
- *   trajectory's digest is 64 characters of hex whichever of the two is stated.
+ * - `Blake3` (0) is BLAKE3. {@link defaultAlgorithm} is `Blake3`.
+ * - `Blake2b` (1) is BLAKE2b with 32 digest bytes. An unconfigured BLAKE2b
+ *   computes 64 bytes, so the length belongs to the digest.
  * - `Sha256` (2) is SHA-256.
  *
- * A digest is read by feeding one run of a hash the bytes of one stream, so what an
- * algorithm states is what two programs agree on: they read the same digest off a
- * trajectory where they state the same one. Which of them read the digest a
- * trajectory carries is what the trajectory states of itself — the metadata it ends
- * with states the algorithm its digest was read with as that algorithm's code
- * ({@link StreamHash.algorithm}) — so a program handed a trajectory can tell how its
- * digest was read rather than reading it again with an algorithm of its own. The
- * codes are the format's, as they are for the frame a trajectory is carried in: each
- * digest is stated by one of them, and a code is never restated for another digest,
- * so a digest is read the way it was read however long after it was written.
+ * Each digest has 32 bytes, or 64 hex characters. A trajectory carries a digest
+ * of that length for every algorithm.
  *
- * @see {@link Options} for where an algorithm is stated.
- * @see {@link StreamHash.algorithm} for what a hash states of itself.
+ * Each code is a format contract. A code always names the same digest, so an old
+ * trajectory decodes with its recorded code.
+ *
+ * @see {@link Options} for the algorithm of one call.
+ * @stability stable
  * @category models
  */
 export const Algorithm = Schema.Enum({
@@ -63,27 +54,23 @@ export const Algorithm = Schema.Enum({
 export type Algorithm = Schema.Schema.Type<typeof Algorithm>;
 
 /**
- * The digest a hash layer is built over.
+ * The digest option of one hash call.
  *
  * **When to use**
  *
- * Use where a program states what digests its trajectories, or to type what a hash
- * layer is built with.
+ * Use to state the algorithm of {@link StreamHash.digest}.
  *
  * **Details**
  *
- * - `algorithm` is the digest a stream is hashed to ({@link Algorithm}), and
- *   defaults to {@link defaultAlgorithm} — `Blake3` — so a program that states
- *   nothing digests its trajectories the way they have always been digested.
+ * `algorithm` holds the algorithm ({@link Algorithm}). {@link defaultAlgorithm}
+ * applies when `algorithm` is omitted.
  *
- * The option is stated where the layer is built rather than where a digest is read,
- * since reading one takes no choice: what a digest is of is a stream of bytes, and
- * what it is read with is the layer. Which one read the digest of a trajectory is
- * what the trajectory states of itself ({@link StreamHash.algorithm}), so a program
- * that reads one back can tell whether it is digesting it the way it was digested
- * when it was written.
+ * One hash handles every algorithm of its platform. State `algorithm` per call to
+ * digest different trajectories. The metadata records the algorithm of a
+ * trajectory.
  *
- * @see {@link Algorithm} for the digests a program may state.
+ * @see {@link Algorithm} for the available digests.
+ * @stability stable
  * @category models
  */
 export interface Options {
@@ -91,97 +78,77 @@ export interface Options {
 }
 
 /**
- * The algorithm a digest is read with when a program states none: `Blake3`.
+ * The default algorithm: `Blake3`.
  *
  * **When to use**
  *
- * Use where a hash layer resolves the option it was built with ({@link Options}),
- * so that what a program stating nothing gets is stated once rather than by each
- * layer.
+ * Use in a hash to resolve an omitted option ({@link Options}).
  *
  * **Details**
  *
- * It is the digest a trajectory has always been digested with, so a program that
- * states no algorithm digests a trajectory the way a program that stated none did,
- * and digests one written before an algorithm could be stated the way it has always
- * been digested.
+ * `Blake3` is the historical digest of a trajectory. A call without an algorithm
+ * reads what an earlier call without one wrote. Older trajectories digest the
+ * same way.
  *
- * @see {@link Algorithm} for what it names.
+ * @see {@link Algorithm} for the code.
+ * @stability stable
  * @category constants
  */
 export const defaultAlgorithm: Algorithm = Algorithm.enums.Blake3;
 
 /**
- * A hash of a stream of bytes: the bytes are given to it as a sink, and the digest
- * is read off them once they have ended.
+ * The hash service of the exchange.
  *
  * **Details**
  *
- * `algorithm` is which algorithm this hash reads a digest with
- * ({@link Algorithm}), which a trajectory states of itself. `digest` is a sink of
- * the bytes of one stream: it consumes them to their end and leaves none of them
- * over, and what it holds when it is done is the digest, as a lowercase hex string
- * of 64 characters. The bytes a trajectory carries its parts in are what it is given
- * — the format's own bytes, so a part of a trajectory is hashed the way
- * `Exchange.Part` carries it rather than the way a program happened to read it —
- * so the digest of a trajectory is the same wherever one is computed from it.
+ * `digest` takes an algorithm ({@link Options}) and returns a sink. The sink
+ * consumes one stream and holds its digest as 64 lowercase hex characters.
+ * {@link defaultAlgorithm} applies when no algorithm is given.
  *
- * The digest is of the algorithm the hash states of itself
- * ({@link StreamHash.algorithm}), and every algorithm a hash states names a digest
- * of 32 bytes — 64 characters of hex — so what a trajectory ends with is the same
- * length whichever one it was read with, and a digest read through one layer is
- * one another layer reads where the two are built over the same algorithm.
+ * The sink reads the format bytes, so every platform hashes the same part bytes.
+ * Each run keeps its own state, and two runs share nothing. No hash of a layer
+ * fails, so the sink declares no error.
  *
- * A hash is of a stream of bytes rather than of a program: two streams are hashed
- * by two runs of the sink, and nothing of one is held for the next. Reading a
- * digest off the bytes of one stream is what the sink is for, and no hash a layer
- * provides fails at it, so the sink states no failure of its own.
- *
- * @see {@link StreamHash} for the service a program reads a digest through.
+ * @see {@link Options} for the algorithm of one call.
+ * @stability stable
+ * @category services
  */
 export interface StreamHash {
   /**
-   * Which algorithm this hash reads a digest with, as {@link Algorithm} names it:
-   * what a trajectory digested through it states of itself.
-   */
-  readonly algorithm: Algorithm;
-
-  /**
    * The digest of the bytes given to it, read once they have ended.
    */
-  readonly digest: Sink.Sink<string, Uint8Array, never, never>;
+  readonly digest: (options?: Options) => Sink.Sink<string, Uint8Array, never, never>;
 }
 
 /**
- * The hash a trajectory is hashed through: what `yield* StreamHash` gives reads
- * the digest of a stream of bytes ({@link StreamHash}).
+ * The hash of the exchange.
  *
  * **When to use**
  *
- * Use to require a hash of a program, and {@link layer} or the layer a platform
- * package ships to provide it.
+ * Use to require a hash. Provide {@link layer} or the layer of a platform
+ * package.
  *
  * **Details**
  *
- * A digest is read once per stream of bytes rather than held between them, so
- * nothing of it survives a read: two streams are hashed by two runs of the sink,
- * whatever else is going on.
+ * Each call reads one digest and keeps nothing between calls. State the algorithm
+ * per call ({@link Options}).
  *
- * @see {@link StreamHash} for what it reads a digest with.
+ * @see {@link StreamHash} for the operation.
+ * @stability stable
+ * @category tags
  */
 export const StreamHash: Context.Service<StreamHash, StreamHash> = Context.Service<
   StreamHash,
   StreamHash
 >()("trajs/utils/StreamHash");
 
-/** One run of a hash of one algorithm, its bytes fed to it as the sink runs. */
 const hashing = (algorithm: Algorithm): Sink.Sink<string, Uint8Array, never, never> =>
   Sink.reduce(
     () => {
       switch (algorithm) {
         case Algorithm.enums.Blake2b:
-          // BLAKE2b of the length the other two digests are of, rather than the 64
-          // bytes one computes where its length is not stated.
+          // BLAKE2b at 32 bytes, the length of the other two digests. An
+          // unconfigured BLAKE2b computes 64.
           return blake2b.create({ dkLen: 32 });
         case Algorithm.enums.Sha256:
           return sha256.create();
@@ -197,64 +164,50 @@ const hashing = (algorithm: Algorithm): Sink.Sink<string, Uint8Array, never, nev
   ).pipe(Sink.map((hashed) => bytesToHex(hashed.digest())));
 
 /**
- * A hash of one algorithm as the service it is read through: the digest of a
- * stream the layer is built over ({@link StreamHash}).
+ * The hash of this package as a service.
  *
  * **When to use**
  *
- * Use where a layer is stated over a hash of this package rather than over the one
- * a platform provides — `@trajs/platform-browser` is over this for BLAKE2b, which a
- * browser states no codec for — or where a program provides the service itself
- * rather than through a layer.
+ * Use to state a layer over the hash of this package instead of a platform hash.
+ * `@trajs/platform-browser` uses it for BLAKE2b, because a browser supplies no
+ * BLAKE2b codec. Use it as well to provide the service without a layer.
  *
  * **Details**
  *
- * It is what {@link layer} provides, as the value a layer is built from, so a
- * `StreamHash` built here and one provided by the layer hash the same bytes to the
- * same digest, and both state the same algorithm. The algorithm defaults to
- * {@link defaultAlgorithm}, as it does for every layer built over one of these
- * hashes.
+ * {@link layer} provides this value. A `StreamHash` from here and one from the
+ * layer read the same digest. {@link defaultAlgorithm} applies to a call without
+ * an algorithm.
  *
- * @see {@link layer} for the hash this builds as a layer.
+ * @see {@link layer} for the same hash as a layer.
+ * @stability stable
  * @category constructors
  */
-export const make = (options?: Options): StreamHash => {
-  const algorithm = options?.algorithm ?? defaultAlgorithm;
-
-  return { algorithm, digest: hashing(algorithm) };
-};
+export const make = (): StreamHash => ({
+  digest: (options) => hashing(options?.algorithm ?? defaultAlgorithm),
+});
 
 /**
- * The hash this package ships: BLAKE3, BLAKE2b or SHA-256, as `@noble/hashes`
- * computes them.
+ * The hash of this package: BLAKE3, BLAKE2b or SHA-256, computed by
+ * `@noble/hashes`.
  *
  * **When to use**
  *
- * Use when a program hashes a trajectory without a platform package — a page, a
- * worker, a script — or when every run should hash a trajectory with the same code,
- * whatever it is run on: it is the one hash that needs no native addon to be loaded
- * by the machine and no WebAssembly module to be carried, so a program that
- * provides it hashes wherever JavaScript runs.
+ * Use to hash without a platform package, such as in a page, a worker or a
+ * script. Use it as well when every run should hash with the same code. It needs
+ * no native addon and no WebAssembly module, so it runs wherever JavaScript runs.
  *
  * **Details**
  *
- * `@noble/hashes` is JavaScript with no dependencies of its own, so what computes
- * the digest is a module like any other of this package's rather than a binding or
- * a WebAssembly module resolved where the layer is provided: a bundle of a program
- * carries it, which is what a page and a worker can run. The cost of that is the
- * code and the speed of JavaScript against a codec the machine states itself, which
- * is what the platform packages are for.
+ * `@noble/hashes` is JavaScript without dependencies, so a program bundle carries
+ * it. The cost is bundle size and JavaScript speed against a native codec.
  *
- * Bytes are fed to one hash as they arrive and the digest is read off it once they
- * have ended, which is how the platform layers read one too: what it computes for an
- * algorithm is what the codecs of the platforms compute for the same one, so a digest
- * it reads off a trajectory is the one `@trajs/platform-node`, `@trajs/platform-bun`
- * and `@trajs/platform-browser` read off the same bytes — a digest one computes is a
- * digest the others compute.
+ * Bytes arrive chunk by chunk, and the digest is read at the end. One algorithm
+ * yields the same digest as the platform packages, so they read the same
+ * trajectory.
  *
- * @see {@link StreamHash} for the hash this provides.
- * @see {@link make} for the same hash as the service rather than as the layer.
+ * @see {@link StreamHash} for the service of this hash.
+ * @see {@link make} for the same hash as a service.
+ * @stability stable
  * @category layers
  */
-export const layer = (options?: Options): Layer.Layer<StreamHash> =>
-  Layer.succeed(StreamHash, make(options));
+export const layer: Layer.Layer<StreamHash> = Layer.succeed(StreamHash, make());

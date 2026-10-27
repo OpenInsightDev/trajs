@@ -111,7 +111,5 @@ export const inspect = Command.make(
   Command.withDescription("Print what a `.trajs` file states about itself."),
   // The frame the parts are carried in is never decompressed, since what is printed
   // is what the file states rather than anything read out of the parts.
-  Command.provide(
-    Layer.provide(Exchange.layer, Layer.merge(NodeServices.layer(), layerFileSystem)),
-  ),
+  Command.provide(Layer.provide(Exchange.layer, Layer.merge(NodeServices.layer, layerFileSystem))),
 );

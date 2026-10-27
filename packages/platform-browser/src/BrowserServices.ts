@@ -1,82 +1,51 @@
 /**
- * The platform services a program that runs where WebAssembly does runs with, from
- * one place: the compression the browser's own codecs and the WebAssembly zstd codec
- * write and read a frame with, and the hash the WebAssembly BLAKE3, WebCrypto and the
- * JavaScript hash of `@trajs/utils` read a digest with.
+ * The compression and the hash of `@trajs/utils`, for a program without
+ * `node:zlib`.
  *
- * {@link layer} is the layer a program that runs where `node:zlib` is not provides
- * the exchange layer of `@trajs/core` with, beside where it keeps its trajectories.
+ * {@link layer} provides both for the exchange layer of `@trajs/core`, beside the
+ * storage of a trajectory.
+ *
+ * @stability stable
  */
 
-import { type Compression, type Options as CompressionOptions } from "@trajs/utils/Compression";
-import { type Options as StreamHashOptions, type StreamHash } from "@trajs/utils/StreamHash";
+import { type Compression } from "@trajs/utils/Compression";
+import { type StreamHash } from "@trajs/utils/StreamHash";
 import { Layer } from "effect";
 
 import * as BrowserCompression from "#/BrowserCompression.ts";
 import * as BrowserStreamHash from "#/BrowserStreamHash.ts";
 
 /**
- * The services a program computes anywhere with: its parts carried in a frame the
- * browser's own codecs and the WebAssembly zstd codec write and read, and the digest
- * the WebAssembly BLAKE3, WebCrypto and the JavaScript hash read.
+ * The compression and the hash of a browser program.
  *
- * @see {@link layer} for the layer that provides them.
+ * @see {@link layer} for the provider.
+ * @stability stable
  * @category models
  */
 export type BrowserServices = Compression | StreamHash;
 
 /**
- * The services a program that runs where WebAssembly does runs with, as what
- * {@link layer} is built from.
+ * The compression and the hash of a browser program.
  *
  * **When to use**
  *
- * Use where a program states how its trajectories are carried and what names them, or
- * to type what a layer of these services is built with.
+ * Use in a page or a worker, without `node:zlib`. Use it as well when every run
+ * should write and read with the same codecs.
  *
  * **Details**
  *
- * - `compression` is what {@link BrowserCompression.layer} is built with: the
- *   algorithm a trajectory's parts are carried in ({@link CompressionOptions}), which
- *   `@trajs/utils`'s `Compression` states.
- * - `hash` is what {@link BrowserStreamHash.layer} is built with: the algorithm
- *   those parts are named by ({@link StreamHashOptions}), which `@trajs/utils`'s
- *   `StreamHash` states.
+ * {@link BrowserCompression.layer} and {@link BrowserStreamHash.layer} provide it.
+ * Neither layer states an algorithm, so a call states the one of its write, read
+ * or digest.
  *
- * Either may be left out, and neither is required: a layer built over no options
- * carries and names a trajectory the way it has always been carried and named — in a
- * zstd frame, by a BLAKE3 digest.
+ * The storage is not among them. A page keeps a trajectory in the bytes it was
+ * handed or in its own store, so the program supplies a storage beside this layer.
  *
- * @see {@link layer} for what it is given to.
- * @category models
- */
-export interface Options {
-  readonly compression?: CompressionOptions;
-  readonly hash?: StreamHashOptions;
-}
-
-/**
- * The service implementations a program that runs where WebAssembly does provides
- * the exchange layer of `@trajs/core` with.
- *
- * **When to use**
- *
- * Use when a program has no `node:zlib` — a page, a worker — or when every run
- * should write and read a trajectory with the same codecs.
- *
- * **Details**
- *
- * It is {@link BrowserCompression.layer} and {@link BrowserStreamHash.layer} at the
- * algorithms given ({@link Options}), so what a program provides decides both how a
- * trajectory is carried and what names it. Where a trajectory is kept is not among
- * them: where a page keeps one — the bytes it was handed, a store in it — is the
- * program's to say, so it provides a storage of its own beside this layer.
- *
- * @see {@link BrowserServices} for the services it provides.
+ * @see {@link BrowserServices} for the provided services.
+ * @stability stable
  * @category layers
  */
-export const layer = (options?: Options): Layer.Layer<BrowserServices> =>
-  Layer.merge(
-    BrowserCompression.layer(options?.compression),
-    BrowserStreamHash.layer(options?.hash),
-  );
+export const layer: Layer.Layer<BrowserServices> = Layer.merge(
+  BrowserCompression.layer,
+  BrowserStreamHash.layer,
+);

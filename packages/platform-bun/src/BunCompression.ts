@@ -1,12 +1,12 @@
 /**
- * The frame a trajectory's parts are carried in, as Bun writes and reads one: a
- * zstd, gzip or deflate frame, or the bytes as they are.
+ * The frame of a trajectory's parts, as Bun writes and reads one.
  *
- * {@link layer} is the {@link Compression} this package provides the exchange with,
- * over `Bun.zstdCompress` and `Bun.zstdDecompress` for zstd, and over Bun's own
- * `gzipSync`, `gunzipSync`, `deflateSync` and `inflateSync` for gzip and deflate.
- * What it writes is the same frame `node:zlib` and the WebAssembly codec write, so a
- * frame either writes the others read.
+ * {@link layer} provides the {@link Compression} of this package. Zstd uses
+ * `Bun.zstdCompress` and `Bun.zstdDecompress`. Gzip and deflate use
+ * `Bun.gzipSync`, `Bun.gunzipSync`, `Bun.deflateSync` and `Bun.inflateSync`.
+ * One algorithm yields the same frame as `node:zlib` and the WebAssembly codec.
+ *
+ * @stability stable
  */
 
 import {
@@ -20,8 +20,7 @@ import { deflateSync, gunzipSync, gzipSync, inflateSync, zstdCompress, zstdDecom
 import { Effect, Layer, Stream } from "effect";
 
 /**
- * The algorithms Bun states a codec for: every one the compression states but the
- * bytes carried as they are, which no codec is needed for.
+ * The algorithms of the codecs: every algorithm except `None`.
  */
 type BunAlgorithm = Exclude<Algorithm, typeof Algorithm.enums.None>;
 
@@ -38,10 +37,10 @@ const decompressors: Record<BunAlgorithm, (bytes: Uint8Array) => Uint8Array | Pr
     [Algorithm.enums.Zstd]: zstdDecompress,
   };
 
-/** What Bun refuses a frame for, as the compression that failed. */
+/** A thrown codec value, as a {@link CompressionError}. */
 const refused = (cause: unknown): CompressionError => new CompressionError({ cause });
 
-/** The bytes of a stream held whole, as the one buffer Bun compresses or decompresses at once. */
+/** The chunks in one buffer, the input of a Bun codec. */
 const held = (chunks: ReadonlyArray<Uint8Array>): Uint8Array => {
   const bytes = new Uint8Array(chunks.reduce((total, chunk) => total + chunk.length, 0));
   let at = 0;
@@ -55,12 +54,10 @@ const held = (chunks: ReadonlyArray<Uint8Array>): Uint8Array => {
 };
 
 /**
- * Carries a stream of chunks through one call of a Bun codec: the chunks are held
- * whole, handed to `whole` at once, and what it gives back is emitted as one chunk.
+ * Carries a stream of chunks through one call of a Bun codec.
  *
- * Bun states its codecs as whole-buffer operations rather than streams — the zstd
- * pair as a promise, the other four as calls that return at once — so a trajectory's
- * parts are held while it is written or read rather than carried as they arrive.
+ * Bun states its codecs as whole-buffer calls, so the chunks are held while the
+ * frame is written or read.
  */
 const carried = <E, R>(
   whole: (bytes: Uint8Array) => Uint8Array | Promise<Uint8Array>,
@@ -69,49 +66,55 @@ const carried = <E, R>(
   bytes.pipe(
     Stream.runCollect,
     Effect.flatMap((chunks) =>
-      // A codec that returns at once throws where it refuses a frame, so what it
-      // writes is taken as a promise either way.
+      // A synchronous codec throws on a bad frame, so the result is awaited either
+      // way.
       Effect.tryPromise({ try: async () => whole(held(chunks)), catch: refused }),
     ),
     Stream.fromEffect,
   );
 
 /**
- * The compression a program on Bun carries a trajectory's parts with: the codecs Bun
- * states itself.
+ * One direction of a frame as Bun states it.
+ *
+ * The call states the codec, and `None` reads or writes no frame.
+ */
+const frame =
+  (codecs: Record<BunAlgorithm, (bytes: Uint8Array) => Uint8Array | Promise<Uint8Array>>) =>
+  (options?: Options) =>
+  <E, R>(
+    bytes: Stream.Stream<Uint8Array, E, R>,
+  ): Stream.Stream<Uint8Array, E | CompressionError, R> => {
+    const algorithm = options?.algorithm ?? defaultAlgorithm;
+
+    return algorithm === Algorithm.enums.None ? bytes : carried(codecs[algorithm], bytes);
+  };
+
+/**
+ * The compression of a Bun program: the codecs of Bun.
  *
  * **When to use**
  *
- * Use when a program runs on Bun, where `Bun.zstdCompress` and the rest of Bun's
- * codecs are there: it states every algorithm the browser's compression states and
- * zstd beside them.
+ * Use in a Bun program with `Bun.zstdCompress` and the other Bun codecs
+ * available. It covers every algorithm of the browser compression, plus zstd.
  *
  * **Details**
  *
- * What it writes for an algorithm is what the other platform packages write for the
- * same one — the gzip and deflate a browser states itself, and the zstd `node:zlib`
- * writes — so a trajectory one wrote is a trajectory the others load. `none` carries
- * the parts as the format encodes them, which is the frame that costs nothing to
- * write and the most to keep.
+ * Every algorithm is available, and each call states its own ({@link Options}).
+ * An omitted algorithm means zstd, the historical frame. `None` stores the parts
+ * unwrapped.
  *
- * The algorithm is the layer's to state ({@link Options}), and defaults to zstd, the
- * frame a trajectory has always been carried in.
+ * One algorithm yields the same frame as the other platform packages, so every
+ * package reads every trajectory.
  *
- * Bun states its codecs as whole-buffer operations rather than streams, so a
- * trajectory's parts are held while the frame is written or read — which is what this
- * layer costs over the streaming compressions the other platform packages state.
+ * Bun supplies whole-buffer codecs, so the parts are held during a write or a
+ * read. That is the cost of this layer against the streaming layers of the other
+ * platform packages.
  *
- * @see {@link Compression} for the compression this provides.
+ * @see {@link Compression} for the provided service.
+ * @stability stable
  * @category layers
  */
-export const layer = (options?: Options): Layer.Layer<Compression> => {
-  const algorithm = options?.algorithm ?? defaultAlgorithm;
-
-  return Layer.succeed(Compression, {
-    algorithm,
-    compress: (bytes) =>
-      algorithm === Algorithm.enums.None ? bytes : carried(compressors[algorithm], bytes),
-    decompress: (bytes) =>
-      algorithm === Algorithm.enums.None ? bytes : carried(decompressors[algorithm], bytes),
-  });
-};
+export const layer: Layer.Layer<Compression> = Layer.succeed(Compression, {
+  compress: frame(compressors),
+  decompress: frame(decompressors),
+});

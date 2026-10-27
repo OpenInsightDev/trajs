@@ -10,5 +10,5 @@ computing anywhere with WebAssembly runs with.
 - `BrowserStreamHash` — the BLAKE3 digest the WebAssembly `blake3-wasm` carries,
   the SHA-256 WebCrypto reads, and the BLAKE2b the JavaScript hash of
   [`@trajs/utils`](../utils) computes.
-- `BrowserServices` — the two as one layer, at the algorithms it is built with,
-  provided with where a page keeps a trajectory.
+- `BrowserServices` — the two as one layer, provided with where a page keeps a
+  trajectory.

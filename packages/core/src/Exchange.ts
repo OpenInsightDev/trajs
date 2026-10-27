@@ -11,9 +11,16 @@ import {
   Algorithm as CompressionAlgorithm,
   Compression,
   type CompressionError,
+  type Options as CompressionOptions,
+  defaultAlgorithm as defaultCompressionAlgorithm,
 } from "@trajs/utils/Compression";
 import { Storage, type StorageError } from "@trajs/utils/Storage";
-import { Algorithm as HashAlgorithm, StreamHash } from "@trajs/utils/StreamHash";
+import {
+  Algorithm as HashAlgorithm,
+  StreamHash,
+  type Options as StreamHashOptions,
+  defaultAlgorithm as defaultHashAlgorithm,
+} from "@trajs/utils/StreamHash";
 import { Context, Effect, Fiber, Layer, Schema, Stream } from "effect";
 
 import * as Config from "#/Config.ts";
@@ -169,6 +176,33 @@ export interface Loaded<Config extends Config.AnyConfig = Config.AnyConfig> {
 }
 
 /**
+ * The options of one trajectory write.
+ *
+ * **When to use**
+ *
+ * Use to state the algorithms of {@link Service.save}.
+ *
+ * **Details**
+ *
+ * - `compression` holds the {@link CompressionOptions} of the write. The metadata
+ *   records the algorithm.
+ * - `hash` holds the {@link StreamHashOptions} of the write. The metadata records
+ *   the algorithm too.
+ *
+ * Omitted options fall back to {@link defaultCompressionAlgorithm} and
+ * {@link defaultHashAlgorithm}. A read needs no option, because the metadata
+ * carries both algorithms.
+ *
+ * @see {@link Service.save} for the operation.
+ * @stability stable
+ * @category models
+ */
+export interface SaveOptions {
+  readonly compression?: CompressionOptions;
+  readonly hash?: StreamHashOptions;
+}
+
+/**
  * Service for inspecting, loading, and saving stored trajectories.
  *
  * @see {@link Exchange} for the service tag.
@@ -207,11 +241,12 @@ export interface Service {
    *
    * Header and metadata are read immediately.
    * Part decompression and decoding wait until the returned trajectory is consumed.
+   * The frame decodes with the recorded algorithm of the metadata
+   * ({@link Metadata}), so a read takes no algorithm from the caller.
    *
    * **Gotchas**
    *
-   * Loading does not verify the digest or select compression from the metadata.
-   * The provided compression service must support the stored frame.
+   * Loading does not verify the digest.
    *
    * @see {@link Service.inspect} for the header and the metadata alone.
    * @see {@link Service.save} for writing a trajectory.
@@ -232,7 +267,9 @@ export interface Service {
    * **Details**
    *
    * The source is consumed once and its parts are encoded in order.
-   * Encoded parts form one compressed frame between the header and metadata.
+   * Encoded parts form one frame between the header and metadata.
+   * The frame and the digest follow `options` ({@link SaveOptions}), and the
+   * metadata records both.
    * Hashing covers the uncompressed encoded part bytes.
    * The storage key is independent of the trajectory's id.
    *
@@ -246,6 +283,7 @@ export interface Service {
    */
   readonly save: <Config extends Config.AnyConfig, E, R>(
     trajectory: Trajectory.Trajectory<string, Config, E, R>,
+    options?: SaveOptions,
   ) => (
     id: string,
   ) => Effect.Effect<void, E | TrajectoryError | StorageError, R | Config.EncodingServices<Config>>;
@@ -322,7 +360,7 @@ export const layer: Layer.Layer<Exchange, never, Storage | Compression | StreamH
             const { bytes, header, metadata, from, to } = yield* headerAndMetadata(id);
 
             const compressed = frameOf<StorageError>({ from, to })(bytes).pipe(
-              compression.decompress,
+              compression.decompress({ algorithm: metadata.compression }),
             );
 
             const body = catchCompression(compressed);
@@ -337,9 +375,12 @@ export const layer: Layer.Layer<Exchange, never, Storage | Compression | StreamH
       save:
         <Config extends Config.AnyConfig, E, R>(
           trajectory: Trajectory.Trajectory<string, Config, E, R>,
+          options?: SaveOptions,
         ) =>
         (id: string) => {
           const config = configOf(trajectory);
+          const compressed = options?.compression?.algorithm ?? defaultCompressionAlgorithm;
+          const digested = options?.hash?.algorithm ?? defaultHashAlgorithm;
 
           const encoded = Effect.gen(function* () {
             const header = encodeHeader(config);
@@ -356,14 +397,16 @@ export const layer: Layer.Layer<Exchange, never, Storage | Compression | StreamH
               capacity: "unbounded",
             });
 
-            const digest = yield* Stream.run(hashed, hasher.digest).pipe(Effect.forkScoped);
+            const digest = yield* Stream.run(hashed, hasher.digest({ algorithm: digested })).pipe(
+              Effect.forkScoped,
+            );
 
             const metadata = Fiber.join(digest).pipe(
               Effect.map((digest) =>
                 encodeMetadata(Metadata, Magic, {
                   version: Version,
-                  compression: compression.algorithm,
-                  hash: hasher.algorithm,
+                  compression: compressed,
+                  hash: digested,
                   digest,
                 }),
               ),
@@ -372,7 +415,9 @@ export const layer: Layer.Layer<Exchange, never, Storage | Compression | StreamH
 
             // `frames` are the encoded parts.
             // `frame` is those parts compressed.
-            const frame = catchCompression(written.pipe(compression.compress));
+            const frame = catchCompression(
+              written.pipe(compression.compress({ algorithm: compressed })),
+            );
 
             return Stream.make(header).pipe(Stream.concat(frame), Stream.concat(metadata));
           }).pipe(

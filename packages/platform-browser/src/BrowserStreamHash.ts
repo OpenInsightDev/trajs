@@ -1,13 +1,12 @@
 /**
- * The hash a program computes anywhere with: the BLAKE3 digest the WebAssembly
- * BLAKE3 `blake3-wasm` carries, the SHA-256 WebCrypto reads, and the BLAKE2b the
- * hash of `@trajs/utils` computes.
+ * The digest of a trajectory's parts in a browser: `blake3-wasm`, WebCrypto and
+ * `@trajs/utils`.
  *
- * {@link layer} is the {@link StreamHash} this package provides the exchange with.
- * What each digest is agrees with what every other platform package computes for the
- * same algorithm, so a trajectory one layer names the others recognise. The codecs
- * are imported with this module, which only a program that depends on this package
- * imports.
+ * {@link layer} provides the {@link StreamHash} of this package. One algorithm
+ * yields the same digest as every other platform package. This module imports the
+ * codecs, so only a package with a dependency on it loads them.
+ *
+ * @stability stable
  */
 
 import {
@@ -20,18 +19,17 @@ import {
 import * as blake3 from "blake3-wasm";
 import { Effect, Layer, Sink } from "effect";
 
-/** A digest as a browser reads one: the bytes of a stream in, the digest of them out. */
+/** The sink of one digest: bytes in, a hex digest out. */
 type Hashing = Sink.Sink<string, Uint8Array, never, never>;
 
 /** What SHA-256 is asked of WebCrypto as. */
 const Sha256 = "SHA-256";
 
 /**
- * The bytes of a stream as one buffer, which is what a browser digests at once.
+ * The chunks in one buffer.
  *
- * WebCrypto states no digest of a stream — `crypto.subtle.digest` is one call over
- * the bytes it is given — so what it reads is held while it is read, where a hash
- * that takes one chunk at a time is not.
+ * WebCrypto holds no streaming hash. `crypto.subtle.digest` takes the whole input
+ * at once, so the chunks are kept until the end.
  */
 const held = (chunks: ReadonlyArray<Uint8Array>): Uint8Array<ArrayBuffer> => {
   const bytes = new Uint8Array(chunks.reduce((total, chunk) => total + chunk.length, 0));
@@ -45,7 +43,7 @@ const held = (chunks: ReadonlyArray<Uint8Array>): Uint8Array<ArrayBuffer> => {
   return bytes;
 };
 
-/** The digest of bytes as the lowercase hex a trajectory ends with. */
+/** The digest of bytes as lowercase hex. */
 const hex = (bytes: Uint8Array): string => {
   let text = "";
 
@@ -57,13 +55,11 @@ const hex = (bytes: Uint8Array): string => {
 };
 
 /**
- * The SHA-256 digest WebCrypto reads: the bytes of the stream collected as they
- * arrive, digested in one call once they have ended.
+ * The SHA-256 sink: the chunks are kept and digested in one WebCrypto call.
  *
- * WebCrypto is served over a secure context, so a page served as plain HTTP has no
- * SHA-256 to read — BLAKE2b and BLAKE3 are the digests that need nothing of the
- * page's context. A digest it refuses is a defect rather than a failure, as no hash
- * a layer provides fails.
+ * WebCrypto needs a secure context, so a page over plain HTTP has no SHA-256.
+ * BLAKE2b and BLAKE3 need no page context. A refused digest is a defect, because
+ * no hash of a layer fails.
  */
 const webCrypto: Hashing = Sink.reduce<Array<Uint8Array>, Uint8Array>(
   () => [],
@@ -81,12 +77,10 @@ const webCrypto: Hashing = Sink.reduce<Array<Uint8Array>, Uint8Array>(
 );
 
 /**
- * The BLAKE3 digest the WebAssembly `blake3-wasm` carries: the bytes fed to one hash
- * as they arrive, the digest read off it once they have ended.
+ * The BLAKE3 sink of the WebAssembly module `blake3-wasm`.
  *
- * The hash is spent by reading it — the WebAssembly hasher frees itself on the
- * digest — so a digest is read off one made where the sink runs, rather than off a
- * hash that has already let go of the bytes.
+ * Reading the digest spends the hash, because the WebAssembly hasher frees itself
+ * then. A run therefore builds its own hash.
  */
 const webAssembly: Hashing = Sink.reduce(
   () => blake3.createHash(),
@@ -97,11 +91,11 @@ const webAssembly: Hashing = Sink.reduce(
   },
 ).pipe(Sink.map((hashed) => hashed.digest("hex")));
 
-/** The digest of one algorithm, as the sink a stream is hashed through. */
-const digest = (algorithm: Algorithm): Hashing => {
+/** The sink of one algorithm. */
+const hashing = (algorithm: Algorithm): Hashing => {
   switch (algorithm) {
     case Algorithm.enums.Blake2b:
-      return hashInJavaScript({ algorithm }).digest;
+      return hashInJavaScript().digest({ algorithm });
     case Algorithm.enums.Sha256:
       return webCrypto;
     default:
@@ -110,36 +104,32 @@ const digest = (algorithm: Algorithm): Hashing => {
 };
 
 /**
- * The hash a program computes anywhere with, over the codecs a page states.
+ * The hash of a browser: the browser codecs and the JavaScript hash of
+ * `@trajs/utils`.
  *
  * **When to use**
  *
- * Use when a program runs where a native addon cannot be loaded — a page, a worker
- * — or when every run should hash a trajectory with the same code.
+ * Use in a page or a worker, where a native addon is not available. Use it as well
+ * when every run should hash with the same code.
  *
  * **Details**
  *
- * BLAKE3 is the digest the WebAssembly module `blake3-wasm` carries: a bundle is
- * handed the implementation the package states for the browser, which carries no
- * WebAssembly code of its own, so a page provides that code the way the package's
- * own readme says — `blake3/browser` is the entry carrying it; what carries the code
- * itself is the package's Node.js entry, so a program that runs on Node hashes
- * through this layer as it stands.
+ * Every algorithm is available, and each call states its own ({@link Options}).
+ * An omitted algorithm means BLAKE3, the historical digest.
  *
- * SHA-256 is the digest WebCrypto reads, over the bytes of a whole stream rather
- * than as they arrive, and BLAKE2b is the one algorithm a browser states no codec
- * for: it is the JavaScript hash `@trajs/utils` ships, computed where JavaScript
- * runs. The three digests are of 32 bytes each, so a trajectory's parts are named by
- * the same 64 characters of hex whichever one is stated.
+ * BLAKE3 comes from the WebAssembly module `blake3-wasm`. A bundle takes the
+ * browser entry of the package, so a page supplies the WebAssembly code through
+ * `blake3/browser`.
  *
- * The algorithm is the layer's to state ({@link Options}), and defaults to BLAKE3,
- * the digest a trajectory's parts have always been digested with.
+ * SHA-256 comes from WebCrypto, with one call over the whole stream. BLAKE2b has
+ * no browser codec, so it uses the JavaScript hash of `@trajs/utils`.
  *
- * @see {@link StreamHash} for the hash this provides.
+ * Every digest has 32 bytes, or 64 hex characters.
+ *
+ * @see {@link StreamHash} for the provided service.
+ * @stability stable
  * @category layers
  */
-export const layer = (options?: Options): Layer.Layer<StreamHash> => {
-  const algorithm = options?.algorithm ?? defaultAlgorithm;
-
-  return Layer.succeed(StreamHash, { algorithm, digest: digest(algorithm) });
-};
+export const layer: Layer.Layer<StreamHash> = Layer.succeed(StreamHash, {
+  digest: (options?: Options) => hashing(options?.algorithm ?? defaultAlgorithm),
+});

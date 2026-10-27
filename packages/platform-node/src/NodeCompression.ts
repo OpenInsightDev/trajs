@@ -1,11 +1,11 @@
 /**
- * The frame a trajectory's parts are carried in, as `node:zlib` writes and reads one:
- * a zstd, gzip or deflate frame, or the bytes as they are.
+ * The frame of a trajectory's parts, as `node:zlib` writes and reads one.
  *
- * {@link layer} is the {@link Compression} this package provides the exchange
- * with, over the primitives below, which write and read the stream itself. What a
- * trajectory is of is the format's, and what writes and reads the frame it carries
- * the parts in is this.
+ * {@link layer} provides the {@link Compression} of this package.
+ * {@link compress} and {@link decompress} run one stream through one `node:zlib`
+ * stream, so the bytes are never whole in memory.
+ *
+ * @stability stable
  */
 
 import type { Transform } from "node:stream";
@@ -29,8 +29,7 @@ import {
 import { Layer, Stream } from "effect";
 
 /**
- * The algorithms `node:zlib` writes a frame with: every one the compression states
- * but the bytes carried as they are, which no codec is needed for.
+ * The algorithms of the codecs: every algorithm except `None`.
  */
 type ZlibAlgorithm = Exclude<Algorithm, typeof Algorithm.enums.None>;
 
@@ -47,11 +46,9 @@ const decompressors: Record<ZlibAlgorithm, () => Transform> = {
 };
 
 /**
- * Carries a stream of chunks through one stream of `node:zlib`: every chunk
- * upstream is written to it as the downstream pulls one back.
+ * Carries a stream of chunks through one `node:zlib` stream.
  *
- * The stream is opened per run and lives in the scope that runs it, so a
- * downstream that stops early destroys it.
+ * The stream belongs to the run. An early downstream stop destroys it.
  */
 const through = (open: () => Transform) =>
   pipeThroughDuplex<Uint8Array, CompressionError>({
@@ -60,30 +57,27 @@ const through = (open: () => Transform) =>
   });
 
 /**
- * Compresses a byte stream into the frame a compression states.
+ * Compresses a byte stream into one frame.
  *
  * **When to use**
  *
- * Use to shrink bytes on their way somewhere else — a file, a socket — without
- * holding the input in memory.
+ * Use to shrink bytes for a file or a socket. The input is never whole in memory.
  *
  * **Details**
  *
- * - Every upstream chunk is written to one stream of `node:zlib` as the downstream
- *   pulls it, and each compressed chunk the stream produces is emitted as soon as it
- *   is available. Back pressure travels upstream: a slow consumer stops reading what
- *   it writes.
- * - The source completing ends the stream, so whatever it still holds is flushed
- *   into the output: what is written is one whole frame, which reads back in
- *   streaming fashion or all at once (`zstdDecompressSync` for the frame zstd
- *   writes, `gunzipSync` and `inflateSync` for the other two), and a source with
- *   nothing in it produces a frame that decodes to nothing.
- * - `none` writes no frame at all: the chunks are emitted as they arrive, and none
- *   of them is held.
- * - A failure of the source stream passes through untouched; only a failure of the
- *   stream itself becomes {@link CompressionError}.
- * - The stream lives in the scope that runs the result, so a downstream that stops
- *   early destroys it.
+ * - Each upstream chunk goes to one `node:zlib` stream as the downstream pulls.
+ *   Each compressed chunk is emitted on arrival. A slow consumer stops the writes
+ *   upstream.
+ * - The end of the source ends the stream and flushes the rest. The output is one
+ *   complete frame. `zstdDecompressSync`, `gunzipSync` or `inflateSync` reads it
+ *   at once. An empty source yields a frame of no bytes.
+ * - `None` writes no frame. Chunks are emitted on arrival and none is held.
+ * - A failed source passes through untouched. Only a stream failure raises
+ *   {@link CompressionError}.
+ *
+ * **Gotchas**
+ *
+ * The stream belongs to the run. An early downstream stop destroys it.
  *
  * **Example** (Compressing text into a gzip frame)
  *
@@ -103,6 +97,7 @@ const through = (open: () => Transform) =>
  *
  * @see {@link decompress} for the other direction.
  * @see {@link Options} for the algorithm it writes with.
+ * @stability stable
  * @category combinators
  */
 export const compress =
@@ -120,23 +115,19 @@ export const compress =
  *
  * **When to use**
  *
- * Use to read back the bytes one of the algorithms wrote without holding a frame in
- * memory.
+ * Use to read the bytes of one frame back. The frame is never whole in memory.
  *
  * **Details**
  *
- * - Every upstream chunk is written to one stream of `node:zlib` as the downstream
- *   pulls it, and each decompressed chunk is emitted as soon as it is available.
- * - What this reads is the body of a file, which is one frame: a frame that is cut
- *   short fails as {@link CompressionError} rather than decompressing the part of it
- *   that arrived. A frame written with another algorithm fails there too, since what
- *   reads one is the stream of the algorithm it is read with.
- * - `none` reads no frame at all: the chunks are emitted as they arrive.
- * - A failure of the source stream passes through untouched; only a failure of the
- *   stream itself becomes {@link CompressionError}.
+ * - Each upstream chunk goes to one `node:zlib` stream as the downstream pulls,
+ *   and each decompressed chunk is emitted on arrival.
+ * - The input is one frame. A truncated frame raises {@link CompressionError}. A
+ *   frame of another algorithm raises the same error.
+ * - `None` reads no frame. Chunks are emitted on arrival.
+ * - A failed source passes through untouched. Only a stream failure raises
+ *   {@link CompressionError}.
  *
- * It takes no option beside the algorithm, since a frame carries what decompressing
- * it takes.
+ * The frame needs only its algorithm, so `options` holds nothing else.
  *
  * **Example** (Decompressing what a compression wrote)
  *
@@ -155,6 +146,7 @@ export const compress =
  *
  * @see {@link compress} for the other direction.
  * @see {@link Options} for the algorithm it reads with.
+ * @stability stable
  * @category combinators
  */
 export const decompress =
@@ -168,43 +160,30 @@ export const decompress =
   };
 
 /**
- * The compression a program on Node carries a trajectory's parts with: the streams
- * `node:zlib` writes and reads a frame with.
+ * The compression of a Node program: the streams of `node:zlib`.
  *
  * **When to use**
  *
- * Use when a program runs on Node, where `node:zlib` is there: it states every
- * algorithm the browser's compression states and zstd beside them, it loads nothing
- * else to do it, and it carries a frame as it is written rather than holding it.
+ * Use in a Node program with `node:zlib` available. It covers every algorithm of
+ * the browser compression, plus zstd.
  *
  * **Details**
  *
- * What it writes for an algorithm is what the other platform packages write for the
- * same one — the gzip and deflate a browser states itself, and the zstd
- * `Bun.zstdCompress` and the WebAssembly codec write — so a trajectory one wrote is
- * a trajectory the others load. `none` carries the parts as the format encodes them,
- * which is the frame that costs nothing to write and the most to keep.
+ * Every algorithm is available, and each call states its own ({@link Options}).
+ * An omitted algorithm means zstd, the historical frame. `None` stores the parts
+ * unwrapped.
  *
- * The algorithm is the layer's to state ({@link Options}), and defaults to zstd,
- * the frame a trajectory has always been carried in.
+ * One algorithm yields the same frame as the other platform packages, so every
+ * package reads every trajectory.
  *
- * The streams are `node:zlib`'s, so they are loaded when this layer is provided
- * rather than when this module is imported: a program that never provides it — a
- * page — never reaches for them. What a program that runs where `node:zlib` is not
- * provides instead is `@trajs/platform-browser`'s compression.
+ * `node:zlib` is a Node builtin, so this package is for Node only. Where
+ * `node:zlib` is absent, `@trajs/platform-browser` supplies the compression.
  *
- * Each frame is written and read through one stream per run, so the bytes are never
- * held whole.
- *
- * @see {@link Compression} for the compression this provides.
+ * @see {@link Compression} for the provided service.
+ * @stability stable
  * @category layers
  */
-export const layer = (options?: Options): Layer.Layer<Compression> => {
-  const algorithm = options?.algorithm ?? defaultAlgorithm;
-
-  return Layer.succeed(Compression, {
-    algorithm,
-    compress: (bytes) => compress({ algorithm })(bytes),
-    decompress: (bytes) => decompress({ algorithm })(bytes),
-  });
-};
+export const layer: Layer.Layer<Compression> = Layer.succeed(Compression, {
+  compress,
+  decompress,
+});

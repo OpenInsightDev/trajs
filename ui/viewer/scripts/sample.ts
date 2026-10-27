@@ -303,7 +303,7 @@ const program = Effect.gen(function* () {
 // The file storage reads through the file system `@effect/platform-node` provides,
 // under the codecs of `@trajs/platform-node`.
 const exchangeOverFiles = Layer.provide(
-  Layer.provide(Exchange.layer, Layer.merge(NodeServices.layer(), layerFileSystem)),
+  Layer.provide(Exchange.layer, Layer.merge(NodeServices.layer, layerFileSystem)),
   PlatformNode.layer,
 );
 
