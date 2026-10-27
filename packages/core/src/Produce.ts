@@ -15,7 +15,7 @@ import * as Event from "#/Event.ts";
 import * as EventKit from "#/EventKit.ts";
 import * as Extra from "#/Extra.ts";
 import * as ExtraKit from "#/ExtraKit.ts";
-import { foldResponse, initial } from "#/internal/folding.ts";
+import { foldResponse, initial, type State } from "#/internal/folding.ts";
 import { produceParts } from "#/internal/produce.ts";
 import { configOf, uuid } from "#/internal/trajectory.ts";
 import * as MetricKit from "#/MetricKit.ts";
@@ -27,21 +27,74 @@ import * as Trajectory from "#/Trajectory.ts";
 import { TrajectoryError } from "#/TrajectoryError.ts";
 
 /**
+ * A response part of a message stream.
+ *
+ * **When to use**
+ *
+ * Use when a message stream supplies a response that is still arriving.
+ *
+ * **Details**
+ *
+ * `response` is a finished part, or one of the increments an answer arrives in.
+ * Production folds those increments into the chunk they build.
+ * The part the chunk ends in is the one written, with its own `sessionId`,
+ * `timestamp`, and `extra`.
+ * A part {@link Trajectory.parts} builds states the rest.
+ * Spread such a part and replace its `response` with the increment.
+ *
+ * **Gotchas**
+ *
+ * The increments and the part that ends them must name the same session.
+ * A chunk still open when the stream ends is not written.
+ *
+ * @see {@link Response.AllPartsView} for the increments a response arrives in.
+ * @see {@link MessagePart} for every part a message stream supplies.
+ * @stability stable
+ * @category models
+ */
+export type MessageResponsePart<Config extends Config.AnyConfig> = Omit<
+  Trajectory.ResponsePartOf<Config>,
+  "response"
+> & {
+  readonly response:
+    | Trajectory.ResponsePartOf<Config>["response"]
+    | Response.AllPartsView<Config.ToolsOf<Config>>;
+};
+
+/**
+ * One part of a {@link MessageStream}.
+ *
+ * **Details**
+ *
+ * A prompt or an event part is written as it is.
+ * A response part is written as the part its answer ends in.
+ *
+ * @see {@link MessageStream} for the stream of these parts.
+ * @see {@link MessageResponsePart} for a response that is still arriving.
+ * @stability stable
+ * @category models
+ */
+export type MessagePart<Config extends Config.AnyConfig> =
+  | Trajectory.PromptPartOf<Config>
+  | MessageResponsePart<Config>
+  | Trajectory.EventPartOf<Config>;
+
+/**
  * Prompt, response, and event parts supplied to trajectory production.
  *
  * **Details**
  *
- * Response parts are finished payloads.
+ * A response part may still be arriving.
+ * Production folds its increments into the part the answer ends in.
  * Session declarations and metric reports are excluded.
  *
+ * @see {@link MessagePart} for the parts the stream supplies.
  * @see {@link fromSession} for producing a single-session trajectory.
  * @stability stable
  * @category models
  */
 export type MessageStream<Config extends Config.AnyConfig, E = never, R = never> = Stream.Stream<
-  | Trajectory.PromptPart<Config["extrakit"]>
-  | Trajectory.ResponsePart<Config["toolkit"], Config["extrakit"]>
-  | Trajectory.EventPart<Config["eventkit"]>,
+  MessagePart<Config>,
   E,
   R
 >;
@@ -101,6 +154,33 @@ export type ProducingConfig<
   Extras extends ExtraKit.Any,
 > = Config.Config<Toolkit, Events, MetricKit.WithProducers<Metrics>, Extras>;
 
+// A trajectory holds the part a chunk ends in, not the increments that build
+// it, so an increment leaves the stream without a part of its own.
+const foldMessages = <Config extends Config.AnyConfig, E, R>(
+  stream: MessageStream<Config, E, R>,
+): Stream.Stream<Trajectory.Part<Config>, E, R> =>
+  stream.pipe(
+    Stream.mapAccum<State, MessagePart<Config>, Trajectory.Part<Config>>(initial, (state, part) => {
+      if (!Predicate.isTagged("Response")(part)) {
+        return [state, [part]];
+      }
+
+      const [next, folded] = foldResponse<Config.ToolsOf<Config>>(
+        state,
+        part.sessionId ?? Trajectory.mainSessionId,
+        part.response,
+      );
+
+      return [
+        next,
+        Option.match(folded, {
+          onNone: () => [],
+          onSome: (response) => [{ ...part, response }],
+        }),
+      ];
+    }),
+  );
+
 const produceWith =
   <
     Toolkit extends Toolkit.Any,
@@ -127,14 +207,17 @@ const produceWith =
  *
  * The explicit-id overload keeps that id; the other assigns a new uuid v7.
  * Input parts retain their order while metric reports can interleave.
+ * A response that is still arriving is written as the part it ends in.
  *
  * **Gotchas**
  *
  * No session declaration is added and no `sessionId` is rewritten.
  * A self-contained single-session input must use the main session or omit `sessionId`.
+ * A chunk still open when the stream ends is not written.
  * Production broadcasts use unbounded buffers.
  * Slow metric producers can retain an unbounded backlog.
  *
+ * @see {@link MessageResponsePart} for a response that is still arriving.
  * @see {@link fromSessions} for declaring several session sources.
  * @see {@link produce} for effectful session writers.
  * @see {@link produceMetrics} for enriching an existing trajectory.
@@ -185,7 +268,8 @@ export function fromSession<
 ) {
   const [id, config] = args.length === 1 ? [undefined, args[0]] : args;
 
-  return produceWith(id, config);
+  return <E, R>(stream: MessageStream<ProducingConfig<Toolkit, Events, Metrics, Extras>, E, R>) =>
+    produceWith(id, config)(foldMessages(stream));
 }
 
 /**
@@ -201,7 +285,7 @@ export function fromSession<
  * Each child forks from its parent's declaration, not from a message.
  * All declarations precede messages.
  * Message streams run concurrently with unbounded concurrency.
- * Id assignment and metric production follow {@link fromSession}.
+ * Id assignment, folding, and metric production follow {@link fromSession}.
  *
  * **Gotchas**
  *
@@ -317,7 +401,9 @@ export function fromSessions<
       { concurrency: "unbounded" },
     );
 
-    return produceWith(id, config)(Stream.make(...declarations).pipe(Stream.concat(streams)));
+    const messages = Stream.make(...declarations).pipe(Stream.concat(foldMessages(streams)));
+
+    return produceWith(id, config)(messages);
   };
 }
 
