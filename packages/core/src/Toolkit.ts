@@ -19,42 +19,78 @@ import { Tool, type Toolkit } from "effect/ai";
 export * from "effect/ai/Toolkit";
 
 /**
- * A draft-07 JSON Schema document for a stored tool schema.
- *
- * @stability stable
- * @category encoding
- */
-export type JsonSchemaDocument = JsonSchema.Document<"draft-07">;
-
-/**
- * A tool declaration without its runtime handler.
+ * Schema for a draft-07 JSON Schema document of a stored schema.
  *
  * **Details**
  *
- * Parameter, success, and failure schemas use draft-07 JSON Schema documents.
+ * A document states the dialect it is written in, its root schema, and the named definitions
+ * the root refers to.
+ *
+ * @stability stable
+ * @category schemas
+ */
+export const JsonSchemaDocument = Schema.Struct({
+  dialect: Schema.Literal("draft-07"),
+  schema: Schema.Record(Schema.String, Schema.Unknown),
+  definitions: Schema.Record(Schema.String, Schema.Record(Schema.String, Schema.Unknown)),
+});
+
+/**
+ * A draft-07 JSON Schema document for a stored schema.
+ *
+ * @see {@link JsonSchemaDocument} for the schema.
+ * @stability stable
+ * @category models
+ */
+export type JsonSchemaDocument = Schema.Schema.Type<typeof JsonSchemaDocument>;
+
+/**
+ * Schema for a tool declaration without its runtime handler.
+ *
+ * **Details**
+ *
+ * Parameter, success, and failure schemas are draft-07 JSON Schema documents.
  * An absent description stays absent.
  *
  * @see {@link encode} for serializing a toolkit.
  * @stability stable
- * @category encoding
+ * @category schemas
  */
-export type ToolEncoded = Readonly<{
-  id: string;
-  name: string;
-  description?: string;
-  parameters: JsonSchemaDocument;
-  success: JsonSchemaDocument;
-  failure: JsonSchemaDocument;
-}>;
+export const ToolSchema = Schema.Struct({
+  id: Schema.String,
+  name: Schema.String,
+  description: Schema.optional(Schema.String),
+  parameters: JsonSchemaDocument,
+  success: JsonSchemaDocument,
+  failure: JsonSchemaDocument,
+});
+
+/**
+ * A tool declaration without its runtime handler.
+ *
+ * @see {@link ToolSchema} for the schema.
+ * @stability stable
+ * @category models
+ */
+export type ToolSchema = Schema.Schema.Type<typeof ToolSchema>;
+
+/**
+ * Schema for stored tool declarations keyed by their toolkit keys.
+ *
+ * @see {@link ToolSchema} for each declaration.
+ * @stability stable
+ * @category schemas
+ */
+export const ToolkitSchema = Schema.Record(Schema.String, ToolSchema);
 
 /**
  * Stored tool declarations keyed by their toolkit keys.
  *
- * @see {@link ToolEncoded} for each declaration.
+ * @see {@link ToolkitSchema} for the schema.
  * @stability stable
- * @category encoding
+ * @category models
  */
-export type ToolkitEncoded = Record<string, ToolEncoded>;
+export type ToolkitSchema = Schema.Schema.Type<typeof ToolkitSchema>;
 
 /**
  * Converts a toolkit into stored tool declarations.
@@ -73,11 +109,11 @@ export type ToolkitEncoded = Record<string, ToolEncoded>;
  * Schema conversion can throw for unsupported schemas.
  * The result does not preserve schema transformations or runtime services.
  *
- * @see {@link ToolkitEncoded} for the stored representation.
+ * @see {@link ToolkitSchema} for the stored representation.
  * @stability stable
  * @category encoding
  */
-export const encode = (toolkit: Toolkit.Any): ToolkitEncoded =>
+export const encode = (toolkit: Toolkit.Any): ToolkitSchema =>
   Object.fromEntries(
     Object.entries(toolkit.tools).map(([key, tool]) => {
       const encoded = {

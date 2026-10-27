@@ -24,7 +24,9 @@ import {
 import { Context, Effect, Fiber, Layer, Schema, Stream } from "effect";
 
 import * as Config from "#/Config.ts";
+import * as Event from "#/Event.ts";
 import * as ExchangeIssue from "#/ExchangeIssue.ts";
+import * as Extra from "#/Extra.ts";
 import {
   checkParts,
   encodeHeader,
@@ -37,6 +39,8 @@ import {
   trajectoryOf,
 } from "#/internal/exchange.ts";
 import { configOf } from "#/internal/trajectory.ts";
+import * as Metric from "#/Metric.ts";
+import * as Toolkit from "#/Toolkit.ts";
 import * as Trajectory from "#/Trajectory.ts";
 import { TrajectoryError } from "#/TrajectoryError.ts";
 
@@ -65,18 +69,22 @@ export const Version = pkg.version;
  * **Details**
  *
  * The uncompressed JSON record follows a four-byte big-endian length.
- * Tool entries include JSON Schema descriptions but no executable handlers or schema transformations.
- * Event, metric, and extra entries state what each declaration names of itself and the package it is in, not a decoding schema.
+ * Each entry states what its declaration names of itself and the JSON Schema documents of its schemas.
+ * Tool entries include them but no executable handlers or schema transformations.
  *
+ * @see {@link Toolkit.ToolkitSchema} for stored tool declarations.
+ * @see {@link Event.EventKitSchema} for stored event declarations.
+ * @see {@link Metric.MetricKitSchema} for stored metric declarations.
+ * @see {@link Extra.ExtraKitSchema} for stored extra declarations.
  * @see {@link Metadata} for the tail.
  * @stability stable
  * @category schemas
  */
 export const Header = Schema.Struct({
-  toolkit: Schema.JsonObject,
-  eventkit: Schema.Record(Schema.String, Schema.Json),
-  metrickit: Schema.Record(Schema.String, Schema.Json),
-  extrakit: Schema.Record(Schema.String, Schema.Json),
+  toolkit: Toolkit.ToolkitSchema,
+  eventkit: Event.EventKitSchema,
+  metrickit: Metric.MetricKitSchema,
+  extrakit: Extra.ExtraKitSchema,
 });
 
 /**
@@ -460,7 +468,7 @@ export const layer: Layer.Layer<Exchange, never, Storage | Compression | StreamH
           const digested = options?.hash?.algorithm ?? defaultHashAlgorithm;
 
           const encoded = Effect.gen(function* () {
-            const header = encodeHeader(config);
+            const header = encodeHeader(Header, config);
 
             // Part order is the trajectory order, so encoding stays sequential.
             const frames = trajectory.pipe(

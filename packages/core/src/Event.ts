@@ -3,6 +3,7 @@
  *
  * {@link Event} names an event schema.
  * {@link EventParts} reads the events declared by a kit.
+ * {@link EventKitSchema} states those declarations as a stored header holds them.
  *
  * @stability stable
  */
@@ -10,7 +11,9 @@
 import { Data, Schema } from "effect";
 
 import type * as EventKit from "#/EventKit.ts";
-import type { PackageMetadata } from "#/Package.ts";
+import { documentOf } from "#/internal/schema.ts";
+import { PackageMetadata } from "#/Package.ts";
+import { JsonSchemaDocument } from "#/Toolkit.ts";
 import * as VersionedSchema from "#/VersionedSchema.ts";
 
 /**
@@ -61,6 +64,85 @@ export class Event<
  * @category utility types
  */
 export type Any = Event<string, string, VersionedSchema.Any>;
+
+/**
+ * Schema for a stored event declaration.
+ *
+ * **Details**
+ *
+ * The declaration states its `metadata`, the package it is in, and its payload schema.
+ * The payload schema is a draft-07 JSON Schema document of the versions it accepts.
+ *
+ * @see {@link encode} for serializing a kit.
+ * @see {@link EventKitSchema} for the record a stored header holds.
+ * @stability stable
+ * @category schemas
+ */
+export const EventSchema = Schema.Struct({
+  metadata: Metadata,
+  packageMetadata: Schema.optional(PackageMetadata),
+  schema: JsonSchemaDocument,
+});
+
+/**
+ * A stored event declaration without its decoding schema.
+ *
+ * @see {@link EventSchema} for the schema.
+ * @stability stable
+ * @category models
+ */
+export type EventSchema = Schema.Schema.Type<typeof EventSchema>;
+
+/**
+ * Schema for the stored event declarations of a kit, keyed by tag.
+ *
+ * @see {@link EventSchema} for each declaration.
+ * @stability stable
+ * @category schemas
+ */
+export const EventKitSchema = Schema.Record(Schema.String, EventSchema);
+
+/**
+ * Stored event declarations keyed by their kit tags.
+ *
+ * @see {@link EventKitSchema} for the schema.
+ * @stability stable
+ * @category models
+ */
+export type EventKitSchema = Schema.Schema.Type<typeof EventKitSchema>;
+
+/**
+ * Converts an event kit into its stored declarations.
+ *
+ * **When to use**
+ *
+ * Use to describe the events of a kit without their decoding schemas.
+ *
+ * **Details**
+ *
+ * Record keys are the tags of the kit.
+ * Each payload schema becomes a draft-07 JSON Schema document of the versions it accepts.
+ *
+ * **Gotchas**
+ *
+ * Schema conversion can throw for unsupported schemas.
+ * The result does not preserve schema transformations or runtime services.
+ *
+ * @see {@link EventKitSchema} for the stored representation.
+ * @stability stable
+ * @category encoding
+ */
+export const encode = (kit: EventKit.Any): EventKitSchema =>
+  Object.fromEntries(
+    Object.entries(kit.events).map(([tag, event]) => [
+      tag,
+      {
+        metadata: event.metadata,
+        packageMetadata: event.packageMetadata,
+        schema: documentOf(event.schema),
+      },
+    ]),
+  );
 
 /**
  * An event payload identified by its declaration's tag.

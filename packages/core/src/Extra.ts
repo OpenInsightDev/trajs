@@ -3,6 +3,7 @@
  *
  * {@link Extra} declares schemas by part kind.
  * {@link ExtraRecord} decodes declared fields and {@link stated} selects fields without decoding.
+ * {@link ExtraKitSchema} states the declarations as a stored header holds them.
  *
  * @stability stable
  */
@@ -10,7 +11,9 @@
 import { Data, Schema } from "effect";
 
 import type * as ExtraKit from "#/ExtraKit.ts";
-import type { PackageMetadata } from "#/Package.ts";
+import { documentOf } from "#/internal/schema.ts";
+import { PackageMetadata } from "#/Package.ts";
+import { JsonSchemaDocument } from "#/Toolkit.ts";
 import * as VersionedSchema from "#/VersionedSchema.ts";
 
 /**
@@ -72,10 +75,104 @@ export type Any = Extra<
   VersionedSchema.Any
 >;
 
+/**
+ * Schema for a stored extra declaration.
+ *
+ * **Details**
+ *
+ * The declaration states its name, its description, and the package it is in.
+ * The name and the description sit under `metadata`, as event and metric declarations state them.
+ * Each schema it declares becomes a draft-07 JSON Schema document of the versions it accepts.
+ *
+ * @see {@link encode} for serializing a kit.
+ * @see {@link ExtraKitSchema} for the record a stored header holds.
+ * @stability stable
+ * @category schemas
+ */
+export const ExtraSchema = Schema.Struct({
+  metadata: Schema.Struct({
+    name: Schema.optional(Schema.String),
+    description: Schema.optional(Schema.String),
+  }),
+  packageMetadata: Schema.optional(PackageMetadata),
+  prompt: Schema.optional(JsonSchemaDocument),
+  response: Schema.optional(JsonSchemaDocument),
+  session: Schema.optional(JsonSchemaDocument),
+});
+
+/**
+ * A stored extra declaration without its decoding schemas.
+ *
+ * @see {@link ExtraSchema} for the schema.
+ * @stability stable
+ * @category models
+ */
+export type ExtraSchema = Schema.Schema.Type<typeof ExtraSchema>;
+
+/**
+ * Schema for the stored extra declarations of a kit, keyed by tag.
+ *
+ * @see {@link ExtraSchema} for each declaration.
+ * @stability stable
+ * @category schemas
+ */
+export const ExtraKitSchema = Schema.Record(Schema.String, ExtraSchema);
+
+/**
+ * Stored extra declarations keyed by their kit tags.
+ *
+ * @see {@link ExtraKitSchema} for the schema.
+ * @stability stable
+ * @category models
+ */
+export type ExtraKitSchema = Schema.Schema.Type<typeof ExtraKitSchema>;
+
+/**
+ * Converts an extra kit into its stored declarations.
+ *
+ * **When to use**
+ *
+ * Use to describe the extra data of a kit without its decoding schemas.
+ *
+ * **Details**
+ *
+ * Record keys are the tags of the kit.
+ * A part kind the declaration states no schema for stays absent.
+ * Each stated schema becomes a draft-07 JSON Schema document of the versions it accepts.
+ *
+ * **Gotchas**
+ *
+ * Schema conversion can throw for unsupported schemas.
+ * The result does not preserve schema transformations or runtime services.
+ *
+ * @see {@link ExtraKitSchema} for the stored representation.
+ * @stability stable
+ * @category encoding
+ */
+export const encode = (kit: ExtraKit.Any): ExtraKitSchema =>
+  Object.fromEntries(
+    Object.entries(kit.extra).map(([tag, extra]) => [
+      tag,
+      {
+        metadata: { name: extra.name, description: extra.description },
+        packageMetadata: extra.packageMetadata,
+        prompt: documentFor(extra, "prompt"),
+        response: documentFor(extra, "response"),
+        session: documentFor(extra, "session"),
+      },
+    ]),
+  );
+
 type Declared<X extends Any, P extends Part> = Exclude<X[P], undefined>;
 
 const declaredFor = (item: Any, part: Part): VersionedSchema.Any | undefined =>
   ({ prompt: item.prompt, response: item.response, session: item.session })[part];
+
+const documentFor = (item: Any, part: Part): JsonSchemaDocument | undefined => {
+  const schema = declaredFor(item, part);
+
+  return schema === undefined ? undefined : documentOf(schema);
+};
 
 type Datum<X extends Any, P extends Part> = [Declared<X, P>] extends [never]
   ? never

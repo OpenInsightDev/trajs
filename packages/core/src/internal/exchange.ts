@@ -7,10 +7,10 @@ import type * as Config from "#/Config.ts";
 import * as Event from "#/Event.ts";
 import type * as Exchange from "#/Exchange.ts";
 import * as ExchangeIssue from "#/ExchangeIssue.ts";
+import * as Extra from "#/Extra.ts";
 import type * as ExtraKit from "#/ExtraKit.ts";
 import { joined, readFrames, splitFrames } from "#/internal/frames.ts";
 import * as Metric from "#/Metric.ts";
-import { PackageMetadata } from "#/Package.ts";
 import * as Prompt from "#/Prompt.ts";
 import * as Toolkit from "#/Toolkit.ts";
 import * as Trajectory from "#/Trajectory.ts";
@@ -153,42 +153,18 @@ const decodeJson = <A>(
     Effect.mapError(TrajectoryError.parse),
   );
 
-const encodedPackageMetadata = (
-  packageMetadata: PackageMetadata | undefined,
-): Schema.Codec.Encoded<typeof PackageMetadata> | undefined =>
-  packageMetadata === undefined ? undefined : Schema.encodeSync(PackageMetadata)(packageMetadata);
-
-export const encodeHeader = (config: Config.AnyConfig): Uint8Array => {
-  const json = JSON.stringify({
+export const encodeHeader = (
+  schema: Schema.ConstraintCodec<Exchange.Header, unknown, never, never>,
+  config: Config.AnyConfig,
+): Uint8Array => {
+  const header: Exchange.Header = {
     toolkit: Toolkit.encode(config.toolkit),
-    eventkit: Object.fromEntries(
-      Object.entries(config.eventkit.events).map(([tag, event]) => [
-        tag,
-        {
-          metadata: Schema.encodeSync(Event.Metadata)(event.metadata),
-          packageMetadata: encodedPackageMetadata(event.packageMetadata),
-        },
-      ]),
-    ),
-    metrickit: Object.fromEntries(
-      Object.entries(config.metrickit.metrics).map(([tag, metric]) => [
-        tag,
-        {
-          metadata: Schema.encodeSync(Metric.Metadata)(metric.metadata),
-          packageMetadata: encodedPackageMetadata(metric.packageMetadata),
-        },
-      ]),
-    ),
-    extrakit: Object.fromEntries(
-      Object.entries(config.extrakit.extra).map(([tag, extra]) => [
-        tag,
-        {
-          metadata: { name: extra.name, description: extra.description },
-          packageMetadata: encodedPackageMetadata(extra.packageMetadata),
-        },
-      ]),
-    ),
-  });
+    eventkit: Event.encode(config.eventkit),
+    metrickit: Metric.encode(config.metrickit),
+    extrakit: Extra.encode(config.extrakit),
+  };
+
+  const json = Schema.encodeSync(Schema.fromJsonString(schema))(header);
 
   return lengthPrefixed(new TextEncoder().encode(json));
 };
