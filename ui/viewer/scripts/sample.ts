@@ -23,11 +23,6 @@ import { NodeServices } from "@trajs/platform-node";
 import { layerFileSystem } from "@trajs/utils/Storage";
 import { DateTime, Effect, Formatter, Layer, Stream } from "effect";
 
-/** What a response part looks like to a toolkit of no tools: the most a trajectory holds. */
-type Streamed = Response.AllPartsView<{}>;
-
-type Answered = Response.PartView<{}>;
-
 /** The ids the trajectory names its sessions by: the main session, and the ones forked. */
 const planning = Trajectory.mainSessionId;
 
@@ -37,9 +32,11 @@ const clarify = "clarify";
 
 const review = "review";
 
-/** What the sample is built and written with: response parts of either kind, and no other kit. */
+/** What a response part looks like to a toolkit of no tools. */
+type Answered = Response.PartView<{}>;
+
+/** What the sample is built and written with: no tools, and no other kit. */
 const config = Config.config({
-  stream: true,
   toolkit: Toolkit.empty,
   eventkit: EventKit.empty,
   metrickit: MetricKit.empty,
@@ -84,48 +81,9 @@ let clock = Date.parse("2025-05-04T09:12:00Z");
 
 const nextMoment = (): DateTime.Utc => DateTime.makeUnsafe(new Date((clock += 1_000)));
 
-/** One increment of a response that was streamed, as the trajectory holds it. */
-const increment = (sessionId: string, response: Streamed) =>
-  part.response(response, { sessionId, uuid: nextUuid(), timestamp: nextMoment() });
-
-/** One part of a response that was produced whole, as the trajectory holds it. */
+/** One part of a response, as the trajectory holds it. */
 const produced = (sessionId: string, response: Answered) =>
   part.response(response, { sessionId, uuid: nextUuid(), timestamp: nextMoment() });
-
-type ProducedIncrement = ReturnType<typeof increment>;
-
-const reasoning = (
-  sessionId: string,
-  id: string,
-  thought: string,
-): ReadonlyArray<ProducedIncrement> => [
-  increment(sessionId, Response.makePart("reasoning-start", { id })),
-  increment(sessionId, Response.makePart("reasoning-delta", { id, delta: thought })),
-  increment(sessionId, Response.makePart("reasoning-end", { id })),
-];
-
-/**
- * The text of an answer, written in the fragments a model writes it in: a few
- * characters at a time rather than a block at a time.
- */
-const written = (
-  sessionId: string,
-  id: string,
-  answer: string,
-  size = 12,
-): ReadonlyArray<ProducedIncrement> => {
-  const fragments: Array<string> = [];
-
-  for (let at = 0; at < answer.length; at += size) fragments.push(answer.slice(at, at + size));
-
-  return [
-    increment(sessionId, Response.makePart("text-start", { id })),
-    ...fragments.map((delta) =>
-      increment(sessionId, Response.makePart("text-delta", { id, delta })),
-    ),
-    increment(sessionId, Response.makePart("text-end", { id })),
-  ];
-};
 
 const stopped = (inputTokens: number, outputTokens: number): Answered =>
   Response.makePart("finish", {
@@ -138,7 +96,7 @@ const stopped = (inputTokens: number, outputTokens: number): Answered =>
   });
 
 // The session the viewer opens on: a question about how a trajectory holds its
-// sessions, answered as it was streamed.
+// sessions, answered with the thinking behind the answer and the answer itself.
 const opening = promptPart(
   Prompt.make(
     "A trajectory holds every session that ran in one stream of parts. How does a reader tell them apart?",
@@ -147,32 +105,34 @@ const opening = promptPart(
 );
 
 const openingAnswer = [
-  ...reasoning(
+  produced(
     planning,
-    "reasoning_0a1",
-    "The question is about what a part says of the session it belongs to, so the answer is the field that says it, and what a part that names no session carries instead.",
+    Response.makePart("reasoning", {
+      text: "The question is about what a part says of the session it belongs to, so the answer is the field that says it, and what a part that names no session carries instead.",
+    }),
   ),
-  ...written(
+  produced(
     planning,
-    "text_0b2",
-    [
-      "Every part names its session, so nothing is read apart from the stream:",
-      "",
-      "- a `Session` part declares one, by `id`, and continues another where it produces a `fork`",
-      "- a prompt or a response part refers to the declaration by `sessionId`",
-      "- a metric part names no session at all, and is read with the parts around it",
-      "",
-      "So the sessions of a trajectory are read by filtering its parts into them, once:",
-      "",
-      "```ts",
-      "const main = await Effect.runPromise(Session.main(trajectory))",
-      "const sessions = Session.all(main)",
-      "```",
-      "",
-      "What tells the filtering apart from a mere partition is the fork: a session that continues from one of the parts of another runs on that session's parts up to there rather than repeating them.",
-    ].join("\n"),
+    Response.makePart("text", {
+      text: [
+        "Every part names its session, so nothing is read apart from the stream:",
+        "",
+        "- a `Session` part declares one, by `id`, and continues another where it produces a `fork`",
+        "- a prompt or a response part refers to the declaration by `sessionId`",
+        "- a metric part names no session at all, and is read with the parts around it",
+        "",
+        "So the sessions of a trajectory are read by filtering its parts into them, once:",
+        "",
+        "```ts",
+        "const main = await Effect.runPromise(Session.main(trajectory))",
+        "const sessions = Session.all(main)",
+        "```",
+        "",
+        "What tells the filtering apart from a mere partition is the fork: a session that continues from one of the parts of another runs on that session's parts up to there rather than repeating them.",
+      ].join("\n"),
+    }),
   ),
-  increment(planning, stopped(1_284, 266)),
+  produced(planning, stopped(1_284, 266)),
 ];
 
 // The main session, which the parts of the viewer's first conversation belong to.

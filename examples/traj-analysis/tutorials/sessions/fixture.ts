@@ -2,7 +2,7 @@ import { Prompt, Response, Trajectory } from "@trajs/core";
 import * as Config from "@trajs/core/Config";
 import { Stream } from "effect";
 
-const config = Config.config({ stream: false });
+const config = Config.config();
 
 const part = Trajectory.parts(config);
 

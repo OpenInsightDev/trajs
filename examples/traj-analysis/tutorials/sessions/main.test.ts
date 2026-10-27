@@ -1,6 +1,6 @@
 import { expect, it } from "@effect/vitest";
 import { Cache, Session } from "@trajs/core";
-import { Effect, Predicate, Stream } from "effect";
+import { Effect, Match, Predicate, Stream } from "effect";
 
 import { trajectory } from "./fixture.ts";
 
@@ -39,14 +39,10 @@ const main = Effect.fn(function* () {
             outputTokens: 0,
             firstInputTokens: 0,
           }),
-          (produced, part) => {
-            switch (part._tag) {
-              case "Prompt":
-                return { ...produced, prompts: produced.prompts + 1 };
-
-              case "Response": {
-                const response = part.response;
-
+          (produced, part) =>
+            Match.value(part).pipe(
+              Match.tag("Prompt", () => ({ ...produced, prompts: produced.prompts + 1 })),
+              Match.tag("Response", ({ response }) => {
                 switch (response.type) {
                   case "tool-call":
                     return {
@@ -75,12 +71,9 @@ const main = Effect.fn(function* () {
                   default:
                     return produced;
                 }
-              }
-
-              default:
-                return produced;
-            }
-          },
+              }),
+              Match.orElse(() => produced),
+            ),
         ),
       );
 

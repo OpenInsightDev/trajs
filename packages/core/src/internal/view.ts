@@ -1,23 +1,19 @@
-import { Effect, Option, Result, Stream } from "effect";
+import { Effect, Option, Predicate, Result, Stream } from "effect";
 import type { Tool } from "effect/ai";
 
 import type * as Cache from "#/Cache.ts";
 import type * as Config from "#/Config.ts";
-import { initial, type State } from "#/internal/folding.ts";
 import type * as Response from "#/Response.ts";
 import type * as Trajectory from "#/Trajectory.ts";
 import type { TrajectoryError } from "#/TrajectoryError.ts";
 import type * as View from "#/View.ts";
 
+/** The finished responses of one run, since the last prompt or event. */
 export interface Run<Tools extends Record<string, Tool.Any>> {
   readonly response: ReadonlyArray<Response.PartView<Tools>>;
-  readonly folding: State;
 }
 
-export const idle = <Tools extends Record<string, Tool.Any>>(): Run<Tools> => ({
-  response: [],
-  folding: initial(),
-});
+export const idle = <Tools extends Record<string, Tool.Any>>(): Run<Tools> => ({ response: [] });
 
 type Part<Config extends Config.AnyConfig> = Trajectory.Part<Config>;
 
@@ -37,14 +33,16 @@ type MetricStream<Config extends Config.AnyConfig> = View.MetricTrajectoryStream
 /** Metric part indices by the uuid of every part they attach to, in trajectory order. */
 type Attachment = Map<string, Array<number>>;
 
+const isMetric = <Config extends Config.AnyConfig>(
+  part: Part<Config>,
+): part is Trajectory.MetricPartOf<Config> => Predicate.isTagged("Metric")(part);
+
 const attachPart = <Config extends Config.AnyConfig>(
   attached: Attachment,
   part: Part<Config>,
   index: number,
 ): void => {
-  if (part._tag !== "Metric") {
-    return;
-  }
+  if (!isMetric<Config>(part)) return;
 
   // A report that names one target twice attaches once.
   for (const target of new Set(part.metric.data.attach ?? [])) {
@@ -72,10 +70,6 @@ const record = <Config extends Config.AnyConfig>(
 
     return attached;
   });
-
-const isMetric = <Config extends Config.AnyConfig>(
-  part: Part<Config>,
-): part is Trajectory.MetricPartOf<Config> => part._tag === "Metric";
 
 const metricAt = <Config extends Config.AnyConfig>(
   cached: Cache.Cached<string, Config>,
@@ -126,7 +120,8 @@ const emit = <Config extends Config.AnyConfig>(
   attached: Attachment,
   part: Part<Config>,
 ): Reading<Config, Result.Result<View.MetricTrajectoryPart<Config>, void>> => {
-  if (part._tag === "Metric") {
+  // A report that names a target is emitted with that target rather than last.
+  if (isMetric<Config>(part)) {
     return Effect.succeed(
       part.metric.data.attach === undefined ? Result.succeed(part) : Result.failVoid,
     );

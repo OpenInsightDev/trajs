@@ -4,7 +4,7 @@ import { Exchange, Prompt, Response, Trajectory } from "@trajs/core";
 import * as Config from "@trajs/core/Config";
 import { DateTime, Effect, FileSystem, Stream } from "effect";
 
-export const config = Config.config({ stream: false });
+export const config = Config.config();
 
 const part = Trajectory.parts(config);
 

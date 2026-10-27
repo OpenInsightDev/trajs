@@ -71,7 +71,7 @@ const replayed = Prompt.fromMessages([
   }),
 ]);
 
-export const config = Config.config({ stream: false, metrickit });
+export const config = Config.config({ metrickit });
 
 const part = Trajectory.parts(config);
 

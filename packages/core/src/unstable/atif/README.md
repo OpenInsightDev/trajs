@@ -29,8 +29,7 @@ steps.map((step) => step.source); // => ["user", "agent"]
 ```
 
 `Step.steps` reads the steps of `View.steps` of `@trajs/core`, so a step is
-derived from the parts a trajectory arrived in: the increments of a streamed
-response are folded into the parts they complete, and a run of response parts ends
+derived from the parts a trajectory arrived in: a run of response parts ends
 at the prompt or event that follows it. As in `View.steps`, a trajectory that
 interleaves several sessions is read one session at a time.
 
@@ -121,12 +120,12 @@ A reader installs the kit a trajectory declares those fields with — `extrakit`
 and reads them off the part with their types:
 
 ```ts
-import { Effect, Stream } from "effect";
+import { Effect, Predicate, Stream } from "effect";
 import { Extra } from "@trajs/core/unstable/atif";
 
 const parts = Array.from(await Effect.runPromise(Stream.runCollect(trajectory)));
-const session = parts.find((part) => part._tag === "Session");
-const answered = parts.find((part) => part._tag === "Response");
+const session = parts.find((part) => Predicate.isTagged("Session")(part));
+const answered = parts.find((part) => Predicate.isTagged("Response")(part));
 
 session?.extra[Extra.documentExtra.tag]?.agent.name; // => "claude-code"
 answered?.extra[Extra.stepExtra.tag]?.model_name; // => "claude-sonnet-4"

@@ -94,9 +94,9 @@ the writing has reached — and keeps the thinking open until it has been though
 fragments they are arriving as, and `ResponseError` is what a stream reports
 instead of an answer.
 
-[`@trajs/core`](../../packages/core) folds the same increments into the parts they complete
-when it reads a trajectory, because a trajectory has ended and nothing of it is
-still open. Here it is what is open that is worth showing.
+[`@trajs/core`](../../packages/core) stores a response as the finished parts it ended in,
+because a trajectory has ended and nothing of it is still open. Here it is what is
+open that is worth showing.
 
 ## The mark
 

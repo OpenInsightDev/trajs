@@ -48,14 +48,19 @@ export type AnyToolCallPart = ToolCallPart<string, unknown>;
 export type AnyToolResultPart = ToolResultPart<string, unknown, unknown>;
 
 /**
- * Streaming and finished response parts, including undeclared tool calls and results.
+ * A response that is still arriving, including undeclared tool calls and results.
+ *
+ * **When to use**
+ *
+ * Use to type the parts a model streams, which are folded into the parts they
+ * complete before they are written to a trajectory.
  *
  * **Gotchas**
  *
  * A tool name alone cannot prove a payload follows a known tool's schema.
  * The undeclared-tool variants also accept known names.
  *
- * @see {@link PartView} for finished parts only.
+ * @see {@link PartView} for the parts a trajectory holds.
  * @stability stable
  * @category models
  */
@@ -67,7 +72,14 @@ export type AllPartsView<Tools extends Record<string, Tool.Any>> =
 /**
  * Finished response parts, including undeclared tool calls and results.
  *
- * @see {@link AllPartsView} for streaming increments and tool-name narrowing limits.
+ * **Gotchas**
+ *
+ * A tool name alone cannot prove a payload follows a known tool's schema.
+ * The undeclared-tool variants also accept known names.
+ *
+ * @see {@link AllPartsView} for the increments of a response that is still arriving.
+ * @see {@link ToolCallPartsView} for calls alone.
+ * @see {@link ToolResultPartsView} for results alone.
  * @stability stable
  * @category models
  */
@@ -79,7 +91,7 @@ export type PartView<Tools extends Record<string, Tool.Any>> =
 /**
  * Tool calls accepting both declared and undeclared parameter payloads.
  *
- * @see {@link AllPartsView} for tool-name narrowing limits.
+ * @see {@link AnyToolCallPart} for the variant no declaration covers.
  * @see {@link ToolCallOf} for calls typed through a config.
  * @stability stable
  * @category models
@@ -91,7 +103,7 @@ export type ToolCallPartsView<Tools extends Record<string, Tool.Any>> =
 /**
  * Tool results accepting both declared and undeclared result payloads.
  *
- * @see {@link AllPartsView} for tool-name narrowing limits.
+ * @see {@link AnyToolResultPart} for the variant no declaration covers.
  * @see {@link ToolResultOf} for results typed through a config.
  * @stability stable
  * @category models

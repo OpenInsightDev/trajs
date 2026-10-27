@@ -4,7 +4,7 @@ import { Exchange, Storage, View } from "@trajs/core";
 import type { Tokens } from "@trajs/extension-tokenize";
 import { tokenEstimate } from "@trajs/extension-tokenize";
 import { NodeServices } from "@trajs/platform-node";
-import { Effect, Layer, Stream } from "effect";
+import { Effect, Layer, Predicate, Stream } from "effect";
 
 import { config, Fixture, writeFixture } from "./produce.ts";
 
@@ -68,7 +68,7 @@ const main = () =>
           ],
 
           // Only a prompt estimate is kept. The last one is the kind breakdown.
-          prompt: count._tag === "prompt" ? count : reading.prompt,
+          prompt: Predicate.isTagged("prompt")(count) ? count : reading.prompt,
         }),
       ),
     );

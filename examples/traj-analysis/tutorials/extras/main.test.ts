@@ -1,7 +1,7 @@
 import { expect, it } from "@effect/vitest";
 import { Extra, ExtraKit, Prompt, Response, Trajectory, VersionedSchema } from "@trajs/core";
 import * as Config from "@trajs/core/Config";
-import { Effect, Schema, SchemaGetter, Stream } from "effect";
+import { Effect, Match, Schema, SchemaGetter, Stream } from "effect";
 
 /** The fields the harness wrote of a step, before `model_name` became `model`. */
 const stepAt1 = Schema.Struct({
@@ -46,7 +46,7 @@ const runExtra = new Extra.Extra({ package: "tutorial", id: "Run", session: run 
 // that does not declare a field leaves that field out.
 const extrakit = ExtraKit.make(stepExtra, runExtra);
 
-const config = Config.config({ stream: false, extrakit });
+const config = Config.config({ extrakit });
 
 const part = Trajectory.parts(config);
 
@@ -111,19 +111,18 @@ const trajectory = Trajectory.make(config)(
 const main = trajectory.pipe(
   Stream.runFold(
     (): Report => ({ run: null, turns: [] }),
-    (report, value) => {
-      switch (value._tag) {
-        case "Session": {
+    (report, value) =>
+      Match.value(value).pipe(
+        Match.tag("Session", (session) => {
           // Every declared field is optional: a part may carry none of them.
-          const recorded = value.extra[runExtra.tag];
+          const recorded = session.extra[runExtra.tag];
 
           return recorded === undefined
             ? report
             : { ...report, run: { agent: recorded.agent, task: recorded.task } };
-        }
-
-        case "Response": {
-          const recorded = value.extra[stepExtra.tag];
+        }),
+        Match.tag("Response", (response) => {
+          const recorded = response.extra[stepExtra.tag];
 
           if (recorded === undefined) return report;
 
@@ -134,16 +133,13 @@ const main = trajectory.pipe(
               {
                 model: recorded.model,
                 effort: recorded.effort,
-                tool: value.response.type === "tool-call" ? value.response.name : null,
+                tool: response.response.type === "tool-call" ? response.response.name : null,
               },
             ],
           };
-        }
-
-        default:
-          return report;
-      }
-    },
+        }),
+        Match.orElse(() => report),
+      ),
   ),
 );
 

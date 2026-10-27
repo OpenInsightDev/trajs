@@ -78,7 +78,6 @@ export const encode = (
 ): Trajectory.Trajectory<
   string,
   Config.Config<
-    true,
     Toolkit.Any,
     EventKit.Empty,
     MetricKit.WithProducers<MetricKit.Empty>,
@@ -112,7 +111,6 @@ export const fromFile = (
   Trajectory.Trajectory<
     string,
     Config.Config<
-      true,
       Toolkit.Any,
       EventKit.Empty,
       MetricKit.WithProducers<MetricKit.Empty>,
@@ -142,7 +140,6 @@ export const fromFile = (
 const kits = (document: Document) =>
   Produce.produce(
     Config.config({
-      stream: true,
       toolkit: toolkitOf(document),
       eventkit: EventKit.empty,
       // A kit that names no metric derives nothing, so the trajectory holds the parts

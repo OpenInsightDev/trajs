@@ -1,4 +1,4 @@
-import { Effect, Option, Stream } from "effect";
+import { Effect, Match, Option, Predicate, Stream } from "effect";
 
 import type * as Config from "#/Config.ts";
 import type * as Session from "#/Session.ts";
@@ -27,9 +27,26 @@ const recordPart = <Config extends Config.AnyConfig>(
   part: Trajectory.Part<Config>,
   index: number,
 ): Effect.Effect<void, TrajectoryError> => {
-  switch (part._tag) {
-    case "Session": {
-      const id = part.type.id;
+  // A prompt, a response, and an event all name the session they belong to.
+  const names = (named: { readonly sessionId?: string }): Effect.Effect<void> => {
+    recorded.named.add(named.sessionId ?? Trajectory.mainSessionId);
+
+    return Effect.void;
+  };
+
+  return Match.value(part).pipe(
+    Match.tag("Prompt", names),
+    Match.tag("Response", names),
+    Match.tag("Event", names),
+    Match.tag("Metric", (metric) => {
+      for (const attached of metric.metric.data.attach ?? []) {
+        recorded.attached.add(attached);
+      }
+
+      return Effect.void;
+    }),
+    Match.tag("Session", (session) => {
+      const id = session.type.id;
 
       if (id === Trajectory.mainSessionId || recorded.declared.has(id)) {
         return Effect.void;
@@ -40,33 +57,18 @@ const recordPart = <Config extends Config.AnyConfig>(
         return Effect.fail(TrajectoryError.session(id, "late-declaration"));
       }
 
-      switch (part.type._tag) {
-        case "main":
-          return Effect.void;
-
-        case "sub":
-          recorded.declared.set(id, { fork: part.type.fork, index });
+      return Match.value(session.type).pipe(
+        Match.tag("main", () => Effect.void),
+        Match.tag("sub", (sub) => {
+          recorded.declared.set(id, { fork: sub.fork, index });
 
           return Effect.void;
-      }
-    }
-
-    case "Metric": {
-      for (const attached of part.metric.data.attach ?? []) {
-        recorded.attached.add(attached);
-      }
-
-      return Effect.void;
-    }
-
-    case "Prompt":
-    case "Response":
-    case "Event": {
-      recorded.named.add(part.sessionId ?? Trajectory.mainSessionId);
-
-      return Effect.void;
-    }
-  }
+        }),
+        Match.exhaustive,
+      );
+    }),
+    Match.exhaustive,
+  );
 };
 
 const undeclared = (recorded: Recorded): string | undefined =>
@@ -78,33 +80,35 @@ const belongsTo = <Config extends Config.AnyConfig>(
   attached: ReadonlySet<string>,
   seen: Set<string>,
 ): part is Part<Config> => {
-  switch (part._tag) {
-    case "Session": {
-      if (part.type.id === id && attached.has(part.uuid)) {
-        seen.add(part.uuid);
-      }
-
+  const names = (named: { readonly uuid: string; readonly sessionId?: string }): boolean => {
+    if ((named.sessionId ?? Trajectory.mainSessionId) !== id) {
       return false;
     }
 
-    // A metric is produced after the part it names, so only uuids seen so far match.
-    case "Metric":
-      return (part.metric.data.attach ?? []).some((target) => target === id || seen.has(target));
-
-    case "Prompt":
-    case "Response":
-    case "Event": {
-      if ((part.sessionId ?? Trajectory.mainSessionId) !== id) {
-        return false;
-      }
-
-      if (attached.has(part.uuid)) {
-        seen.add(part.uuid);
-      }
-
-      return true;
+    if (attached.has(named.uuid)) {
+      seen.add(named.uuid);
     }
-  }
+
+    return true;
+  };
+
+  return Match.value(part).pipe(
+    Match.tag("Prompt", names),
+    Match.tag("Response", names),
+    Match.tag("Event", names),
+    // A metric is produced after the part it names, so only uuids seen so far match.
+    Match.tag("Metric", (metric) =>
+      (metric.metric.data.attach ?? []).some((target) => target === id || seen.has(target)),
+    ),
+    Match.tag("Session", (session) => {
+      if (session.type.id === id && attached.has(session.uuid)) {
+        seen.add(session.uuid);
+      }
+
+      return false;
+    }),
+    Match.exhaustive,
+  );
 };
 
 const streamOf = <Config extends Config.AnyConfig, E, R>(
@@ -169,33 +173,29 @@ const resolveForks = <Config extends Config.AnyConfig, E, R>(
         Stream.takeWhile(() => found.size < wanted.size),
         Stream.runForEach(([part, index]) =>
           Effect.sync(() => {
-            switch (part._tag) {
-              case "Session":
-              case "Prompt":
-              case "Response": {
-                if (!wanted.has(part.uuid)) {
-                  return;
-                }
-
-                const session =
-                  part._tag === "Session"
-                    ? part.type.id
-                    : (part.sessionId ?? Trajectory.mainSessionId);
-
-                found.set(part.uuid, { index, session });
-
-                return;
+            // A prompt or a response part names its session; a declaration names itself.
+            const name = (named: { readonly uuid: string; readonly sessionId?: string }): void => {
+              if (wanted.has(named.uuid)) {
+                found.set(named.uuid, {
+                  index,
+                  session: named.sessionId ?? Trajectory.mainSessionId,
+                });
               }
+            };
 
-              case "Event":
-              case "Metric":
-                return;
-
-              // A part kind added to a trajectory stops this compiling rather than
-              // going unread here.
-              default:
-                return part satisfies never;
-            }
+            Match.value(part).pipe(
+              Match.tag("Session", (session) => {
+                if (wanted.has(session.uuid)) {
+                  found.set(session.uuid, { index, session: session.type.id });
+                }
+              }),
+              Match.tag("Prompt", name),
+              Match.tag("Response", name),
+              // An event or a report cannot be a fork target.
+              Match.tag("Event", () => undefined),
+              Match.tag("Metric", () => undefined),
+              Match.exhaustive,
+            );
           }),
         ),
       );
@@ -265,15 +265,21 @@ export const read = <Config extends Config.AnyConfig, E, R>(
     return yield* treeOf(trajectory, recorded);
   });
 
+/** Whether `part` is the part `uuid` names. A metric carries no uuid, so it never ends one. */
+const endsAt =
+  <Config extends Config.AnyConfig>(uuid: string) =>
+  (part: Trajectory.Part<Config>): boolean =>
+    !Predicate.isTagged("Metric")(part) && part.uuid === uuid;
+
 const holds = <Config extends Config.AnyConfig, E, R>(
   stream: Session.SessionStream<Config, E, R>,
   uuid: string,
 ): Effect.Effect<boolean, E, R> =>
   stream.pipe(
-    Stream.takeUntil((part) => part._tag !== "Metric" && part.uuid === uuid),
+    Stream.takeUntil(endsAt<Config>(uuid)),
     Stream.runFold(
       () => false,
-      (_, part) => part._tag !== "Metric" && part.uuid === uuid,
+      (_, part) => endsAt<Config>(uuid)(part),
     ),
   );
 
@@ -283,9 +289,7 @@ const inherited = <Config extends Config.AnyConfig, E, R>(
 ): Session.SessionStream<Config, E, R> =>
   holds(stream, fork).pipe(
     Effect.map((produces) =>
-      produces
-        ? stream.pipe(Stream.takeUntil((part) => part._tag !== "Metric" && part.uuid === fork))
-        : Stream.empty,
+      produces ? stream.pipe(Stream.takeUntil(endsAt<Config>(fork))) : Stream.empty,
     ),
     Stream.unwrap,
   );

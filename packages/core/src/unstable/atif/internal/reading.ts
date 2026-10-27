@@ -9,7 +9,7 @@
 import { DateTime, Effect, FileSystem, Option, Path, Predicate, Schema } from "effect";
 import type { PlatformError } from "effect";
 
-import * as Config from "#/Config.ts";
+import * as EventKit from "#/EventKit.ts";
 import type * as Extra from "#/Extra.ts";
 import * as Produce from "#/Produce.ts";
 import * as Prompt from "#/Prompt.ts";
@@ -209,11 +209,11 @@ const resultId = (step: StepObject, at: number): string => `${step.step_id}-${at
 const resultsOf = (
   step: StepObject,
   cwd: string | undefined,
-): Effect.Effect<ReadonlyArray<Response.AllPartsView<{}>>, PlatformError.PlatformError, Services> =>
+): Effect.Effect<ReadonlyArray<Response.PartView<{}>>, PlatformError.PlatformError, Services> =>
   Effect.gen(function* () {
     const calls = step.tool_calls ?? [];
     const answered = new Set<string>();
-    const parts: Response.AllPartsView<{}>[] = [];
+    const parts: Response.PartView<{}>[] = [];
 
     for (const [at, result] of (step.observation?.results ?? []).entries()) {
       const stated = result.source_call_id ?? undefined;
@@ -259,11 +259,11 @@ const resultsOf = (
 const responsesOf = (
   step: StepObject,
   cwd: string | undefined,
-): Effect.Effect<ReadonlyArray<Response.AllPartsView<{}>>, PlatformError.PlatformError, Services> =>
+): Effect.Effect<ReadonlyArray<Response.PartView<{}>>, PlatformError.PlatformError, Services> =>
   Effect.gen(function* () {
     if (step.source !== "agent") return [];
 
-    const parts: Response.AllPartsView<{}>[] = [];
+    const parts: Response.PartView<{}>[] = [];
 
     const reasoning = step.reasoning_content ?? "";
 
@@ -300,7 +300,7 @@ interface Turn {
   prompt: Prompt.Prompt;
   /** What the document states of the step that stated the prompt. */
   promptStates: Stated | undefined;
-  response: Array<Response.AllPartsView<{}>>;
+  response: Array<Response.PartView<{}>>;
   /** What the document states of the step that answered, held by the first response part. */
   answerStates: Stated | undefined;
   /** Whether an agent step has answered the turn already. */
@@ -359,11 +359,7 @@ const turnsOf = (
  * of a step with the part of that step.
  */
 export const produce = (
-  main: Produce.ProduceSession<
-    Tools,
-    Config.UnknownConfig["eventkit"]["events"],
-    (typeof extrakit)["extra"]
-  >,
+  main: Produce.ProduceSession<Tools, EventKit.Empty["events"], (typeof extrakit)["extra"]>,
   document: Document,
   cwd: string | undefined,
 ): Effect.Effect<void, TrajectoryError | PlatformError.PlatformError, Services> =>

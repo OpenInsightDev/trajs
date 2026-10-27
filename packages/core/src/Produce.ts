@@ -8,13 +8,14 @@
  * @stability stable
  */
 
-import { Cause, DateTime, Effect, Exit, Function, Queue, Stream } from "effect";
+import { Cause, DateTime, Effect, Exit, Function, Option, Predicate, Queue, Stream } from "effect";
 
 import * as Config from "#/Config.ts";
 import * as Event from "#/Event.ts";
 import * as EventKit from "#/EventKit.ts";
 import * as Extra from "#/Extra.ts";
 import * as ExtraKit from "#/ExtraKit.ts";
+import { foldResponse, initial } from "#/internal/folding.ts";
 import { produceParts } from "#/internal/produce.ts";
 import { configOf, uuid } from "#/internal/trajectory.ts";
 import * as MetricKit from "#/MetricKit.ts";
@@ -30,7 +31,7 @@ import { TrajectoryError } from "#/TrajectoryError.ts";
  *
  * **Details**
  *
- * Response parts can contain streaming increments or finished payloads.
+ * Response parts are finished payloads.
  * Session declarations and metric reports are excluded.
  *
  * @see {@link fromSession} for producing a single-session trajectory.
@@ -39,7 +40,7 @@ import { TrajectoryError } from "#/TrajectoryError.ts";
  */
 export type MessageStream<Config extends Config.AnyConfig, E = never, R = never> = Stream.Stream<
   | Trajectory.PromptPart<Config["extrakit"]>
-  | Trajectory.ResponsePart<Config["toolkit"], Config["extrakit"], boolean>
+  | Trajectory.ResponsePart<Config["toolkit"], Config["extrakit"]>
   | Trajectory.EventPart<Config["eventkit"]>,
   E,
   R
@@ -86,7 +87,6 @@ export type SessionStreams<Config extends Config.AnyConfig, E = never, R = never
  *
  * **Details**
  *
- * Production always emits a streaming trajectory, regardless of the supplied `stream` flag.
  * An empty metric kit still needs a producer record.
  *
  * @see {@link MetricKit.toProducers} for supplying that record.
@@ -99,23 +99,7 @@ export type ProducingConfig<
   Events extends EventKit.Any,
   Metrics extends MetricKit.Any,
   Extras extends ExtraKit.Any,
-> = Config.Config<boolean, Toolkit, Events, MetricKit.WithProducers<Metrics>, Extras>;
-
-type ProducedConfig<
-  Toolkit extends Toolkit.Any,
-  Events extends EventKit.Any,
-  Metrics extends MetricKit.Any,
-  Extras extends ExtraKit.Any,
-> = Config.Config<true, Toolkit, Events, MetricKit.WithProducers<Metrics>, Extras>;
-
-const produced = <
-  Toolkit extends Toolkit.Any,
-  Events extends EventKit.Any,
-  Metrics extends MetricKit.Any,
-  Extras extends ExtraKit.Any,
->(
-  config: ProducingConfig<Toolkit, Events, Metrics, Extras>,
-): ProducedConfig<Toolkit, Events, Metrics, Extras> => Config.config({ ...config, stream: true });
+> = Config.Config<Toolkit, Events, MetricKit.WithProducers<Metrics>, Extras>;
 
 const produceWith =
   <
@@ -125,10 +109,10 @@ const produceWith =
     Extras extends ExtraKit.Any,
   >(
     id: string | undefined,
-    config: ProducedConfig<Toolkit, Events, Metrics, Extras>,
+    config: ProducingConfig<Toolkit, Events, Metrics, Extras>,
   ) =>
   <E, R>(
-    stream: Trajectory.TrajectoryStream<ProducedConfig<Toolkit, Events, Metrics, Extras>, E, R>,
+    stream: Trajectory.TrajectoryStream<ProducingConfig<Toolkit, Events, Metrics, Extras>, E, R>,
   ) =>
     produceParts(config, config.metrickit)(stream).pipe(Trajectory.make(id ?? uuid(), config));
 
@@ -142,7 +126,6 @@ const produceWith =
  * **Details**
  *
  * The explicit-id overload keeps that id; the other assigns a new uuid v7.
- * The result uses `stream: true`.
  * Input parts retain their order while metric reports can interleave.
  *
  * **Gotchas**
@@ -168,10 +151,10 @@ export function fromSession<
   id: Id,
   config: ProducingConfig<Toolkit, Events, Metrics, Extras>,
 ): <E, R>(
-  stream: MessageStream<ProducedConfig<Toolkit, Events, Metrics, Extras>, E, R>,
+  stream: MessageStream<ProducingConfig<Toolkit, Events, Metrics, Extras>, E, R>,
 ) => Trajectory.Trajectory<
   Id,
-  ProducedConfig<Toolkit, Events, Metrics, Extras>,
+  ProducingConfig<Toolkit, Events, Metrics, Extras>,
   E | TrajectoryError,
   R
 >;
@@ -183,10 +166,10 @@ export function fromSession<
 >(
   config: ProducingConfig<Toolkit, Events, Metrics, Extras>,
 ): <E, R>(
-  stream: MessageStream<ProducedConfig<Toolkit, Events, Metrics, Extras>, E, R>,
+  stream: MessageStream<ProducingConfig<Toolkit, Events, Metrics, Extras>, E, R>,
 ) => Trajectory.Trajectory<
   string,
-  ProducedConfig<Toolkit, Events, Metrics, Extras>,
+  ProducingConfig<Toolkit, Events, Metrics, Extras>,
   E | TrajectoryError,
   R
 >;
@@ -202,7 +185,7 @@ export function fromSession<
 ) {
   const [id, config] = args.length === 1 ? [undefined, args[0]] : args;
 
-  return produceWith(id, produced(config));
+  return produceWith(id, config);
 }
 
 /**
@@ -242,10 +225,10 @@ export function fromSessions<
   id: Id,
   config: ProducingConfig<Toolkit, Events, Metrics, Extras>,
 ): <E, R>(
-  sessions: SessionStreams<ProducedConfig<Toolkit, Events, Metrics, Extras>, E, R>,
+  sessions: SessionStreams<ProducingConfig<Toolkit, Events, Metrics, Extras>, E, R>,
 ) => Trajectory.Trajectory<
   Id,
-  ProducedConfig<Toolkit, Events, Metrics, Extras>,
+  ProducingConfig<Toolkit, Events, Metrics, Extras>,
   E | TrajectoryError,
   R
 >;
@@ -257,10 +240,10 @@ export function fromSessions<
 >(
   config: ProducingConfig<Toolkit, Events, Metrics, Extras>,
 ): <E, R>(
-  sessions: SessionStreams<ProducedConfig<Toolkit, Events, Metrics, Extras>, E, R>,
+  sessions: SessionStreams<ProducingConfig<Toolkit, Events, Metrics, Extras>, E, R>,
 ) => Trajectory.Trajectory<
   string,
-  ProducedConfig<Toolkit, Events, Metrics, Extras>,
+  ProducingConfig<Toolkit, Events, Metrics, Extras>,
   E | TrajectoryError,
   R
 >;
@@ -275,16 +258,15 @@ export function fromSessions<
     | [config: ProducingConfig<Toolkit, Events, Metrics, Extras>]
 ) {
   const [id, config] = args.length === 1 ? [undefined, args[0]] : args;
-  const read = produced(config);
-  const part = Trajectory.parts(read);
+  const part = Trajectory.parts(config);
 
   return <E, R>(
-    sessions: SessionStreams<ProducedConfig<Toolkit, Events, Metrics, Extras>, E, R>,
+    sessions: SessionStreams<ProducingConfig<Toolkit, Events, Metrics, Extras>, E, R>,
   ) => {
     const extraOf = (
-      source: SessionSource<ProducedConfig<Toolkit, Events, Metrics, Extras>, E, R>,
+      source: SessionSource<ProducingConfig<Toolkit, Events, Metrics, Extras>, E, R>,
     ): Extra.ExtraRecord<Extras["extra"], "session"> =>
-      Extra.stated(read.extrakit, "session")(source);
+      Extra.stated(config.extrakit, "session")(source);
 
     const main = part.mainSession(extraOf(sessions.main));
     const mainId = Trajectory.mainSessionId;
@@ -313,7 +295,7 @@ export function fromSessions<
           TrajectoryError.session(unreachable ?? mainId, "unproduced-fork"),
         );
 
-        return produceWith(id, read)(failed);
+        return produceWith(id, config)(failed);
       }
 
       for (const [sessionId, source, fork] of ready) {
@@ -335,7 +317,7 @@ export function fromSessions<
       { concurrency: "unbounded" },
     );
 
-    return produceWith(id, read)(Stream.make(...declarations).pipe(Stream.concat(streams)));
+    return produceWith(id, config)(Stream.make(...declarations).pipe(Stream.concat(streams)));
   };
 }
 
@@ -344,7 +326,6 @@ export function fromSessions<
  * config it is read with, with a metric kit of both.
  */
 type WithMetrics<Config extends Config.AnyConfig, Metrics extends MetricKit.Any> = Config.Config<
-  Config["stream"],
   Config["toolkit"],
   Config["eventkit"],
   MetricKit.Merged<readonly [Config["metrickit"], Metrics]>,
@@ -363,7 +344,7 @@ type WithMetrics<Config extends Config.AnyConfig, Metrics extends MetricKit.Any>
  * Input parts retain their order and values.
  * New reports interleave as their producers emit them.
  * The resulting config merges existing and supplied metric declarations.
- * The result receives a new uuid v7 and preserves the original `stream` flag.
+ * The result receives a new uuid v7.
  *
  * **Gotchas**
  *
@@ -427,6 +408,7 @@ type Moments = {
  * Extras sit beside timing options, not under an `extra` key.
  * An omitted prompt timestamp stays absent.
  * Responses and events receive the current time when their timestamp is omitted.
+ * A response that is still arriving is written as the part that ends it.
  *
  * @see {@link produce} for the writer's lifetime.
  * @stability stable
@@ -442,11 +424,27 @@ export type ProduceSession<
     message: Prompt.Prompt,
     options?: Extra.ExtraRecord<Extras, "prompt"> & Moments,
   ) => Effect.Effect<Trajectory.PromptPart<ExtraKit.ExtraKit<Extras>>>;
+  /**
+   * Writes the part a response ended in, folding the increments it arrived in.
+   *
+   * **Details**
+   *
+   * A finished part is written as it is.
+   * The increments of a streamed answer are folded into the chunk they build.
+   * The chunk is written at the part that ends it, under that call's options.
+   *
+   * **Gotchas**
+   *
+   * Returns none until the part that ends the chunk arrives.
+   * A chunk still open when the run ends is not written.
+   *
+   * @see {@link Response.AllPartsView} for the parts a response arrives in.
+   */
   enqueueResponse: (
     response: Response.AllPartsView<Tools>,
     options?: Extra.ExtraRecord<Extras, "response"> & Moments,
   ) => Effect.Effect<
-    Trajectory.ResponsePart<Toolkit.Toolkit<Tools>, ExtraKit.ExtraKit<Extras>, true>
+    Option.Option<Trajectory.ResponsePart<Toolkit.Toolkit<Tools>, ExtraKit.ExtraKit<Extras>>>
   >;
   enqueueEvent: (
     event: Event.EventParts<Events>,
@@ -491,7 +489,7 @@ type ProduceFn<
  * The main session is declared before the callback runs.
  * Declared session extras are read beside the config and attached to that declaration.
  * The explicit-id overload keeps that id; the other assigns a new uuid v7.
- * The output uses `stream: true` and includes the config's produced metric reports.
+ * The output includes the config's produced metric reports.
  * Callback failure fails the trajectory.
  *
  * **Gotchas**
@@ -537,7 +535,7 @@ export function produce<
   fn: ProduceFn<Toolkit["tools"], Events["events"], Extras["extra"], E, R>,
 ) => Trajectory.Trajectory<
   Id,
-  ProducedConfig<Toolkit, Events, Metrics, Extras>,
+  ProducingConfig<Toolkit, Events, Metrics, Extras>,
   E | TrajectoryError,
   R
 >;
@@ -553,7 +551,7 @@ export function produce<
   fn: ProduceFn<Toolkit["tools"], Events["events"], Extras["extra"], E, R>,
 ) => Trajectory.Trajectory<
   string,
-  ProducedConfig<Toolkit, Events, Metrics, Extras>,
+  ProducingConfig<Toolkit, Events, Metrics, Extras>,
   E | TrajectoryError,
   R
 >;
@@ -577,32 +575,32 @@ export function produce<
   fn: ProduceFn<Toolkit["tools"], Events["events"], Extras["extra"], E, R>,
 ) => Trajectory.Trajectory<
   string,
-  ProducedConfig<Toolkit, Events, Metrics, Extras>,
+  ProducingConfig<Toolkit, Events, Metrics, Extras>,
   E | TrajectoryError,
   R
 > {
   const [id, config] = args.length === 1 ? [undefined, args[0]] : args;
-  const read = produced(config);
-  const part = Trajectory.parts(read);
+  const part = Trajectory.parts<ProducingConfig<Toolkit, Events, Metrics, Extras>>(config);
 
   // The extra data the kit declares of a session part is stated beside the config, and is
   // declared with the main session: the one the program is handed.
-  const sessionExtra = Extra.stated(read.extrakit, "session")(config);
+  const sessionExtra = Extra.stated(config.extrakit, "session")(config);
 
   return (fn) => {
     // The queue only ever ends rather than fails — a run that fails fails the
     // trajectory through the fork — so its failure type is the end alone.
     const trajectory = Effect.gen(function* () {
       const parts = yield* Queue.unbounded<
-        Trajectory.Part<ProducedConfig<Toolkit, Events, Metrics, Extras>>,
+        Trajectory.Part<ProducingConfig<Toolkit, Events, Metrics, Extras>>,
         Cause.Done
       >();
 
       const declared = new Set<string>();
       const forkable = new Set<string>();
+      const folding = initial();
 
       const enqueue = <
-        P extends Trajectory.Part<ProducedConfig<Toolkit, Events, Metrics, Extras>> & {
+        P extends Trajectory.Part<ProducingConfig<Toolkit, Events, Metrics, Extras>> & {
           readonly uuid: string;
         },
       >(
@@ -613,7 +611,7 @@ export function produce<
 
           // A `fork` names a part a session continues from, so an event is written
           // without being remembered to fork from.
-          if (written._tag !== "Event") {
+          if (!Predicate.isTagged("Event")(written)) {
             forkable.add(written.uuid);
           }
 
@@ -630,9 +628,26 @@ export function produce<
         enqueuePrompt: (prompt, { timestamp, startTimestamp, ...extra } = {}) =>
           enqueue(part.prompt(prompt, { sessionId: stated, timestamp, startTimestamp, ...extra })),
         enqueueResponse: (response, { timestamp, startTimestamp, ...extra } = {}) =>
-          enqueue(
-            part.response(response, { sessionId: stated, timestamp, startTimestamp, ...extra }),
-          ),
+          Effect.gen(function* () {
+            // A response that is still arriving is folded into the chunk it builds, so
+            // the trajectory holds the part the chunk ends in.
+            const [, folded] = foldResponse(folding, stated ?? Trajectory.mainSessionId, response);
+
+            if (Option.isNone(folded)) {
+              return Option.none();
+            }
+
+            const written = yield* enqueue(
+              part.response(folded.value, {
+                sessionId: stated,
+                timestamp,
+                startTimestamp,
+                ...extra,
+              }),
+            );
+
+            return Option.some(written);
+          }),
         enqueueEvent: (event, { timestamp, startTimestamp } = {}) =>
           enqueue(part.event(event, { sessionId: stated, timestamp, startTimestamp })),
         forkSession: ({ id: sessionId, fork, ...extra }) =>
@@ -654,7 +669,7 @@ export function produce<
 
             declared.add(sessionId);
 
-            const extraData = Extra.stated(read.extrakit, "session")(extra);
+            const extraData = Extra.stated(config.extrakit, "session")(extra);
 
             const opened = yield* enqueue(
               part.subSession(sessionId, { fork: continuing, ...extraData }),
@@ -679,6 +694,6 @@ export function produce<
       return Stream.fromQueue(parts).pipe(Stream.drainFork(program));
     });
 
-    return produceWith(id, read)(trajectory.pipe(Stream.unwrap));
+    return produceWith(id, config)(trajectory.pipe(Stream.unwrap));
   };
 }

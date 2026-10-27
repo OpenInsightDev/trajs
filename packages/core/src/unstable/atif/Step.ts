@@ -7,7 +7,7 @@
  * @stability stable
  */
 
-import { Option, Stream } from "effect";
+import { Match, Option, Stream } from "effect";
 import type { Prompt, Tool } from "effect/ai";
 
 import * as Config from "#/Config.ts";
@@ -84,27 +84,27 @@ const messageOf = (message: Prompt.Message): string =>
 /** The steps one step of a session is read as. */
 const stepsOf = <Config extends Config.AnyConfig>(
   step: View.Step<Config>,
-): ReadonlyArray<Step<Tools<Config>>> => {
-  switch (step._tag) {
-    case "Prompt":
-      return step.prompt.messages.map((message) => ({
+): ReadonlyArray<Step<Tools<Config>>> =>
+  Match.value(step).pipe(
+    Match.tag("Prompt", (prompt) =>
+      prompt.prompt.messages.map((message) => ({
         source: sources[message.role],
         message: messageOf(message),
         reasoning: Option.none(),
         toolCalls: [],
         observations: [],
-      }));
-
-    case "Response": {
+      })),
+    ),
+    Match.tag("Response", ({ response: parts }): ReadonlyArray<Step<Tools<Config>>> => {
       // A run that produced nothing answers with no step of its own.
-      if (step.response.length === 0) return [];
+      if (parts.length === 0) return [];
 
       let message = "";
       let reasoning = "";
       const toolCalls: Response.ToolCallPartsView<Tools<Config>>[] = [];
       const observations: Response.ToolResultPartsView<Tools<Config>>[] = [];
 
-      for (const part of step.response) {
+      for (const part of parts) {
         switch (part.type) {
           case "text":
             message += part.text;
@@ -132,12 +132,11 @@ const stepsOf = <Config extends Config.AnyConfig>(
           observations,
         },
       ];
-    }
-
-    case "Event":
-      return [];
-  }
-};
+    }),
+    // An event states nothing of the conversation.
+    Match.tag("Event", () => []),
+    Match.exhaustive,
+  );
 
 /**
  * Converts one session into unnumbered, text-oriented ATIF step views.
@@ -147,7 +146,7 @@ const stepsOf = <Config extends Config.AnyConfig>(
  * Each prompt message becomes one step.
  * Each response group becomes one agent step.
  * Events produce no steps.
- * Response grouping and streaming completion follow {@link View.steps}.
+ * Response grouping follows {@link View.steps}.
  *
  * **Gotchas**
  *

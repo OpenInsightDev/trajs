@@ -2,8 +2,8 @@
 
 `View.steps` groups a session's flat parts into turns: one step per prompt, one
 per reply. A reply is several parts — text, a tool call, its result, more text —
-so a count over parts counts pieces, not replies. `View.steps` folds the run
-into finished parts before it emits, so a step is one whole turn.
+so a count over parts counts pieces, not replies. `View.steps` groups the run
+into its steps before it emits, so a step is one whole turn.
 
 ```ts
 const main = Effect.gen(function* () {
@@ -25,10 +25,8 @@ effect needs a layer: `Cache.layer()` keeps the parts in memory,
 `Cache.layerFsTemp()` spills them to a temporary directory.
 
 What a step does not keep: the uuid, timestamp, and extra fields of the response
-parts, because the step holds the folded parts and not the trajectory parts. A
-`Prompt` step does keep its prompt part. Text and reasoning increments become
-one finished part at their end marker; an increment still open when the input
-ends is dropped, and a new prompt discards open increments. When you want the
+parts, because the step holds the response parts and not the trajectory parts. A
+`Prompt` step does keep its prompt part. When you want the
 whole conversation rather than its turns — to build the next model call —
 `View.prompt` folds a session into one prompt.
 

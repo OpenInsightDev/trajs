@@ -18,7 +18,6 @@ import { DateTime, Effect, Stream } from "effect";
 import { expect, it } from "vite-plus/test";
 
 const config = Config.config({
-  stream: false,
   toolkit: Toolkit.empty,
   eventkit: EventKit.empty,
   metrickit: MetricKit.empty,

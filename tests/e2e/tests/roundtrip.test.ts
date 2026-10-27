@@ -20,7 +20,7 @@ import * as Trajectory from "@trajs/core/Trajectory";
 import { NodeServices } from "@trajs/platform-node";
 import { Algorithm as CompressionAlgorithm } from "@trajs/utils/Compression";
 import { layerFileSystem } from "@trajs/utils/Storage";
-import { Effect, FileSystem, Layer, Stream } from "effect";
+import { Effect, FileSystem, Layer, Predicate, Stream } from "effect";
 import { describe, expect, it } from "vite-plus/test";
 
 /** The session the trajectory runs in. */
@@ -33,11 +33,10 @@ const question = "what is the weather in SF";
 const extrakit = ExtraKit.empty;
 
 /**
- * The kits the trajectory is built and read with: no tools, no events, no metrics,
- * and a response part stated whole rather than as the increments of a stream.
+ * The kits the trajectory is built and read with: no tools, no events, and no
+ * metrics.
  */
 const config = Config.config({
-  stream: false,
   toolkit: Toolkit.empty,
   eventkit: EventKit.empty,
   metrickit: MetricKit.empty,
@@ -113,7 +112,7 @@ describe("a trajectory kept as a file", () => {
 
     expect(prompt._tag).toBe("Prompt");
 
-    if (prompt._tag === "Prompt") {
+    if (Predicate.isTagged("Prompt")(prompt)) {
       expect(prompt.sessionId).toBe(session);
       expect(prompt.messages).toEqual(Prompt.make(question).content);
     }

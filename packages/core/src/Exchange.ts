@@ -18,9 +18,9 @@ import { Context, Effect, Fiber, Layer, Schema, Stream } from "effect";
 
 import * as Config from "#/Config.ts";
 import {
-  encodeExchangePart,
   encodeHeader,
   encodeMetadata,
+  encodePart,
   ExchangePart,
   frameOf,
   headerOf,
@@ -108,12 +108,11 @@ export const Metadata = Schema.Struct({
 export type Metadata = Schema.Schema.Type<typeof Metadata>;
 
 /**
- * Creates the storage part schema using `config`'s kits and streaming response variant.
+ * Creates the storage part schema using `config`'s kits.
  *
  * **Details**
  *
- * Storage always accepts streaming response increments, regardless of `config.stream`.
- * {@link Loaded.read} folds increments for a non-streaming read config.
+ * A stored part is a trajectory part, so a response is a finished part.
  * Prompt file data also accepts stored URL representations.
  *
  * @see {@link Trajectory.Part} for ordinary trajectory parts.
@@ -162,12 +161,7 @@ export interface Loaded<Config extends Config.AnyConfig = Config.AnyConfig> {
    *
    * **Details**
    *
-   * A non-streaming config folds text and reasoning increments into finished parts.
    * Decoding and storage failures occur during stream consumption.
-   *
-   * **Gotchas**
-   *
-   * Tool parameter increments, response error payloads, and unfinished text or reasoning are omitted by non-streaming folding.
    */
   readonly read: <C extends Config.AnyConfig = Config>(
     config?: C,
@@ -352,7 +346,7 @@ export const layer: Layer.Layer<Exchange, never, Storage | Compression | StreamH
 
             // Part order is the trajectory order, so encoding stays sequential.
             const frames = trajectory.pipe(
-              Stream.mapEffect(encodeExchangePart(config), { concurrency: 1 }),
+              Stream.mapEffect(encodePart(config), { concurrency: 1 }),
             );
 
             // The digest sits in the metadata at the tail.

@@ -23,7 +23,7 @@ import type { TrajectoryError } from "@trajs/core/TrajectoryError";
 import { BrowserServices } from "@trajs/platform-browser";
 import { makeByte } from "@trajs/utils/Byte";
 import { Storage, StorageError } from "@trajs/utils/Storage";
-import { Effect, Layer, Option, Sink, Stream } from "effect";
+import { Effect, Layer, Match, Option, Predicate, Sink, Stream } from "effect";
 
 /**
  * What reading a trajectory fails with: the trajectory's own failure, or the cache its
@@ -31,7 +31,7 @@ import { Effect, Layer, Option, Sink, Stream } from "effect";
  */
 type Failure = TrajectoryError | StorageError | Cache.CacheError;
 
-/** Empty kits. A part a kit made is stepped over, and response parts stay streamed. */
+/** Empty kits. A part a kit made is stepped over. */
 const config = Config.config();
 
 type ViewerConfig = typeof config;
@@ -134,7 +134,7 @@ interface Assembly {
 const endsAt =
   (uuid: string) =>
   (part: { readonly _tag: string; readonly uuid?: string }): boolean =>
-    part._tag !== "Metric" && part.uuid === uuid;
+    !Predicate.isTagged("Metric")(part) && part.uuid === uuid;
 
 /** `takeUntil` would keep the whole stream when `until` names no part. */
 const bounded = (stream: PartStream, until?: string): Effect.Effect<PartStream, Failure> => {
@@ -158,31 +158,29 @@ const turnsOf = (stream: PartStream, until?: string): Effect.Effect<ReadonlyArra
       View.steps(parts).pipe(
         Stream.runFold(
           (): Assembly => ({ turns: [], open: Option.none() }),
-          (assembly, step) => {
-            switch (step._tag) {
-              case "Prompt":
-                return {
-                  turns: Option.isSome(assembly.open)
-                    ? [...assembly.turns, assembly.open.value]
-                    : assembly.turns,
-                  open: Option.some({ prompt: step.prompt, response: [] }),
-                };
-
-              case "Response":
-                return Option.isNone(assembly.open)
+          (assembly, step) =>
+            Match.value(step).pipe(
+              Match.tag("Prompt", (prompt) => ({
+                turns: Option.isSome(assembly.open)
+                  ? [...assembly.turns, assembly.open.value]
+                  : assembly.turns,
+                open: Option.some({ prompt: prompt.prompt, response: [] }),
+              })),
+              Match.tag("Response", (response) =>
+                Option.isNone(assembly.open)
                   ? assembly
                   : {
                       turns: assembly.turns,
                       open: Option.some({
                         prompt: assembly.open.value.prompt,
-                        response: [...assembly.open.value.response, ...step.response],
+                        response: [...assembly.open.value.response, ...response.response],
                       }),
-                    };
-
-              case "Event":
-                return assembly;
-            }
-          },
+                    },
+              ),
+              // An event is not a turn, so it neither opens nor closes one.
+              Match.tag("Event", () => assembly),
+              Match.exhaustive,
+            ),
         ),
         Effect.map(({ turns, open }): ReadonlyArray<Turn> =>
           Option.isSome(open) ? [...turns, open.value] : turns,

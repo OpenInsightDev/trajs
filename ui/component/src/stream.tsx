@@ -9,9 +9,8 @@
  * A stream part is not rendered one at a time: the increments of one chunk say the
  * text of one part, so reading them apart would read one bubble per increment.
  * A `*-start` opens a chunk where it is first written, its `*-delta` parts add to
- * it and its `*-end` closes it — the rule `@trajs/core` folds a stream
- * by — and an increment whose start is not among the parts read belongs to no
- * chunk. What a stream that has not ended has to say is what is left over: a chunk
+ * it and its `*-end` closes it — the rule a stream writes a chunk by — and an
+ * increment whose start is not among the parts read belongs to no chunk. What a stream that has not ended has to say is what is left over: a chunk
  * that is still open reads as what has been written of it, and an error part,
  * which a trajectory of a finished turn carries nothing of, reads as itself.
  */
@@ -30,7 +29,7 @@ import type { AnyResponsePart } from "./response.tsx";
 import { ToolPayload } from "./tool-payload.tsx";
 
 /**
- * A streaming response part, as a trajectory carries it: the toolkit a part was
+ * A streaming response part, as a handler accumulates it: the toolkit a part was
  * produced with is not the toolkit it is read with, so the tool a part names is
  * left unconstrained.
  *

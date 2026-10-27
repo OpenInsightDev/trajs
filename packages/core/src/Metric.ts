@@ -187,13 +187,13 @@ export const makeFailure = <Ext extends Any>(
  * An attachment must name an already consumed part or a declared session.
  * The producer must not require services beyond the input stream's requirements.
  *
- * @see {@link produce} for folding streaming increments before production.
+ * @see {@link produce} for running the producers of a kit.
  * @see {@link MetricKit.toProducers} for registering producers.
  * @stability stable
  * @category models
  */
 export type Producer<Ext extends Any> = <E, R>(
-  trajectory: Trajectory.TrajectoryStream<Config.NonStreamConfig, E, R>,
+  trajectory: Trajectory.TrajectoryStream<Config.AnyConfig, E, R>,
 ) => Stream.Stream<Output<Ext>, E | TrajectoryError | Failure<Ext>, R>;
 
 type OutputSchema<Ext extends Any> = Schema.TaggedStruct<
@@ -269,7 +269,6 @@ export const MetricParts = <K extends MetricKit.Any>(
  *
  * **Details**
  *
- * Streaming increments are folded before producers receive parts.
  * Producers run concurrently, so reports from different producers can interleave.
  * A {@link Failure} becomes one report and ends only its producer.
  * Other errors fail the resulting stream.

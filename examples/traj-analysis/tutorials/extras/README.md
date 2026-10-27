@@ -20,7 +20,7 @@ const runExtra = new Extra.Extra({
 });
 
 const extrakit = ExtraKit.make(stepExtra, runExtra);
-const config = Config.config({ stream: false, extrakit });
+const config = Config.config({ extrakit });
 ```
 
 The tag is `package` and `id` joined — `tutorial/Step` — and it is the key the
