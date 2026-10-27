@@ -2,7 +2,7 @@
  * What this package states of itself, which every declaration it makes states again.
  */
 
-import type { PackageMetadata } from "#/PackageMetadata.ts";
+import type { PackageMetadata } from "#/Package.ts";
 
 import packageJson from "../../../../package.json" with { type: "json" };
 

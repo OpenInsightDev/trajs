@@ -85,7 +85,7 @@ export * as MetricKit from "#/MetricKit.ts";
  * @stability stable
  * @category re-exports
  */
-export { PackageMetadata } from "#/PackageMetadata.ts";
+export { PackageMetadata } from "#/Package.ts";
 
 /**
  * Live trajectory writers and metric enrichment.

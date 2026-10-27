@@ -13,7 +13,7 @@ import type { NonEmptyArray } from "effect/Array";
 import * as Config from "#/Config.ts";
 import { runProducers } from "#/internal/metric.ts";
 import type * as MetricKit from "#/MetricKit.ts";
-import type { PackageMetadata } from "#/PackageMetadata.ts";
+import type { PackageMetadata } from "#/Package.ts";
 import type * as Trajectory from "#/Trajectory.ts";
 import type { TrajectoryError } from "#/TrajectoryError.ts";
 import * as VersionedSchema from "#/VersionedSchema.ts";

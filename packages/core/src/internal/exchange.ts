@@ -9,7 +9,7 @@ import type * as Exchange from "#/Exchange.ts";
 import type * as ExtraKit from "#/ExtraKit.ts";
 import { readFrames } from "#/internal/frames.ts";
 import * as Metric from "#/Metric.ts";
-import { PackageMetadata } from "#/PackageMetadata.ts";
+import { PackageMetadata } from "#/Package.ts";
 import * as Prompt from "#/Prompt.ts";
 import * as Toolkit from "#/Toolkit.ts";
 import * as Trajectory from "#/Trajectory.ts";

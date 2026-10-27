@@ -10,7 +10,7 @@
 import { Data, Schema } from "effect";
 
 import type * as EventKit from "#/EventKit.ts";
-import type { PackageMetadata } from "#/PackageMetadata.ts";
+import type { PackageMetadata } from "#/Package.ts";
 import * as VersionedSchema from "#/VersionedSchema.ts";
 
 /**
