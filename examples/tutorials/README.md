@@ -26,6 +26,8 @@ in one pass — is a case in [`examples/traj-analysis`](../traj-analysis) instea
   written before a rename still reads.
 - [olap](./olap/README.md) — write runs into ClickHouse and answer their calls and billing with
   SQL.
+- [cache](./cache/README.md) — read a source once and replay it, with the newest parts in memory and
+  the rest spilled to a byte store.
 
 ## Running
 
