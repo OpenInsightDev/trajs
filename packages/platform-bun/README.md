@@ -6,9 +6,10 @@ Bun runs with.
 - `BunCompression` — a zstd frame `Bun.zstdCompress` and `Bun.zstdDecompress`
   write and read, and a gzip or deflate frame `Bun.gzipSync`, `Bun.gunzipSync`,
   `Bun.deflateSync` and `Bun.inflateSync` do.
-- `BunServices` — the compression and the BLAKE3, BLAKE2b or SHA-256 digest
-  `@trajs/platform-node` reads through the Rust binding, as one layer provided
-  beside the storage where a program on Bun keeps a trajectory.
+- `BunChecksum` — the CRC-32 of a block `Bun.hash.crc32` reads.
+- `BunServices` — the compression, the checksum and the BLAKE3, BLAKE2b or SHA-256
+  digest `@trajs/platform-node` reads through the Rust binding, as one layer
+  provided beside the storage where a program on Bun keeps a trajectory.
 
 Bun states no BLAKE3 of its own, so this package stands on
 [`@trajs/platform-node`](../platform-node) for the digests the way

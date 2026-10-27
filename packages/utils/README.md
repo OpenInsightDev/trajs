@@ -8,7 +8,9 @@ platform package can say what each is over.
 - `Storage` — where a trajectory is kept, what a place that could not serve one
   failed with (`StorageError`), and the storages this package ships: a directory of
   files (`Storage.layerFileSystem`) and a bucket reached with a client of the AWS
-  SDK (`Storage.layerS3`).
+  SDK (`Storage.layerS3`). A write begins a trajectory or continues one from an
+  offset (`Storage.WriteOptions.mode`), which a file holds and a bucket does not
+  (`Storage.Capabilities`).
 - `ByteStore` — the bytes a program keeps between readings, held in chunks in the
   key/value store of `effect/persistence` (`ByteStore.layerKVStore`), in memory
   (`ByteStore.layer`), or in a temporary directory of the file system that goes
@@ -17,9 +19,16 @@ platform package can say what each is over.
 - `Compression` — what carries a trajectory's parts in a frame: zstd, gzip,
   deflate, or the bytes as they are, stated at the call that writes or reads one
   (`Compression.Options`) and written into the metadata a trajectory ends with.
+- `Checksum` — what checks a block of a trajectory's parts: CRC-32, stated at
+  the call that reads one (`Checksum.Options`) and read over one block at a time.
+  A platform package reads it with the codec of its runtime (`node:zlib`,
+  `Bun.hash.crc32`), and the tables here read the same number where a runtime
+  states none. A checksum catches a torn or misplaced block, and does not name
+  it: what names a trajectory is a digest.
 - `StreamHash` — what reads the digest of a trajectory's parts: BLAKE3, BLAKE2b
   or SHA-256, stated at the call that reads one (`StreamHash.Options`) and written
-  into the metadata a trajectory ends with, and the JavaScript hash this package
+  into the metadata a trajectory ends with, read in one pass over a stream or fed
+  to a running digest (`StreamHash.start`), and the JavaScript hash this package
   ships for all three.
 
 `@trajs/platform-node` and `@trajs/platform-browser` provide the layers these

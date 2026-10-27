@@ -14,13 +14,14 @@ import {
   StreamHash,
   defaultAlgorithm,
   make as hashInJavaScript,
+  type Hashing,
   type Options,
 } from "@trajs/utils/StreamHash";
 import * as blake3 from "blake3-wasm";
 import { Effect, Layer, Sink } from "effect";
 
 /** The sink of one digest: bytes in, a hex digest out. */
-type Hashing = Sink.Sink<string, Uint8Array, never, never>;
+type Digest = Sink.Sink<string, Uint8Array, never, never>;
 
 /** What SHA-256 is asked of WebCrypto as. */
 const Sha256 = "SHA-256";
@@ -61,7 +62,7 @@ const hex = (bytes: Uint8Array): string => {
  * BLAKE2b and BLAKE3 need no page context. A refused digest is a defect, because
  * no hash of a layer fails.
  */
-const webCrypto: Hashing = Sink.reduce<Array<Uint8Array>, Uint8Array>(
+const webCrypto: Digest = Sink.reduce<Array<Uint8Array>, Uint8Array>(
   () => [],
   (chunks, chunk) => {
     chunks.push(chunk);
@@ -82,7 +83,7 @@ const webCrypto: Hashing = Sink.reduce<Array<Uint8Array>, Uint8Array>(
  * Reading the digest spends the hash, because the WebAssembly hasher frees itself
  * then. A run therefore builds its own hash.
  */
-const webAssembly: Hashing = Sink.reduce(
+const webAssembly: Digest = Sink.reduce(
   () => blake3.createHash(),
   (hashed, chunk: Uint8Array) => {
     hashed.update(chunk);
@@ -92,7 +93,7 @@ const webAssembly: Hashing = Sink.reduce(
 ).pipe(Sink.map((hashed) => hashed.digest("hex")));
 
 /** The sink of one algorithm. */
-const hashing = (algorithm: Algorithm): Hashing => {
+const hashing = (algorithm: Algorithm): Digest => {
   switch (algorithm) {
     case Algorithm.enums.Blake2b:
       return hashInJavaScript().digest({ algorithm });
@@ -100,6 +101,39 @@ const hashing = (algorithm: Algorithm): Hashing => {
       return webCrypto;
     default:
       return webAssembly;
+  }
+};
+
+/**
+ * The running BLAKE3 of `blake3-wasm`.
+ *
+ * Reading the digest frees the WebAssembly hash, which is what {@link Hashing}
+ * states of every running digest.
+ */
+const webAssemblyRunning = (): Hashing => {
+  const hashed = blake3.createHash();
+
+  return {
+    digest: () => hashed.digest("hex"),
+    update: (bytes) => {
+      hashed.update(bytes);
+    },
+  };
+};
+
+/**
+ * The running digest of one algorithm.
+ *
+ * SHA-256 comes from the JavaScript hash of `@trajs/utils` rather than WebCrypto,
+ * which reads a whole input in one call. The bytes it digests are the same, so it
+ * reads the same digest.
+ */
+const running = (algorithm: Algorithm): Hashing => {
+  switch (algorithm) {
+    case Algorithm.enums.Blake3:
+      return webAssemblyRunning();
+    default:
+      return hashInJavaScript().start({ algorithm });
   }
 };
 
@@ -121,8 +155,9 @@ const hashing = (algorithm: Algorithm): Hashing => {
  * browser entry of the package, so a page supplies the WebAssembly code through
  * `blake3/browser`.
  *
- * SHA-256 comes from WebCrypto, with one call over the whole stream. BLAKE2b has
- * no browser codec, so it uses the JavaScript hash of `@trajs/utils`.
+ * SHA-256 comes from WebCrypto, with one call over the whole stream, and from
+ * the JavaScript hash of `@trajs/utils` where the bytes arrive over several
+ * writes. BLAKE2b has no browser codec, so it uses the JavaScript hash too.
  *
  * Every digest has 32 bytes, or 64 hex characters.
  *
@@ -132,4 +167,5 @@ const hashing = (algorithm: Algorithm): Hashing => {
  */
 export const layer: Layer.Layer<StreamHash> = Layer.succeed(StreamHash, {
   digest: (options?: Options) => hashing(options?.algorithm ?? defaultAlgorithm),
+  start: (options?: Options) => running(options?.algorithm ?? defaultAlgorithm),
 });

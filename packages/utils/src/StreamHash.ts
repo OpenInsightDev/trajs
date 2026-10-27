@@ -1,8 +1,10 @@
 /**
  * The digest of a trajectory's parts.
  *
- * A {@link StreamHash} reads the digest of one stream. The exchange runs over a
- * hash, so a platform package supplies the codecs. `@trajs/platform-node` and
+ * A {@link StreamHash} reads the digest of one stream
+ * ({@link StreamHash.digest}), or of a sequence fed to it over several writes
+ * ({@link StreamHash.start}). The exchange runs over a hash, so a platform
+ * package supplies the codecs. `@trajs/platform-node` and
  * `@trajs/platform-bun` use `@napi-rs/blake-hash` and `node:crypto`.
  * `@trajs/platform-browser` uses `blake3-wasm`, WebCrypto and the hash of this
  * package.
@@ -97,13 +99,58 @@ export interface Options {
 export const defaultAlgorithm: Algorithm = Algorithm.enums.Blake3;
 
 /**
+ * A digest being computed: bytes fed to it, and the digest read once they end.
+ *
+ * **When to use**
+ *
+ * Use where the bytes of a digest arrive over several writes rather than one
+ * stream, such as the digest of one chunk beside a frontier over the digests
+ * before it. Use it as well to read a digest where no stream ends.
+ *
+ * **Details**
+ *
+ * - `update` feeds bytes to the digest, and may be called as often as wanted.
+ * - `digest` reads the digest of the bytes fed so far, as 64 lowercase hex
+ *   characters.
+ *
+ * Each running digest keeps its own state, and bytes fed to one never reach
+ * another. No running digest of a layer fails.
+ *
+ * **Gotchas**
+ *
+ * `digest` reads one digest and spends the state. The WebAssembly BLAKE3 of a
+ * page frees itself on reading, and `node:crypto` spends its hash, so updating
+ * after a digest is not part of what a running digest does. A caller reading
+ * several points of one sequence begins a running digest per span.
+ *
+ * @see {@link StreamHash.start} for the operation that begins one.
+ * @stability stable
+ * @category models
+ */
+export interface Hashing {
+  /**
+   * Feeds one sequence of bytes to the digest.
+   */
+  readonly update: (bytes: Uint8Array) => void;
+
+  /**
+   * Reads the digest of the bytes fed so far, as 64 lowercase hex characters.
+   */
+  readonly digest: () => string;
+}
+
+/**
  * The hash service of the exchange.
  *
  * **Details**
  *
- * `digest` takes an algorithm ({@link Options}) and returns a sink. The sink
- * consumes one stream and holds its digest as 64 lowercase hex characters.
- * {@link defaultAlgorithm} applies when no algorithm is given.
+ * - `digest` takes an algorithm ({@link Options}) and returns a sink. The sink
+ *   consumes one stream and holds its digest as 64 lowercase hex characters.
+ * - `start` takes the same algorithm and returns a {@link Hashing} that bytes
+ *   are fed to over several writes.
+ *
+ * {@link defaultAlgorithm} applies when no algorithm is given. Both forms read
+ * the same digest of the same bytes, so what one writes the other reads.
  *
  * The sink reads the format bytes, so every platform hashes the same part bytes.
  * Each run keeps its own state, and two runs share nothing. No hash of a layer
@@ -118,6 +165,11 @@ export interface StreamHash {
    * The digest of the bytes given to it, read once they have ended.
    */
   readonly digest: (options?: Options) => Sink.Sink<string, Uint8Array, never, never>;
+
+  /**
+   * The digest of bytes fed to it over several writes ({@link Hashing}).
+   */
+  readonly start: (options?: Options) => Hashing;
 }
 
 /**
@@ -142,26 +194,38 @@ export const StreamHash: Context.Service<StreamHash, StreamHash> = Context.Servi
   StreamHash
 >()("trajs/utils/StreamHash");
 
+const running = (algorithm: Algorithm): Hashing => {
+  switch (algorithm) {
+    case Algorithm.enums.Blake2b:
+      // BLAKE2b at 32 bytes, the length of the other two digests. An
+      // unconfigured BLAKE2b computes 64.
+      return digestOf(blake2b.create({ dkLen: 32 }));
+    case Algorithm.enums.Sha256:
+      return digestOf(sha256.create());
+    default:
+      return digestOf(blake3.create());
+  }
+};
+
+const digestOf = (hashed: {
+  readonly update: (bytes: Uint8Array) => void;
+  readonly digest: () => Uint8Array;
+}): Hashing => ({
+  digest: () => bytesToHex(hashed.digest()),
+  update: (bytes) => {
+    hashed.update(bytes);
+  },
+});
+
 const hashing = (algorithm: Algorithm): Sink.Sink<string, Uint8Array, never, never> =>
   Sink.reduce(
-    () => {
-      switch (algorithm) {
-        case Algorithm.enums.Blake2b:
-          // BLAKE2b at 32 bytes, the length of the other two digests. An
-          // unconfigured BLAKE2b computes 64.
-          return blake2b.create({ dkLen: 32 });
-        case Algorithm.enums.Sha256:
-          return sha256.create();
-        default:
-          return blake3.create();
-      }
-    },
-    (hashed, chunk: Uint8Array) => {
-      hashed.update(chunk);
+    () => running(algorithm),
+    (running: Hashing, chunk: Uint8Array) => {
+      running.update(chunk);
 
-      return hashed;
+      return running;
     },
-  ).pipe(Sink.map((hashed) => bytesToHex(hashed.digest())));
+  ).pipe(Sink.map((running) => running.digest()));
 
 /**
  * The hash of this package as a service.
@@ -184,6 +248,7 @@ const hashing = (algorithm: Algorithm): Sink.Sink<string, Uint8Array, never, nev
  */
 export const make = (): StreamHash => ({
   digest: (options) => hashing(options?.algorithm ?? defaultAlgorithm),
+  start: (options) => running(options?.algorithm ?? defaultAlgorithm),
 });
 
 /**

@@ -11,25 +11,19 @@
 import { createHash } from "node:crypto";
 
 import * as blake from "@napi-rs/blake-hash";
-import { Algorithm, StreamHash, defaultAlgorithm, type Options } from "@trajs/utils/StreamHash";
+import {
+  Algorithm,
+  StreamHash,
+  defaultAlgorithm,
+  type Hashing,
+  type Options,
+} from "@trajs/utils/StreamHash";
 import { Layer, Sink } from "effect";
 
 /**
- * The state of one running hash: chunked input, and a digest at the end.
- *
- * The binding's hashers and the `node:crypto` hashers take the same calls. Bytes
- * go in, and hex comes out, so one sink serves every algorithm.
- */
-interface Hashing {
-  /** Feeds one chunk of the stream to the hash. */
-  update(chunk: Uint8Array): void;
-
-  /** Reads the digest of the input so far, as lowercase hex. */
-  digest(format: "hex"): string;
-}
-
-/**
  * The hasher of one algorithm: the binding's, and SHA-256 from `node:crypto`.
+ *
+ * Both take the calls of {@link Hashing}: bytes go in, and hex comes out.
  *
  * BLAKE2b runs at 32 bytes, the length of the other two digests. An unconfigured
  * BLAKE2b computes 64. The length belongs to the digest, so this matches
@@ -43,7 +37,7 @@ const hashers: Record<Algorithm, () => Hashing> = {
     const hashing = blake.Blake2BHasher.withParams(params);
 
     return {
-      digest: (format) => hashing.digest(format),
+      digest: () => hashing.digest("hex"),
       // The binding accepts `Buffer` and `Uint8Array` at run time. A chunk passes
       // through as the same memory, not a copy.
       update: (chunk) => {
@@ -52,7 +46,16 @@ const hashers: Record<Algorithm, () => Hashing> = {
     };
   },
   [Algorithm.enums.Blake3]: () => new blake.Blake3Hasher(),
-  [Algorithm.enums.Sha256]: () => createHash("sha256"),
+  [Algorithm.enums.Sha256]: () => {
+    const hashing = createHash("sha256");
+
+    return {
+      digest: () => hashing.digest("hex"),
+      update: (chunk) => {
+        hashing.update(chunk);
+      },
+    };
+  },
 };
 
 const hashing = (algorithm: Algorithm): Sink.Sink<string, Uint8Array, never, never> =>
@@ -60,7 +63,7 @@ const hashing = (algorithm: Algorithm): Sink.Sink<string, Uint8Array, never, nev
     hashed.update(chunk);
 
     return hashed;
-  }).pipe(Sink.map((hashed) => hashed.digest("hex")));
+  }).pipe(Sink.map((hashed) => hashed.digest()));
 
 /**
  * The hash of a Node program: `@napi-rs/blake-hash` and `node:crypto`.
@@ -79,7 +82,8 @@ const hashing = (algorithm: Algorithm): Sink.Sink<string, Uint8Array, never, nev
  * The binding is a native addon, so a bundle leaves it for the target machine to
  * resolve. A bundle with the binding carries one platform only.
  *
- * Bytes arrive chunk by chunk, and the digest is read at the end. The binding
+ * Bytes arrive chunk by chunk, and the digest is read at the end, whether one
+ * sink carries the stream or `start` is fed over several writes. The binding
  * reads a digest repeatedly, and `node:crypto` reads one once.
  *
  * A program without a native addon uses `@trajs/platform-browser`. One algorithm
@@ -91,4 +95,5 @@ const hashing = (algorithm: Algorithm): Sink.Sink<string, Uint8Array, never, nev
  */
 export const layer: Layer.Layer<StreamHash> = Layer.succeed(StreamHash, {
   digest: (options?: Options) => hashing(options?.algorithm ?? defaultAlgorithm),
+  start: (options?: Options) => hashers[options?.algorithm ?? defaultAlgorithm](),
 });

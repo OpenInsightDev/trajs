@@ -7,7 +7,7 @@ import type { CompletedPart, S3Client } from "@aws-sdk/client-s3";
 import { Effect, Sink } from "effect";
 
 import { type Byte, makeByte } from "#/Byte.ts";
-import { type Storage, StorageError, type WriteOptions } from "#/Storage.ts";
+import { type Storage, StorageError, UnsupportedWrite, type WriteOptions } from "#/Storage.ts";
 
 /** What a bucket answered where the id holds no object. */
 const NotFound = 404;
@@ -375,7 +375,19 @@ export const s3Storage = (
   const bucket: Bucket = { sdk, client, name };
 
   return {
+    capabilities: { resume: false },
     read: (id) => Effect.succeed(bytesOf(bucket, id)),
-    write: (id, write) => writeInto(bucket, id, write),
+    write: (id, write) =>
+      write?.mode === "resume"
+        ? // A bucket holds an object whole, so what a write continues from an
+          // offset is not served: the write fails rather than holding the object
+          // until it ends.
+          Sink.fail(
+            new StorageError({
+              id,
+              cause: new UnsupportedWrite({ mode: write.mode, offset: write.offset ?? 0n }),
+            }),
+          )
+        : writeInto(bucket, id, write),
   };
 };

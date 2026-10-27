@@ -1,13 +1,14 @@
 /**
- * The compression and the hash of `@trajs/utils`, for a program without
- * `node:zlib`.
+ * The compression, the hash and the checksum of `@trajs/utils`, for a program
+ * without `node:zlib`.
  *
- * {@link layer} provides both for the exchange layer of `@trajs/core`, beside the
- * storage of a trajectory.
+ * {@link layer} provides all three for the exchange layer of `@trajs/core`, beside
+ * the storage of a trajectory.
  *
  * @stability stable
  */
 
+import { type Checksum, layer as ChecksumLayer } from "@trajs/utils/Checksum";
 import { type Compression } from "@trajs/utils/Compression";
 import { type StreamHash } from "@trajs/utils/StreamHash";
 import { Layer } from "effect";
@@ -16,16 +17,16 @@ import * as BrowserCompression from "#/BrowserCompression.ts";
 import * as BrowserStreamHash from "#/BrowserStreamHash.ts";
 
 /**
- * The compression and the hash of a browser program.
+ * The compression, the hash and the checksum of a browser program.
  *
  * @see {@link layer} for the provider.
  * @stability stable
  * @category models
  */
-export type BrowserServices = Compression | StreamHash;
+export type BrowserServices = Compression | StreamHash | Checksum;
 
 /**
- * The compression and the hash of a browser program.
+ * The compression, the hash and the checksum of a browser program.
  *
  * **When to use**
  *
@@ -34,9 +35,13 @@ export type BrowserServices = Compression | StreamHash;
  *
  * **Details**
  *
- * {@link BrowserCompression.layer} and {@link BrowserStreamHash.layer} provide it.
- * Neither layer states an algorithm, so a call states the one of its write, read
- * or digest.
+ * {@link BrowserCompression.layer} and {@link BrowserStreamHash.layer} provide the
+ * compression and the hash, and neither states an algorithm, so a call states the
+ * one of its write, read or digest.
+ *
+ * A page states no CRC of its own, so the checksum is the tables of
+ * `@trajs/utils` (`Checksum.layer` there), which read the number `node:zlib` and
+ * `Bun.hash.crc32` read.
  *
  * The storage is not among them. A page keeps a trajectory in the bytes it was
  * handed or in its own store, so the program supplies a storage beside this layer.
@@ -45,7 +50,8 @@ export type BrowserServices = Compression | StreamHash;
  * @stability stable
  * @category layers
  */
-export const layer: Layer.Layer<BrowserServices> = Layer.merge(
+export const layer: Layer.Layer<BrowserServices> = Layer.mergeAll(
   BrowserCompression.layer,
   BrowserStreamHash.layer,
+  ChecksumLayer,
 );
