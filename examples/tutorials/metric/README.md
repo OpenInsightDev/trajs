@@ -44,12 +44,13 @@ only ever sees finished parts.
 
 Both schemas are versioned, so a stored report stays readable when a field is
 added or renamed: the report names its version and reading it runs the
-migration. `View.produced(metric)` selects one metric's successful outputs from
-a part stream. [`View.metricTrajectory`](../metric-trajectory/README.md) reads a
-whole trajectory into parts that carry the reports naming them, so a part can be
-shown beside the numbers measured about it. Producing streams the reports; to
-keep them in the trajectory, the declaration goes on the config's `metrickit` —
-a metric part under a tag the config does not declare does not decode.
+migration. `View.metricOutputs(metric)` selects one metric's successful outputs
+from a part stream. [`View.metricTrajectory`](../metric-trajectory/README.md)
+reads a whole trajectory into parts that carry the reports naming them, so a
+part can be shown beside the numbers measured about it. Producing streams the
+reports; to keep them in the trajectory, the declaration goes on the config's
+`metrickit` — a metric part under a tag the config does not declare does not
+decode.
 
 The measurements here are over tool results. Two results hold text, so two
 reports come back: 16 characters from `grep` and 64 from `read_file`, 80 in all.

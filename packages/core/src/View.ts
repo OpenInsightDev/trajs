@@ -197,10 +197,11 @@ export const steps = <Config extends Config.AnyConfig, E, R>(
  * Values are selected by tag without schema validation.
  *
  * @see {@link Metric.Output} for timing and attachment fields.
+ * @see {@link metricTrajectory} for reading reports with the parts they name.
  * @stability stable
  * @category filtering
  */
-export const produced =
+export const metricOutputs =
   <Ext extends Metric.Any>(metric: Ext) =>
   <Config extends Config.AnyConfig, E, R>(
     stream: Stream.Stream<Trajectory.Part<Config>, E, R>,
@@ -303,7 +304,7 @@ export type MetricTrajectoryStream<
  * An unknown target attaches nothing.
  * Reading requires the cache's backing store to remain available.
  *
- * @see {@link produced} for selecting metric outputs directly.
+ * @see {@link metricOutputs} for selecting metric outputs directly.
  * @see {@link Cache.Cache} for the service the reading runs in.
  * @stability stable
  * @category transforming

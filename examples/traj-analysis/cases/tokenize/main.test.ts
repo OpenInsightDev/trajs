@@ -55,8 +55,8 @@ const main = () =>
 
     const trajectory = loaded.read();
 
-    // View.produced reads those stored estimates. No tokenizer runs here.
-    const reading = yield* View.produced(tokenEstimate)(trajectory).pipe(
+    // View.metricOutputs reads those stored estimates. No tokenizer runs here.
+    const reading = yield* View.metricOutputs(tokenEstimate)(trajectory).pipe(
       Stream.map((output) => output.output),
       Stream.runFold(
         (): Reading => ({ growth: [], prompt: undefined }),
