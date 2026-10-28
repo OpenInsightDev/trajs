@@ -1,13 +1,8 @@
 #!/usr/bin/env node
 /**
- * The `trajs` command line: what a `.trajs` trajectory states about itself,
- * without opening it in a viewer.
+ * The `trajs` command line.
  *
- * The commands are built with `effect/cli` and run on Node through
- * `@effect/platform-node`, so a command reads and writes files, standard
- * output and the terminal through the services the platform layer provides.
- * This module is the entry point: it holds the root command the subcommands
- * hang off and runs it.
+ * The root command holds {@link inspect} and runs on the Node runtime.
  */
 
 import { NodeRuntime, NodeServices } from "@effect/platform-node";
@@ -36,9 +31,7 @@ const cli = Command.make("trajs").pipe(
   ]),
 );
 
-// The platform layer carries the file system, the path helpers and the terminal
-// the command is parsed and run with, and `runMain` reports what a command fails
-// with and exits non-zero on it.
+// `runMain` reports the failure of a command and exits non-zero on it.
 NodeRuntime.runMain(
   Command.run(cli, { version: pkg.version }).pipe(Effect.provide(NodeServices.layer)),
 );

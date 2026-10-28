@@ -1,15 +1,10 @@
 /**
- * The `trajs inspect` command: what a `.trajs` file states about itself — its
- * header, or with `--metadata` what it states at its end about its own bytes —
- * printed as JSON.
+ * The `trajs inspect` command.
  *
- * A trajectory carries its header at the head of the file and its metadata at its
- * tail, and neither is compressed. `Exchange.inspect` reads them and stops before
- * the frame the parts are carried in.
- *
- * What is printed is what the file states — the header as the format encodes it, and
- * the metadata with the algorithm each of its two coded fields states named rather
- * than coded ({@link metadataJson}).
+ * It prints the header or the metadata of a `.trajs` file as JSON.
+ * The format carries the header at the head of the file and the metadata at its tail.
+ * Neither record is compressed, so {@link Exchange.Service.inspect} reads both
+ * without parsing the part frame.
  */
 
 import * as Exchange from "@trajs/core/Exchange";
@@ -20,38 +15,31 @@ import { Algorithm as HashAlgorithm } from "@trajs/utils/StreamHash";
 import { Console, Effect, Layer, Schema } from "effect";
 import { Argument, CliError, Command, Flag } from "effect/cli";
 
-/** What the format encodes a trajectory's header to, printed as JSON at `indent`. */
+/** Returns the header in the encoding of the format, as JSON at `indent`. */
 const headerJson = (header: Exchange.Header, indent: number): string =>
   JSON.stringify(Schema.encodeSync(Exchange.Header)(header), null, indent);
 
-/**
- * The names each compression algorithm goes by, keyed by the code the format carries
- * it as.
- */
+/** The name of each compression algorithm, keyed by its code in the format. */
 const compressions = new Map<number, string>(
   Object.entries(CompressionAlgorithm.enums).map(([name, code]) => [code, name] as const),
 );
 
-/** The names each hash algorithm goes by, keyed by the code the format carries it as. */
+/** The name of each hash algorithm, keyed by its code in the format. */
 const hashes = new Map<number, string>(
   Object.entries(HashAlgorithm.enums).map(([name, code]) => [code, name] as const),
 );
 
 /**
- * The name an algorithm goes by, as the code the format carries it as.
+ * Returns the name the vocabulary gives `code`.
  *
- * A trajectory states an algorithm as the code it goes by rather than as the name of
- * it ({@link Metadata}), since the codes are the format's and a code is never
- * restated for another algorithm. A reader of what the command prints is after the
- * name, so the codes the vocabularies state are read back to theirs; a code that
- * states no name is printed as itself, since it is still what the file carries.
+ * A code from another format version is returned as itself.
  */
 const nameOf = (names: ReadonlyMap<number, string>, code: number): string =>
   names.get(code) ?? String(code);
 
 /**
- * What the format encodes a trajectory's metadata to, printed as JSON at `indent`,
- * with the algorithm each of its two coded fields states named rather than coded.
+ * Returns the metadata in the encoding of the format, as JSON at `indent`, with
+ * `compression` and `hash` named rather than coded.
  */
 const metadataJson = (metadata: Exchange.Metadata, indent: number): string => {
   const stated = Schema.encodeSync(Exchange.Metadata)(metadata);
@@ -68,7 +56,7 @@ const metadataJson = (metadata: Exchange.Metadata, indent: number): string => {
 };
 
 /**
- * The `inspect` command: reads what a trajectory states and prints it.
+ * The `inspect` subcommand, registered by the root `trajs` command.
  */
 export const inspect = Command.make(
   "inspect",
@@ -78,13 +66,13 @@ export const inspect = Command.make(
     ),
     indent: Flag.Int("indent").pipe(
       Flag.withDescription(
-        "Spaces to indent the printed JSON by. Without it it is written on one line.",
+        "Spaces to indent the printed JSON by. Without it the JSON is written on one line.",
       ),
       Flag.withDefault(0),
     ),
     metadata: Flag.Boolean("metadata").pipe(
       Flag.withDescription(
-        "Print what the trajectory states at its end instead of at its head: how its parts were written and what they digest to, with each algorithm named rather than coded.",
+        "Print the metadata instead of the header. It states how the parts were compressed and hashed, and their digest, with both algorithms named.",
       ),
       Flag.withDefault(false),
     ),
@@ -101,15 +89,12 @@ export const inspect = Command.make(
 
       yield* Console.log(stated);
     }).pipe(
-      // A file that cannot be read, or one whose bytes do not state what was asked
-      // for — a header at its head, a metadata at its tail — is what the person who
-      // ran the command can act on, so it is reported as the message it already
-      // carries rather than as a stack trace.
+      // A file that cannot be read, or that states no header or metadata, is a user error.
+      // It is reported as its message rather than as a stack trace.
       Effect.mapError((cause) => new CliError.UserError({ cause })),
     ),
 ).pipe(
   Command.withDescription("Print what a `.trajs` file states about itself."),
-  // The frame the parts are carried in is never decompressed, since what is printed
-  // is what the file states rather than anything read out of the parts.
+  // `Exchange.layer` requires compression and hashing, though inspection uses neither.
   Command.provide(Layer.provide(Exchange.layer, Layer.merge(NodeServices.layer, layerFileSystem))),
 );
