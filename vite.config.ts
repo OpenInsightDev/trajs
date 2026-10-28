@@ -1,4 +1,4 @@
-import { defineConfig } from "vite-plus";
+import { configDefaults, defineConfig } from "vite-plus";
 
 // What fmt and lint stay out of: agent tooling assets and the vendored anti-slop
 // plugin, which are copied sources rather than project code, and the shadcn/ui
@@ -27,6 +27,12 @@ const ignoredByFmtAndLint = [
 export default defineConfig({
   staged: {
     "*": "vp check --fix",
+  },
+  test: {
+    // `references/` holds symlinks to sibling checkouts that `.agents/prepare`
+    // creates. Those are other repositories, which run their own tests, so this
+    // workspace's run stops at its own packages.
+    exclude: [...configDefaults.exclude, "references/**"],
   },
   fmt: {
     ignorePatterns: [...ignoredByFmtAndLint],

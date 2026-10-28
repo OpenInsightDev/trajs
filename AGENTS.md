@@ -45,5 +45,6 @@ release. Add a tool name to select part of the graph. For example, run
 
 ## Testing
 
+- Run the tests the change touches, named by file, directory, or test name. A bare `vp test` runs the whole workspace suite, so it is forbidden.
 - Do not change the test suite unless the user explicitly asks for it.
 - Temporary unit tests written while implementing are allowed, but delete every one of them once the task is done.
