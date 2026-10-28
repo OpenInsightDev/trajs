@@ -13,18 +13,18 @@ import { type Storage, StorageError, UnsupportedWrite, type WriteOptions } from 
 const NotFound = 404;
 
 /**
- * What a bucket answered where a range begins at or past the end of the object: a
- * read that takes nothing rather than a bucket that failed ({@link Byte}).
+ * What a bucket answered where a range begins at or past the end of the object.
+ *
+ * It is a read that takes nothing, rather than a bucket that failed.
  */
 const NotSatisfiable = 416;
 
 /**
  * How many bytes of a trajectory are held before a part of an upload is written.
  *
- * It is above the five mebibytes a bucket states for a part that is not the last one,
- * so a part is written only where the bucket takes it as one. A chunk larger than it
- * is written as a part of its own rather than cut, so a part holds the bytes that
- * arrived rather than a size stated here.
+ * It is above the five mebibytes a bucket states for a part that is not the last one.
+ * A chunk larger than it is written as a part of its own rather than cut, so a part holds the
+ * bytes that arrived rather than a size stated here.
  */
 const PartSize = 8 * 1024 * 1024;
 
@@ -39,11 +39,11 @@ interface Bucket {
 }
 
 /**
- * The status a bucket answered a request with, where the SDK reports the request as
- * failed: what tells a bucket that holds nothing from one that could not serve.
+ * The status a bucket answered a request with, where the SDK reports the request as failed.
  *
- * A request the SDK could not make at all — a bucket that is unreachable, an endpoint
- * that does not resolve — carries no answer, so it is reported by the failure alone.
+ * It tells a bucket that holds nothing from one that could not serve.
+ * A request the SDK could not make at all carries no answer, such as an endpoint that does not
+ * resolve, so it is reported by the failure alone.
  */
 const statusOf = (cause: unknown): number | undefined => {
   // SAFETY: every error the SDK reports is an object carrying the answer it reported
@@ -57,11 +57,10 @@ const statusOf = (cause: unknown): number | undefined => {
 };
 
 /**
- * A request the SDK makes for a bucket, as the failure of this storage where the bucket
- * refused it or could not be reached.
+ * A request the SDK makes for a bucket, failed as this storage.
  *
- * What a bucket answered with is kept as the cause of the failure, so the status of an
- * answer is read where one failure is told apart from another ({@link statusOf}).
+ * What the bucket answered with is kept as the cause of the failure, so the status of an answer
+ * is read where one failure is told apart from another.
  */
 const request = <A>(
   bucket: Bucket,
@@ -77,14 +76,15 @@ const head = (bucket: Bucket, id: string) =>
   );
 
 /**
- * Fails where an id is taken and the write may not write over it: the bucket is asked
- * for the object, and only an object it does not hold lets the write begin.
+ * Fails where an id is taken and the write may not write over it.
+ *
+ * The bucket is asked for the object, and only an object it does not hold lets the write begin.
  */
 const refuse = (bucket: Bucket, id: string): Effect.Effect<void, StorageError> =>
   head(bucket, id).pipe(
     Effect.matchEffect({
-      // An id the bucket holds nothing under is free; anything else it failed with is
-      // what the write failed with, since nothing says the id is untaken.
+      // An id the bucket holds nothing under is free; any other failure is what the
+      // write failed with, since nothing says the id is untaken.
       onFailure: (error) => (statusOf(error.cause) === NotFound ? Effect.void : Effect.fail(error)),
       onSuccess: () =>
         Effect.fail(new StorageError({ id, cause: "it already holds a trajectory" })),
@@ -92,8 +92,7 @@ const refuse = (bucket: Bucket, id: string): Effect.Effect<void, StorageError> =
   );
 
 /**
- * The bytes a bucket holds under an id: how long the object is, as the head of it, and
- * the range of it a read asks for.
+ * The bytes a bucket holds under an id, as the head of the object and the range a read asks for.
  */
 const bytesOf = (bucket: Bucket, id: string): Byte<StorageError> =>
   makeByte({
@@ -103,7 +102,7 @@ const bytesOf = (bucket: Bucket, id: string): Byte<StorageError> =>
         const wanted = Math.min(size, buffer.length);
 
         // A read that asks for nothing reaches the bucket for nothing: what lies from
-        // an offset at or past the end of an object is none of it ({@link Byte}).
+        // an offset at or past the end of an object is none of it.
         if (wanted <= 0) {
           return 0;
         }
@@ -182,8 +181,10 @@ const joined = (chunks: ReadonlyArray<Uint8Array>): Uint8Array => {
 };
 
 /**
- * Begins the upload an id is written as: the id is checked where it may not be written
- * over, and the bucket is asked for an upload the parts are written into.
+ * Begins the upload an id is written as.
+ *
+ * The id is checked where it may not be written over, and the bucket is asked for an upload the
+ * parts are written into.
  */
 const begin = (
   bucket: Bucket,
@@ -209,8 +210,9 @@ const begin = (
   });
 
 /**
- * Writes the chunks held as one part of the upload an id is being written as, which
- * the bucket makes an object of where the upload is completed.
+ * Writes the chunks held as one part of the upload an id is being written as.
+ *
+ * The bucket makes an object of the parts where the upload is completed.
  */
 const part = (
   bucket: Bucket,
@@ -240,8 +242,9 @@ const part = (
   });
 
 /**
- * Writes what is left of a trajectory and makes an object of it: an object is put
- * whole where no part was written, and the upload is completed where parts were.
+ * Writes what is left of a trajectory and makes an object of it.
+ *
+ * An object is put whole where no part was written, and the upload is completed where parts were.
  */
 const finish = (
   bucket: Bucket,
@@ -253,8 +256,7 @@ const finish = (
     const uploadId = state.uploadId;
 
     // A trajectory whose bytes never filled a part is one object however long it is: a
-    // bucket takes an object of any size in one request, where a part of an upload has
-    // to hold at least five mebibytes for the upload to be worth beginning.
+    // bucket takes an object of any size in one request.
     if (uploadId === undefined) {
       yield* request(bucket, id, () =>
         bucket.client.send(
@@ -286,8 +288,7 @@ const finish = (
           UploadId: uploadId,
           MultipartUpload: { Parts: state.parts },
           // Parts are written before the bucket states anything about the object, so
-          // refusing to write over one is stated again where the object is made: the
-          // upload is completed only where the bucket holds none under the id.
+          // refusing to write over one is stated again where the object is made.
           IfNoneMatch: write?.overwrite === false ? "*" : undefined,
         }),
       ),
@@ -317,13 +318,15 @@ const abort = (bucket: Bucket, id: string, state: Uploading): Effect.Effect<void
   });
 
 /**
- * The sink a trajectory is written into an id through: the bytes are held as they
- * arrive, a part is written each time the part being filled holds enough, and the
- * object is made of the parts where the bytes end.
+ * The sink a trajectory is written into an id through.
  *
- * What it holds open is an upload rather than a file, which nothing else reads, so the
- * sink states no scope of its own (`Storage.write`): what the write does not take
- * to an object is aborted where the sink ends, whether the bytes ended or failed.
+ * The bytes are held as they arrive, a part is written each time the part being filled holds
+ * enough, and the object is made of the parts where the bytes end.
+ *
+ * What it holds open is an upload rather than a file, which nothing else reads, so the sink states
+ * no scope of its own.
+ * What the write does not take to an object is aborted where the sink ends, whether the bytes
+ * ended or failed.
  */
 const writeInto = (
   bucket: Bucket,
@@ -342,8 +345,8 @@ const writeInto = (
   return Sink.forEachArray<Uint8Array, void, StorageError, never>((chunks) =>
     Effect.gen(function* () {
       for (const chunk of chunks) {
-        // The chunk is copied rather than held: what a sink is handed may be written
-        // into again before the part it falls in is written.
+        // The chunk is copied rather than held: a sink is handed bytes that may be
+        // written into again before the part they fall in is written.
         state.chunks.push(chunk.slice());
         state.buffered += chunk.length;
 
@@ -361,8 +364,7 @@ const writeInto = (
   ).pipe(
     Sink.mapEffect(() => finish(bucket, id, state, write)),
     // What is left of an upload no object was made of is aborted, whether the bytes
-    // ended, failed, or were interrupted: no part of a trajectory that failed is left
-    // behind for the bucket to keep.
+    // ended, failed, or were interrupted, so nothing of a failed trajectory is kept.
     Sink.onExit(() => abort(bucket, id, state)),
   );
 };
@@ -379,9 +381,8 @@ export const s3Storage = (
     read: (id) => Effect.succeed(bytesOf(bucket, id)),
     write: (id, write) =>
       write?.mode === "resume"
-        ? // A bucket holds an object whole, so what a write continues from an
-          // offset is not served: the write fails rather than holding the object
-          // until it ends.
+        ? // A bucket holds an object whole, so what a write continues from an offset
+          // is not served. The write fails rather than holding the object until it ends.
           Sink.fail(
             new StorageError({
               id,

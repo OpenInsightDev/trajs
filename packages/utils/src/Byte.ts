@@ -1,19 +1,13 @@
 /**
- * A byte sequence read at random, and the sequences this package builds of one:
- * what a storage serves a trajectory as.
+ * The bytes of a trajectory, read at random.
  *
- * What a trajectory is read out of is bytes, and what reads them takes the part it
- * came for rather than the whole of it — the head of a trajectory for what it
- * states of itself, its tail for the metadata it ends with, the frame between them
- * for the parts of a trajectory — so a sequence is read at random ({@link Byte}).
- * What one is of is not part of what one is: a file, the range of a bucket, or
- * bytes already in memory are all read the same way, which is why every read is
- * effectful and carries what it is of failing as `E` and what reading it takes as
- * `R` ({@link Byte}) rather than a failure of a place it is over.
+ * A reader takes only the part it came for, such as a head or a tail.
+ * Where the bytes come from is not part of what a sequence is.
+ * A read fails as `E` where its source does, and requires `R`.
  *
- * {@link makeByte} builds a sequence from the reads a source serves: what a
- * storage serves the bytes it holds as, and what a sequence of your own is built
- * from.
+ * {@link makeByte} builds a sequence from what its reads serve.
+ *
+ * @stability stable
  */
 
 import { Effect, Stream } from "effect";
@@ -23,24 +17,22 @@ import { Effect, Stream } from "effect";
  *
  * **When to use**
  *
- * Use to name what {@link Byte.read} and {@link Byte.readAlloc} read, what
- * {@link Storage.read} reserves an `options` for, or to type what a caller hands
- * one.
+ * Use to state where {@link Byte.read} and {@link Byte.readAlloc} begin and how much they take.
+ * Use as well to type the `options` of {@link Storage.read}.
  *
  * **Details**
  *
- * - `offset` is where the read begins, counted in bytes from the start of the
- *   sequence, and defaults to `0n`. A byte sequence is read at random, so a read
- *   names where it starts rather than carrying on from the last one it followed.
- * - `size` is how many bytes are asked for, and defaults to what that read can
- *   take: the length of the buffer {@link Byte.read} is given, and the rest of
- *   the sequence for {@link Byte.readAlloc}.
+ * - `offset` is where the read begins, in bytes, and defaults to `0n`.
+ * - `size` is how many bytes are asked for, and defaults to what the read can take.
  *
- * What a read yields is what it could read, which is fewer bytes than were asked
- * for where the sequence ends before them — and none at all where the offset is
- * at or past that end.
+ * The default `size` is the buffer length given to {@link Byte.read}.
+ * For {@link Byte.readAlloc} it is the rest of the sequence.
+ * A read yields fewer bytes where the sequence ends before them.
+ * An offset at or past that end yields none.
  *
  * @see {@link Byte} for the sequence these are read from.
+ * @stability stable
+ * @category models
  */
 export interface ReadOptions {
   readonly offset?: bigint;
@@ -48,40 +40,30 @@ export interface ReadOptions {
 }
 
 /**
- * A sequence of bytes that can be read at random: what a storage serves of a
- * trajectory.
+ * A sequence of bytes read at random, as a storage serves a trajectory.
  *
  * **When to use**
  *
- * Use to read a trajectory without holding it whole — or to read part of one, such
- * as its head or its tail — and to type what a storage serves
- * ({@link Storage.read}) or what a sequence of your own reads by
- * ({@link makeByte}).
+ * Use to read part of a trajectory without holding it whole, such as its head or its tail.
+ * Use as well to type what a storage serves ({@link Storage.read}).
  *
  * **Details**
  *
  * - `length` is how many bytes the sequence holds.
- * - `read` fills a buffer the caller holds, beginning at the offset asked for
- *   and taking up to the size asked for, and yields how many bytes it read into
- *   it.
- * - `readAlloc` reads the same way into a buffer it allocates, and yields that
- *   buffer, cut to what was read where the sequence ended before the size asked
- *   for.
- * - `stream` reads the whole sequence from its head, in chunks, so a trajectory
- *   too large to hold is read as it arrives rather than all at once.
+ * - `read` fills a buffer the caller holds and yields how many bytes it read.
+ * - `readAlloc` reads into a buffer it allocates, cut to what it read.
+ * - `stream` reads the whole sequence from its head, one chunk at a time.
  *
- * Where a byte sequence comes from is not part of what one is: a file, the range
- * of a bucket, or bytes already in memory are all read the same way. So the two
- * channels are the sequence's rather than this one's, and read as `Effect` and
- * `Stream` read theirs: a read fails as `E`, which is what a sequence is of — a
- * disk, a socket — failing, and requires what reading it takes as `R`. A sequence
- * over memory is one that fails with `never`; a storage serves one that fails as
- * the failure of a storage, and a layer of it states which.
+ * A read fails as `E` where what the sequence is of fails, such as a disk.
+ * It requires what reading it takes as `R`.
+ * A sequence over memory fails with `never`.
+ * A storage serves one that fails as a {@link StorageError}.
  *
  * **Example** (A sequence of bytes read at random)
  *
  * ```ts import.meta.vitest
  * import { Effect } from "effect"
+ * import { makeByte } from "@trajs/utils/Byte"
  *
  * const held = new TextEncoder().encode("trajs")
  *
@@ -104,41 +86,40 @@ export interface ReadOptions {
  *
  * @see {@link makeByte} for building one from the reads it takes.
  * @see {@link Storage} for what serves one.
+ * @stability stable
+ * @category models
  */
 export interface Byte<out E = never, out R = never> {
   /**
-   * How many bytes the sequence holds, asked when it is wanted rather than once
-   * when it is made: what a sequence is of may have changed since, and the
-   * length is read to tell where a read can reach.
+   * How many bytes the sequence holds.
+   *
+   * The length is asked when it is wanted, since what it is of may have changed.
    */
   readonly length: Effect.Effect<bigint, E, R>;
 
   /**
-   * Reads up to `size` bytes of the sequence beginning at `offset` into the
-   * buffer given, and yields how many bytes were read into it.
+   * Reads up to `size` bytes of the sequence beginning at `offset` into the buffer given.
    *
-   * The buffer is the caller's, and what it holds past the bytes read is left as
-   * it was: a read of `n` bytes reads into the first `n`, and a read that reaches
-   * the end of the sequence before the size asked for reads fewer.
+   * Yields how many bytes were read into it.
+   * The buffer is the caller's, and what it holds past those bytes is left as it was.
+   * A read of `n` bytes reads into the first `n`.
    */
   readonly read: (buffer: Uint8Array, options?: ReadOptions) => Effect.Effect<number, E, R>;
 
   /**
-   * Reads up to `size` bytes of the sequence beginning at `offset` into a buffer
-   * it allocates, and yields that buffer cut to what it read.
+   * Reads up to `size` bytes of the sequence beginning at `offset` into a buffer it allocates.
    *
-   * Without a size, the read takes everything left from the offset to the end of
-   * the sequence.
+   * Yields that buffer cut to what it read.
+   * Without a size, the read takes everything left from the offset to the end of the sequence.
    */
   readonly readAlloc: (options?: ReadOptions) => Effect.Effect<Uint8Array, E, R>;
 
   /**
-   * The whole sequence, read from its head in chunks as the consumer pulls them,
-   * so what a sequence holds is read as it arrives rather than all at once.
+   * The whole sequence, read from its head in chunks as the consumer pulls them.
    *
+   * What a sequence holds is read as it arrives.
    * `chunkSize` states how many bytes are read at a time, and defaults to 64 KiB.
-   * A chunk is allocated as it is read, so a caller reading a trajectory it does not
-   * hold states how much of it to hold at once.
+   * A chunk is allocated as it is read, so a caller states how much to hold at once.
    */
   readonly stream: (options?: { readonly chunkSize?: number }) => Stream.Stream<Uint8Array, E, R>;
 }
@@ -147,23 +128,21 @@ export interface Byte<out E = never, out R = never> {
 const Chunk = 64 * 1024;
 
 /**
- * Builds a byte sequence from what its reads take: what a storage serves of the
- * bytes it holds.
+ * Builds a byte sequence from what its reads take.
  *
  * **When to use**
  *
- * Use to serve the bytes a storage holds ({@link Storage.read}), or to read bytes
- * that are, or that arrive, somewhere a storage is not: a buffer in memory, a
- * range a program fetched, a source it walks.
+ * Use to serve the bytes a storage holds ({@link Storage.read}).
+ * Use as well to read bytes that are somewhere a storage is not, such as a buffer in memory.
  *
  * **Details**
  *
- * Only `length` and `read` are asked for, since what the other two are is what
- * those two read: {@link Byte.readAlloc} allocates what it reads into, and
- * {@link Byte.stream} reads the sequence from its head one chunk at a time. A
- * read that takes nothing ends that stream, since a read takes what it can and the
- * offset it was asked for is where it started — so the bytes a sequence holds are
- * what its reads serve from the offset `0n` on.
+ * Only `length` and `read` are asked for.
+ * {@link Byte.readAlloc} allocates what it reads into.
+ * {@link Byte.stream} reads the sequence from its head one chunk at a time.
+ *
+ * A read that takes nothing ends that stream, since the sequence ended there.
+ * The bytes a sequence holds are what its reads serve from `0n` on.
  *
  * **Example** (Building the sequence a storage serves)
  *
@@ -190,6 +169,8 @@ const Chunk = 64 * 1024;
  * ```
  *
  * @see {@link Byte} for the sequence this builds.
+ * @stability stable
+ * @category constructors
  */
 export const makeByte = <E = never, R = never>(bytes: {
   readonly length: Effect.Effect<bigint, E, R>;

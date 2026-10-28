@@ -1,17 +1,15 @@
 /**
  * The digest of a trajectory's parts.
  *
- * A {@link StreamHash} reads the digest of one stream
- * ({@link StreamHash.digest}), or of a sequence fed to it over several writes
- * ({@link StreamHash.start}). The exchange runs over a hash, so a platform
- * package supplies the codecs. `@trajs/platform-node` and
- * `@trajs/platform-bun` use `@napi-rs/blake-hash` and `node:crypto`.
- * `@trajs/platform-browser` uses `blake3-wasm`, WebCrypto and the hash of this
- * package.
+ * {@link StreamHash.digest} reads the digest of one stream.
+ * {@link StreamHash.start} reads one of a sequence fed to it over several writes.
+ * A platform package supplies the codecs, and `@trajs/platform-node` and `@trajs/platform-bun`
+ * use `@napi-rs/blake-hash` and `node:crypto`.
+ * `@trajs/platform-browser` uses `blake3-wasm`, WebCrypto and the hash of this package.
  *
- * The algorithm is stated per call ({@link Options}). One algorithm yields one
- * digest on every platform, so a digest read on one platform reads back on
- * another.
+ * The algorithm is stated per call ({@link Options}).
+ * One algorithm yields one digest on every platform, so a digest read on one platform reads back
+ * on another.
  *
  * @stability stable
  */

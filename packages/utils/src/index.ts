@@ -1,20 +1,21 @@
 /**
- * The generic services a trajectory is carried and kept through: the compression
- * its parts are carried in, the hash it is named by, the checksum its blocks are
- * checked with, the byte sequence a storage serves it as, and the storage itself.
+ * The generic services a trajectory is carried and kept through.
  *
- * Every module is re-exported as a namespace — `Byte.Byte`,
- * `Storage.Storage` — and each is also available as a subpath import such as
- * `@trajs/utils/Byte`.
+ * {@link Compression} writes and reads the frame of a trajectory's parts.
+ * {@link StreamHash} reads the digest a trajectory is named by.
+ * {@link Checksum} checks a block of those parts.
+ * {@link Byte} is the bytes of a trajectory, read at random.
+ * {@link Storage} is where a program keeps its trajectories.
+ * {@link ByteStore} keeps bytes between readings.
  *
- * Where a trajectory is kept and what reads a digest are stated here over what any
- * platform provides — `Storage.layerFileSystem`, `Storage.layerS3`,
- * `StreamHash.layer` and `Checksum.layer` — and what carries a trajectory's parts
- * in a frame is a platform
- * package's to state, which is what `@trajs/platform-node`, `@trajs/platform-bun` and
- * `@trajs/platform-browser` provide. Where a trajectory's bytes are kept between
- * readings is stated over the key/value store of `effect/persistence`
+ * A module is also a subpath import, such as `@trajs/utils/Byte`.
+ * The layers stated here work over any platform, such as {@link Storage.layerFileSystem} and
+ * {@link Storage.layerS3}.
+ * A platform package states the codec a frame is carried with, such as `@trajs/platform-node`.
+ * The bytes kept between readings are kept over the key/value store of `effect/persistence`
  * ({@link ByteStore.layerKVStore}) or over the one in memory ({@link ByteStore.layer}).
+ *
+ * @stability stable
  */
 
 export * as Byte from "#/Byte.ts";

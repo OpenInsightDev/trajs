@@ -1,19 +1,18 @@
 /**
- * The block checksum of a trajectory's parts: one cheap number over the bytes of
- * one block.
+ * The block checksum of a trajectory's parts.
  *
- * A {@link Checksum} tells a block that arrived whole from one that did not, at a
- * cost small enough to read beside every block a trajectory is cut into. A
- * checksum is not a digest: it catches the corruption a torn, misplaced or
- * rewritten block shows, and says nothing against the collision of a sequence
- * chosen to have the same number. What must name its bytes reads a digest
- * ({@link StreamHash}).
+ * A {@link Checksum} tells a block that arrived whole from one that did not, at a cost small
+ * enough to read beside every block of a trajectory.
  *
- * The algorithm is stated per call ({@link Options}). One algorithm yields one
- * number on every platform, so a checksum read on one platform agrees with the
- * checksum of the same bytes read on another. A platform package reads it with
- * the codec its runtime states, and the tables this package carries read the same
- * number where a runtime states none.
+ * A checksum is not a digest.
+ * It catches the corruption of a torn, misplaced or rewritten block, and nothing more.
+ * Bytes that must be named by their content read a digest ({@link StreamHash}).
+ *
+ * The algorithm is stated per call ({@link Options}).
+ * One algorithm yields one number on every platform, so a checksum read on one platform agrees
+ * with one read on another.
+ * A platform package reads it with the codec its runtime states, and the tables of this package
+ * read the same number where a runtime states none.
  *
  * @see {@link StreamHash} for the digest of a trajectory's parts.
  * @stability experimental
