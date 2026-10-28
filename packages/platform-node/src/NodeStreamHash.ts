@@ -23,7 +23,8 @@ import { Layer, Sink } from "effect";
 /**
  * The hasher of one algorithm: the binding's, and SHA-256 from `node:crypto`.
  *
- * Both take the calls of {@link Hashing}: bytes go in, and hex comes out.
+ * Both take the calls of {@link Hashing}. Bytes go in, and the digest's 32 bytes
+ * come out.
  *
  * BLAKE2b runs at 32 bytes, the length of the other two digests. An unconfigured
  * BLAKE2b computes 64. The length belongs to the digest, so this matches
@@ -37,7 +38,7 @@ const hashers: Record<Algorithm, () => Hashing> = {
     const hashing = blake.Blake2BHasher.withParams(params);
 
     return {
-      digest: () => hashing.digest("hex"),
+      digest: () => hashing.digestBuffer(),
       // The binding accepts `Buffer` and `Uint8Array` at run time. A chunk passes
       // through as the same memory, not a copy.
       update: (chunk) => {
@@ -45,12 +46,21 @@ const hashers: Record<Algorithm, () => Hashing> = {
       },
     };
   },
-  [Algorithm.enums.Blake3]: () => new blake.Blake3Hasher(),
+  [Algorithm.enums.Blake3]: () => {
+    const hashing = new blake.Blake3Hasher();
+
+    return {
+      digest: () => hashing.digestBuffer(),
+      update: (chunk) => {
+        hashing.update(chunk);
+      },
+    };
+  },
   [Algorithm.enums.Sha256]: () => {
     const hashing = createHash("sha256");
 
     return {
-      digest: () => hashing.digest("hex"),
+      digest: () => hashing.digest(),
       update: (chunk) => {
         hashing.update(chunk);
       },
@@ -63,7 +73,7 @@ const hashing = (algorithm: Algorithm): Sink.Sink<string, Uint8Array, never, nev
     hashed.update(chunk);
 
     return hashed;
-  }).pipe(Sink.map((hashed) => hashed.digest()));
+  }).pipe(Sink.map((hashed) => Buffer.from(hashed.digest()).toString("hex")));
 
 /**
  * The hash of a Node program: `@napi-rs/blake-hash` and `node:crypto`.

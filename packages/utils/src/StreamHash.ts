@@ -108,8 +108,8 @@ export const defaultAlgorithm: Algorithm = Algorithm.enums.Blake3;
  * **Details**
  *
  * - `update` feeds bytes to the digest, and may be called as often as wanted.
- * - `digest` reads the digest of the bytes fed so far, as 64 lowercase hex
- *   characters.
+ * - `digest` reads the digest of the bytes fed so far, as 32 bytes for every
+ *   algorithm.
  *
  * Each running digest keeps its own state, and bytes fed to one never reach
  * another. No running digest of a layer fails.
@@ -132,9 +132,12 @@ export interface Hashing {
   readonly update: (bytes: Uint8Array) => void;
 
   /**
-   * Reads the digest of the bytes fed so far, as 64 lowercase hex characters.
+   * Reads the digest of the bytes fed so far, as 32 bytes for every algorithm.
+   *
+   * {@link StreamHash.digest} states the same digest as the 64 lowercase hex
+   * characters a recorded digest is written with.
    */
-  readonly digest: () => string;
+  readonly digest: () => Uint8Array;
 }
 
 /**
@@ -165,7 +168,8 @@ export interface StreamHash {
   readonly digest: (options?: Options) => Sink.Sink<string, Uint8Array, never, never>;
 
   /**
-   * The digest of bytes fed to it over several writes ({@link Hashing}).
+   * The digest of bytes fed to it over several writes, as its 32 bytes
+   * ({@link Hashing}).
    */
   readonly start: (options?: Options) => Hashing;
 }
@@ -209,7 +213,7 @@ const digestOf = (hashed: {
   readonly update: (bytes: Uint8Array) => void;
   readonly digest: () => Uint8Array;
 }): Hashing => ({
-  digest: () => bytesToHex(hashed.digest()),
+  digest: () => hashed.digest(),
   update: (bytes) => {
     hashed.update(bytes);
   },
@@ -223,7 +227,7 @@ const hashing = (algorithm: Algorithm): Sink.Sink<string, Uint8Array, never, nev
 
       return running;
     },
-  ).pipe(Sink.map((running) => running.digest()));
+  ).pipe(Sink.map((running) => bytesToHex(running.digest())));
 
 /**
  * The hash of this package as a service.

@@ -19,6 +19,7 @@ import {
   Compression,
   CompressionError,
   defaultAlgorithm,
+  make as makeCompression,
   type Options,
 } from "@trajs/utils/Compression";
 import { Effect, Layer, Stream } from "effect";
@@ -171,13 +172,15 @@ const frame =
  * An omitted algorithm means zstd, the historical frame. `None` stores the parts
  * unwrapped.
  *
- * Each frame goes through one codec per run, so the bytes are carried, not held.
+ * Each frame goes through one codec per run.
+ * A frame over a stream is carried rather than held, and a frame over one
+ * buffer is that buffer.
  *
  * @see {@link Compression} for the provided service.
  * @stability stable
  * @category layers
  */
-export const layer: Layer.Layer<Compression> = Layer.succeed(Compression, {
-  compress: frame(compressors),
-  decompress: frame(decompressors),
-});
+export const layer: Layer.Layer<Compression> = Layer.succeed(
+  Compression,
+  makeCompression({ compress: frame(compressors), decompress: frame(decompressors) }),
+);

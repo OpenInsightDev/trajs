@@ -18,7 +18,10 @@ platform package can say what each is over.
   chunk at a time.
 - `Compression` — what carries a trajectory's parts in a frame: zstd, gzip,
   deflate, or the bytes as they are, stated at the call that writes or reads one
-  (`Compression.Options`) and written into the metadata a trajectory ends with.
+  (`Compression.Options`) and recorded with each chunk of a stored trajectory.
+  What one chunk holds is one buffer, which `Compression.compressBytes` writes as
+  one frame and `Compression.decompressBytes` reads back. The same codec carries
+  the chunks of a stream (`Compression.compress`).
 - `Checksum` — what checks a block of a trajectory's parts: CRC-32, stated at
   the call that reads one (`Checksum.Options`) and read over one block at a time.
   A platform package reads it with the codec of its runtime (`node:zlib`,
@@ -26,10 +29,10 @@ platform package can say what each is over.
   states none. A checksum catches a torn or misplaced block, and does not name
   it: what names a trajectory is a digest.
 - `StreamHash` — what reads the digest of a trajectory's parts: BLAKE3, BLAKE2b
-  or SHA-256, stated at the call that reads one (`StreamHash.Options`) and written
-  into the metadata a trajectory ends with, read in one pass over a stream or fed
-  to a running digest (`StreamHash.start`), and the JavaScript hash this package
-  ships for all three.
+  or SHA-256, stated at the call that reads one (`StreamHash.Options`) and
+  recorded with a stored trajectory, read in one pass over a stream or fed to a
+  running digest (`StreamHash.start`), which reads it as its 32 bytes, and the
+  JavaScript hash this package ships for all three.
 
 `@trajs/platform-node` and `@trajs/platform-browser` provide the layers these
 services are read through, and the exchange layer of [`@trajs/core`](../core) is built

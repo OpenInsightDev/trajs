@@ -14,6 +14,7 @@ import {
   Compression,
   CompressionError,
   defaultAlgorithm,
+  make as makeCompression,
   type Options,
 } from "@trajs/utils/Compression";
 import { deflateSync, gunzipSync, gzipSync, inflateSync, zstdCompress, zstdDecompress } from "bun";
@@ -114,7 +115,7 @@ const frame =
  * @stability stable
  * @category layers
  */
-export const layer: Layer.Layer<Compression> = Layer.succeed(Compression, {
-  compress: frame(compressors),
-  decompress: frame(decompressors),
-});
+export const layer: Layer.Layer<Compression> = Layer.succeed(
+  Compression,
+  makeCompression({ compress: frame(compressors), decompress: frame(decompressors) }),
+);

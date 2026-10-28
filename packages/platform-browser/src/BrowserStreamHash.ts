@@ -114,7 +114,7 @@ const webAssemblyRunning = (): Hashing => {
   const hashed = blake3.createHash();
 
   return {
-    digest: () => hashed.digest("hex"),
+    digest: () => hashed.digest(),
     update: (bytes) => {
       hashed.update(bytes);
     },

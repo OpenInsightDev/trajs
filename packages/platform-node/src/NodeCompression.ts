@@ -24,6 +24,7 @@ import {
   Compression,
   CompressionError,
   defaultAlgorithm,
+  make as makeCompression,
   type Options,
 } from "@trajs/utils/Compression";
 import { Layer, Stream } from "effect";
@@ -183,7 +184,7 @@ export const decompress =
  * @stability stable
  * @category layers
  */
-export const layer: Layer.Layer<Compression> = Layer.succeed(Compression, {
-  compress,
-  decompress,
-});
+export const layer: Layer.Layer<Compression> = Layer.succeed(
+  Compression,
+  makeCompression({ compress, decompress }),
+);
