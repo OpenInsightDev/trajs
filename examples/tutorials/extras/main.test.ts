@@ -61,7 +61,7 @@ interface Turn {
   readonly tool: string | null;
 }
 
-interface Report {
+interface Summary {
   /** The agent that produced the run, and the task it was given. */
   readonly run: Readonly<{ agent: string; task: string }> | null;
 
@@ -110,26 +110,26 @@ const trajectory = Trajectory.make(config)(
 
 const main = trajectory.pipe(
   Stream.runFold(
-    (): Report => ({ run: null, turns: [] }),
-    (report, value) =>
+    (): Summary => ({ run: null, turns: [] }),
+    (summary, value) =>
       Match.value(value).pipe(
         Match.tag("Session", (session) => {
           // Every declared field is optional: a part may carry none of them.
           const recorded = session.extra[runExtra.tag];
 
           return recorded === undefined
-            ? report
-            : { ...report, run: { agent: recorded.agent, task: recorded.task } };
+            ? summary
+            : { ...summary, run: { agent: recorded.agent, task: recorded.task } };
         }),
         Match.tag("Response", (response) => {
           const recorded = response.extra[stepExtra.tag];
 
-          if (recorded === undefined) return report;
+          if (recorded === undefined) return summary;
 
           return {
-            ...report,
+            ...summary,
             turns: [
-              ...report.turns,
+              ...summary.turns,
               {
                 model: recorded.model,
                 effort: recorded.effort,
@@ -138,14 +138,14 @@ const main = trajectory.pipe(
             ],
           };
         }),
-        Match.orElse(() => report),
+        Match.orElse(() => summary),
       ),
   ),
 );
 
 it.effect("main", () =>
-  Effect.map(main, (report) =>
-    expect(report).toEqual({
+  Effect.map(main, (summary) =>
+    expect(summary).toEqual({
       run: { agent: "cline@3.1.0", task: "t-204" },
       turns: [
         // `model_name` was read as `model`: the record was written at version 1
@@ -153,6 +153,6 @@ it.effect("main", () =>
         { model: "gpt-4.1-mini", effort: "low", tool: "grep" },
         { model: "gpt-4.1", effort: "high", tool: null },
       ],
-    } satisfies Report),
+    } satisfies Summary),
   ),
 );

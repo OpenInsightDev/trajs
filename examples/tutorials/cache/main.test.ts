@@ -13,7 +13,7 @@ const part = Trajectory.parts(config);
 const tags = (parts: Iterable<Trajectory.Part<typeof config>>): ReadonlyArray<string> =>
   Array.from(parts, (held) => held._tag);
 
-interface Report {
+interface Summary {
   /** How many parts the cache reports after the source ended. */
   readonly length: number;
   /** Parts the source emitted, over both readings. */
@@ -81,8 +81,8 @@ const main = Effect.fn(function* () {
 
 it.effect("main", () =>
   main().pipe(
-    Effect.map((report) =>
-      expect(report).toEqual({
+    Effect.map((summary) =>
+      expect(summary).toEqual({
         length: 4,
         sourceReads: 4,
         firstPass: ["Prompt", "Response", "Prompt", "Response"],
@@ -91,7 +91,7 @@ it.effect("main", () =>
         pastTheEnd: true,
         reusedSourceReads: 0,
         reusedLength: 4,
-      } satisfies Report),
+      } satisfies Summary),
     ),
     // The window holds the newest 2 parts in memory; the 2 before them go to the store.
     Effect.provide(Cache.layer({ capacity: 2 })),

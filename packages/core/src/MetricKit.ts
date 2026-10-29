@@ -80,7 +80,7 @@ export type Empty = typeof empty;
 /**
  * Metric declarations of a {@link MetricKit}, or `never` for another type.
  *
- * @see {@link Metric.MetricParts} for the corresponding tagged reports.
+ * @see {@link Metric.MetricParts} for the corresponding tagged results.
  * @stability stable
  * @category utility types
  */
@@ -89,7 +89,7 @@ export type Metrics<K> = K extends MetricKit<infer Metrics> ? Metrics : never;
 /**
  * Schema requirements for decoding metric outputs and failures of a {@link MetricKit}.
  *
- * @see {@link EncodingServices} for writing the same reports.
+ * @see {@link EncodingServices} for writing the same results.
  * @stability stable
  * @category utility types
  */
@@ -100,7 +100,7 @@ export type DecodingServices<K extends Any> = Schema.Codec.DecodingServices<
 /**
  * Schema requirements for encoding metric outputs and failures of a {@link MetricKit}.
  *
- * @see {@link DecodingServices} for reading the same reports.
+ * @see {@link DecodingServices} for reading the same results.
  * @stability stable
  * @category utility types
  */
@@ -161,7 +161,7 @@ export const merge = <Ks extends ReadonlyArray<Any>>(...kits: Ks): Merged<Ks> =>
   const metrics = {} as Record<string, Metric.Any>;
 
   // SAFETY: every producer of every kit that states one is inserted under the tag
-  // of the metric it reports below, so what the record holds is one producer per
+  // of the metric it results below, so what the record holds is one producer per
   // tag those kits name.
   const producers = {} as Record<string, Metric.Producer<Metric.Any>>;
 
@@ -217,7 +217,7 @@ export type WithProducers<K extends Any> = K & {
  * The producer record uses metric tags as keys.
  * Existing producers are replaced.
  *
- * @see {@link Metric.produce} for producing reports.
+ * @see {@link Metric.produce} for producing results.
  * @stability stable
  * @category constructors
  */

@@ -21,7 +21,7 @@ in one pass — is a case in [`examples/traj-analysis`](../traj-analysis) instea
 - [metric](./metric/README.md) — declare a metric, measure parts with a producer, and read what
   it could not measure.
 - [metric-trajectory](./metric-trajectory/README.md) — read a trajectory into parts that carry
-  the reports naming them with `View.metricTrajectory`.
+  the results naming them with `View.metricTrajectory`.
 - [extras](./extras/README.md) — write a harness's own fields onto parts, versioned so a record
   written before a rename still reads.
 - [olap](./olap/README.md) — write runs into ClickHouse and answer their calls and billing with

@@ -239,17 +239,19 @@ schema of the body.
 | `Footer`   | the tag only                                            | `chunks`                                                          |
 
 - A uuid is stored as its 16 bytes rather than its 36-character string: the part's
-  `uuid`, the `fork` of a sub session's `type`, and each `attach` entry that is one.
-  A session id is whatever string its producer chose, stored as that string; a
+  `uuid`, the `fork` of a sub session's `type`, and each `attach` entry. A
+  session id is whatever string its producer chose, stored as that string; a
   `sessionId`
   absent means the main session. A decoder yields the canonical string of every
   identifier it decodes, so a reader compares like with like.
 - `type` of a `Session` is `{ _tag: "main" }` or `{ _tag: "sub", id, fork }`. The
   main session's id is the constant `"main"`, so it is not stored.
 - `metricTag` is `part.metric._tag`. `attach` is the `metric.data.attach` list
-  lifted out of the body: it names the parts and sessions a metric is attached to,
-  which is what session membership is decided by. Encoding moves it into the meta
-  and decoding puts it back, so the part model keeps it where it is.
+  lifted out of the body: it names the parts a metric is attached to, by uuid.
+  A metric part states no session of its own: it belongs to the session of every
+  part it names, which is what session membership is decided by. Encoding moves
+  it into the meta and decoding puts it back, so the part model keeps it where it
+  is.
 - `timestamp` and `startTimestamp` are epoch milliseconds as an integer, and decode
   to the part's `DateTime.Utc`. They are not the ISO strings the part schema
   encodes: this region is not compressed, an ISO timestamp costs 25 bytes there, and

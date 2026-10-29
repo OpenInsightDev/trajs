@@ -11,7 +11,7 @@ interface RepeatedToolCall {
   readonly ids: ReadonlyArray<string>;
 }
 
-interface Report {
+interface Summary {
   readonly totalToolTurns: number;
   readonly repeated: ReadonlyArray<RepeatedToolCall>;
 }
@@ -59,15 +59,15 @@ const main = Effect.fn(function* (threshold: number) {
     Stream.groupAdjacentBy(({ call: { name, params } }) => ({ name, params })),
 
     Stream.runFold(
-      (): Report => ({ totalToolTurns: 0, repeated: [] }),
-      (report, [{ name, params }, run]) => ({
-        totalToolTurns: report.totalToolTurns + run.length,
+      (): Summary => ({ totalToolTurns: 0, repeated: [] }),
+      (summary, [{ name, params }, run]) => ({
+        totalToolTurns: summary.totalToolTurns + run.length,
 
         // At 2, two identical reads are not a repeat.
         repeated:
           run.length > threshold
-            ? [...report.repeated, { name, params, ids: run.map(({ call }) => call.id) }]
-            : report.repeated,
+            ? [...summary.repeated, { name, params, ids: run.map(({ call }) => call.id) }]
+            : summary.repeated,
       }),
     ),
   );
@@ -75,8 +75,8 @@ const main = Effect.fn(function* (threshold: number) {
 
 it.effect("main", () =>
   main(2).pipe(
-    Effect.map((report) =>
-      expect(report).toEqual({
+    Effect.map((summary) =>
+      expect(summary).toEqual({
         totalToolTurns: 8,
         repeated: [
           { name: "grep", params: { pattern: "parseConfig" }, ids: ["call_1", "call_2", "call_3"] },

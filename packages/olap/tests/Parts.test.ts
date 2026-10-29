@@ -140,7 +140,7 @@ it("states what an event and a metric name, and the session a metric does not st
 
   // A metric part is what a producer of its metric reported, read through the kit
   // that names the metric — so the part is produced rather than written out.
-  const reports = Array.from(
+  const results = Array.from(
     await Metric.produce(
       MetricKit.toProducers(metrickit, {
         "test/tokens": () =>
@@ -154,7 +154,7 @@ it("states what an event and a metric name, and the session a metric does not st
     )(Trajectory.make(config)(Stream.empty)).pipe(Stream.runCollect, Effect.runPromise),
   );
 
-  const metricPart = described.metric(reports[0]!, { timestamp: at });
+  const metricPart = described.metric(results[0]!, { timestamp: at });
 
   const trajectory = Trajectory.make(kitted)(Stream.fromIterable([eventPart, metricPart]));
 

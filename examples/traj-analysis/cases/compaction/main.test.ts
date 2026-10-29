@@ -56,7 +56,7 @@ interface PhaseDraft {
   readonly paths: Set<string>;
 }
 
-interface Report {
+interface Summary {
   readonly steps: Readonly<Record<"prompt" | "response" | "event", number>>;
 
   /** The phases the events split the run into. */
@@ -66,8 +66,8 @@ interface Report {
   readonly rediscovered: ReadonlyArray<string>;
 }
 
-/** The report while the pass fills it, before it is stated as a {@link Report}. */
-interface ReportDraft {
+/** The summary while the pass fills it, before it is stated as a {@link Summary}. */
+interface SummaryDraft {
   readonly steps: Record<"prompt" | "response" | "event", number>;
 
   /** The phases so far, the open one last. */
@@ -175,7 +175,7 @@ const main = Effect.fn(function* () {
     // View.steps keeps the event in order with the prompts and the responses.
     View.steps,
     Stream.runFold(
-      (): ReportDraft => ({
+      (): SummaryDraft => ({
         steps: { prompt: 0, response: 0, event: 0 },
         phases: [open("run", 1)],
         firstRead: new Map(),
@@ -240,7 +240,7 @@ const main = Effect.fn(function* () {
     })),
 
     rediscovered: [...draft.rediscovered],
-  } satisfies Report;
+  } satisfies Summary;
 });
 
 it.effect("main", () =>

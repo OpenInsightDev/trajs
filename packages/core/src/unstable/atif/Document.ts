@@ -437,7 +437,7 @@ export type Metrics = Schema.Schema.Type<typeof Metrics>;
  * Cost uses US dollars.
  * Totals are supplied by the producer, not calculated or cross-checked against steps.
  *
- * @see {@link Metrics} for per-step reports.
+ * @see {@link Metrics} for per-step results.
  * @stability stable
  * @category schemas
  */

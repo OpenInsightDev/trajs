@@ -16,12 +16,13 @@ import type * as Trajectory from "#/Trajectory.ts";
 import type { TrajectoryError } from "#/TrajectoryError.ts";
 
 /**
- * A session's own parts and attached metric reports in trajectory order.
+ * A session's own parts and attached metric results in trajectory order.
  *
  * **Details**
  *
  * Session declarations are excluded.
- * Metrics can attach to the session id, its declaration uuid, or an earlier part uuid.
+ * A metric part states no session of its own: it belongs to the session of
+ * every part it attaches to, and a declaration belongs to the session it declares.
  * Unattached metrics are excluded.
  *
  * @see {@link Session} for the session owning the stream.

@@ -5,7 +5,7 @@ import { Effect, Match, Stream } from "effect";
 
 const config = Config.config();
 
-interface Report {
+interface Summary {
   readonly steps: number;
   readonly prompts: number;
   readonly responses: number;
@@ -37,7 +37,7 @@ const main = Effect.fn(function* () {
   // Parts are flat. View.steps emits one prompt, then the responses before the next prompt.
   return yield* View.steps(session.stream).pipe(
     Stream.runFold(
-      (): Report => ({
+      (): Summary => ({
         steps: 0,
         prompts: 0,
         responses: 0,
@@ -45,8 +45,8 @@ const main = Effect.fn(function* () {
         characters: 0,
         toolCalls: {},
       }),
-      (report, step) => {
-        const counted = { ...report, steps: report.steps + 1 };
+      (summary, step) => {
+        const counted = { ...summary, steps: summary.steps + 1 };
 
         return Match.value(step).pipe(
           Match.tag("Prompt", ({ prompt }) => ({
@@ -87,15 +87,15 @@ const main = Effect.fn(function* () {
 
 it.effect("main", () =>
   main().pipe(
-    Effect.map((report) =>
-      expect(report).toEqual({
+    Effect.map((summary) =>
+      expect(summary).toEqual({
         steps: 4,
         prompts: 2,
         responses: 2,
         messages: 6,
         characters: 26,
         toolCalls: { get_weather: 2 },
-      } satisfies Report),
+      } satisfies Summary),
     ),
     // Session.main reads parts from Cache. This layer keeps them in memory.
     // Cache.layerFsTemp keeps them in a temporary directory instead.

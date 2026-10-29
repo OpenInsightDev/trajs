@@ -2,7 +2,7 @@
  * Conversation steps, tool turns, and metric views over trajectory parts.
  *
  * {@link steps} groups one session's responses and {@link prompt} reconstructs its conversation.
- * {@link metricTrajectory} attaches reports to the parts they name.
+ * {@link metricTrajectory} attaches results to the parts they name.
  *
  * @stability stable
  */
@@ -32,7 +32,7 @@ type Tools<Config extends Config.AnyConfig> = Config["toolkit"]["tools"];
  *
  * Prompt messages retain their order.
  * Response steps become messages through {@link Prompt.fromResponseParts}.
- * Events and metric reports add no messages.
+ * Events and metric results add no messages.
  *
  * **Gotchas**
  *
@@ -66,7 +66,7 @@ export const prompt = <Config extends Config.AnyConfig, E, R>(
  * **Details**
  *
  * Steps have no ordinal.
- * Session declarations and metric reports do not become steps.
+ * Session declarations and metric results do not become steps.
  *
  * @see {@link steps} for grouping and emission rules.
  * @stability stable
@@ -145,7 +145,7 @@ const assembleStep = <Config extends Config.AnyConfig>(
       { response: [...run.response, response.response] },
       [],
     ]),
-    // A report names a part of an earlier step, so it neither starts nor ends one.
+    // A result names a part of an earlier step, so it neither starts nor ends one.
     Match.tag("Metric", (): Assembly<Config> => [run, []]),
     Match.exhaustive,
   );
@@ -161,7 +161,7 @@ const assembleStep = <Config extends Config.AnyConfig>(
  *
  * A prompt or event closes the current response group.
  * End of input also emits the remaining group.
- * Metric reports do not close a group.
+ * Metric results do not close a group.
  *
  * **Gotchas**
  *
@@ -185,7 +185,7 @@ export const steps = <Config extends Config.AnyConfig, E, R>(
   );
 
 /**
- * Selects successful reports for one metric in input order.
+ * Selects successful results for one metric in input order.
  *
  * **When to use**
  *
@@ -193,11 +193,11 @@ export const steps = <Config extends Config.AnyConfig, E, R>(
  *
  * **Details**
  *
- * Reports from other metrics and failure reports are omitted.
+ * Results from other metrics and failed results are omitted.
  * Values are selected by tag without schema validation.
  *
  * @see {@link Metric.Output} for timing and attachment fields.
- * @see {@link metricTrajectory} for reading reports with the parts they name.
+ * @see {@link metricTrajectory} for reading results with the parts they name.
  * @stability stable
  * @category filtering
  */
@@ -224,7 +224,7 @@ export const metricOutputs =
 /**
  * The metric part of the metric `Tag` names, carrying that metric's payload.
  */
-type ReportOf<Config extends Config.AnyConfig, Tag extends keyof Config.MetricsOf<Config>> = Omit<
+type ResultOf<Config extends Config.AnyConfig, Tag extends keyof Config.MetricsOf<Config>> = Omit<
   Trajectory.MetricPartOf<Config>,
   "metric"
 > &
@@ -233,25 +233,25 @@ type ReportOf<Config extends Config.AnyConfig, Tag extends keyof Config.MetricsO
   }>;
 
 /**
- * The reports attached to one part, keyed by metric tag, each list in trajectory order.
+ * The results attached to one part, keyed by metric tag, each list in trajectory order.
  *
  * **Details**
  *
  * A key is present only for a metric that reported on the part.
- * Each list holds the reports of the metric of that tag.
+ * Each list holds the results of the metric of that tag.
  *
- * @see {@link metricTrajectory} for how reports reach a part.
+ * @see {@link metricTrajectory} for how results reach a part.
  * @stability stable
  * @category models
  */
 export type AttachedMetrics<Config extends Config.AnyConfig> = Readonly<{
-  [Tag in keyof Config.MetricsOf<Config>]?: ReadonlyArray<ReportOf<Config, Tag>>;
+  [Tag in keyof Config.MetricsOf<Config>]?: ReadonlyArray<ResultOf<Config, Tag>>;
 }>;
 
 /**
- * A part with the reports attached to it, or a report without attachments.
+ * A part with the results attached to it, or a result without attachments.
  *
- * @see {@link metricTrajectory} for routing reports to target parts.
+ * @see {@link metricTrajectory} for routing results to target parts.
  * @stability stable
  * @category models
  */
@@ -266,7 +266,7 @@ type AttachablePart<Config extends Config.AnyConfig> =
   | Trajectory.EventPartOf<Config>;
 
 /**
- * A trajectory view carrying the reports attached to each part.
+ * A trajectory view carrying the results attached to each part.
  *
  * @see {@link MetricTrajectoryPart} for each emitted value.
  * @see {@link metricTrajectory} for construction.
@@ -280,27 +280,27 @@ export type MetricTrajectoryStream<
 > = Stream.Stream<MetricTrajectoryPart<Config>, E, R>;
 
 /**
- * Reads a trajectory into parts carrying the reports attached to them.
+ * Reads a trajectory into parts carrying the results attached to them.
  *
  * **When to use**
  *
- * Use to display a part together with the reports that name it.
+ * Use to display a part together with the results that name it.
  *
  * **Details**
  *
  * {@link Cache.Cache} reads the trajectory to completion before any part is emitted.
- * A scan of the cached parts indexes each report by the uuid of the parts it names.
- * A non-metric part carries `metrics`, a record from metric tag to the reports naming its uuid.
- * Reading one metric's reports needs only `metrics[tag]`.
+ * A scan of the cached parts indexes each result by the uuid of the parts it names.
+ * A non-metric part carries `metrics`, a record from metric tag to the results naming its uuid.
+ * Reading one metric's results needs only `metrics[tag]`.
  * Reports without `attach` remain in the stream.
  * Reports with `attach` leave the stream for the `metrics` of the parts they name.
- * Repeated target ids within one report attach once.
+ * Repeated target ids within one result attach once.
  *
  * **Gotchas**
  *
  * The entire trajectory is read before the first part is emitted.
  * An infinite trajectory never emits.
- * Attachments match part uuids only, not session ids.
+ * An attachment names a part uuid.
  * An unknown target attaches nothing.
  * Reading requires the cache's backing store to remain available.
  *

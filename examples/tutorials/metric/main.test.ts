@@ -7,7 +7,7 @@ const config = Config.config();
 
 const part = Trajectory.parts(config);
 
-interface Report {
+interface Summary {
   /** Characters of text each tool result held. */
   readonly results: ReadonlyArray<{ readonly call: string; readonly characters: number }>;
 
@@ -156,19 +156,19 @@ const main = Effect.fn(function* () {
   // output of a measured part or the failure of one the producer could not read.
   return yield* Metric.produce(counted)(trajectory).pipe(
     Stream.runFold(
-      (): Report => ({ results: [], unmeasured: [], characters: 0 }),
-      (report, { data }) => {
+      (): Summary => ({ results: [], unmeasured: [], characters: 0 }),
+      (summary, { data }) => {
         const call = calls.get(data.attach?.[0] ?? "") ?? "unknown";
 
         return Match.valueTags(data, {
           Output: ({ output }) => ({
-            ...report,
-            results: [...report.results, { call, characters: output.characters }],
-            characters: report.characters + output.characters,
+            ...summary,
+            results: [...summary.results, { call, characters: output.characters }],
+            characters: summary.characters + output.characters,
           }),
           Failure: ({ failure }) => ({
-            ...report,
-            unmeasured: [...report.unmeasured, { call, reason: failure.reason }],
+            ...summary,
+            unmeasured: [...summary.unmeasured, { call, reason: failure.reason }],
           }),
         });
       },
@@ -177,14 +177,14 @@ const main = Effect.fn(function* () {
 });
 
 it.effect("main", () =>
-  Effect.map(main(), (report) =>
-    expect(report).toEqual({
+  Effect.map(main(), (summary) =>
+    expect(summary).toEqual({
       results: [
         { call: "grep", characters: 16 },
         { call: "read_file", characters: 64 },
       ],
       unmeasured: [{ call: "view_image", reason: "not-text" }],
       characters: 80,
-    } satisfies Report),
+    } satisfies Summary),
   ),
 );

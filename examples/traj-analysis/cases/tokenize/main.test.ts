@@ -18,7 +18,7 @@ const kinds = [
   "media",
 ] as const satisfies ReadonlyArray<PromptKind>;
 
-interface Report {
+interface Summary {
   readonly growth: ReadonlyArray<{
     readonly parts: number;
     readonly tokens: number;
@@ -33,7 +33,7 @@ interface Report {
 }
 
 interface Reading {
-  readonly growth: Report["growth"];
+  readonly growth: Summary["growth"];
 
   readonly prompt: Tokens.PromptTokens | undefined;
 }
@@ -83,7 +83,7 @@ const main = () =>
 
         return { kind, tokens, share: promptTokens === 0 ? 0 : tokens / promptTokens };
       }),
-    } satisfies Report;
+    } satisfies Summary;
   }).pipe(Effect.provide(layers));
 
 it.effect("main", () =>

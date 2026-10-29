@@ -72,7 +72,7 @@ export * as Extra from "#/Extra.ts";
 export * as ExtraKit from "#/ExtraKit.ts";
 
 /**
- * Metric declarations, reports, and stream producers.
+ * Metric declarations, results, and stream producers.
  *
  * @stability stable
  * @category re-exports

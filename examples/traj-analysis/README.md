@@ -14,7 +14,7 @@ what it finds. An API taught on its own short trajectory is a tutorial in
 - [compaction](./cases/compaction/README.md) — split a run at a context compaction, and list the
   files the agent had to read again.
 - [metric-guided-investigation](./cases/metric-guided-investigation/README.md) — trace test results to
-  their metric reports and find where repeated checks stop adding evidence.
+  their metric results and find where repeated checks stop adding evidence.
 - [repeated-tool-calls](./cases/repeated-tool-calls/README.md) — report a tool call that was made
   again and again with the same arguments.
 - [tokenize](./cases/tokenize/README.md) — read token counts stored with the trajectory: how the

@@ -25,7 +25,7 @@ export const runProducers = <
     return Stream.empty;
   }
 
-  // SAFETY: each report uses the tag of its metric.
+  // SAFETY: each result uses the tag of its metric.
   // That tag is the metric part the kit holds.
   // The kit has one part per metric.
   return produced.pipe(

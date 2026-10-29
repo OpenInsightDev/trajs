@@ -19,7 +19,7 @@ interface Run {
   readonly output: number;
 }
 
-interface Report {
+interface Summary {
   /** The rows the two runs became. */
   readonly written: number;
 
@@ -109,12 +109,12 @@ const main = Effect.gen(function* () {
     ORDER BY trajectory_id
   `;
 
-  return { written, rows: counted?.rows ?? 0, tools, runs } satisfies Report;
+  return { written, rows: counted?.rows ?? 0, tools, runs } satisfies Summary;
 }).pipe(Effect.provide(Clickhouse.layerEmbedded()));
 
 it.effect("main", () =>
-  Effect.map(main, (report) => {
-    expect(report).toEqual({
+  Effect.map(main, (summary) => {
+    expect(summary).toEqual({
       written: 12,
       rows: 12,
 
@@ -128,6 +128,6 @@ it.effect("main", () =>
         { trajectory: "tutorial-run-1", input: 300, output: 75 },
         { trajectory: "tutorial-run-2", input: 170, output: 35 },
       ],
-    } satisfies Report);
+    } satisfies Summary);
   }),
 );

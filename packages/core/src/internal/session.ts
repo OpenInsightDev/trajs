@@ -96,10 +96,13 @@ const belongsTo = <Config extends Config.AnyConfig>(
     Match.tag("Prompt", names),
     Match.tag("Response", names),
     Match.tag("Event", names),
-    // A metric is produced after the part it names, so only uuids seen so far match.
+    // A metric is produced after the parts it names, so the uuids read so far
+    // decide the sessions it is read in.
     Match.tag("Metric", (metric) =>
-      (metric.metric.data.attach ?? []).some((target) => target === id || seen.has(target)),
+      (metric.metric.data.attach ?? []).some((target) => seen.has(target)),
     ),
+    // A declaration is not a part of the session it declares, but a metric
+    // naming it is read in that session.
     Match.tag("Session", (session) => {
       if (session.type.id === id && attached.has(session.uuid)) {
         seen.add(session.uuid);
@@ -191,7 +194,7 @@ const resolveForks = <Config extends Config.AnyConfig, E, R>(
               }),
               Match.tag("Prompt", name),
               Match.tag("Response", name),
-              // An event or a report cannot be a fork target.
+              // An event or a metric part cannot be a fork target.
               Match.tag("Event", () => undefined),
               Match.tag("Metric", () => undefined),
               Match.exhaustive,

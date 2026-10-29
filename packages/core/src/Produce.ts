@@ -3,7 +3,7 @@
  *
  * {@link produce} provides session writers to an effectful program.
  * {@link fromSession} and {@link fromSessions} accept existing message streams.
- * {@link produceMetrics} adds reports to an existing trajectory.
+ * {@link produceMetrics} adds results to an existing trajectory.
  *
  * @stability stable
  */
@@ -86,7 +86,7 @@ export type MessagePart<Config extends Config.AnyConfig> =
  *
  * A response part may still be arriving.
  * Production folds its increments into the part the answer ends in.
- * Session declarations and metric reports are excluded.
+ * Session declarations and metric results are excluded.
  *
  * @see {@link MessagePart} for the parts the stream supplies.
  * @see {@link fromSession} for producing a single-session trajectory.
@@ -206,7 +206,7 @@ const produceWith =
  * **Details**
  *
  * The explicit-id overload keeps that id; the other assigns a new uuid v7.
- * Input parts retain their order while metric reports can interleave.
+ * Input parts retain their order while metric results can interleave.
  * A response that is still arriving is written as the part it ends in.
  *
  * **Gotchas**
@@ -273,7 +273,7 @@ export function fromSession<
 }
 
 /**
- * Declares session sources and merges their messages with produced metric reports.
+ * Declares session sources and merges their messages with produced metric results.
  *
  * **When to use**
  *
@@ -419,7 +419,7 @@ type WithMetrics<Config extends Config.AnyConfig, Metrics extends MetricKit.Any>
 >;
 
 /**
- * Adds newly produced metric reports to an existing trajectory.
+ * Adds newly produced metric results to an existing trajectory.
  *
  * **When to use**
  *
@@ -428,15 +428,15 @@ type WithMetrics<Config extends Config.AnyConfig, Metrics extends MetricKit.Any>
  * **Details**
  *
  * Input parts retain their order and values.
- * New reports interleave as their producers emit them.
+ * New results interleave as their producers emit them.
  * The resulting config merges existing and supplied metric declarations.
  * The result receives a new uuid v7.
  *
  * **Gotchas**
  *
- * Existing reports are retained, even for metrics being produced again.
+ * Existing results are retained, even for metrics being produced again.
  * Supplied declarations replace existing declarations under duplicate tags.
- * A replacement schema must still accept retained reports under that tag.
+ * A replacement schema must still accept retained results under that tag.
  * Production broadcasts use unbounded buffers.
  *
  * @see {@link fromSession} for producing metrics alongside a live message stream.
@@ -575,7 +575,7 @@ type ProduceFn<
  * The main session is declared before the callback runs.
  * Declared session extras are read beside the config and attached to that declaration.
  * The explicit-id overload keeps that id; the other assigns a new uuid v7.
- * The output includes the config's produced metric reports.
+ * The output includes the config's produced metric results.
  * Callback failure fails the trajectory.
  *
  * **Gotchas**

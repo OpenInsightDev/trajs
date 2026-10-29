@@ -4,7 +4,7 @@ import { Effect, Match, Predicate, Stream } from "effect";
 
 import { trajectory } from "./fixture.ts";
 
-interface Report {
+interface Summary {
   readonly sessions: ReadonlyArray<{
     readonly id: string;
     readonly forkFrom: string | null;
@@ -116,7 +116,7 @@ const main = Effect.fn(function* () {
     })),
     inputTokens: summed.inputTokens,
     outputTokens: summed.outputTokens,
-  } satisfies Report;
+  } satisfies Summary;
 });
 
 it.effect("main", () =>

@@ -25,7 +25,7 @@ const toolkit = Toolkit.make(
 // city stays a string, not an unknown payload.
 const config = Config.config({ toolkit });
 
-interface Report {
+interface Summary {
   readonly cities: ReadonlyArray<string>;
 
   readonly queries: ReadonlyArray<string>;
@@ -110,31 +110,33 @@ const main = Effect.fn(function* () {
   // View.toolCalls also yields an undeclared tool.
   return yield* View.toolCalls(session.stream).pipe(
     Stream.runFold(
-      (): Report => ({ cities: [], queries: [], limit: 0, extensions: {}, undescribed: 0 }),
-      (report, call) =>
+      (): Summary => ({ cities: [], queries: [], limit: 0, extensions: {}, undescribed: 0 }),
+      (summary, call) =>
         Match.value(call).pipe(
           Match.discriminator("name")("get_weather", ({ params: { city } }) => ({
-            ...report,
-            cities: report.cities.includes(city) ? report.cities : [...report.cities, city],
+            ...summary,
+            cities: summary.cities.includes(city) ? summary.cities : [...summary.cities, city],
           })),
           Match.discriminator("name")("search_docs", ({ params: { query, limit } }) => ({
-            ...report,
-            queries: report.queries.includes(query) ? report.queries : [...report.queries, query],
-            limit: Math.max(report.limit, limit),
+            ...summary,
+            queries: summary.queries.includes(query)
+              ? summary.queries
+              : [...summary.queries, query],
+            limit: Math.max(summary.limit, limit),
           })),
           Match.discriminator("name")("read_file", ({ params: { path } }) => {
             const extension = path.slice(path.lastIndexOf(".") + 1);
 
             return {
-              ...report,
+              ...summary,
               extensions: {
-                ...report.extensions,
-                [extension]: (report.extensions[extension] ?? 0) + 1,
+                ...summary.extensions,
+                [extension]: (summary.extensions[extension] ?? 0) + 1,
               },
             };
           }),
           // web_fetch has no declaration. Count it here instead of dropping the call.
-          Match.orElse(() => ({ ...report, undescribed: report.undescribed + 1 })),
+          Match.orElse(() => ({ ...summary, undescribed: summary.undescribed + 1 })),
         ),
     ),
   );
@@ -142,15 +144,15 @@ const main = Effect.fn(function* () {
 
 it.effect("main", () =>
   main().pipe(
-    Effect.map((report) =>
-      expect(report).toEqual({
+    Effect.map((summary) =>
+      expect(summary).toEqual({
         cities: ["Paris", "Berlin"],
 
         queries: ["retry policy", "backoff"],
         limit: 20,
         extensions: { ts: 1, md: 1 },
         undescribed: 1,
-      } satisfies Report),
+      } satisfies Summary),
     ),
     Effect.provide(Cache.layer()),
   ),

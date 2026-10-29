@@ -4,7 +4,7 @@
  * The trajectory below is built with the core's own constructors and read by the
  * metric's own kit and producer, with the tokenizer this package ships, so what is
  * exercised is the way a trajectory is counted rather than one function of the
- * package: the parts in, the reports a kit produces of them out.
+ * package: the parts in, the results a kit produces of them out.
  *
  * A count is estimated from the text of a part, so the tokens a case asserts are
  * related to one another rather than pinned to numbers a tokenizer's encoding
@@ -140,7 +140,7 @@ const trajectory = Trajectory.make(config)(Stream.fromIterable(parts));
  * The media of the trajectory is priced with `"openai"` so that the count of the
  * image is a number the package publishes rather than one a family's rules moved.
  */
-const report = async (): Promise<Map<string, Estimate>> => {
+const counted = async (): Promise<Map<string, Estimate>> => {
   const program = Effect.gen(function* () {
     const producer = yield* makeProducer({ media: "openai" }).pipe(
       Effect.provide(Tokenizer.layerOpenAi({ model: "gpt-4o" })),
@@ -179,7 +179,7 @@ const of = (byPart: Map<string, Estimate>, part: { uuid: string }): Estimate => 
 
 describe("the metric over a trajectory", () => {
   it("reports a count for the parts a count is taken from, and no other", async () => {
-    const byPart = await report();
+    const byPart = await counted();
 
     expect(byPart.size).toBe(6);
     expect(of(byPart, question).count._tag).toBe("prompt");
@@ -196,7 +196,7 @@ describe("the metric over a trajectory", () => {
   });
 
   it("states the kinds of a prompt beside its total", async () => {
-    const byPart = await report();
+    const byPart = await counted();
     const asked = of(byPart, question).count;
 
     expect(asked._tag).toBe("prompt");
@@ -214,7 +214,7 @@ describe("the metric over a trajectory", () => {
   });
 
   it("states a tool result of a prompt as its own kind", async () => {
-    const byPart = await report();
+    const byPart = await counted();
     const carriedOver = of(byPart, carried).count;
 
     expect(carriedOver._tag).toBe("prompt");
@@ -228,7 +228,7 @@ describe("the metric over a trajectory", () => {
   });
 
   it("states a response part as its own kind, and no media a tokenizer counted", async () => {
-    const byPart = await report();
+    const byPart = await counted();
     const answered = of(byPart, answer).count;
 
     expect(answered._tag).toBe("text");
@@ -241,7 +241,7 @@ describe("the metric over a trajectory", () => {
   });
 
   it("pairs a tool result with the call it answers", async () => {
-    const byPart = await report();
+    const byPart = await counted();
     const called = of(byPart, call).count;
     const returned = of(byPart, result).count;
 
@@ -254,7 +254,7 @@ describe("the metric over a trajectory", () => {
   });
 
   it("prices a payload that is not text with the rule it was given", async () => {
-    const byPart = await report();
+    const byPart = await counted();
     const given = of(byPart, image).count;
 
     expect(given._tag).toBe("file");
@@ -267,7 +267,7 @@ describe("the metric over a trajectory", () => {
   });
 
   it("accumulates the total of each session on its own", async () => {
-    const byPart = await report();
+    const byPart = await counted();
     const running = new Map<string, number>();
 
     for (const part of [question, answer, call, result, carried, image]) {

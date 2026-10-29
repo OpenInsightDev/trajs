@@ -44,7 +44,7 @@ const attachPart = <Config extends Config.AnyConfig>(
 ): void => {
   if (!isMetric<Config>(part)) return;
 
-  // A report that names one target twice attaches once.
+  // A result that names one target twice attaches once.
   for (const target of new Set(part.metric.data.attach ?? [])) {
     const indices = attached.get(target);
 
@@ -81,24 +81,24 @@ const metricAt = <Config extends Config.AnyConfig>(
     Effect.map(Option.getOrThrow),
   );
 
-/** Groups the reports of one part by metric tag, each list in trajectory order. */
+/** Groups the results of one part by metric tag, each list in trajectory order. */
 const byTag = <Config extends Config.AnyConfig>(
-  reports: ReadonlyArray<Trajectory.MetricPartOf<Config>>,
+  results: ReadonlyArray<Trajectory.MetricPartOf<Config>>,
 ): View.AttachedMetrics<Config> => {
   const grouped = new Map<string, Array<Trajectory.MetricPartOf<Config>>>();
 
-  for (const report of reports) {
-    const tag = report.metric._tag;
+  for (const result of results) {
+    const tag = result.metric._tag;
     const held = grouped.get(tag);
 
     if (held === undefined) {
-      grouped.set(tag, [report]);
+      grouped.set(tag, [result]);
     } else {
-      held.push(report);
+      held.push(result);
     }
   }
 
-  // SAFETY: each list holds the reports of the metric its key names, in trajectory order,
+  // SAFETY: each list holds the results of the metric its key names, in trajectory order,
   // which is what the record holds and all it holds. The tags of a config are not known
   // one by one where the config is a type parameter, so the groups cannot be read as the
   // record by type alone.
@@ -114,13 +114,13 @@ const metricsOf = <Config extends Config.AnyConfig>(
     Effect.map(byTag),
   );
 
-/** Keeps a report that names no target, and hands every other part its reports. */
+/** Keeps a result that names no target, and hands every other part its results. */
 const emit = <Config extends Config.AnyConfig>(
   cached: Cache.Cached<string, Config>,
   attached: Attachment,
   part: Part<Config>,
 ): Reading<Config, Result.Result<View.MetricTrajectoryPart<Config>, void>> => {
-  // A report that names a target is emitted with that target rather than last.
+  // A result that names a target is emitted with that target rather than last.
   if (isMetric<Config>(part)) {
     return Effect.succeed(
       part.metric.data.attach === undefined ? Result.succeed(part) : Result.failVoid,
@@ -132,7 +132,7 @@ const emit = <Config extends Config.AnyConfig>(
   );
 };
 
-/** Reads the parts of a cached trajectory with the reports attached to each of them. */
+/** Reads the parts of a cached trajectory with the results attached to each of them. */
 export const metricStream = <Config extends Config.AnyConfig>(
   cached: Cache.Cached<string, Config>,
 ): Reading<Config, MetricStream<Config>> =>

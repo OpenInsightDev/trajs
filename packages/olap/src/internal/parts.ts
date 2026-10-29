@@ -64,7 +64,8 @@ const moment = (timestamp: DateTime.Utc | undefined): string | null =>
  *
  * A session part declares the session, so the session it belongs to is the id it
  * names; a part that states no session of its own belongs to the main session, and
- * a metric part states no session, so it belongs to none. Every kind of part is
+ * a metric part states no session, so its row states none: it belongs to the
+ * sessions of the parts it attaches to. Every kind of part is
  * stated, so a kind added to a trajectory is a kind this fails to read rather than
  * one it writes as nothing.
  */

@@ -33,7 +33,7 @@ import type { TokenCount } from "#/Tokens.ts";
  * to it.
  *
  * A part is named by its `uuid` rather than carried: what the metric produces of a
- * part is a report about that part, and the part itself is already in the
+ * part is a result about that part, and the part itself is already in the
  * trajectory — see `Metrics` for the output a measurement becomes.
  */
 export interface Measured {

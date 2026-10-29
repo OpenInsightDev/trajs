@@ -42,7 +42,7 @@ interface Analysis {
   readonly days: ReadonlyArray<Day>;
 }
 
-interface Report {
+interface Summary {
   readonly written: number;
   readonly analysis: Analysis;
 }
@@ -147,7 +147,7 @@ const main = () =>
         subSessionShare: subSessions?.share ?? 0,
         days,
       },
-    } satisfies Report;
+    } satisfies Summary;
   }).pipe(Effect.scoped, Effect.provide(Layers));
 
 const expectNear = (observed: number, expected: number, tolerance: number) =>

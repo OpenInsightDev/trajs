@@ -146,9 +146,9 @@ replay walks its inherited prefixes. That is already more readings than a source
 that can be read once has to give. It is why `Session.main` carries `Cache.Cache`
 in its environment: `Cache.layer()` is the smallest thing you can provide for it.
 
-`View.metricTrajectory` is the second case in this package. A report arrives
+`View.metricTrajectory` is the second case in this package. A result arrives
 after the part it names, so the view has to read the run to its end before it can
-emit the first part annotated with that report.
+emit the first part annotated with that result.
 
 The general shape is an analysis that answers several questions from one run and
 stays a stream — usage per session, calls per tool, characters per metric. Each

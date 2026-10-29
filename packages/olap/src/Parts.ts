@@ -115,7 +115,8 @@ export type Encoded = Schema.JsonObject;
  * `position` is where the part is in the one order a trajectory carries its parts
  * in, and `session_id` is the session the part belongs to: the id a session part
  * declares, the main session for a part that states none of its own, and `""` for a
- * metric part, which states no session.
+ * metric part, which states no session: it belongs to the sessions of the parts it
+ * attaches to, which one `session_id` cannot state.
  *
  * @category models
  */

@@ -150,7 +150,7 @@ const stepsOf = <Config extends Config.AnyConfig>(
  *
  * **Gotchas**
  *
- * Media content, timestamps, extras, metric reports, and step ids are not carried into the view.
+ * Media content, timestamps, extras, metric results, and step ids are not carried into the view.
  * Tool-result content inside prompt messages contributes no text.
  * The result cannot reconstruct a complete original ATIF document.
  *

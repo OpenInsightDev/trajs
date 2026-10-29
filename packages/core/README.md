@@ -5,7 +5,7 @@ recorded as, the config that says which kits decode them, and the layers that
 produce, cache, and exchange them.
 
 A trajectory is one stream of parts — a session declaration, a prompt, the parts of
-a response, an event, a metric report — and a `Config` says what those parts carry:
+a response, an event, a metric result — and a `Config` says what those parts carry:
 the tools they can call, the events they can state, the metrics derived from them,
 and the extra fields a producer attaches. One config is shared by production,
 storage, and every read, so a trajectory written by one program is read by another
@@ -38,7 +38,7 @@ without a conversion step.
 - `PackageMetadata` — what a `package.json` states about the package itself,
   which event, metric, and extra declarations state as their `packageMetadata`.
 - `Event` and `EventKit` — versioned event declarations and their collections.
-- `Metric` and `MetricKit` — metric reports, producers over trajectory parts, and
+- `Metric` and `MetricKit` — metric results, producers over trajectory parts, and
   their collections.
 - `Extra` and `ExtraKit` — versioned extra fields for prompt, response, and session
   parts.

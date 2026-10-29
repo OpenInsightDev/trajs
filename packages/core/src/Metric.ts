@@ -1,8 +1,8 @@
 /**
- * Versioned metric declarations, reports, and stream producers.
+ * Versioned metric declarations, results, and stream producers.
  *
  * {@link Metric} declares output and failure schemas.
- * {@link produce} runs kit producers and emits tagged reports.
+ * {@link produce} runs kit producers and emits tagged results.
  * {@link MetricKitSchema} states the declarations as a stored header holds them.
  *
  * @stability stable
@@ -43,8 +43,8 @@ export class Metadata extends Schema.Class<Metadata>("Metadata")({
  * `packageMetadata` is what the declaring package states of itself.
  *
  * @see {@link MetricKit.toProducers} for associating producers with declarations.
- * @see {@link Output} for successful reports.
- * @see {@link Failure} for failed reports.
+ * @see {@link Output} for successful results.
+ * @see {@link Failure} for failed results.
  * @stability stable
  * @category models
  */
@@ -67,7 +67,7 @@ export class Metric<
 }
 
 /**
- * A {@link Metric} without specific identity or report types.
+ * A {@link Metric} without specific identity or result types.
  *
  * @stability stable
  * @category utility types
@@ -79,7 +79,7 @@ export type Any = Metric<string, string, VersionedSchema.Any, VersionedSchema.An
  *
  * **Details**
  *
- * The declaration states its `metadata`, the package it is in, and its report schemas.
+ * The declaration states its `metadata`, the package it is in, and its result schemas.
  * Output and failure schemas are draft-07 JSON Schema documents of the versions they accept.
  *
  * @see {@link encode} for serializing a kit.
@@ -156,7 +156,7 @@ export const encode = (kit: MetricKit.Any): MetricKitSchema =>
   );
 
 /**
- * A metric report identified by its declaration's tag.
+ * A metric result identified by its declaration's tag.
  *
  * @see {@link MetricPart} for the schema.
  * @stability stable
@@ -165,7 +165,7 @@ export const encode = (kit: MetricKit.Any): MetricKitSchema =>
 export type MetricPart<Tag extends string, Data> = Readonly<{ _tag: Tag; data: Data }>;
 
 /**
- * Creates a schema for a tagged metric report.
+ * Creates a schema for a tagged metric result.
  *
  * @see {@link MetricParts} for all declarations of a kit.
  * @stability stable
@@ -177,16 +177,17 @@ export const MetricPart = <Tag extends string, S extends Schema.Top>(
 ): Schema.TaggedStruct<Tag, { readonly data: S }> => Schema.TaggedStruct(tag, { data: schema });
 
 /**
- * A successful metric report with optional timing and attachments.
+ * A successful metric result with optional timing and attachments.
  *
  * **Details**
  *
- * `attach` names part uuids or session ids.
- * Omitting `attach` leaves the report trajectory-wide.
- * Omitting `timestamp` leaves the report untimed.
+ * `attach` names the parts the result is about, by uuid.
+ * A result belongs to the sessions of the parts it names.
+ * Omitting `attach` leaves the result trajectory-wide.
+ * Omitting `timestamp` leaves the result untimed.
  *
  * @see {@link makeOutput} for construction.
- * @see {@link Failure} for a failed report.
+ * @see {@link Failure} for a failed result.
  * @stability stable
  * @category models
  */
@@ -196,19 +197,19 @@ export class Output<Ext extends Any> extends Data.TaggedClass("Output")<{
   readonly attach?: NonEmptyArray<string>;
 }> {}
 
-const reported = {
+const resultFields = {
   timestamp: Schema.optional(Schema.DateTimeUtcFromString),
   attach: Schema.optional(Schema.NonEmptyArray(Schema.String)),
 };
 
 const outputSchemaOf = <Ext extends Any>(metric: Ext): OutputSchema<Ext> =>
-  Schema.TaggedStruct("Output", { output: metric.output, ...reported });
+  Schema.TaggedStruct("Output", { output: metric.output, ...resultFields });
 
 const failureSchemaOf = <Ext extends Any>(metric: Ext): FailureSchema<Ext> =>
-  Schema.TaggedStruct("Failure", { failure: metric.failure, ...reported });
+  Schema.TaggedStruct("Failure", { failure: metric.failure, ...resultFields });
 
 /**
- * Creates an output report without adding a timestamp or attachments.
+ * Creates a successful result without adding a timestamp or attachments.
  *
  * **Gotchas**
  *
@@ -216,7 +217,7 @@ const failureSchemaOf = <Ext extends Any>(metric: Ext): FailureSchema<Ext> =>
  * The metric's schema does not validate the value during construction.
  *
  * @see {@link Output} for attachment semantics.
- * @see {@link makeFailure} for a failed report.
+ * @see {@link makeFailure} for a failed result.
  * @stability stable
  * @category constructors
  */
@@ -244,7 +245,7 @@ export class Failure<Ext extends Any> extends Data.TaggedClass("Failure")<{
 }> {}
 
 /**
- * Creates a failure report without adding a timestamp or attachments.
+ * Creates a failed result without adding a timestamp or attachments.
  *
  * **Gotchas**
  *
@@ -252,7 +253,7 @@ export class Failure<Ext extends Any> extends Data.TaggedClass("Failure")<{
  * The metric's schema does not validate the value during construction.
  *
  * @see {@link Failure} for producer error handling.
- * @see {@link makeOutput} for a successful report.
+ * @see {@link makeOutput} for a successful result.
  * @stability stable
  * @category constructors
  */
@@ -271,7 +272,7 @@ export const makeFailure = <Ext extends Any>(
  *
  * **Gotchas**
  *
- * An attachment must name an already consumed part or a declared session.
+ * An attachment must name an already consumed part.
  * The producer must not require services beyond the input stream's requirements.
  *
  * @see {@link produce} for running the producers of a kit.
@@ -285,12 +286,12 @@ export type Producer<Ext extends Any> = <E, R>(
 
 type OutputSchema<Ext extends Any> = Schema.TaggedStruct<
   "Output",
-  { readonly output: Ext["output"] } & typeof reported
+  { readonly output: Ext["output"] } & typeof resultFields
 >;
 
 type FailureSchema<Ext extends Any> = Schema.TaggedStruct<
   "Failure",
-  { readonly failure: Ext["failure"] } & typeof reported
+  { readonly failure: Ext["failure"] } & typeof resultFields
 >;
 
 type ProducedSchema<Ext extends Any> = Schema.Union<
@@ -313,7 +314,7 @@ type MetricPartOf<Ext> = Ext extends Any
   : never;
 
 /**
- * Tagged output and failure reports of a record of {@link Metric} declarations.
+ * Tagged results, successful or failed, of a record of {@link Metric} declarations.
  *
  * @see {@link MetricParts} for the schema built from a kit.
  * @stability stable
@@ -322,14 +323,14 @@ type MetricPartOf<Ext> = Ext extends Any
 export type MetricParts<Metrics extends Record<string, Any>> = MetricPartOf<Metrics[keyof Metrics]>;
 
 /**
- * Creates a union schema for the metric reports declared by `kit`.
+ * Creates a union schema for the metric results declared by `kit`.
  *
  * **Details**
  *
  * Each tagged payload accepts an output or a failure.
- * An empty kit accepts no metric reports.
+ * An empty kit accepts no metric results.
  *
- * @see {@link MetricPart} for a single report schema.
+ * @see {@link MetricPart} for a single result schema.
  * @stability stable
  * @category schemas
  */
@@ -352,12 +353,12 @@ export const MetricParts = <K extends MetricKit.Any>(
  *
  * **When to use**
  *
- * Use to read metric reports without retaining the input parts in the output.
+ * Use to read metric results without retaining the input parts in the output.
  *
  * **Details**
  *
- * Producers run concurrently, so reports from different producers can interleave.
- * A {@link Failure} becomes one report and ends only its producer.
+ * Producers run concurrently, so results from different producers can interleave.
+ * A {@link Failure} becomes one result and ends only its producer.
  * Other errors fail the resulting stream.
  *
  * **Gotchas**

@@ -16,7 +16,7 @@ const main = Effect.gen(function* () {
 
 A prompt is a step of its own. The response parts that arrive before the next
 prompt or event are one `Response` step; that prompt, that event, or the end of
-input closes it. Metric reports and session declarations are not steps.
+input closes it. Metric results and session declarations are not steps.
 
 `View.steps` reads one session, so give it `session.stream` for that session
 alone, or `Session.stream(session)` to put the inherited conversation in front.

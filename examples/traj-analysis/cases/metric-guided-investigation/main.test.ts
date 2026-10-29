@@ -17,7 +17,7 @@ interface Evidence {
   readonly finding: "timeout-unset" | "tests-pass" | "repeat";
 }
 
-interface Report {
+interface Summary {
   readonly findings: ReadonlyArray<Evidence["finding"]>;
   readonly resolvedOnRun: number | undefined;
   readonly redundantRuns: ReadonlyArray<number>;
@@ -166,13 +166,13 @@ const metrickit = MetricKit.toProducers(MetricKit.make(testEvidence), {
 });
 
 const main = Effect.fn(function* () {
-  const reports = Metric.produce(metrickit)(trajectory).pipe(
+  const results = Metric.produce(metrickit)(trajectory).pipe(
     Stream.map((metric) => part.metric(metric)),
   );
 
   // View.metricTrajectory reads the trajectory into the cache, then carries each
-  // report to the part it names, under that report's metric tag.
-  const view = yield* Stream.concat(reports, trajectory).pipe(
+  // result to the part it names, under that result's metric tag.
+  const view = yield* Stream.concat(results, trajectory).pipe(
     Trajectory.make(config),
     View.metricTrajectory,
   );
@@ -195,15 +195,15 @@ const main = Effect.fn(function* () {
       ),
     ),
     Stream.runFold(
-      (): Report => ({ findings: [], resolvedOnRun: undefined, redundantRuns: [] }),
-      (report, finding) => {
-        const run = report.findings.length + 1;
+      (): Summary => ({ findings: [], resolvedOnRun: undefined, redundantRuns: [] }),
+      (summary, finding) => {
+        const run = summary.findings.length + 1;
 
         return {
-          findings: [...report.findings, finding],
-          resolvedOnRun: report.resolvedOnRun ?? (finding === "tests-pass" ? run : undefined),
+          findings: [...summary.findings, finding],
+          resolvedOnRun: summary.resolvedOnRun ?? (finding === "tests-pass" ? run : undefined),
           redundantRuns:
-            finding === "repeat" ? [...report.redundantRuns, run] : report.redundantRuns,
+            finding === "repeat" ? [...summary.redundantRuns, run] : summary.redundantRuns,
         };
       },
     ),
@@ -215,12 +215,12 @@ const main = Effect.fn(function* () {
 it.effect("main", () =>
   main().pipe(
     Effect.provide(Cache.layer()),
-    Effect.map((report) =>
-      expect(report).toEqual({
+    Effect.map((summary) =>
+      expect(summary).toEqual({
         findings: ["timeout-unset", "tests-pass", "repeat"],
         resolvedOnRun: 2,
         redundantRuns: [3],
-      } satisfies Report),
+      } satisfies Summary),
     ),
   ),
 );

@@ -12,15 +12,15 @@ import {
 import * as Config from "@trajs/core/Config";
 import { Effect, Match, Predicate, Schema, Stream } from "effect";
 
-interface Report {
-  /** Tool results with a report naming them, in session order. */
+interface Summary {
+  /** Tool results with a result naming them, in session order. */
   readonly results: ReadonlyArray<{
     readonly tool: string;
     readonly characters: number;
   }>;
 
-  /** Characters of the reports left in the stream, in order. */
-  readonly remainingReports: ReadonlyArray<number>;
+  /** Characters of the results left in the stream, in order. */
+  readonly remainingResults: ReadonlyArray<number>;
 }
 
 /** Characters of text one tool result holds. */
@@ -44,7 +44,7 @@ const toolText = new Metric.Metric({
 });
 
 // The declaration is on the config, so the trajectory's metric parts decode as
-// this metric's reports.
+// this metric's results.
 const config = Config.config({
   metrickit: MetricKit.make(toolText),
 });
@@ -135,7 +135,7 @@ const measure: Metric.Producer<typeof toolText> = (input) =>
           Match.orElse(() => [total, []] as const),
         ),
       {
-        // A run-wide report names no part, so the view leaves it in the stream.
+        // A run-wide summary names no part, so the view leaves it in the stream.
         onHalt: (total) => [
           Metric.makeOutput<typeof toolText>(
             characters.make({ version: "0.1.0", characters: total }),
@@ -151,30 +151,30 @@ const counted = MetricKit.toProducers(MetricKit.make(toolText), {
 });
 
 const main = Effect.fn(function* () {
-  // A produced report is a part too, so it is concatenated after the run it
+  // A produced result is a part too, so it is concatenated after the run it
   // measures.
-  const reports = Metric.produce(counted)(trajectory).pipe(
+  const results = Metric.produce(counted)(trajectory).pipe(
     Stream.map((metric) => part.metric(metric)),
   );
 
-  const stored = Stream.concat(trajectory, reports).pipe(Trajectory.make(config));
+  const stored = Stream.concat(trajectory, results).pipe(Trajectory.make(config));
 
-  // A part comes back with the reports naming it; a report naming no part stays
+  // A part comes back with the results naming it; a result naming no part stays
   // a part.
   const view = yield* View.metricTrajectory(stored);
 
   return yield* view.pipe(
     Stream.runFold(
-      (): Report => ({ results: [], remainingReports: [] }),
-      (report, value) =>
+      (): Summary => ({ results: [], remainingResults: [] }),
+      (summary, value) =>
         Match.value(value).pipe(
           Match.tag("Metric", ({ metric }) =>
             Match.valueTags(metric.data, {
               Output: ({ output }) => ({
-                ...report,
-                remainingReports: [...report.remainingReports, output.characters],
+                ...summary,
+                remainingResults: [...summary.remainingResults, output.characters],
               }),
-              Failure: () => report,
+              Failure: () => summary,
             }),
           ),
           Match.when(
@@ -182,16 +182,16 @@ const main = Effect.fn(function* () {
             ({ response, metrics }) =>
               Match.value(metrics[toolText.tag]?.[0]?.metric.data).pipe(
                 Match.tag("Output", ({ output }) => ({
-                  ...report,
+                  ...summary,
                   results: [
-                    ...report.results,
+                    ...summary.results,
                     { tool: response.name, characters: output.characters },
                   ],
                 })),
-                Match.orElse(() => report),
+                Match.orElse(() => summary),
               ),
           ),
-          Match.orElse(() => report),
+          Match.orElse(() => summary),
         ),
     ),
   );
@@ -200,14 +200,14 @@ const main = Effect.fn(function* () {
 it.effect("main", () =>
   main().pipe(
     Effect.provide(Cache.layer()),
-    Effect.map((report) =>
-      expect(report).toEqual({
+    Effect.map((summary) =>
+      expect(summary).toEqual({
         results: [
           { tool: "grep", characters: 16 },
           { tool: "read_file", characters: 64 },
         ],
-        remainingReports: [80],
-      } satisfies Report),
+        remainingResults: [80],
+      } satisfies Summary),
     ),
   ),
 );

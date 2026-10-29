@@ -167,7 +167,7 @@ const runnable = MetricKit.toProducers(metrickit, {
   [tokenEstimate.tag]: producer,
 });
 
-// What the kit derived of a trajectory: one report per part it counted, each
+// What the kit derived of a trajectory: one result per part it counted, each
 // anchored to the part it was taken for by that part's uuid.
 const estimates = Metric.produce(runnable)(trajectory);
 ```
@@ -198,7 +198,7 @@ one: which tokenizer a trajectory is counted with is chosen where the producer i
 provided with a layer, and travels with the producer rather than with the kit that
 runs it.
 
-Each report carries the datum of one part, `Estimate`, which is what the part is
+Each result carries the datum of one part, `Estimate`, which is what the part is
 worth and how it was derived:
 
 - `count` is the count itself — a `Tokens.TokenCount`, the union of the shapes a
@@ -211,7 +211,7 @@ worth and how it was derived:
   summing the parts before it. A part the producer did not count leaves it
   unchanged.
 
-The datum says nothing about the part it is about beyond its `count`: the report's
+The datum says nothing about the part it is about beyond its `count`: the result's
 `attach` names that part, so the datum does not repeat its content. Which tokenizer
 took the count is not among them either: a tokenizer states no name, and which one
 a run carries is a property of the run rather than of the trajectory. A count is an
