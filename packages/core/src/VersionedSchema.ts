@@ -9,17 +9,12 @@
 
 import { Schema, SchemaGetter } from "effect";
 
-import {
-  assemble,
-  type ServiceFree,
-  type ServiceFreeFields,
-  tagSchema,
-} from "#/internal/versioned.ts";
+import { assemble, tagSchema } from "#/internal/versioned.ts";
 
-type Reading<Prev extends Schema.Top, Next extends Schema.Top> = Schema.decodeTo<
+type Reading<Prev extends Schema.Top, Next extends Schema.Top, RD = never> = Schema.decodeTo<
   Next,
   Prev,
-  never,
+  RD,
   never
 >;
 
@@ -30,7 +25,8 @@ type Reading<Prev extends Schema.Top, Next extends Schema.Top> = Schema.decodeTo
  *
  * Decoding accepts current payloads and configured historical versions.
  * Encoding uses the current schema.
- * Versioned fields and migrations require no services.
+ * Fields and migrations may require services.
+ * The services of the fields and migrations are what decoding requires.
  *
  * @see {@link make} for starting a version history.
  * @see {@link upgrade} for adding migrations.
@@ -38,8 +34,8 @@ type Reading<Prev extends Schema.Top, Next extends Schema.Top> = Schema.decodeTo
  * @category schemas
  */
 export type VersionedSchema<
-  Self extends Schema.Struct<ServiceFreeFields>,
-  Members extends ReadonlyArray<ServiceFree> = ReadonlyArray<ServiceFree>,
+  Self extends Schema.Struct<Schema.Struct.Fields>,
+  Members extends ReadonlyArray<Schema.Top> = ReadonlyArray<Schema.Top>,
 > = Schema.Union<Members> & {
   readonly self: Self;
 };
@@ -50,7 +46,7 @@ export type VersionedSchema<
  * @stability stable
  * @category utility types
  */
-export type Any = VersionedSchema<Schema.Struct<ServiceFreeFields>>;
+export type Any = VersionedSchema<Schema.Struct<Schema.Struct.Fields>>;
 
 /**
  * A {@link VersionedSchema} accepting previous payloads and decoding them into new fields.
@@ -61,10 +57,11 @@ export type Any = VersionedSchema<Schema.Struct<ServiceFreeFields>>;
  */
 export type Upgraded<
   Prev extends Any,
-  More extends ServiceFreeFields & { readonly version: AnyVersion },
+  More extends Schema.Struct.Fields & { readonly version: AnyVersion },
+  RD = never,
 > = VersionedSchema<
   Schema.Struct<More>,
-  readonly [Schema.Struct<More>, Reading<Prev, Schema.Struct<More>>]
+  readonly [Schema.Struct<More>, Reading<Prev, Schema.Struct<More>, RD>]
 >;
 
 /**
@@ -78,7 +75,9 @@ export type Upgraded<
  * @stability stable
  * @category constructors
  */
-export const make = <Self extends Schema.Struct<{ readonly version: Schema.Literal<string> }>>(
+export const make = <
+  Self extends Schema.Struct<Schema.Struct.Fields & { readonly version: AnyVersion }>,
+>(
   schema: Self,
 ): VersionedSchema<Self, readonly [Self]> => assemble<Self, readonly [Self]>(schema, [schema]);
 
@@ -93,6 +92,7 @@ export const make = <Self extends Schema.Struct<{ readonly version: Schema.Liter
  *
  * `fields` receives the previous `self` fields and returns the new fields.
  * `decode` receives the previous decoded value and returns the new encoded value.
+ * The services of `fields` and `decode` are what decoding the derived version requires.
  * Earlier migrations remain reachable through the previous schema.
  * Encoding writes the new schema, not a historical version.
  *
@@ -122,23 +122,27 @@ export const make = <Self extends Schema.Struct<{ readonly version: Schema.Liter
  * @category combinators
  */
 export const upgrade =
-  <Prev extends Any, More extends ServiceFreeFields & { readonly version: AnyVersion }>(
+  <
+    Prev extends Any,
+    More extends Schema.Struct.Fields & { readonly version: AnyVersion },
+    RD = never,
+  >(
     fields: (previous: Prev["self"]["fields"]) => More,
     change: {
-      readonly decode: SchemaGetter.Getter<Schema.Struct<More>["Encoded"], Prev["Type"]>;
+      readonly decode: SchemaGetter.Getter<Schema.Struct<More>["Encoded"], Prev["Type"], RD>;
     },
   ) =>
-  (previous: Prev): Upgraded<Prev, More> => {
+  (previous: Prev): Upgraded<Prev, More, RD> => {
     const self = previous.self.mapFields(fields);
 
-    const step = Schema.decodeTo<Schema.Struct<More>, Prev, never, never>(self, {
+    const step = Schema.decodeTo<Schema.Struct<More>, Prev, RD, never>(self, {
       decode: change.decode,
       encode: SchemaGetter.forbiddenEncoding,
     })(previous);
 
     return assemble<
       Schema.Struct<More>,
-      readonly [Schema.Struct<More>, Reading<Prev, Schema.Struct<More>>]
+      readonly [Schema.Struct<More>, Reading<Prev, Schema.Struct<More>, RD>]
     >(self, [self, step]);
   };
 

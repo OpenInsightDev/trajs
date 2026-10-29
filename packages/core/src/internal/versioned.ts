@@ -2,14 +2,10 @@ import { Schema, SchemaGetter } from "effect";
 
 import type { Any, AnyVersioned, VersionedSchema } from "#/VersionedSchema.ts";
 
-export type ServiceFree = Schema.Codec<unknown, unknown, never, never>;
-
-export type ServiceFreeFields = Readonly<Record<PropertyKey, ServiceFree>>;
-
 export function assemble<
-  Self extends Schema.Struct<ServiceFreeFields>,
-  Members extends ReadonlyArray<ServiceFree>,
->(self: Self, readers: ReadonlyArray<ServiceFree>): VersionedSchema<Self, Members>;
+  Self extends Schema.Struct<Schema.Struct.Fields>,
+  Members extends ReadonlyArray<Schema.Top>,
+>(self: Self, readers: ReadonlyArray<Schema.Top>): VersionedSchema<Self, Members>;
 export function assemble(self: Schema.Top, readers: ReadonlyArray<Schema.Top>): Schema.Top {
   return Object.assign(Schema.Union(readers), { self });
 }
@@ -20,7 +16,6 @@ export const tagSchema = (tag: string, entry: Any): Any => {
   // The schema types are explicit, not inferred.
   // A transform from one schema to another names neither schema.
   // Each schema here is the entry's `Any`.
-  // A trajectory schema takes no services.
   const writing = Schema.decodeTo<Schema.flip<Any>, Any, never, never>(Schema.flip(entry), {
     decode: SchemaGetter.passthrough(),
     encode: SchemaGetter.forbiddenEncoding,
