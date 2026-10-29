@@ -32,7 +32,7 @@ for when the result matters and not just the call.
 The trajectory stores the params as the toolkit encoded them, so the toolkit is
 not travelling with the data: two programs reading the same trajectory need the
 same toolkit to read its calls typed. For a program that keeps the declarations
-themselves, `Toolkit.encode` writes them as JSON Schema.
+themselves, `Toolkit.encode` writes them as a `SchemaRepresentation` document.
 
 The run here calls three declared tools and fetches a page with one nobody
 registered. Reading with the toolkit gives the cities, the search queries, the

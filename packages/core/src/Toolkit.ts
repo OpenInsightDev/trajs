@@ -7,8 +7,10 @@
  * @stability stable
  */
 
-import { JsonSchema, pipe, Schema } from "effect";
+import { JsonSchema, pipe, Schema, SchemaRepresentation } from "effect";
 import { Tool, type Toolkit } from "effect/ai";
+
+import { documentOf } from "#/internal/schema.ts";
 
 /**
  * Re-exports Effect's toolkit APIs without modification.
@@ -19,37 +21,38 @@ import { Tool, type Toolkit } from "effect/ai";
 export * from "effect/ai/Toolkit";
 
 /**
- * Schema for a draft-07 JSON Schema document of a stored schema.
+ * Schema for a stored schema.
  *
  * **Details**
  *
- * A document states the dialect it is written in, its root schema, and the named definitions
- * the root refers to.
+ * A stored schema is a `SchemaRepresentation.Document` in its JSON form.
+ * `SchemaRepresentation.fromJson` reads it, and `SchemaRepresentation.fromRepresentation` rebuilds the schema.
+ *
+ * **Gotchas**
+ *
+ * Effect states no schema for a representation document, so this schema accepts any JSON value.
+ * Rebuilding a document needs a reviver for every declaration and every check it names.
  *
  * @stability stable
  * @category schemas
  */
-export const JsonSchemaDocument = Schema.Struct({
-  dialect: Schema.Literal("draft-07"),
-  schema: Schema.Record(Schema.String, Schema.Unknown),
-  definitions: Schema.Record(Schema.String, Schema.Record(Schema.String, Schema.Unknown)),
-});
+export const SchemaDocument = Schema.Json;
 
 /**
- * A draft-07 JSON Schema document for a stored schema.
+ * A stored schema.
  *
- * @see {@link JsonSchemaDocument} for the schema.
+ * @see {@link SchemaDocument} for the schema.
  * @stability stable
  * @category models
  */
-export type JsonSchemaDocument = Schema.Schema.Type<typeof JsonSchemaDocument>;
+export type SchemaDocument = Schema.Schema.Type<typeof SchemaDocument>;
 
 /**
  * Schema for a tool declaration without its runtime handler.
  *
  * **Details**
  *
- * Parameter, success, and failure schemas are draft-07 JSON Schema documents.
+ * Parameter, success, and failure schemas are stored as {@link SchemaDocument}s.
  * An absent description stays absent.
  *
  * @see {@link encode} for serializing a toolkit.
@@ -60,9 +63,9 @@ export const ToolSchema = Schema.Struct({
   id: Schema.String,
   name: Schema.String,
   description: Schema.optional(Schema.String),
-  parameters: JsonSchemaDocument,
-  success: JsonSchemaDocument,
-  failure: JsonSchemaDocument,
+  parameters: SchemaDocument,
+  success: SchemaDocument,
+  failure: SchemaDocument,
 });
 
 /**
@@ -102,12 +105,13 @@ export type ToolkitSchema = Schema.Schema.Type<typeof ToolkitSchema>;
  * **Details**
  *
  * Record keys stay unchanged.
- * Parameter, success, and failure schemas become draft-07 JSON Schema documents.
+ * Parameter, success, and failure schemas become {@link SchemaDocument}s.
  *
  * **Gotchas**
  *
- * Schema conversion can throw for unsupported schemas.
- * The result does not preserve schema transformations or runtime services.
+ * Building a document can throw for a schema it cannot state.
+ * The result states the encoded side, not the decoding transformations.
+ * A dynamic tool states its parameters as JSON Schema, which is what its document is read from.
  *
  * @see {@link ToolkitSchema} for the stored representation.
  * @stability stable
@@ -119,15 +123,9 @@ export const encode = (toolkit: Toolkit.Any): ToolkitSchema =>
       const encoded = {
         id: tool.id,
         name: tool.name,
-        // `Tool.getJsonSchema` states the schema as `unknown`, so it is read into
-        // a document through `pipe` rather than a `.pipe(...)` of its own.
-        parameters: pipe(
-          Tool.getJsonSchema(tool),
-          JsonSchema.fromSchemaDraft2020_12,
-          JsonSchema.toDocumentDraft07,
-        ),
-        success: JsonSchema.toDocumentDraft07(Schema.toJsonSchemaDocument(tool.successSchema)),
-        failure: JsonSchema.toDocumentDraft07(Schema.toJsonSchemaDocument(tool.failureSchema)),
+        parameters: parametersOf(tool),
+        success: documentOf(tool.successSchema),
+        failure: documentOf(tool.failureSchema),
       };
 
       return [
@@ -136,6 +134,15 @@ export const encode = (toolkit: Toolkit.Any): ToolkitSchema =>
       ];
     }),
   );
+
+const parametersOf = (tool: Tool.Any): SchemaDocument =>
+  Tool.isDynamic(tool) && tool.jsonSchema !== undefined
+    ? pipe(
+        JsonSchema.fromSchemaDraft2020_12(tool.jsonSchema),
+        SchemaRepresentation.fromJsonSchemaDocument,
+        documentOf,
+      )
+    : documentOf(tool.parametersSchema);
 
 /**
  * The toolkit type with no declared tools.

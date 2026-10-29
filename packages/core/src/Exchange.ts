@@ -69,9 +69,10 @@ export const Version = pkg.version;
  * **Details**
  *
  * The uncompressed JSON record follows a four-byte big-endian length.
- * Each entry states what its declaration names of itself and the JSON Schema documents of its schemas.
+ * Each entry states what its declaration names of itself and its stored schemas.
  * Tool entries include them but no executable handlers or schema transformations.
  *
+ * @see {@link Toolkit.SchemaDocument} for the stored form of a schema.
  * @see {@link Toolkit.ToolkitSchema} for stored tool declarations.
  * @see {@link Event.EventKitSchema} for stored event declarations.
  * @see {@link Metric.MetricKitSchema} for stored metric declarations.

@@ -1,7 +1,5 @@
-import { DateTime, Effect, JsonSchema, Schema, SchemaTransformation } from "effect";
+import { DateTime, Effect, Schema, SchemaRepresentation, SchemaTransformation } from "effect";
 import * as uuid from "uuid";
-
-import type { JsonSchemaDocument } from "#/Toolkit.ts";
 
 const bytesOf = (length: number) => Schema.Uint8Array.check(Schema.isBetweenLength(length, length));
 
@@ -37,5 +35,5 @@ export const TimestampEpoch = Schema.DateTimeUtcFromMillis.pipe(
 // whatever algorithm the header names.
 export const Chain = bytesOf(32);
 
-export const documentOf = (schema: Schema.Top): JsonSchemaDocument =>
-  JsonSchema.toDocumentDraft07(Schema.toJsonSchemaDocument(schema));
+export const documentOf = (schema: Schema.Top): Schema.Json =>
+  schema.pipe(Schema.toRepresentation, SchemaRepresentation.toJson);

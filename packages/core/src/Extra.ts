@@ -13,7 +13,7 @@ import { Data, Schema } from "effect";
 import type * as ExtraKit from "#/ExtraKit.ts";
 import { documentOf } from "#/internal/schema.ts";
 import { PackageMetadata } from "#/Package.ts";
-import { JsonSchemaDocument } from "#/Toolkit.ts";
+import { SchemaDocument } from "#/Toolkit.ts";
 
 /**
  * The trajectory part kinds supporting extras.
@@ -138,7 +138,7 @@ export const makeUnknown = <Pkg extends string, Id extends string>(
  * The declaration states the package it is in and the schemas it declares.
  * The optional name and description sit under `metadata`, as event and metric declarations
  * state them.
- * Each schema it declares becomes a draft-07 JSON Schema document of the versions it accepts.
+ * Each schema it declares is stored as a {@link SchemaDocument} of the versions it accepts.
  *
  * @see {@link encode} for serializing a kit.
  * @see {@link ExtraKitSchema} for the record a stored header holds.
@@ -153,9 +153,9 @@ export const ExtraSchema = Schema.Struct({
     }),
   ),
   packageMetadata: Schema.optional(PackageMetadata),
-  prompt: Schema.optional(JsonSchemaDocument),
-  response: Schema.optional(JsonSchemaDocument),
-  session: Schema.optional(JsonSchemaDocument),
+  prompt: Schema.optional(SchemaDocument),
+  response: Schema.optional(SchemaDocument),
+  session: Schema.optional(SchemaDocument),
 });
 
 /**
@@ -197,12 +197,12 @@ export type ExtraKitSchema = Schema.Schema.Type<typeof ExtraKitSchema>;
  * Record keys are the tags of the kit.
  * A declaration that states no name or description states no `metadata`.
  * A part kind the declaration states no schema for stays absent.
- * Each stated schema becomes a draft-07 JSON Schema document of the versions it accepts.
+ * Each stated schema becomes a {@link SchemaDocument} of the versions it accepts.
  *
  * **Gotchas**
  *
- * Schema conversion can throw for unsupported schemas.
- * The result does not preserve schema transformations or runtime services.
+ * Building a document can throw for a schema it cannot state.
+ * The result states the encoded side, not the decoding transformations.
  *
  * @see {@link ExtraKitSchema} for the stored representation.
  * @stability stable
@@ -232,7 +232,7 @@ type Declared<X extends Any, P extends Part> = Exclude<X[P], undefined>;
 const declaredFor = (item: Any, part: Part): Schema.Top | undefined =>
   ({ prompt: item.prompt, response: item.response, session: item.session })[part];
 
-const documentFor = (item: Any, part: Part): JsonSchemaDocument | undefined => {
+const documentFor = (item: Any, part: Part): SchemaDocument | undefined => {
   const schema = declaredFor(item, part);
 
   return schema === undefined ? undefined : documentOf(schema);

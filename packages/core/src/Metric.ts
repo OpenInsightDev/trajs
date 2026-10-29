@@ -16,7 +16,7 @@ import { runProducers } from "#/internal/metric.ts";
 import { documentOf } from "#/internal/schema.ts";
 import type * as MetricKit from "#/MetricKit.ts";
 import { PackageMetadata } from "#/Package.ts";
-import { JsonSchemaDocument } from "#/Toolkit.ts";
+import { SchemaDocument } from "#/Toolkit.ts";
 import type * as Trajectory from "#/Trajectory.ts";
 import type { TrajectoryError } from "#/TrajectoryError.ts";
 
@@ -133,7 +133,7 @@ export const makeUnknown = <Pkg extends string, Id extends string>(
  *
  * The declaration states the package it is in and its result schemas.
  * `metadata` and `packageMetadata` are optional.
- * Output and failure schemas are draft-07 JSON Schema documents of the versions they accept.
+ * Output and failure schemas are stored as {@link SchemaDocument}s of the versions they accept.
  *
  * @see {@link encode} for serializing a kit.
  * @see {@link MetricKitSchema} for the record a stored header holds.
@@ -143,8 +143,8 @@ export const makeUnknown = <Pkg extends string, Id extends string>(
 export const MetricSchema = Schema.Struct({
   metadata: Schema.optional(Metadata),
   packageMetadata: Schema.optional(PackageMetadata),
-  output: JsonSchemaDocument,
-  failure: JsonSchemaDocument,
+  output: SchemaDocument,
+  failure: SchemaDocument,
 });
 
 /**
@@ -184,12 +184,12 @@ export type MetricKitSchema = Schema.Schema.Type<typeof MetricKitSchema>;
  * **Details**
  *
  * Record keys are the tags of the kit.
- * Output and failure schemas become draft-07 JSON Schema documents of the versions they accept.
+ * Output and failure schemas become {@link SchemaDocument}s of the versions they accept.
  *
  * **Gotchas**
  *
- * Schema conversion can throw for unsupported schemas.
- * The result does not preserve schema transformations or runtime services.
+ * Building a document can throw for a schema it cannot state.
+ * The result states the encoded side, not the decoding transformations.
  *
  * @see {@link MetricKitSchema} for the stored representation.
  * @stability stable

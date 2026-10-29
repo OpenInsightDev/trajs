@@ -277,11 +277,11 @@ know.
 Every trajectory begins with a chunk that holds exactly one frame, tagged `Header`.
 Its body states:
 
-| Field                                          | Meaning                                                 |
-| ---------------------------------------------- | ------------------------------------------------------- |
-| `version`                                      | the `@trajs/core` release that wrote the trajectory     |
-| `hash`                                         | digest algorithm of every chain value                   |
-| `toolkit`, `eventkit`, `metrickit`, `extrakit` | the stored kit descriptions, by name and by JSON Schema |
+| Field                                          | Meaning                                                   |
+| ---------------------------------------------- | --------------------------------------------------------- |
+| `version`                                      | the `@trajs/core` release that wrote the trajectory       |
+| `hash`                                         | digest algorithm of every chain value                     |
+| `toolkit`, `eventkit`, `metrickit`, `extrakit` | the stored kit descriptions, by name and by stored schema |
 
 `hash` is the algorithm the chain values are computed with (section 5.2), so a reader
 takes no algorithm from outside the file.

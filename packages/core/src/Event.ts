@@ -13,7 +13,7 @@ import { Data, Schema } from "effect";
 import type * as EventKit from "#/EventKit.ts";
 import { documentOf } from "#/internal/schema.ts";
 import { PackageMetadata } from "#/Package.ts";
-import { JsonSchemaDocument } from "#/Toolkit.ts";
+import { SchemaDocument } from "#/Toolkit.ts";
 
 /**
  * Optional display information for an {@link Event}.
@@ -111,7 +111,7 @@ export const makeUnknown = <Pkg extends string, Id extends string>(
  *
  * The declaration states the package it is in and its payload schema.
  * `metadata` and `packageMetadata` are optional.
- * The payload schema is a draft-07 JSON Schema document of the versions it accepts.
+ * The payload schema is a {@link SchemaDocument} of the versions it accepts.
  *
  * @see {@link encode} for serializing a kit.
  * @see {@link EventKitSchema} for the record a stored header holds.
@@ -121,7 +121,7 @@ export const makeUnknown = <Pkg extends string, Id extends string>(
 export const EventSchema = Schema.Struct({
   metadata: Schema.optional(Metadata),
   packageMetadata: Schema.optional(PackageMetadata),
-  schema: JsonSchemaDocument,
+  schema: SchemaDocument,
 });
 
 /**
@@ -161,12 +161,12 @@ export type EventKitSchema = Schema.Schema.Type<typeof EventKitSchema>;
  * **Details**
  *
  * Record keys are the tags of the kit.
- * Each payload schema becomes a draft-07 JSON Schema document of the versions it accepts.
+ * Each payload schema becomes a {@link SchemaDocument} of the versions it accepts.
  *
  * **Gotchas**
  *
- * Schema conversion can throw for unsupported schemas.
- * The result does not preserve schema transformations or runtime services.
+ * Building a document can throw for a schema it cannot state.
+ * The result states the encoded side, not the decoding transformations.
  *
  * @see {@link EventKitSchema} for the stored representation.
  * @stability stable
