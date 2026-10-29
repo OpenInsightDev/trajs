@@ -11,19 +11,18 @@
     "start": "fumapress start"
   },
   "dependencies": {
-    "@base-ui/react": "catalog:",
     "@fontsource-variable/geist": "catalog:",
     "@fontsource/ibm-plex-mono": "catalog:",
     "@fontsource/poppins": "catalog:",
     "@fumapress/ai": "catalog:",
     "@trajs/ui-component": "workspace:*",
     "@trajs/ui-shaders": "workspace:*",
-    "fumadocs-core": "^16.17.3",
-    "fumadocs-mdx": "^15.4.7",
-    "fumadocs-ui": "npm:@fumadocs/base-ui@^16.17.3",
-    "fumapress": "^1.6.1",
-    "react": "^19.3.0",
-    "react-dom": "^19.3.0"
+    "fumadocs-core": "^16.17.9",
+    "fumadocs-mdx": "^15.4.10",
+    "fumadocs-ui": "npm:@fumadocs/base-ui@^16.17.9",
+    "fumapress": "^1.6.2",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1"
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.3.3",

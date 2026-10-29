@@ -14,8 +14,8 @@ way each API takes them.
 ## Usage
 
 ```ts
-import { Effect } from "effect";
 import { Anthropic, OpenAiCompat } from "@trajs/core/codec";
+import { Effect } from "effect";
 
 const root = await Effect.runPromise(Session.main(trajectory).pipe(Effect.provide(Cache.layer())));
 

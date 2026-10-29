@@ -15,13 +15,13 @@
     "@trajs/ui-shadcn": "workspace:*",
     "cn": "catalog:",
     "effect": "catalog:",
-    "fumadocs-core": "^16.17.3",
-    "fumadocs-mdx": "^15.4.7",
-    "fumadocs-ui": "npm:@fumadocs/base-ui@^16.17.3",
-    "fumapress": "^1.6.1",
+    "fumadocs-core": "^16.17.9",
+    "fumadocs-mdx": "^15.4.10",
+    "fumadocs-ui": "npm:@fumadocs/base-ui@^16.17.9",
+    "fumapress": "^1.6.2",
     "lucide-react": "catalog:",
-    "react": "^19.3.0",
-    "react-dom": "^19.3.0"
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1"
   },
   "devDependencies": {
     "@streamdown/code": "catalog:",

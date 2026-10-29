@@ -14,8 +14,8 @@ Each signal states its identity and an `attributes` schema. A span also states i
 kind, and a metric its instrument and unit.
 
 ```ts
-import { Schema } from "effect";
 import { Spans } from "@trajs/core/unstable/otel";
+import { Schema } from "effect";
 
 const attributes = Schema.decodeUnknownSync(Spans.Inference.attributes)({
   "gen_ai.operation.name": "chat",
@@ -37,8 +37,8 @@ Spans.Inference.kind; // => "client"
 A signal a provider refines carries the attributes of the signal it extends:
 
 ```ts
-import { Schema } from "effect";
 import { Spans } from "@trajs/core/unstable/otel";
+import { Schema } from "effect";
 
 const attributes = Schema.decodeUnknownSync(Spans.OpenAiInference.attributes)({
   "gen_ai.operation.name": "chat",
@@ -53,8 +53,8 @@ Spans.OpenAiInference.ref; // => "gen_ai.client.inference"
 A metric is read the same way:
 
 ```ts
-import { Schema } from "effect";
 import { Metrics } from "@trajs/core/unstable/otel";
+import { Schema } from "effect";
 
 const attributes = Schema.decodeUnknownSync(Metrics.McpClientOperationDuration.attributes)({
   "mcp.method.name": "tools/call",
@@ -68,8 +68,8 @@ Metrics.McpClientOperationDuration.unit; // => "s"
 A prompt template variable is an attribute whose name has the variable appended:
 
 ```ts
-import { Schema } from "effect";
 import { Attributes, Spans } from "@trajs/core/unstable/otel";
+import { Schema } from "effect";
 
 const attributes = Schema.decodeUnknownSync(Spans.Inference.attributes)({
   "gen_ai.operation.name": "chat",
@@ -86,8 +86,8 @@ documents, and memory records. The objects accept and preserve properties the
 registry does not model, so provider-specific fields survive a decode.
 
 ```ts
-import { Schema } from "effect";
 import { Content } from "@trajs/core/unstable/otel";
+import { Schema } from "effect";
 
 const part = Schema.decodeUnknownSync(Content.TextPart)({
   type: "text",

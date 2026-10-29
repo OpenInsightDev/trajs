@@ -21,8 +21,7 @@
     "@trajs/extension-tokenize": "workspace:*",
     "@trajs/olap": "workspace:*",
     "@trajs/platform-node": "workspace:*",
-    "effect": "catalog:",
-    "immer": "catalog:"
+    "effect": "catalog:"
   },
   "devDependencies": {
     "@effect/vitest": "catalog:",

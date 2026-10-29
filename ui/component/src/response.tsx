@@ -100,8 +100,7 @@ export const ResponseSource = ({ part }: { part: SourcePart }) => (
 
 /**
  * The fields a metadata part produced, as the label and the value each is read
- * by. A request is read as the method and the URL it was sent to rather than as
- * the parameters and headers it carried.
+ * by.
  */
 const fieldsOf = (
   part: Response.ResponseMetadataPart,
@@ -113,10 +112,6 @@ const fieldsOf = (
   if (part.modelId !== undefined) fields.push(["model", part.modelId]);
 
   if (part.timestamp !== undefined) fields.push(["time", DateTime.formatIso(part.timestamp)]);
-
-  if (part.request !== undefined) {
-    fields.push(["request", `${part.request.method} ${part.request.url}`]);
-  }
 
   return fields;
 };
@@ -133,8 +128,8 @@ const Field = ({ label, value }: { label: string; value: string }) => (
  *
  * **When to use**
  *
- * Use to show which model answered, when, and what it was asked with, folded
- * away from the answer itself.
+ * Use to show which model answered and when, folded away from the answer
+ * itself.
  *
  * **Details**
  *

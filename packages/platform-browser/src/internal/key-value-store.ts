@@ -69,6 +69,9 @@ export const make = (storage: Storage, prefix = defaultPrefix): KeyValueStore.Ke
       }
     }),
     size: attempted("size", undefined, () => entries(storage, prefix).length),
+    keys: attempted("keys", undefined, () =>
+      entries(storage, prefix).map((key) => key.slice(prefix.length)),
+    ),
   });
 
 export const layer = (prefix = defaultPrefix): Layer.Layer<KeyValueStore.KeyValueStore> =>

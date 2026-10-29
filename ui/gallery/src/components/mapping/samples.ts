@@ -175,12 +175,6 @@ export const metadataPart = Response.makePart("response-metadata", {
   id: "resp_2f81",
   modelId: "claude-sonnet-4-6",
   timestamp: DateTime.makeUnsafe("2025-05-04T09:12:07Z"),
-  request: {
-    method: "POST",
-    url: "https://api.anthropic.com/v1/messages",
-    urlParams: [],
-    headers: {},
-  },
 });
 
 export const stoppedPart = Response.makePart("finish", {

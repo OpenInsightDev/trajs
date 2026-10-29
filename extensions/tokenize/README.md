@@ -13,8 +13,8 @@ whose counting an implementation supplies — and this package supplies two of t
 ## Usage
 
 ```ts
-import { Effect } from "effect";
 import { Tokenizer } from "@trajs/extension-tokenize";
+import { Effect } from "effect";
 
 const program = Effect.gen(function* () {
   const tokenizer = yield* Tokenizer.Tokenizer;
@@ -151,8 +151,8 @@ from the package, because it is what the package is for: what it offers is the
 metric and the producer a kit derives its data with.
 
 ```ts
-import { Tokenizer, makeProducer, metrickit, tokenEstimate } from "@trajs/extension-tokenize";
 import { Metric, MetricKit } from "@trajs/core";
+import { Tokenizer, makeProducer, metrickit, tokenEstimate } from "@trajs/extension-tokenize";
 import { Effect } from "effect";
 
 // The tokenizer is the producer's own dependency, so it is provided around the

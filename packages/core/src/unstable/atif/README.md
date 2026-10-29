@@ -19,8 +19,8 @@ step.
 ## Usage
 
 ```ts
-import { Effect, Stream } from "effect";
 import { Step } from "@trajs/core/unstable/atif";
+import { Effect, Stream } from "effect";
 
 const steps = await Effect.runPromise(Stream.runCollect(Step.steps(trajectory)));
 
@@ -46,8 +46,8 @@ file holds is decoded before it is read.
 
 ```ts
 import { NodeServices } from "@effect/platform-node";
-import { Effect, Stream } from "effect";
 import { Encode, Step } from "@trajs/core/unstable/atif";
+import { Effect, Stream } from "effect";
 
 const steps = await Effect.runPromise(
   Effect.gen(function* () {
@@ -69,8 +69,9 @@ it with `Encode.encode`, and names the directory its paths are read from:
 ```ts
 import { readFile } from "node:fs/promises";
 import { dirname } from "node:path";
-import { Schema } from "effect";
+
 import { Document, Encode } from "@trajs/core/unstable/atif";
+import { Schema } from "effect";
 
 const path = "runs/one/trajectory.json";
 const json = await readFile(path, "utf8");
@@ -130,8 +131,8 @@ A reader installs the kits a trajectory declares with — `extrakit` and `eventk
 and reads those fields off the part with their types:
 
 ```ts
-import { Effect, Predicate, Stream } from "effect";
 import { Extra } from "@trajs/core/unstable/atif";
+import { Effect, Predicate, Stream } from "effect";
 
 const parts = Array.from(await Effect.runPromise(Stream.runCollect(trajectory)));
 const session = parts.find((part) => Predicate.isTagged("Session")(part));
@@ -175,9 +176,9 @@ transforms its context produces the event among the parts of its own trajectory
 rather than in a field of the ATIF document.
 
 ```ts
-import { Stream } from "effect";
 import { Config, MetricKit, Produce, Trajectory } from "@trajs/core";
 import { Event } from "@trajs/core/unstable/atif";
+import { Stream } from "effect";
 
 const config = Config.config({
   eventkit: Event.eventkit,

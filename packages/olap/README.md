@@ -19,8 +19,8 @@ A trajectory is imported through the exchange that read it, so what is written
 is the parts the `.trajs` file carries rather than anything derived of them:
 
 ```ts
-import { Clickhouse, Parts } from "@trajs/olap";
 import { Exchange } from "@trajs/core/Exchange";
+import { Clickhouse, Parts } from "@trajs/olap";
 import { Effect } from "effect";
 
 const importSession = (id: string) =>
