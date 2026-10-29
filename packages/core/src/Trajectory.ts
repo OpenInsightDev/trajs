@@ -172,7 +172,11 @@ export const mainSessionId = "main";
 
 const MainSession = Schema.TaggedStruct("main", { id: Schema.Literal(mainSessionId) });
 
+export const mainSession = MainSession.make({ id: mainSessionId });
+
 const SubSession = Schema.TaggedStruct("sub", { id: Schema.String, fork: Uuid });
+
+export const subSession = (id: string, { fork }: { fork: string }) => SubSession.make({ id, fork });
 
 /**
  * Schema for the metadata of a session declaration.
