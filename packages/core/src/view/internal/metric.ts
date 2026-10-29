@@ -1,19 +1,14 @@
+/**
+ * What the metric view reads of a cached trajectory: the results attached to each part.
+ */
+
 import { Effect, Option, Predicate, Result, Stream } from "effect";
-import type { Tool } from "effect/ai";
 
 import type * as Cache from "#/Cache.ts";
 import type * as Config from "#/Config.ts";
-import type * as Response from "#/Response.ts";
 import type * as Trajectory from "#/Trajectory.ts";
 import type { TrajectoryError } from "#/TrajectoryError.ts";
-import type * as View from "#/View.ts";
-
-/** The finished responses of one run, since the last prompt or event. */
-export interface Run<Tools extends Record<string, Tool.Any>> {
-  readonly response: ReadonlyArray<Response.PartView<Tools>>;
-}
-
-export const idle = <Tools extends Record<string, Tool.Any>>(): Run<Tools> => ({ response: [] });
+import type * as MetricView from "#/view/MetricView.ts";
 
 type Part<Config extends Config.AnyConfig> = Trajectory.Part<Config>;
 
@@ -24,7 +19,7 @@ type Reading<Config extends Config.AnyConfig, A> = Effect.Effect<
   Config.DecodingServices<Config>
 >;
 
-type MetricStream<Config extends Config.AnyConfig> = View.MetricTrajectoryStream<
+type MetricStream<Config extends Config.AnyConfig> = MetricView.MetricTrajectoryStream<
   Config,
   TrajectoryError | Cache.CacheError,
   Config.DecodingServices<Config>
@@ -84,7 +79,7 @@ const metricAt = <Config extends Config.AnyConfig>(
 /** Groups the results of one part by metric tag, each list in trajectory order. */
 const byTag = <Config extends Config.AnyConfig>(
   results: ReadonlyArray<Trajectory.MetricPartOf<Config>>,
-): View.AttachedMetrics<Config> => {
+): MetricView.AttachedMetrics<Config> => {
   const grouped = new Map<string, Array<Trajectory.MetricPartOf<Config>>>();
 
   for (const result of results) {
@@ -102,14 +97,14 @@ const byTag = <Config extends Config.AnyConfig>(
   // which is what the record holds and all it holds. The tags of a config are not known
   // one by one where the config is a type parameter, so the groups cannot be read as the
   // record by type alone.
-  return Object.fromEntries<unknown>(grouped) as View.AttachedMetrics<Config>;
+  return Object.fromEntries<unknown>(grouped) as MetricView.AttachedMetrics<Config>;
 };
 
 const metricsOf = <Config extends Config.AnyConfig>(
   cached: Cache.Cached<string, Config>,
   attached: Attachment,
   uuid: string,
-): Reading<Config, View.AttachedMetrics<Config>> =>
+): Reading<Config, MetricView.AttachedMetrics<Config>> =>
   Effect.forEach(attached.get(uuid) ?? [], (index) => metricAt(cached, index)).pipe(
     Effect.map(byTag),
   );
@@ -119,7 +114,7 @@ const emit = <Config extends Config.AnyConfig>(
   cached: Cache.Cached<string, Config>,
   attached: Attachment,
   part: Part<Config>,
-): Reading<Config, Result.Result<View.MetricTrajectoryPart<Config>, void>> => {
+): Reading<Config, Result.Result<MetricView.MetricTrajectoryPart<Config>, void>> => {
   // A result that names a target is emitted with that target rather than last.
   if (isMetric<Config>(part)) {
     return Effect.succeed(

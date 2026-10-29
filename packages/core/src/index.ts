@@ -173,7 +173,7 @@ export * as VersionedSchema from "#/VersionedSchema.ts";
  * @stability stable
  * @category re-exports
  */
-export * as View from "#/View.ts";
+export * as View from "#/view/index.ts";
 
 /**
  * Re-exports shared byte storage, compression, hashing, and utility APIs.

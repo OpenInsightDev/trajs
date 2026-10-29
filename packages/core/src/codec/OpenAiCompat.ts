@@ -15,7 +15,7 @@ import * as Base64 from "effect/encoding/Base64";
 import { imagesOf, mediaTypeOf, resultText, textOf } from "#/codec/internal/prompt.ts";
 import * as Config from "#/Config.ts";
 import * as Session from "#/Session.ts";
-import * as View from "#/View.ts";
+import * as View from "#/view/index.ts";
 
 /**
  * An OpenAI-compatible Chat Completions input message.

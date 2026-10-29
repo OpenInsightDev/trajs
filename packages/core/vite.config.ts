@@ -8,6 +8,7 @@ export default defineConfig({
       "src/unstable/Indexing.ts",
       "src/unstable/atif/index.ts",
       "src/unstable/otel/index.ts",
+      "src/view/index.ts",
     ],
     unbundle: true,
     dts: {
@@ -20,6 +21,7 @@ export default defineConfig({
         "./*": isPublish ? "./dist/*.mjs" : "./src/*.ts",
         "./internal/*": null,
         "./codec/internal/*": null,
+        "./view/internal/*": null,
         "./unstable/atif/internal/*": null,
         "./unstable/otel/internal/*": null,
         "./*/index": null,

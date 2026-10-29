@@ -14,7 +14,7 @@ import * as Config from "#/Config.ts";
 import type * as Response from "#/Response.ts";
 import type * as Session from "#/Session.ts";
 import type { TrajectoryError } from "#/TrajectoryError.ts";
-import * as View from "#/View.ts";
+import * as View from "#/view/index.ts";
 
 /**
  * The contributor role used by ATIF step views.
