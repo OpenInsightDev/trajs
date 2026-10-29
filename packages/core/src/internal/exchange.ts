@@ -4,13 +4,12 @@ import { Effect, Result, Schema, SchemaTransformation, Stream } from "effect";
 import { SchemaBinary } from "effect/encoding";
 
 import type * as Config from "#/Config.ts";
-import * as Event from "#/Event.ts";
+import * as EventKit from "#/EventKit.ts";
 import type * as Exchange from "#/Exchange.ts";
 import * as ExchangeIssue from "#/ExchangeIssue.ts";
-import * as Extra from "#/Extra.ts";
-import type * as ExtraKit from "#/ExtraKit.ts";
+import * as ExtraKit from "#/ExtraKit.ts";
 import { joined, readFrames, splitFrames } from "#/internal/frames.ts";
-import * as Metric from "#/Metric.ts";
+import * as MetricKit from "#/MetricKit.ts";
 import * as Prompt from "#/Prompt.ts";
 import * as Toolkit from "#/Toolkit.ts";
 import * as Trajectory from "#/Trajectory.ts";
@@ -159,9 +158,9 @@ export const encodeHeader = (
 ): Uint8Array => {
   const header: Exchange.Header = {
     toolkit: Toolkit.encode(config.toolkit),
-    eventkit: Event.encode(config.eventkit),
-    metrickit: Metric.encode(config.metrickit),
-    extrakit: Extra.encode(config.extrakit),
+    eventkit: EventKit.encode(config.eventkit),
+    metrickit: MetricKit.encode(config.metrickit),
+    extrakit: ExtraKit.encode(config.extrakit),
   };
 
   const json = Schema.encodeSync(Schema.fromJsonString(schema))(header);

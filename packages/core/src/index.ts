@@ -24,7 +24,7 @@ export * as Cache from "#/Cache.ts";
 export * as Config from "#/Config.ts";
 
 /**
- * Versioned event declarations and tagged payload schemas.
+ * Versioned event declarations, their stored form, and tagged payload schemas.
  *
  * @stability stable
  * @category re-exports
@@ -32,7 +32,7 @@ export * as Config from "#/Config.ts";
 export * as Event from "#/Event.ts";
 
 /**
- * Event declaration collections and merge operations.
+ * Event declaration collections, merge operations, and their stored form.
  *
  * @stability stable
  * @category re-exports
@@ -56,7 +56,7 @@ export * as Exchange from "#/Exchange.ts";
 export * as ExchangeIssue from "#/ExchangeIssue.ts";
 
 /**
- * Versioned extras for prompt, response, and session parts.
+ * Versioned extras for prompt, response, and session parts, and their stored form.
  *
  * @stability stable
  * @category re-exports
@@ -64,7 +64,7 @@ export * as ExchangeIssue from "#/ExchangeIssue.ts";
 export * as Extra from "#/Extra.ts";
 
 /**
- * Extra declaration collections and merge operations.
+ * Extra declaration collections, merge operations, and their stored form.
  *
  * @stability stable
  * @category re-exports
@@ -72,7 +72,7 @@ export * as Extra from "#/Extra.ts";
 export * as ExtraKit from "#/ExtraKit.ts";
 
 /**
- * Metric declarations, results, and stream producers.
+ * Metric declarations, results, stream producers, and their stored form.
  *
  * @stability stable
  * @category re-exports
@@ -80,7 +80,7 @@ export * as ExtraKit from "#/ExtraKit.ts";
 export * as Metric from "#/Metric.ts";
 
 /**
- * Metric collections and producer registration.
+ * Metric collections, producer registration, and their stored form.
  *
  * @stability stable
  * @category re-exports
@@ -120,6 +120,14 @@ export * as Prompt from "#/Prompt.ts";
 export * as Response from "#/Response.ts";
 
 /**
+ * The stored form of a schema, as a `SchemaRepresentation` document in JSON.
+ *
+ * @stability stable
+ * @category re-exports
+ */
+export { SchemaDocument } from "#/SchemaDocument.ts";
+
+/**
  * Session discovery, fork trees, and inherited streams.
  *
  * @stability stable
@@ -128,7 +136,7 @@ export * as Response from "#/Response.ts";
 export * as Session from "#/Session.ts";
 
 /**
- * Effect tool declarations, schemas, and handlers.
+ * Tool declarations, their stored form, and Effect's tool APIs.
  *
  * @stability stable
  * @category re-exports
@@ -136,7 +144,7 @@ export * as Session from "#/Session.ts";
 export * as Tool from "#/Tool.ts";
 
 /**
- * Effect toolkits and stored schema descriptions.
+ * Effect toolkits and their stored form.
  *
  * @stability stable
  * @category re-exports

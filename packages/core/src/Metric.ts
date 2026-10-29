@@ -2,8 +2,8 @@
  * Versioned metric declarations, results, and stream producers.
  *
  * {@link Metric} declares output and failure schemas.
+ * {@link MetricSchema} states one declaration as a stored header holds it.
  * {@link produce} runs kit producers and emits tagged results.
- * {@link MetricKitSchema} states the declarations as a stored header holds them.
  *
  * @stability stable
  */
@@ -11,12 +11,12 @@
 import { Data, DateTime, Schema, Stream } from "effect";
 import type { NonEmptyArray } from "effect/Array";
 
-import * as Config from "#/Config.ts";
+import type * as Config from "#/Config.ts";
 import { runProducers } from "#/internal/metric.ts";
 import { documentOf } from "#/internal/schema.ts";
 import type * as MetricKit from "#/MetricKit.ts";
 import { PackageMetadata } from "#/Package.ts";
-import { SchemaDocument } from "#/Toolkit.ts";
+import { SchemaDocument } from "#/SchemaDocument.ts";
 import type * as Trajectory from "#/Trajectory.ts";
 import type { TrajectoryError } from "#/TrajectoryError.ts";
 
@@ -135,8 +135,8 @@ export const makeUnknown = <Pkg extends string, Id extends string>(
  * `metadata` and `packageMetadata` are optional.
  * Output and failure schemas are stored as {@link SchemaDocument}s of the versions they accept.
  *
- * @see {@link encode} for serializing a kit.
- * @see {@link MetricKitSchema} for the record a stored header holds.
+ * @see {@link encode} for storing a declaration.
+ * @see {@link MetricKit.MetricKitSchema} for the record a stored header holds.
  * @stability stable
  * @category schemas
  */
@@ -157,33 +157,14 @@ export const MetricSchema = Schema.Struct({
 export type MetricSchema = Schema.Schema.Type<typeof MetricSchema>;
 
 /**
- * Schema for the stored metric declarations of a kit, keyed by tag.
- *
- * @see {@link MetricSchema} for each declaration.
- * @stability stable
- * @category schemas
- */
-export const MetricKitSchema = Schema.Record(Schema.String, MetricSchema);
-
-/**
- * Stored metric declarations keyed by their kit tags.
- *
- * @see {@link MetricKitSchema} for the schema.
- * @stability stable
- * @category models
- */
-export type MetricKitSchema = Schema.Schema.Type<typeof MetricKitSchema>;
-
-/**
- * Converts a metric kit into its stored declarations.
+ * Converts a metric declaration into its stored form.
  *
  * **When to use**
  *
- * Use to describe the metrics of a kit without their decoding schemas.
+ * Use to describe a metric without its decoding schemas.
  *
  * **Details**
  *
- * Record keys are the tags of the kit.
  * Output and failure schemas become {@link SchemaDocument}s of the versions they accept.
  *
  * **Gotchas**
@@ -191,22 +172,17 @@ export type MetricKitSchema = Schema.Schema.Type<typeof MetricKitSchema>;
  * Building a document can throw for a schema it cannot state.
  * The result states the encoded side, not the decoding transformations.
  *
- * @see {@link MetricKitSchema} for the stored representation.
+ * @see {@link MetricSchema} for the stored form.
+ * @see {@link MetricKit.encode} for the stored form of a whole kit.
  * @stability stable
  * @category encoding
  */
-export const encode = (kit: MetricKit.Any): MetricKitSchema =>
-  Object.fromEntries(
-    Object.entries(kit.metrics).map(([tag, metric]) => [
-      tag,
-      {
-        metadata: metric.metadata,
-        packageMetadata: metric.packageMetadata,
-        output: documentOf(metric.output),
-        failure: documentOf(metric.failure),
-      },
-    ]),
-  );
+export const encode = (metric: Any): MetricSchema => ({
+  metadata: metric.metadata,
+  packageMetadata: metric.packageMetadata,
+  output: documentOf(metric.output),
+  failure: documentOf(metric.failure),
+});
 
 /**
  * A metric result identified by its declaration's tag.

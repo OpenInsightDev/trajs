@@ -3,13 +3,14 @@
  *
  * {@link make} collects declarations and {@link merge} combines kits.
  * Each declaration can supply schemas for prompt, response, and session extras.
+ * {@link ExtraKitSchema} states a whole kit as a stored header holds it.
  *
  * @stability stable
  */
 
-import type { Schema } from "effect";
+import { Schema } from "effect";
 
-import type * as Extra from "#/Extra.ts";
+import * as Extra from "#/Extra.ts";
 import type { IndexByKey } from "#/internal/types.ts";
 
 type ExtrasByTag<Xs> = IndexByKey<Xs, "tag">;
@@ -150,3 +151,40 @@ export const merge = <Ks extends ReadonlyArray<Any>>(...kits: Ks): Merged<Ks> =>
   // among those that names it, which is what `ExtrasMerged` reads the kits as.
   return { extra } as Merged<Ks>;
 };
+
+/**
+ * Schema for the stored extra declarations of a kit, keyed by tag.
+ *
+ * @see {@link Extra.ExtraSchema} for each declaration.
+ * @stability stable
+ * @category schemas
+ */
+export const ExtraKitSchema = Schema.Record(Schema.String, Extra.ExtraSchema);
+
+/**
+ * Stored extra declarations keyed by their kit tags.
+ *
+ * @see {@link ExtraKitSchema} for the schema.
+ * @stability stable
+ * @category models
+ */
+export type ExtraKitSchema = Schema.Schema.Type<typeof ExtraKitSchema>;
+
+/**
+ * Converts a kit into the stored declarations of its extras.
+ *
+ * **When to use**
+ *
+ * Use to describe the extra data of a kit without its decoding schemas.
+ *
+ * **Details**
+ *
+ * Record keys are the tags of the kit.
+ *
+ * @see {@link ExtraKitSchema} for the stored declarations.
+ * @see {@link Extra.encode} for a single declaration.
+ * @stability stable
+ * @category encoding
+ */
+export const encode = (kit: Any): ExtraKitSchema =>
+  Object.fromEntries(Object.entries(kit.extra).map(([tag, extra]) => [tag, Extra.encode(extra)]));

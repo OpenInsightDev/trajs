@@ -2,10 +2,10 @@ import { Algorithm as HashAlgorithm } from "@trajs/utils/StreamHash";
 import { Schema } from "effect";
 
 import type * as Config from "#/Config.ts";
-import * as Event from "#/Event.ts";
-import * as Extra from "#/Extra.ts";
+import * as EventKit from "#/EventKit.ts";
+import * as ExtraKit from "#/ExtraKit.ts";
 import type { ExchangePart } from "#/internal/exchange/part.ts";
-import * as Metric from "#/Metric.ts";
+import * as MetricKit from "#/MetricKit.ts";
 import * as Toolkit from "#/Toolkit.ts";
 
 // The header is alone in the first chunk.
@@ -21,9 +21,9 @@ export const HeaderBody = Schema.Struct({
   version: Schema.String,
   hash: HashAlgorithm,
   toolkit: Toolkit.ToolkitSchema,
-  eventkit: Event.EventKitSchema,
-  metrickit: Metric.MetricKitSchema,
-  extrakit: Extra.ExtraKitSchema,
+  eventkit: EventKit.EventKitSchema,
+  metrickit: MetricKit.MetricKitSchema,
+  extrakit: ExtraKit.ExtraKitSchema,
 });
 
 export type HeaderBody = Schema.Schema.Type<typeof HeaderBody>;
@@ -39,8 +39,8 @@ export const headerExchangePart = (
     version,
     hash,
     toolkit: Toolkit.encode(config.toolkit),
-    eventkit: Event.encode(config.eventkit),
-    metrickit: Metric.encode(config.metrickit),
-    extrakit: Extra.encode(config.extrakit),
+    eventkit: EventKit.encode(config.eventkit),
+    metrickit: MetricKit.encode(config.metrickit),
+    extrakit: ExtraKit.encode(config.extrakit),
   },
 });

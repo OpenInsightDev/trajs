@@ -24,9 +24,9 @@ import {
 import { Context, Effect, Fiber, Layer, Schema, Stream } from "effect";
 
 import * as Config from "#/Config.ts";
-import * as Event from "#/Event.ts";
+import * as EventKit from "#/EventKit.ts";
 import * as ExchangeIssue from "#/ExchangeIssue.ts";
-import * as Extra from "#/Extra.ts";
+import * as ExtraKit from "#/ExtraKit.ts";
 import {
   checkParts,
   encodeHeader,
@@ -39,7 +39,7 @@ import {
   trajectoryOf,
 } from "#/internal/exchange.ts";
 import { configOf } from "#/internal/trajectory.ts";
-import * as Metric from "#/Metric.ts";
+import * as MetricKit from "#/MetricKit.ts";
 import * as Toolkit from "#/Toolkit.ts";
 import * as Trajectory from "#/Trajectory.ts";
 import { TrajectoryError } from "#/TrajectoryError.ts";
@@ -72,20 +72,19 @@ export const Version = pkg.version;
  * Each entry states what its declaration names of itself and its stored schemas.
  * Tool entries include them but no executable handlers or schema transformations.
  *
- * @see {@link Toolkit.SchemaDocument} for the stored form of a schema.
  * @see {@link Toolkit.ToolkitSchema} for stored tool declarations.
- * @see {@link Event.EventKitSchema} for stored event declarations.
- * @see {@link Metric.MetricKitSchema} for stored metric declarations.
- * @see {@link Extra.ExtraKitSchema} for stored extra declarations.
+ * @see {@link EventKit.EventKitSchema} for stored event declarations.
+ * @see {@link MetricKit.MetricKitSchema} for stored metric declarations.
+ * @see {@link ExtraKit.ExtraKitSchema} for stored extra declarations.
  * @see {@link Metadata} for the tail.
  * @stability stable
  * @category schemas
  */
 export const Header = Schema.Struct({
   toolkit: Toolkit.ToolkitSchema,
-  eventkit: Event.EventKitSchema,
-  metrickit: Metric.MetricKitSchema,
-  extrakit: Extra.ExtraKitSchema,
+  eventkit: EventKit.EventKitSchema,
+  metrickit: MetricKit.MetricKitSchema,
+  extrakit: ExtraKit.ExtraKitSchema,
 });
 
 /**

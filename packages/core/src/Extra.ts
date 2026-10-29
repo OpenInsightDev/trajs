@@ -2,8 +2,8 @@
  * Versioned extras on prompt, response, and session parts.
  *
  * {@link Extra} declares schemas by part kind.
+ * {@link ExtraSchema} states one declaration as a stored header holds it.
  * {@link ExtraRecord} decodes declared fields and {@link stated} selects fields without decoding.
- * {@link ExtraKitSchema} states the declarations as a stored header holds them.
  *
  * @stability stable
  */
@@ -13,7 +13,7 @@ import { Data, Schema } from "effect";
 import type * as ExtraKit from "#/ExtraKit.ts";
 import { documentOf } from "#/internal/schema.ts";
 import { PackageMetadata } from "#/Package.ts";
-import { SchemaDocument } from "#/Toolkit.ts";
+import { SchemaDocument } from "#/SchemaDocument.ts";
 
 /**
  * The trajectory part kinds supporting extras.
@@ -140,8 +140,8 @@ export const makeUnknown = <Pkg extends string, Id extends string>(
  * state them.
  * Each schema it declares is stored as a {@link SchemaDocument} of the versions it accepts.
  *
- * @see {@link encode} for serializing a kit.
- * @see {@link ExtraKitSchema} for the record a stored header holds.
+ * @see {@link encode} for storing a declaration.
+ * @see {@link ExtraKit.ExtraKitSchema} for the record a stored header holds.
  * @stability stable
  * @category schemas
  */
@@ -168,33 +168,14 @@ export const ExtraSchema = Schema.Struct({
 export type ExtraSchema = Schema.Schema.Type<typeof ExtraSchema>;
 
 /**
- * Schema for the stored extra declarations of a kit, keyed by tag.
- *
- * @see {@link ExtraSchema} for each declaration.
- * @stability stable
- * @category schemas
- */
-export const ExtraKitSchema = Schema.Record(Schema.String, ExtraSchema);
-
-/**
- * Stored extra declarations keyed by their kit tags.
- *
- * @see {@link ExtraKitSchema} for the schema.
- * @stability stable
- * @category models
- */
-export type ExtraKitSchema = Schema.Schema.Type<typeof ExtraKitSchema>;
-
-/**
- * Converts an extra kit into its stored declarations.
+ * Converts an extra declaration into its stored form.
  *
  * **When to use**
  *
- * Use to describe the extra data of a kit without its decoding schemas.
+ * Use to describe the extras of a declaration without their decoding schemas.
  *
  * **Details**
  *
- * Record keys are the tags of the kit.
  * A declaration that states no name or description states no `metadata`.
  * A part kind the declaration states no schema for stays absent.
  * Each stated schema becomes a {@link SchemaDocument} of the versions it accepts.
@@ -204,23 +185,18 @@ export type ExtraKitSchema = Schema.Schema.Type<typeof ExtraKitSchema>;
  * Building a document can throw for a schema it cannot state.
  * The result states the encoded side, not the decoding transformations.
  *
- * @see {@link ExtraKitSchema} for the stored representation.
+ * @see {@link ExtraSchema} for the stored form.
+ * @see {@link ExtraKit.encode} for the stored form of a whole kit.
  * @stability stable
  * @category encoding
  */
-export const encode = (kit: ExtraKit.Any): ExtraKitSchema =>
-  Object.fromEntries(
-    Object.entries(kit.extra).map(([tag, extra]) => [
-      tag,
-      {
-        metadata: metadataOf(extra),
-        packageMetadata: extra.packageMetadata,
-        prompt: documentFor(extra, "prompt"),
-        response: documentFor(extra, "response"),
-        session: documentFor(extra, "session"),
-      },
-    ]),
-  );
+export const encode = (extra: Any): ExtraSchema => ({
+  metadata: metadataOf(extra),
+  packageMetadata: extra.packageMetadata,
+  prompt: documentFor(extra, "prompt"),
+  response: documentFor(extra, "response"),
+  session: documentFor(extra, "session"),
+});
 
 const metadataOf = (item: Any): { name?: string; description?: string } | undefined =>
   item.name === undefined && item.description === undefined

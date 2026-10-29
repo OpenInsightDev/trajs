@@ -2,8 +2,8 @@
  * Versioned event declarations and tagged event payloads.
  *
  * {@link Event} names an event schema.
+ * {@link EventSchema} states one declaration as a stored header holds it.
  * {@link EventParts} reads the events declared by a kit.
- * {@link EventKitSchema} states those declarations as a stored header holds them.
  *
  * @stability stable
  */
@@ -13,7 +13,7 @@ import { Data, Schema } from "effect";
 import type * as EventKit from "#/EventKit.ts";
 import { documentOf } from "#/internal/schema.ts";
 import { PackageMetadata } from "#/Package.ts";
-import { SchemaDocument } from "#/Toolkit.ts";
+import { SchemaDocument } from "#/SchemaDocument.ts";
 
 /**
  * Optional display information for an {@link Event}.
@@ -113,8 +113,8 @@ export const makeUnknown = <Pkg extends string, Id extends string>(
  * `metadata` and `packageMetadata` are optional.
  * The payload schema is a {@link SchemaDocument} of the versions it accepts.
  *
- * @see {@link encode} for serializing a kit.
- * @see {@link EventKitSchema} for the record a stored header holds.
+ * @see {@link encode} for storing a declaration.
+ * @see {@link EventKit.EventKitSchema} for the record a stored header holds.
  * @stability stable
  * @category schemas
  */
@@ -134,55 +134,31 @@ export const EventSchema = Schema.Struct({
 export type EventSchema = Schema.Schema.Type<typeof EventSchema>;
 
 /**
- * Schema for the stored event declarations of a kit, keyed by tag.
- *
- * @see {@link EventSchema} for each declaration.
- * @stability stable
- * @category schemas
- */
-export const EventKitSchema = Schema.Record(Schema.String, EventSchema);
-
-/**
- * Stored event declarations keyed by their kit tags.
- *
- * @see {@link EventKitSchema} for the schema.
- * @stability stable
- * @category models
- */
-export type EventKitSchema = Schema.Schema.Type<typeof EventKitSchema>;
-
-/**
- * Converts an event kit into its stored declarations.
+ * Converts an event declaration into its stored form.
  *
  * **When to use**
  *
- * Use to describe the events of a kit without their decoding schemas.
+ * Use to describe an event without its decoding schema.
  *
  * **Details**
  *
- * Record keys are the tags of the kit.
- * Each payload schema becomes a {@link SchemaDocument} of the versions it accepts.
+ * The payload schema becomes a {@link SchemaDocument} of the versions it accepts.
  *
  * **Gotchas**
  *
  * Building a document can throw for a schema it cannot state.
  * The result states the encoded side, not the decoding transformations.
  *
- * @see {@link EventKitSchema} for the stored representation.
+ * @see {@link EventSchema} for the stored form.
+ * @see {@link EventKit.encode} for the stored form of a whole kit.
  * @stability stable
  * @category encoding
  */
-export const encode = (kit: EventKit.Any): EventKitSchema =>
-  Object.fromEntries(
-    Object.entries(kit.events).map(([tag, event]) => [
-      tag,
-      {
-        metadata: event.metadata,
-        packageMetadata: event.packageMetadata,
-        schema: documentOf(event.schema),
-      },
-    ]),
-  );
+export const encode = (event: Any): EventSchema => ({
+  metadata: event.metadata,
+  packageMetadata: event.packageMetadata,
+  schema: documentOf(event.schema),
+});
 
 /**
  * An event payload identified by its declaration's tag.

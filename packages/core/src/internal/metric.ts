@@ -1,6 +1,8 @@
 import { Effect, Predicate, Stream } from "effect";
 
-import * as Config from "#/Config.ts";
+// `MetricKit` reads `MetricSchema` while it loads, and this module loads before
+// it, so `Config` stays a type here.
+import type * as Config from "#/Config.ts";
 import type { Any, MetricParts, Producer, Failure } from "#/Metric.ts";
 import type { Producers } from "#/MetricKit.ts";
 import type * as Trajectory from "#/Trajectory.ts";

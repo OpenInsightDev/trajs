@@ -3,11 +3,12 @@
  *
  * {@link make} collects declarations and {@link merge} combines kits.
  * Later declarations replace earlier declarations under the same tag.
+ * {@link EventKitSchema} states a whole kit as a stored header holds it.
  *
  * @stability stable
  */
 
-import type { Schema } from "effect";
+import { Schema } from "effect";
 
 import * as Event from "#/Event.ts";
 import type { IndexByKey } from "#/internal/types.ts";
@@ -148,3 +149,40 @@ export const merge = <Ks extends ReadonlyArray<Any>>(...kits: Ks): Merged<Ks> =>
   // `EventsMerged` reads the kits as that record.
   return { events } as Merged<Ks>;
 };
+
+/**
+ * Schema for the stored event declarations of a kit, keyed by tag.
+ *
+ * @see {@link Event.EventSchema} for each declaration.
+ * @stability stable
+ * @category schemas
+ */
+export const EventKitSchema = Schema.Record(Schema.String, Event.EventSchema);
+
+/**
+ * Stored event declarations keyed by their kit tags.
+ *
+ * @see {@link EventKitSchema} for the schema.
+ * @stability stable
+ * @category models
+ */
+export type EventKitSchema = Schema.Schema.Type<typeof EventKitSchema>;
+
+/**
+ * Converts a kit into the stored declarations of its events.
+ *
+ * **When to use**
+ *
+ * Use to describe the events of a kit without their decoding schemas.
+ *
+ * **Details**
+ *
+ * Record keys are the tags of the kit.
+ *
+ * @see {@link EventKitSchema} for the stored declarations.
+ * @see {@link Event.encode} for a single declaration.
+ * @stability stable
+ * @category encoding
+ */
+export const encode = (kit: Any): EventKitSchema =>
+  Object.fromEntries(Object.entries(kit.events).map(([tag, event]) => [tag, Event.encode(event)]));

@@ -3,14 +3,15 @@
  *
  * {@link make} collects declarations.
  * {@link toProducers} associates a producer with every metric in a kit.
+ * {@link MetricKitSchema} states a whole kit as a stored header holds it.
  *
  * @stability stable
  */
 
-import { Predicate, type Schema } from "effect";
+import { Predicate, Schema } from "effect";
 
 import type { IndexByKey } from "#/internal/types.ts";
-import type * as Metric from "#/Metric.ts";
+import * as Metric from "#/Metric.ts";
 
 type MetricsByTag<Ms> = IndexByKey<Ms, "tag">;
 
@@ -225,3 +226,42 @@ export const toProducers = <K extends Any>(
   kit: K,
   producers: Producers<K["metrics"]>,
 ): WithProducers<K> => ({ ...kit, producers });
+
+/**
+ * Schema for the stored metric declarations of a kit, keyed by tag.
+ *
+ * @see {@link Metric.MetricSchema} for each declaration.
+ * @stability stable
+ * @category schemas
+ */
+export const MetricKitSchema = Schema.Record(Schema.String, Metric.MetricSchema);
+
+/**
+ * Stored metric declarations keyed by their kit tags.
+ *
+ * @see {@link MetricKitSchema} for the schema.
+ * @stability stable
+ * @category models
+ */
+export type MetricKitSchema = Schema.Schema.Type<typeof MetricKitSchema>;
+
+/**
+ * Converts a kit into the stored declarations of its metrics.
+ *
+ * **When to use**
+ *
+ * Use to describe the metrics of a kit without their decoding schemas.
+ *
+ * **Details**
+ *
+ * Record keys are the tags of the kit.
+ *
+ * @see {@link MetricKitSchema} for the stored declarations.
+ * @see {@link Metric.encode} for a single declaration.
+ * @stability stable
+ * @category encoding
+ */
+export const encode = (kit: Any): MetricKitSchema =>
+  Object.fromEntries(
+    Object.entries(kit.metrics).map(([tag, metric]) => [tag, Metric.encode(metric)]),
+  );

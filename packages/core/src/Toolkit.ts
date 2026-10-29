@@ -1,16 +1,16 @@
 /**
- * Effect toolkits and their schema descriptions for storage.
+ * Effect toolkits and their stored form.
  *
- * {@link encode} writes tool declarations without handlers.
- * The remaining toolkit APIs come from `effect/ai/Toolkit`.
+ * {@link ToolkitSchema} states a toolkit as a stored header holds it, and {@link encode} writes it.
+ * The toolkit APIs come from `effect/ai/Toolkit`.
  *
  * @stability stable
  */
 
-import { JsonSchema, pipe, Schema, SchemaRepresentation } from "effect";
-import { Tool, type Toolkit } from "effect/ai";
+import { Schema } from "effect";
+import type { Toolkit } from "effect/ai";
 
-import { documentOf } from "#/internal/schema.ts";
+import * as Tool from "#/Tool.ts";
 
 /**
  * Re-exports Effect's toolkit APIs without modification.
@@ -21,70 +21,22 @@ import { documentOf } from "#/internal/schema.ts";
 export * from "effect/ai/Toolkit";
 
 /**
- * Schema for a stored schema.
+ * The toolkit type with no declared tools.
  *
- * **Details**
- *
- * A stored schema is a `SchemaRepresentation.Document` in its JSON form.
- * `SchemaRepresentation.fromJson` reads it, and `SchemaRepresentation.fromRepresentation` rebuilds the schema.
- *
- * **Gotchas**
- *
- * Effect states no schema for a representation document, so this schema accepts any JSON value.
- * Rebuilding a document needs a reviver for every declaration and every check it names.
- *
+ * @see {@link Toolkit.empty} for the value.
  * @stability stable
- * @category schemas
+ * @category utility types
  */
-export const SchemaDocument = Schema.Json;
-
-/**
- * A stored schema.
- *
- * @see {@link SchemaDocument} for the schema.
- * @stability stable
- * @category models
- */
-export type SchemaDocument = Schema.Schema.Type<typeof SchemaDocument>;
-
-/**
- * Schema for a tool declaration without its runtime handler.
- *
- * **Details**
- *
- * Parameter, success, and failure schemas are stored as {@link SchemaDocument}s.
- * An absent description stays absent.
- *
- * @see {@link encode} for serializing a toolkit.
- * @stability stable
- * @category schemas
- */
-export const ToolSchema = Schema.Struct({
-  id: Schema.String,
-  name: Schema.String,
-  description: Schema.optional(Schema.String),
-  parameters: SchemaDocument,
-  success: SchemaDocument,
-  failure: SchemaDocument,
-});
-
-/**
- * A tool declaration without its runtime handler.
- *
- * @see {@link ToolSchema} for the schema.
- * @stability stable
- * @category models
- */
-export type ToolSchema = Schema.Schema.Type<typeof ToolSchema>;
+export type Empty = typeof Toolkit.empty;
 
 /**
  * Schema for stored tool declarations keyed by their toolkit keys.
  *
- * @see {@link ToolSchema} for each declaration.
+ * @see {@link Tool.ToolSchema} for each declaration.
  * @stability stable
  * @category schemas
  */
-export const ToolkitSchema = Schema.Record(Schema.String, ToolSchema);
+export const ToolkitSchema = Schema.Record(Schema.String, Tool.ToolSchema);
 
 /**
  * Stored tool declarations keyed by their toolkit keys.
@@ -96,59 +48,20 @@ export const ToolkitSchema = Schema.Record(Schema.String, ToolSchema);
 export type ToolkitSchema = Schema.Schema.Type<typeof ToolkitSchema>;
 
 /**
- * Converts a toolkit into stored tool declarations.
+ * Converts a toolkit into the stored declarations of its tools.
  *
  * **When to use**
  *
- * Use to describe tools without serializing their handlers.
+ * Use to describe the tools of a toolkit without their handlers.
  *
  * **Details**
  *
- * Record keys stay unchanged.
- * Parameter, success, and failure schemas become {@link SchemaDocument}s.
+ * Record keys are the keys of the toolkit.
  *
- * **Gotchas**
- *
- * Building a document can throw for a schema it cannot state.
- * The result states the encoded side, not the decoding transformations.
- * A dynamic tool states its parameters as JSON Schema, which is what its document is read from.
- *
- * @see {@link ToolkitSchema} for the stored representation.
+ * @see {@link ToolkitSchema} for the stored declarations.
+ * @see {@link Tool.encode} for a single declaration.
  * @stability stable
  * @category encoding
  */
 export const encode = (toolkit: Toolkit.Any): ToolkitSchema =>
-  Object.fromEntries(
-    Object.entries(toolkit.tools).map(([key, tool]) => {
-      const encoded = {
-        id: tool.id,
-        name: tool.name,
-        parameters: parametersOf(tool),
-        success: documentOf(tool.successSchema),
-        failure: documentOf(tool.failureSchema),
-      };
-
-      return [
-        key,
-        tool.description === undefined ? encoded : { ...encoded, description: tool.description },
-      ];
-    }),
-  );
-
-const parametersOf = (tool: Tool.Any): SchemaDocument =>
-  Tool.isDynamic(tool) && tool.jsonSchema !== undefined
-    ? pipe(
-        JsonSchema.fromSchemaDraft2020_12(tool.jsonSchema),
-        SchemaRepresentation.fromJsonSchemaDocument,
-        documentOf,
-      )
-    : documentOf(tool.parametersSchema);
-
-/**
- * The toolkit type with no declared tools.
- *
- * @see {@link Toolkit.empty} for the value.
- * @stability stable
- * @category utility types
- */
-export type Empty = typeof Toolkit.empty;
+  Object.fromEntries(Object.entries(toolkit.tools).map(([key, tool]) => [key, Tool.encode(tool)]));
