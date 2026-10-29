@@ -12,8 +12,10 @@ name: Release
 # and `.changeset/AGENTS.md` states how often one is cut. `id-token: write` is
 # granted to the publish job alone, and npm exchanges that OIDC token for a
 # short-lived credential, so the repository stores no npm token. `pre.json` keeps
-# Changesets in pre mode, so the release is an `X.Y.Z-alpha.N` prerelease
-# published under the `alpha` dist-tag.
+# Changesets in pre mode, so the release is an `X.Y.Z-alpha.N` prerelease. It
+# ships under the `latest` dist-tag, which is the tag `npm install` resolves; the
+# version states the prerelease, and the `select-mode` job says why the tag is
+# stated here instead of left to Changesets.
 
 on:
   push:
@@ -30,7 +32,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       mode: ${{ steps.select-mode.outputs.mode }}
-      publish-plan-artifact-id: ${{ steps.select-mode.outputs.publish-plan-artifact-id }}
+      tagged-publish-plan-artifact-id: ${{ steps.tagged-publish-plan.outputs.artifact-id }}
     permissions:
       contents: read # check out the repository
     steps:
@@ -46,6 +48,33 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - id: select-mode
         uses: changesets/action/select-mode@v2
+      # `select-mode` infers each package's npm tag from the registry, and its
+      # two answers both apply to this release group: a package whose every
+      # published version is an `alpha` prerelease counts as a first release and
+      # goes to `latest`, while a package that carries a stable version keeps its
+      # prereleases off `latest`. `@trajs/core` still carries the `0.0.0` it
+      # published before pre mode, so the group split across both tags, and
+      # `latest` for `@trajs/core` stopped at whichever release last set it. Nothing in the flow can be told a tag —
+      # `publish-plan` takes no `--tag` and `publish` refuses one in pre and
+      # artifact mode — but `publish` does read the tag from this plan, so the
+      # plan is rewritten to name it for every release.
+      - id: publish-plan
+        if: steps.select-mode.outputs.mode == 'publish'
+        uses: actions/download-artifact@v8
+        with:
+          artifact-ids: ${{ steps.select-mode.outputs.publish-plan-artifact-id }}
+          path: ${{ runner.temp }}/publish-plan
+      - if: steps.select-mode.outputs.mode == 'publish'
+        run: >-
+          node scripts/publish-plan-tag.mjs
+          "$RUNNER_TEMP/publish-plan/publish-plan.json" latest
+      - id: tagged-publish-plan
+        if: steps.select-mode.outputs.mode == 'publish'
+        uses: actions/upload-artifact@v7
+        with:
+          name: publish-plan.tagged
+          path: ${{ runner.temp }}/publish-plan/publish-plan.json
+          if-no-files-found: error
 
   version:
     if: needs.select-mode.outputs.mode == 'version'
@@ -97,7 +126,7 @@ jobs:
       - id: pack
         uses: changesets/action/pack@v2
         with:
-          publish-plan-artifact-id: ${{ needs.select-mode.outputs.publish-plan-artifact-id }}
+          publish-plan-artifact-id: ${{ needs.select-mode.outputs.tagged-publish-plan-artifact-id }}
 
   publish:
     needs: pack

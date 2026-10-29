@@ -3,6 +3,7 @@
 - Only the core libraries under `packages/` are published for now. Core libraries are one Changesets `fixed` release group and always share one version (refer to `effect` release strategy).
 - Every other library stays out of the release for now.
 - Every published package ships as an `alpha` prerelease for now. `pre.json` holds Changesets in pre mode. `changeset version` keeps the `X.Y.Z-alpha.N` line.
+- A release ships under the `latest` dist-tag, so `npm install` resolves to the newest one; the `alpha` part of the version is what states the prerelease. The release workflow states why the tag is written to the publish plan instead of left to Changesets.
 - Any change to the public surface ships a `minor` changeset, which moves the alpha minor line: an export or a public type added, changed, or removed. A change that breaks a `stable` export lands this way too while the packages are `alpha`.
 - Each public export carries its own `@stability`:
   - A `stable` export breaks only on a major of the whole core group.
