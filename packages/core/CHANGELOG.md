@@ -1,5 +1,58 @@
 # @trajs/core
 
+## 0.0.0-alpha.4
+
+### Minor Changes
+
+- [`8307998`](https://github.com/trajs-ai/trajs/commit/83079985b6cd3baa2839d8a3228435cb980f37f1) Thanks [@observerw](https://github.com/observerw)! - A kit's stored declarations now sit with the kit they describe, and `encode` describes one level
+  rather than both: `EventKit.EventKitSchema` and `EventKit.encode` take the kit-level form that stood
+  in `Event`, and `Event.encode` takes a single declaration. `MetricKit`, `ExtraKit`, and `Toolkit`
+  follow the same split, so `Tool.ToolkitSchema` gives way to `Toolkit.ToolkitSchema`, and
+  `Tool.encode` takes a single tool.
+  
+  `SchemaDocument` is its own export rather than a member of `Toolkit`, because all four families
+  state their schemas as one.
+
+- [`2fae234`](https://github.com/trajs-ai/trajs/commit/2fae234e75251401234a9ed88d5baef33ceb903c) Thanks [@observerw](https://github.com/observerw)! - Stored schemas are `SchemaRepresentation` documents in their JSON form, where they were draft-07
+  JSON Schema documents. `Toolkit.encode`, `MetricKit.encode`, `ExtraKit.encode`, and `EventKit.encode`
+  state the encoded side of each schema, so `SchemaRepresentation.fromJson` reads a stored schema and
+  `SchemaRepresentation.fromRepresentation` rebuilds it. Rebuilding a schema that names a declaration
+  needs a reviver for that declaration.
+  
+  `SchemaDocument` replaces `Toolkit.JsonSchemaDocument` and states the stored form.
+  `ToolSchema`, `MetricSchema`, `ExtraSchema`, and `EventSchema` hold it where they held a JSON
+  Schema document. `Tool.encode` reads the parameters of a dynamic tool from the JSON Schema that
+  tool states.
+  
+  A trajectory that stores draft-07 documents no longer decodes with this release.
+
+- [`a7a3671`](https://github.com/trajs-ai/trajs/commit/a7a3671955c3bf0086629de291af43d09e645f2d) Thanks [@observerw](https://github.com/observerw)! - `VersionedSchema` accepts fields and migrations that require services, and a read
+  now requires them. `VersionedSchema.make` no longer refuses a field whose decoding
+  needs a service, and `VersionedSchema.upgrade` takes the services its `decode`
+  getter requires, so a migration can read through one.
+  
+  A kit that declares such a payload no longer refuses it. `Config.DecodingServices`
+  states what a read needs, and `Exchange.Service.load` and `Loaded.read` carry it to
+  the caller that reads the parts. Writing still encodes with the current schema, so
+  `Config.EncodingServices` states what a write needs.
+
+- [`02d5c5d`](https://github.com/trajs-ai/trajs/commit/02d5c5d1656f0f6b0e9018d7fbbcca793684b587) Thanks [@observerw](https://github.com/observerw)! - `View` is a module of `@trajs/core` rather than one file: `packages/core/src/View.ts`
+  becomes `packages/core/src/view`, imported as `@trajs/core/view`, with the views
+  reachable beside the barrel as `@trajs/core/view/StepView`,
+  `@trajs/core/view/ToolView` and `@trajs/core/view/MetricView`, and what the metric
+  view reads of a cached trajectory under `@trajs/core/view/internal`, which is not
+  exported.
+  
+  The names a caller uses do not change: `steps`, `prompt`, `toolCalls`, `toolTurns`,
+  `metricOutputs` and `metricTrajectory` are the exports of that barrel, and `@trajs/core`
+  re-exports the module as `View`. Only the subpath a module file is imported by moves,
+  from `@trajs/core/View` to `@trajs/core/view`.
+
+### Patch Changes
+
+- Updated dependencies [[`db80c27`](https://github.com/trajs-ai/trajs/commit/db80c278550c477ea2491db89f67eb95829d971b), [`6176cea`](https://github.com/trajs-ai/trajs/commit/6176cea7cf4130fcf85f75592e912d699bc22f19)]:
+  - @trajs/utils@0.0.0-alpha.4
+
 ## 0.0.0-alpha.3
 
 ### Minor Changes
