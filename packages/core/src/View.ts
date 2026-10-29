@@ -292,8 +292,8 @@ export type MetricTrajectoryStream<
  * A scan of the cached parts indexes each result by the uuid of the parts it names.
  * A non-metric part carries `metrics`, a record from metric tag to the results naming its uuid.
  * Reading one metric's results needs only `metrics[tag]`.
- * Reports without `attach` remain in the stream.
- * Reports with `attach` leave the stream for the `metrics` of the parts they name.
+ * Results without `attach` remain in the stream.
+ * Results with `attach` leave the stream for the `metrics` of the parts they name.
  * Repeated target ids within one result attach once.
  *
  * **Gotchas**
