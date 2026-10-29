@@ -1,8 +1,8 @@
 /**
  * The implementations of `@trajs/utils`'s services that a program on Node runs
  * with: its parts carried in a zstd, gzip, deflate or none frame `node:zlib` writes
- * and reads, the BLAKE3, BLAKE2b or SHA-256 digest the Rust binding
- * `@napi-rs/blake-hash` and `node:crypto` read off them, and the CRC-32 of a block
+ * and reads, the SHA-256, BLAKE2b-512 or XXH32 digest `node:crypto` and
+ * `@node-rs/xxhash` read off them, and the CRC-32 of a block
  * `zlib.crc32` reads.
  *
  * Every module is re-exported as a namespace — `NodeCompression.layer`,

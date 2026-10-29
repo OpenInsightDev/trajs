@@ -206,12 +206,12 @@ catalogs:
     '@fumapress/ai':
       specifier: ^1.2.1
       version: 1.2.1
-    '@napi-rs/blake-hash':
-      specifier: ^1.4.0
-      version: 1.4.0
     '@noble/hashes':
       specifier: ^2.4.0
       version: 2.4.0
+    '@node-rs/xxhash':
+      specifier: ^1.7.8
+      version: 1.7.8
     '@shadcn/react':
       specifier: ^0.3.1
       version: 0.3.1
@@ -227,9 +227,6 @@ catalogs:
     '@webgpu/types':
       specifier: ^0.1.74
       version: 0.1.74
-    blake3-wasm:
-      specifier: ^2.1.5
-      version: 2.1.5
     chdb:
       specifier: ^3.4.0
       version: 3.4.0
@@ -324,7 +321,7 @@ importers:
     dependencies:
       '@effect/platform-node':
         specifier: 'catalog:'
-        version: 4.1.0(effect@4.1.0)(redis@6.3.0)
+        version: 4.1.0(effect@4.1.0)(redis@6.3.0(@node-rs/xxhash@1.7.8))
       '@trajs/core':
         specifier: workspace:*
         version: link:../../packages/core
@@ -355,7 +352,7 @@ importers:
     dependencies:
       '@effect/platform-node':
         specifier: 'catalog:'
-        version: 4.1.0(effect@4.1.0)(redis@6.3.0)
+        version: 4.1.0(effect@4.1.0)(redis@6.3.0(@node-rs/xxhash@1.7.8))
       '@trajs/core':
         specifier: workspace:*
         version: link:../../packages/core
@@ -479,7 +476,7 @@ importers:
     dependencies:
       '@effect/sql-clickhouse':
         specifier: 'catalog:'
-        version: 4.1.0(@effect/platform-node@4.1.0(effect@4.1.0)(redis@6.3.0))(effect@4.1.0)
+        version: 4.1.0(@effect/platform-node@4.1.0(effect@4.1.0)(redis@6.3.0(@node-rs/xxhash@1.7.8)))(effect@4.1.0)
       '@trajs/core':
         specifier: workspace:*
         version: link:../core
@@ -511,9 +508,6 @@ importers:
       '@trajs/utils':
         specifier: workspace:*
         version: link:../utils
-      blake3-wasm:
-        specifier: 'catalog:'
-        version: 2.1.5
       effect:
         specifier: 'catalog:'
         version: 4.1.0
@@ -533,9 +527,6 @@ importers:
 
   packages/platform-bun:
     dependencies:
-      '@trajs/platform-node':
-        specifier: workspace:*
-        version: link:../platform-node
       '@trajs/utils':
         specifier: workspace:*
         version: link:../utils
@@ -560,10 +551,10 @@ importers:
     dependencies:
       '@effect/platform-node':
         specifier: 'catalog:'
-        version: 4.1.0(effect@4.1.0)(redis@6.3.0)
-      '@napi-rs/blake-hash':
+        version: 4.1.0(effect@4.1.0)(redis@6.3.0(@node-rs/xxhash@1.7.8))
+      '@node-rs/xxhash':
         specifier: 'catalog:'
-        version: 1.4.0
+        version: 1.7.8
       '@trajs/utils':
         specifier: workspace:*
         version: link:../utils
@@ -613,7 +604,7 @@ importers:
     dependencies:
       '@effect/platform-node':
         specifier: 'catalog:'
-        version: 4.1.0(effect@4.1.0)(redis@6.3.0)
+        version: 4.1.0(effect@4.1.0)(redis@6.3.0(@node-rs/xxhash@1.7.8))
       '@trajs/core':
         specifier: workspace:*
         version: link:../../packages/core
@@ -885,7 +876,7 @@ importers:
     devDependencies:
       '@effect/platform-node':
         specifier: 'catalog:'
-        version: 4.1.0(effect@4.1.0)(redis@6.3.0)
+        version: 4.1.0(effect@4.1.0)(redis@6.3.0(@node-rs/xxhash@1.7.8))
       '@streamdown/code':
         specifier: 'catalog:'
         version: 2.0.0(react@19.3.1)
@@ -1976,100 +1967,6 @@ packages:
     resolution: {integrity: sha512-e59MfWuSssj6DoQ96JCTqdW1AXT5/XtnTl0WWd6MU1Ka434fFUGGosCLJbGNySDhHGvxQWoRWK137FXYFkYNWw==}
     engines: {node: '>=20'}
 
-  '@napi-rs/blake-hash-android-arm64@1.4.0':
-    resolution: {integrity: sha512-vS8VCHXYoGrNzSal26P0jMgt6GV+sdoXLiVjmFPzAFxG3KQZOhD4rzMfq1kua1u3AEqU3kSZY5UaiuXRLZA1qw==}
-    engines: {node: '>= 22'}
-    cpu: [arm64]
-    os: [android]
-
-  '@napi-rs/blake-hash-darwin-arm64@1.4.0':
-    resolution: {integrity: sha512-Uzg1sv4LVSyCttzhMgljd81rx5DqyqACp3I0o2nZaeLy9DVuew/VHm8j6UHtQkkUN0XNqQMKpfHME/8KIM1Jfg==}
-    engines: {node: '>= 22'}
-    cpu: [arm64]
-    os: [darwin]
-
-  '@napi-rs/blake-hash-darwin-x64@1.4.0':
-    resolution: {integrity: sha512-qPpuci0ehB04xpHQWbosiqptzY60vjW+XQhw+JUWzjGgNSLrmsZdZWnKUHc1AHSaRti78xsADtef2TIDizBVXA==}
-    engines: {node: '>= 22'}
-    cpu: [x64]
-    os: [darwin]
-
-  '@napi-rs/blake-hash-freebsd-x64@1.4.0':
-    resolution: {integrity: sha512-V+LPHOaiIy6+izRoW57o4q3o0WXz1QSLLAmAkEnIC4IqZLPTOckAct2ql2mtvRv7pCuKhi9U0y1bfor+KifHiQ==}
-    engines: {node: '>= 22'}
-    cpu: [x64]
-    os: [freebsd]
-
-  '@napi-rs/blake-hash-linux-arm-gnueabihf@1.4.0':
-    resolution: {integrity: sha512-2v1sW0sLMeh6kc7mgNCup/Xu5Lmzlha8+yqqlOQGVzz7GQQxU5VT5eJvUkB+Y2x/oUHkpNNb45eFKIw4ZQOlIg==}
-    engines: {node: '>= 22'}
-    cpu: [arm]
-    os: [linux]
-
-  '@napi-rs/blake-hash-linux-arm64-gnu@1.4.0':
-    resolution: {integrity: sha512-7ayUqC+1SWXiXkgePVFyOOSMrNJdggU8y8EBzCtdCICuYtC/mIAl1p/OaddjAcRpD6HKphV8xaQgnqZ2kZ75Mg==}
-    engines: {node: '>= 22'}
-    cpu: [arm64]
-    os: [linux]
-    libc: [glibc]
-
-  '@napi-rs/blake-hash-linux-arm64-musl@1.4.0':
-    resolution: {integrity: sha512-Wg8L3KKX0fxFEO6KKm1Qrr+eD/Vj9ApbbhqUOKQYJG8HFE+je80rNU4RsAFYkzAAOSG3mPFcsPa9LOFyxg56jQ==}
-    engines: {node: '>= 22'}
-    cpu: [arm64]
-    os: [linux]
-    libc: [musl]
-
-  '@napi-rs/blake-hash-linux-ppc64-gnu@1.4.0':
-    resolution: {integrity: sha512-Ec6II7r3WETZqcpCkO4GnIgzTAcumVnM0N51+o4c86yp4sVENBq09Ucldi1EzKkjZsr/0Dyg9v32j9yX/US7GQ==}
-    engines: {node: '>= 22'}
-    cpu: [ppc64]
-    os: [linux]
-    libc: [glibc]
-
-  '@napi-rs/blake-hash-linux-s390x-gnu@1.4.0':
-    resolution: {integrity: sha512-9Ds2Yx8HXFrAATSsvPwKl9uXbmEtIqQ7UfLDWF78VJCzIlKgYVzGx09vVUbfQ8KmWPNfVPukOpOvGEZMv8AL8g==}
-    engines: {node: '>= 22'}
-    cpu: [s390x]
-    os: [linux]
-    libc: [glibc]
-
-  '@napi-rs/blake-hash-linux-x64-gnu@1.4.0':
-    resolution: {integrity: sha512-aOnhGVe2wTi7Qd0vzOgAr7aU185SFsjUTeVqmXqADiF9jad7Z4+HcINIoSXoWEtHISXhoR8/qjFGmaDz9/yasg==}
-    engines: {node: '>= 22'}
-    cpu: [x64]
-    os: [linux]
-    libc: [glibc]
-
-  '@napi-rs/blake-hash-linux-x64-musl@1.4.0':
-    resolution: {integrity: sha512-Wnad1XNfU561/avEuGnPRnRi7/ujyctMPcr1EeF8Hs16EeSoSrnOgHffUeizTFbWnNsYzK2IJSvQtuvGM+foww==}
-    engines: {node: '>= 22'}
-    cpu: [x64]
-    os: [linux]
-    libc: [musl]
-
-  '@napi-rs/blake-hash-win32-arm64-msvc@1.4.0':
-    resolution: {integrity: sha512-MXfrSl6IsJgeq+wpfvE9GUzB10P+0MRIJadymMkVwfxs0QOA2JuTC3BtfIy9uAw2r1C/K2PVzvb68drJuKLcWA==}
-    engines: {node: '>= 22'}
-    cpu: [arm64]
-    os: [win32]
-
-  '@napi-rs/blake-hash-win32-ia32-msvc@1.4.0':
-    resolution: {integrity: sha512-2g4hQ4LPLCena4p5w0Fwa9vaTc/+uvaKQ0y+FAQQI/MVpma/t5kiID6g9T5de+rjvqS5/QozJ2UdZw5/LCW6aw==}
-    engines: {node: '>= 22'}
-    cpu: [ia32]
-    os: [win32]
-
-  '@napi-rs/blake-hash-win32-x64-msvc@1.4.0':
-    resolution: {integrity: sha512-MYZFLBCo5SO55n7XCksfp6izvznFi1b+Ib0nY9gL3gUl34lbBXbUC8vwD8BpcxoRrlvZA0QQ50BuM5Lid6Oq/g==}
-    engines: {node: '>= 22'}
-    cpu: [x64]
-    os: [win32]
-
-  '@napi-rs/blake-hash@1.4.0':
-    resolution: {integrity: sha512-8eGl9rvijokp3v5BbKJLkAD5rJRjx0qxge7KvbAkSGdeH6dJjr7yINpK7Qq5CyLEqZPxGw6Z6sXrVzClUwIjCA==}
-    engines: {node: '>= 22'}
-
   '@napi-rs/wasm-runtime@1.2.5':
     resolution: {integrity: sha512-HshSvXzmBxNzqejd3k/KemgQ3hdREUYFRRrgxOZ+gPljDIsO2SDZrVZMd4Z/HsxudQbE62OVyVFE8z9BCurfjA==}
     engines: {node: ^20.19.0 || ^22.13.0 || >=23.5.0}
@@ -2080,6 +1977,92 @@ packages:
   '@noble/hashes@2.4.0':
     resolution: {integrity: sha512-X5XaVWZIBCT7HHZGm5I7ZQXDwLG+bGXuSrMQAW+7Zvl87h1kmc1ZB1VSRJcpUfoUrGQp4Fkoxm5kZ+Ms+aW+eA==}
     engines: {node: '>= 20.19.0'}
+
+  '@node-rs/xxhash-android-arm-eabi@1.7.8':
+    resolution: {integrity: sha512-dOwbmnDzULc5uRgbIvcrxDa7vGdk51GQVREcY98DdxTBd0lomRg/gqAR9ny/S533cD5QTRSvrK+q8KEJMqoG4w==}
+    engines: {node: '>= 12'}
+    cpu: [arm]
+    os: [android]
+
+  '@node-rs/xxhash-android-arm64@1.7.8':
+    resolution: {integrity: sha512-djHN4MBgYkD0uPIGM+IyWrO5aT4vEdsO5bzNxV2+NVl7r1Hdk3PB7GIv0BOKV1C+fkBGXHYJ5xezlOEY1LFDzA==}
+    engines: {node: '>= 12'}
+    cpu: [arm64]
+    os: [android]
+
+  '@node-rs/xxhash-darwin-arm64@1.7.8':
+    resolution: {integrity: sha512-cwhxfUesdIPesdN23VSwh7Ypx9Kx4gvVmH3v6UINADcavnBeizdWRXXefRzdckDphUM2y8WGLko9WMM/86KHYQ==}
+    engines: {node: '>= 12'}
+    cpu: [arm64]
+    os: [darwin]
+
+  '@node-rs/xxhash-darwin-x64@1.7.8':
+    resolution: {integrity: sha512-YO1x98WbSnMdkaiJiKojnMxNaNxg2QrnHz7W9U4BTSw/IcvvpXGFNxNaSm0FYtO6lZAlfvQpiDr4XGXFXjJtJw==}
+    engines: {node: '>= 12'}
+    cpu: [x64]
+    os: [darwin]
+
+  '@node-rs/xxhash-freebsd-x64@1.7.8':
+    resolution: {integrity: sha512-MDsskeigVvvGNEm7G9avNKyHeoqgzBCaDo6KLYsi0T/nEBih+xybVIjZ57+GPxTnpUbet8SrcmU64DgAQC5Rnw==}
+    engines: {node: '>= 12'}
+    cpu: [x64]
+    os: [freebsd]
+
+  '@node-rs/xxhash-linux-arm-gnueabihf@1.7.8':
+    resolution: {integrity: sha512-ld25nCGEGedwnmn2YgpFbgQNdKnvdQXDeqrwqMuORIbRhtc+QOm1dlcbq+tULN2Vii9G0bcpb6i1lPTEv5ejyQ==}
+    engines: {node: '>= 12'}
+    cpu: [arm]
+    os: [linux]
+
+  '@node-rs/xxhash-linux-arm64-gnu@1.7.8':
+    resolution: {integrity: sha512-Z9YH6BQ1Zywk/nl0j9MG3jRBsIYOed6rSZAGTMT4p924wo9nHll39DZ9hd43kksofInkXOv3WMemzDy7zQ6QFw==}
+    engines: {node: '>= 12'}
+    cpu: [arm64]
+    os: [linux]
+    libc: [glibc]
+
+  '@node-rs/xxhash-linux-arm64-musl@1.7.8':
+    resolution: {integrity: sha512-L847azl5081s2QEsX8KqQF8sJAYw1W7j7rpBQH4l5IBC2/kITgdXTNVmPM/MrDHXI2OumKCtRVoNTVuEP8zYVg==}
+    engines: {node: '>= 12'}
+    cpu: [arm64]
+    os: [linux]
+    libc: [musl]
+
+  '@node-rs/xxhash-linux-x64-gnu@1.7.8':
+    resolution: {integrity: sha512-tWvNBiFu73/gbZ57uU/3T/3tJ/q+NFAYQj06hsORt6qtllGLz0wJ7azYG/ZlJBfijJA0K7fT+3rThzKJlIdkZg==}
+    engines: {node: '>= 12'}
+    cpu: [x64]
+    os: [linux]
+    libc: [glibc]
+
+  '@node-rs/xxhash-linux-x64-musl@1.7.8':
+    resolution: {integrity: sha512-HW29+JFyWbBHYzD/SfwkD9xxj5k2VH/VqG+Ltn9JH0PlJHvLQtG4IgXxLPboF9e6Kmwb1fjjBJn46GdT8hxA1w==}
+    engines: {node: '>= 12'}
+    cpu: [x64]
+    os: [linux]
+    libc: [musl]
+
+  '@node-rs/xxhash-win32-arm64-msvc@1.7.8':
+    resolution: {integrity: sha512-3vf7hmj1LVOfrUXMfRZI67G9h6fNjWg39vmgbD/IQdC/CQ/39aAXvnNmOY0MJNEnVixml668CCiyRccll0ZiyQ==}
+    engines: {node: '>= 12'}
+    cpu: [arm64]
+    os: [win32]
+
+  '@node-rs/xxhash-win32-ia32-msvc@1.7.8':
+    resolution: {integrity: sha512-1yqUghB7/Megd3AhDO5KkOi/SiVtK+l0ERunxOTiDLmxvO3Vs4nmb3IW2EmH6mNPB732YYN8I2Y4ZQi3eJRt9Q==}
+    engines: {node: '>= 12'}
+    cpu: [ia32]
+    os: [win32]
+
+  '@node-rs/xxhash-win32-x64-msvc@1.7.8':
+    resolution: {integrity: sha512-gccfpBxTsIAtwx23lvw40j+8moYQWBjc9/1ainrRBSke9HV4Oo8d4xQLgcR1wUXBhwE4mtK/f0T4EAE2oshOkg==}
+    engines: {node: '>= 12'}
+    cpu: [x64]
+    os: [win32]
+
+  '@node-rs/xxhash@1.7.8':
+    resolution: {integrity: sha512-sXiVUI18qaCei5Y5qXty7xfEKrk4Vx89qKNZkG2sGWZG/iTThO3Xmnp5IjQpXCy941IksVDcl41HhvWRuhDLyw==}
+    engines: {node: '>= 12'}
 
   '@nodelib/fs.scandir@2.1.5':
     resolution: {integrity: sha512-vq24Bq3ym5HEQm2NKCr3yXDwjc7vTsEThRDnkp2DK9p1uqLR+DHurm/NOTo0KG7HYHU7eppKZj3MyqYuMBf62g==}
@@ -6812,20 +6795,20 @@ snapshots:
       - bufferutil
       - utf-8-validate
 
-  '@effect/platform-node@4.1.0(effect@4.1.0)(redis@6.3.0)':
+  '@effect/platform-node@4.1.0(effect@4.1.0)(redis@6.3.0(@node-rs/xxhash@1.7.8))':
     dependencies:
       '@effect/platform-node-shared': 4.1.0(effect@4.1.0)
       effect: 4.1.0
-      redis: 6.3.0
+      redis: 6.3.0(@node-rs/xxhash@1.7.8)
       undici: 8.12.3
     transitivePeerDependencies:
       - bufferutil
       - utf-8-validate
 
-  '@effect/sql-clickhouse@4.1.0(@effect/platform-node@4.1.0(effect@4.1.0)(redis@6.3.0))(effect@4.1.0)':
+  '@effect/sql-clickhouse@4.1.0(@effect/platform-node@4.1.0(effect@4.1.0)(redis@6.3.0(@node-rs/xxhash@1.7.8)))(effect@4.1.0)':
     dependencies:
       '@clickhouse/client': 1.24.1
-      '@effect/platform-node': 4.1.0(effect@4.1.0)(redis@6.3.0)
+      '@effect/platform-node': 4.1.0(effect@4.1.0)(redis@6.3.0(@node-rs/xxhash@1.7.8))
       effect: 4.1.0
 
   '@effect/vitest@4.1.0(effect@4.1.0)(vitest@5.0.5)':
@@ -7256,65 +7239,6 @@ snapshots:
       '@modelcontextprotocol/core': 2.3.1
       zod: 4.6.5
 
-  '@napi-rs/blake-hash-android-arm64@1.4.0':
-    optional: true
-
-  '@napi-rs/blake-hash-darwin-arm64@1.4.0':
-    optional: true
-
-  '@napi-rs/blake-hash-darwin-x64@1.4.0':
-    optional: true
-
-  '@napi-rs/blake-hash-freebsd-x64@1.4.0':
-    optional: true
-
-  '@napi-rs/blake-hash-linux-arm-gnueabihf@1.4.0':
-    optional: true
-
-  '@napi-rs/blake-hash-linux-arm64-gnu@1.4.0':
-    optional: true
-
-  '@napi-rs/blake-hash-linux-arm64-musl@1.4.0':
-    optional: true
-
-  '@napi-rs/blake-hash-linux-ppc64-gnu@1.4.0':
-    optional: true
-
-  '@napi-rs/blake-hash-linux-s390x-gnu@1.4.0':
-    optional: true
-
-  '@napi-rs/blake-hash-linux-x64-gnu@1.4.0':
-    optional: true
-
-  '@napi-rs/blake-hash-linux-x64-musl@1.4.0':
-    optional: true
-
-  '@napi-rs/blake-hash-win32-arm64-msvc@1.4.0':
-    optional: true
-
-  '@napi-rs/blake-hash-win32-ia32-msvc@1.4.0':
-    optional: true
-
-  '@napi-rs/blake-hash-win32-x64-msvc@1.4.0':
-    optional: true
-
-  '@napi-rs/blake-hash@1.4.0':
-    optionalDependencies:
-      '@napi-rs/blake-hash-android-arm64': 1.4.0
-      '@napi-rs/blake-hash-darwin-arm64': 1.4.0
-      '@napi-rs/blake-hash-darwin-x64': 1.4.0
-      '@napi-rs/blake-hash-freebsd-x64': 1.4.0
-      '@napi-rs/blake-hash-linux-arm-gnueabihf': 1.4.0
-      '@napi-rs/blake-hash-linux-arm64-gnu': 1.4.0
-      '@napi-rs/blake-hash-linux-arm64-musl': 1.4.0
-      '@napi-rs/blake-hash-linux-ppc64-gnu': 1.4.0
-      '@napi-rs/blake-hash-linux-s390x-gnu': 1.4.0
-      '@napi-rs/blake-hash-linux-x64-gnu': 1.4.0
-      '@napi-rs/blake-hash-linux-x64-musl': 1.4.0
-      '@napi-rs/blake-hash-win32-arm64-msvc': 1.4.0
-      '@napi-rs/blake-hash-win32-ia32-msvc': 1.4.0
-      '@napi-rs/blake-hash-win32-x64-msvc': 1.4.0
-
   '@napi-rs/wasm-runtime@1.2.5(@emnapi/core@1.11.1)(@emnapi/runtime@1.11.1)':
     dependencies:
       '@emnapi/core': 1.11.1
@@ -7323,6 +7247,61 @@ snapshots:
     optional: true
 
   '@noble/hashes@2.4.0': {}
+
+  '@node-rs/xxhash-android-arm-eabi@1.7.8':
+    optional: true
+
+  '@node-rs/xxhash-android-arm64@1.7.8':
+    optional: true
+
+  '@node-rs/xxhash-darwin-arm64@1.7.8':
+    optional: true
+
+  '@node-rs/xxhash-darwin-x64@1.7.8':
+    optional: true
+
+  '@node-rs/xxhash-freebsd-x64@1.7.8':
+    optional: true
+
+  '@node-rs/xxhash-linux-arm-gnueabihf@1.7.8':
+    optional: true
+
+  '@node-rs/xxhash-linux-arm64-gnu@1.7.8':
+    optional: true
+
+  '@node-rs/xxhash-linux-arm64-musl@1.7.8':
+    optional: true
+
+  '@node-rs/xxhash-linux-x64-gnu@1.7.8':
+    optional: true
+
+  '@node-rs/xxhash-linux-x64-musl@1.7.8':
+    optional: true
+
+  '@node-rs/xxhash-win32-arm64-msvc@1.7.8':
+    optional: true
+
+  '@node-rs/xxhash-win32-ia32-msvc@1.7.8':
+    optional: true
+
+  '@node-rs/xxhash-win32-x64-msvc@1.7.8':
+    optional: true
+
+  '@node-rs/xxhash@1.7.8':
+    optionalDependencies:
+      '@node-rs/xxhash-android-arm-eabi': 1.7.8
+      '@node-rs/xxhash-android-arm64': 1.7.8
+      '@node-rs/xxhash-darwin-arm64': 1.7.8
+      '@node-rs/xxhash-darwin-x64': 1.7.8
+      '@node-rs/xxhash-freebsd-x64': 1.7.8
+      '@node-rs/xxhash-linux-arm-gnueabihf': 1.7.8
+      '@node-rs/xxhash-linux-arm64-gnu': 1.7.8
+      '@node-rs/xxhash-linux-arm64-musl': 1.7.8
+      '@node-rs/xxhash-linux-x64-gnu': 1.7.8
+      '@node-rs/xxhash-linux-x64-musl': 1.7.8
+      '@node-rs/xxhash-win32-arm64-msvc': 1.7.8
+      '@node-rs/xxhash-win32-ia32-msvc': 1.7.8
+      '@node-rs/xxhash-win32-x64-msvc': 1.7.8
 
   '@nodelib/fs.scandir@2.1.5':
     dependencies:
@@ -7690,23 +7669,25 @@ snapshots:
     optionalDependencies:
       '@types/react': 19.3.0
 
-  '@redis/bloom@6.3.0(@redis/client@6.3.0)':
+  '@redis/bloom@6.3.0(@redis/client@6.3.0(@node-rs/xxhash@1.7.8))':
     dependencies:
-      '@redis/client': 6.3.0
+      '@redis/client': 6.3.0(@node-rs/xxhash@1.7.8)
 
-  '@redis/client@6.3.0': {}
+  '@redis/client@6.3.0(@node-rs/xxhash@1.7.8)':
+    optionalDependencies:
+      '@node-rs/xxhash': 1.7.8
 
-  '@redis/json@6.3.0(@redis/client@6.3.0)':
+  '@redis/json@6.3.0(@redis/client@6.3.0(@node-rs/xxhash@1.7.8))':
     dependencies:
-      '@redis/client': 6.3.0
+      '@redis/client': 6.3.0(@node-rs/xxhash@1.7.8)
 
-  '@redis/search@6.3.0(@redis/client@6.3.0)':
+  '@redis/search@6.3.0(@redis/client@6.3.0(@node-rs/xxhash@1.7.8))':
     dependencies:
-      '@redis/client': 6.3.0
+      '@redis/client': 6.3.0(@node-rs/xxhash@1.7.8)
 
-  '@redis/time-series@6.3.0(@redis/client@6.3.0)':
+  '@redis/time-series@6.3.0(@redis/client@6.3.0(@node-rs/xxhash@1.7.8))':
     dependencies:
-      '@redis/client': 6.3.0
+      '@redis/client': 6.3.0(@node-rs/xxhash@1.7.8)
 
   '@rolldown/binding-android-arm-eabi@1.2.12':
     optional: true
@@ -10522,13 +10503,13 @@ snapshots:
       unified: 11.0.5
       vfile: 6.0.3
 
-  redis@6.3.0:
+  redis@6.3.0(@node-rs/xxhash@1.7.8):
     dependencies:
-      '@redis/bloom': 6.3.0(@redis/client@6.3.0)
-      '@redis/client': 6.3.0
-      '@redis/json': 6.3.0(@redis/client@6.3.0)
-      '@redis/search': 6.3.0(@redis/client@6.3.0)
-      '@redis/time-series': 6.3.0(@redis/client@6.3.0)
+      '@redis/bloom': 6.3.0(@redis/client@6.3.0(@node-rs/xxhash@1.7.8))
+      '@redis/client': 6.3.0(@node-rs/xxhash@1.7.8)
+      '@redis/json': 6.3.0(@redis/client@6.3.0(@node-rs/xxhash@1.7.8))
+      '@redis/search': 6.3.0(@redis/client@6.3.0(@node-rs/xxhash@1.7.8))
+      '@redis/time-series': 6.3.0(@redis/client@6.3.0(@node-rs/xxhash@1.7.8))
     transitivePeerDependencies:
       - '@node-rs/xxhash'
       - '@opentelemetry/api'

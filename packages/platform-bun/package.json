@@ -36,7 +36,6 @@
     "prepublishOnly": "vp run build"
   },
   "dependencies": {
-    "@trajs/platform-node": "workspace:*",
     "@trajs/utils": "workspace:*",
     "effect": "catalog:"
   },

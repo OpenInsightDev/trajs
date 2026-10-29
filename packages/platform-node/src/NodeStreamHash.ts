@@ -1,5 +1,5 @@
 /**
- * The digest of a trajectory's parts on Node: BLAKE3, BLAKE2b or SHA-256.
+ * The digest of a trajectory's parts on Node: SHA-256, BLAKE2b-512 or XXH32.
  *
  * {@link layer} provides the {@link StreamHash} of this package. One algorithm
  * yields the same digest as every other platform package. This module imports the
@@ -10,7 +10,7 @@
 
 import { createHash } from "node:crypto";
 
-import * as blake from "@napi-rs/blake-hash";
+import { Xxh32 } from "@node-rs/xxhash";
 import {
   Algorithm,
   StreamHash,
@@ -21,36 +21,15 @@ import {
 import { Layer, Sink } from "effect";
 
 /**
- * The hasher of one algorithm: the binding's, and SHA-256 from `node:crypto`.
- *
- * Both take the calls of {@link Hashing}. Bytes go in, and the digest's 32 bytes
- * come out.
- *
- * BLAKE2b runs at 32 bytes, the length of the other two digests. An unconfigured
- * BLAKE2b computes 64. The length belongs to the digest, so this matches
- * `@trajs/utils` and not the `blake2b512` of `node:crypto`.
+ * The hasher of one algorithm: `node:crypto` for the cryptographic digests, and
+ * the binding `@node-rs/xxhash` for XXH32.
  */
 const hashers: Record<Algorithm, () => Hashing> = {
-  [Algorithm.enums.Blake2b]: () => {
-    const params = new blake.Blake2BParam();
-    params.hashLength(32);
-
-    const hashing = blake.Blake2BHasher.withParams(params);
+  [Algorithm.enums.Blake2b512]: () => {
+    const hashing = createHash("blake2b512");
 
     return {
-      digest: () => hashing.digestBuffer(),
-      // The binding accepts `Buffer` and `Uint8Array` at run time. A chunk passes
-      // through as the same memory, not a copy.
-      update: (chunk) => {
-        hashing.update(Buffer.from(chunk.buffer, chunk.byteOffset, chunk.byteLength));
-      },
-    };
-  },
-  [Algorithm.enums.Blake3]: () => {
-    const hashing = new blake.Blake3Hasher();
-
-    return {
-      digest: () => hashing.digestBuffer(),
+      digest: () => hashing.digest(),
       update: (chunk) => {
         hashing.update(chunk);
       },
@@ -66,6 +45,24 @@ const hashers: Record<Algorithm, () => Hashing> = {
       },
     };
   },
+  [Algorithm.enums.Xxh32]: () => {
+    const hashing = new Xxh32();
+
+    return {
+      // The binding reads the digest as the 32-bit value it is, and the digest
+      // of XXH32 is that value big-endian.
+      digest: () => {
+        const digest = new Uint8Array(4);
+
+        new DataView(digest.buffer).setUint32(0, hashing.digest());
+
+        return digest;
+      },
+      update: (chunk) => {
+        hashing.update(chunk);
+      },
+    };
+  },
 };
 
 const hashing = (algorithm: Algorithm): Sink.Sink<string, Uint8Array, never, never> =>
@@ -76,25 +73,24 @@ const hashing = (algorithm: Algorithm): Sink.Sink<string, Uint8Array, never, nev
   }).pipe(Sink.map((hashed) => Buffer.from(hashed.digest()).toString("hex")));
 
 /**
- * The hash of a Node program: `@napi-rs/blake-hash` and `node:crypto`.
+ * The hash of a Node program: `node:crypto` and `@node-rs/xxhash`.
  *
  * **When to use**
  *
- * Use in a Node program with a native addon. BLAKE3 and BLAKE2b come from the
- * binding, and SHA-256 from `node:crypto`.
+ * Use in a Node program with a native addon. SHA-256 and BLAKE2b-512 come from
+ * `node:crypto`, and XXH32 from the binding.
  *
  * **Details**
  *
  * Every algorithm is available, and each call states its own ({@link Options}).
- * An omitted algorithm means BLAKE3, the historical digest and the faster of the
- * two binding hashers.
+ * An omitted algorithm means XXH32, the cheapest of the three.
  *
  * The binding is a native addon, so a bundle leaves it for the target machine to
  * resolve. A bundle with the binding carries one platform only.
  *
  * Bytes arrive chunk by chunk, and the digest is read at the end, whether one
- * sink carries the stream or `start` is fed over several writes. The binding
- * reads a digest repeatedly, and `node:crypto` reads one once.
+ * sink carries the stream or `start` is fed over several writes. `node:crypto`
+ * reads a digest once, and the binding reads it repeatedly.
  *
  * A program without a native addon uses `@trajs/platform-browser`. One algorithm
  * yields the same digest on both.

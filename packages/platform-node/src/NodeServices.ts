@@ -19,7 +19,7 @@ import * as NodeStreamHash from "#/NodeStreamHash.ts";
 
 /**
  * The codecs of a Node program: the compression of `node:zlib`, the digest of
- * `@napi-rs/blake-hash` and `node:crypto`, and the checksum of `zlib.crc32`.
+ * `node:crypto` and `@node-rs/xxhash`, and the checksum of `zlib.crc32`.
  *
  * @see {@link layer} for the provider.
  * @stability stable

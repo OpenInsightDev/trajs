@@ -1,6 +1,5 @@
 /**
- * The digest of a trajectory's parts in a browser: `blake3-wasm`, WebCrypto and
- * `@trajs/utils`.
+ * The digest of a trajectory's parts in a browser: WebCrypto and `@trajs/utils`.
  *
  * {@link layer} provides the {@link StreamHash} of this package. One algorithm
  * yields the same digest as every other platform package. This module imports the
@@ -14,10 +13,8 @@ import {
   StreamHash,
   defaultAlgorithm,
   make as hashInJavaScript,
-  type Hashing,
   type Options,
 } from "@trajs/utils/StreamHash";
-import * as blake3 from "blake3-wasm";
 import { Effect, Layer, Sink } from "effect";
 
 /** The sink of one digest: bytes in, a hex digest out. */
@@ -59,7 +56,7 @@ const hex = (bytes: Uint8Array): string => {
  * The SHA-256 sink: the chunks are kept and digested in one WebCrypto call.
  *
  * WebCrypto needs a secure context, so a page over plain HTTP has no SHA-256.
- * BLAKE2b and BLAKE3 need no page context. A refused digest is a defect, because
+ * BLAKE2b and XXH32 need no page context. A refused digest is a defect, because
  * no hash of a layer fails.
  */
 const webCrypto: Digest = Sink.reduce<Array<Uint8Array>, Uint8Array>(
@@ -78,68 +75,14 @@ const webCrypto: Digest = Sink.reduce<Array<Uint8Array>, Uint8Array>(
 );
 
 /**
- * The BLAKE3 sink of the WebAssembly module `blake3-wasm`.
- *
- * Reading the digest spends the hash, because the WebAssembly hasher frees itself
- * then. A run therefore builds its own hash.
+ * The sink of one algorithm: SHA-256 from WebCrypto, and the JavaScript hash of
+ * `@trajs/utils` otherwise, since a browser states no BLAKE2b or XXH32 codec.
  */
-const webAssembly: Digest = Sink.reduce(
-  () => blake3.createHash(),
-  (hashed, chunk: Uint8Array) => {
-    hashed.update(chunk);
-
-    return hashed;
-  },
-).pipe(Sink.map((hashed) => hashed.digest("hex")));
-
-/** The sink of one algorithm. */
-const hashing = (algorithm: Algorithm): Digest => {
-  switch (algorithm) {
-    case Algorithm.enums.Blake2b:
-      return hashInJavaScript().digest({ algorithm });
-    case Algorithm.enums.Sha256:
-      return webCrypto;
-    default:
-      return webAssembly;
-  }
-};
+const hashing = (algorithm: Algorithm): Digest =>
+  algorithm === Algorithm.enums.Sha256 ? webCrypto : hashInJavaScript().digest({ algorithm });
 
 /**
- * The running BLAKE3 of `blake3-wasm`.
- *
- * Reading the digest frees the WebAssembly hash, which is what {@link Hashing}
- * states of every running digest.
- */
-const webAssemblyRunning = (): Hashing => {
-  const hashed = blake3.createHash();
-
-  return {
-    digest: () => hashed.digest(),
-    update: (bytes) => {
-      hashed.update(bytes);
-    },
-  };
-};
-
-/**
- * The running digest of one algorithm.
- *
- * SHA-256 comes from the JavaScript hash of `@trajs/utils` rather than WebCrypto,
- * which reads a whole input in one call. The bytes it digests are the same, so it
- * reads the same digest.
- */
-const running = (algorithm: Algorithm): Hashing => {
-  switch (algorithm) {
-    case Algorithm.enums.Blake3:
-      return webAssemblyRunning();
-    default:
-      return hashInJavaScript().start({ algorithm });
-  }
-};
-
-/**
- * The hash of a browser: the browser codecs and the JavaScript hash of
- * `@trajs/utils`.
+ * The hash of a browser: WebCrypto and the JavaScript hash of `@trajs/utils`.
  *
  * **When to use**
  *
@@ -149,17 +92,15 @@ const running = (algorithm: Algorithm): Hashing => {
  * **Details**
  *
  * Every algorithm is available, and each call states its own ({@link Options}).
- * An omitted algorithm means BLAKE3, the historical digest.
- *
- * BLAKE3 comes from the WebAssembly module `blake3-wasm`. A bundle takes the
- * browser entry of the package, so a page supplies the WebAssembly code through
- * `blake3/browser`.
+ * An omitted algorithm means XXH32.
  *
  * SHA-256 comes from WebCrypto, with one call over the whole stream, and from
  * the JavaScript hash of `@trajs/utils` where the bytes arrive over several
- * writes. BLAKE2b has no browser codec, so it uses the JavaScript hash too.
+ * writes. BLAKE2b and XXH32 have no browser codec, so they use the JavaScript
+ * hash too.
  *
- * Every digest has 32 bytes, or 64 hex characters.
+ * A digest has the bytes of its algorithm: 128 hex characters for BLAKE2b, 64
+ * for SHA-256, and 8 for XXH32.
  *
  * @see {@link StreamHash} for the provided service.
  * @stability stable
@@ -167,5 +108,6 @@ const running = (algorithm: Algorithm): Hashing => {
  */
 export const layer: Layer.Layer<StreamHash> = Layer.succeed(StreamHash, {
   digest: (options?: Options) => hashing(options?.algorithm ?? defaultAlgorithm),
-  start: (options?: Options) => running(options?.algorithm ?? defaultAlgorithm),
+  start: (options?: Options) =>
+    hashInJavaScript().start({ algorithm: options?.algorithm ?? defaultAlgorithm }),
 });

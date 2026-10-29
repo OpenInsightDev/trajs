@@ -43,7 +43,6 @@
   "dependencies": {
     "@structured-world/structured-zstd": "catalog:",
     "@trajs/utils": "workspace:*",
-    "blake3-wasm": "catalog:",
     "effect": "catalog:"
   },
   "devDependencies": {

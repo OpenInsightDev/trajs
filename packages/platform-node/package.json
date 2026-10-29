@@ -40,7 +40,7 @@
   },
   "dependencies": {
     "@effect/platform-node": "catalog:",
-    "@napi-rs/blake-hash": "catalog:",
+    "@node-rs/xxhash": "catalog:",
     "@trajs/utils": "workspace:*",
     "effect": "catalog:"
   },

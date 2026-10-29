@@ -3,10 +3,19 @@
  * reaches for.
  *
  * Bun puts its APIs on the `bun` module, and a program that runs on Bun states them
- * with `bun-types`; declaring the functions a compression and a checksum use here
- * keeps this package to what it reads rather than depending on the whole of them.
+ * with `bun-types`; declaring here what the compression, the checksum and the hash
+ * use keeps this package to what it reads rather than depending on the whole of
+ * them.
  */
 declare module "bun" {
+  export class CryptoHasher {
+    constructor(algorithm: string);
+
+    digest(): Uint8Array;
+
+    update(data: Uint8Array | string): CryptoHasher;
+  }
+
   export function deflateSync(data: Uint8Array): Uint8Array;
 
   export function gunzipSync(data: Uint8Array): Uint8Array;

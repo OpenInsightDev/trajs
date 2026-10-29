@@ -7,13 +7,14 @@ Bun runs with.
   write and read, and a gzip or deflate frame `Bun.gzipSync`, `Bun.gunzipSync`,
   `Bun.deflateSync` and `Bun.inflateSync` do.
 - `BunChecksum` — the CRC-32 of a block `Bun.hash.crc32` reads.
-- `BunServices` — the compression, the checksum and the BLAKE3, BLAKE2b or SHA-256
-  digest `@trajs/platform-node` reads through the Rust binding, as one layer
+- `BunStreamHash` — the SHA-256 and BLAKE2b-512 digest `Bun.CryptoHasher`
+  computes, and the XXH32 the JavaScript hash of [`@trajs/utils`](../utils)
+  computes.
+- `BunServices` — the compression, the hash and the checksum as one layer,
   provided beside the storage where a program on Bun keeps a trajectory.
 
-Bun states no BLAKE3 of its own, so this package stands on
-[`@trajs/platform-node`](../platform-node) for the digests the way
-`@effect/platform-bun` stands on `@effect/platform-node`. Its own modules import
-each other relatively rather than through the `imports` field's `#/*`: Bun
-resolves that field's exact keys but not its wildcards, so the package could not
-be loaded from source otherwise.
+`Bun.hash.xxHash32` reads a whole input at once, so the XXH32 of a digest fed a
+chunk at a time comes from [`@trajs/utils`](../utils). Its modules import each
+other relatively rather than through the `imports` field's `#/*`: Bun resolves
+that field's exact keys but not its wildcards, so the package could not be loaded
+from source otherwise.

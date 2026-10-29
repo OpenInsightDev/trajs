@@ -20,6 +20,7 @@ import * as Trajectory from "@trajs/core/Trajectory";
 import { NodeServices } from "@trajs/platform-node";
 import { Algorithm as CompressionAlgorithm } from "@trajs/utils/Compression";
 import { layerFileSystem } from "@trajs/utils/Storage";
+import { Algorithm as HashAlgorithm } from "@trajs/utils/StreamHash";
 import { Effect, FileSystem, Layer, Predicate, Stream } from "effect";
 import { describe, expect, it } from "vite-plus/test";
 
@@ -127,6 +128,8 @@ describe("a trajectory kept as a file", () => {
 
     expect(metadata.version).toBe(core.version);
     expect(metadata.compression).toBe(CompressionAlgorithm.enums.Zstd);
-    expect(metadata.digest).toMatch(/^[0-9a-f]{64}$/);
+    // The default digest is XXH32, which is 8 hex characters.
+    expect(metadata.hash).toBe(HashAlgorithm.enums.Xxh32);
+    expect(metadata.digest).toMatch(/^[0-9a-f]{8}$/);
   });
 });

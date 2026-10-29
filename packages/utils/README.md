@@ -28,11 +28,11 @@ platform package can say what each is over.
   `Bun.hash.crc32`), and the tables here read the same number where a runtime
   states none. A checksum catches a torn or misplaced block, and does not name
   it: what names a trajectory is a digest.
-- `StreamHash` — what reads the digest of a trajectory's parts: BLAKE3, BLAKE2b
-  or SHA-256, stated at the call that reads one (`StreamHash.Options`) and
-  recorded with a stored trajectory, read in one pass over a stream or fed to a
-  running digest (`StreamHash.start`), which reads it as its 32 bytes, and the
-  JavaScript hash this package ships for all three.
+- `StreamHash` — what reads the digest of a trajectory's parts: SHA-256,
+  BLAKE2b-512 or XXH32, stated at the call that reads one (`StreamHash.Options`)
+  and recorded with a stored trajectory, read in one pass over a stream or fed to
+  a running digest (`StreamHash.start`), which reads it as the bytes of its
+  algorithm, and the JavaScript hash this package ships for all three.
 
 `@trajs/platform-node` and `@trajs/platform-browser` provide the layers these
 services are read through, and the exchange layer of [`@trajs/core`](../core) is built
