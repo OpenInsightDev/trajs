@@ -14,7 +14,6 @@ import type * as ExtraKit from "#/ExtraKit.ts";
 import { documentOf } from "#/internal/schema.ts";
 import { PackageMetadata } from "#/Package.ts";
 import { JsonSchemaDocument } from "#/Toolkit.ts";
-import * as VersionedSchema from "#/VersionedSchema.ts";
 
 /**
  * The trajectory part kinds supporting extras.
@@ -25,28 +24,13 @@ import * as VersionedSchema from "#/VersionedSchema.ts";
  */
 export type Part = "prompt" | "response" | "session";
 
-/**
- * An extra declaration with a separate versioned schema for each supported part kind.
- *
- * **Details**
- *
- * `tag` joins `packageName` and `id` with `/`.
- * Extra records use this tag as the field name.
- * An omitted schema leaves that part kind unsupported.
- * `packageMetadata` is what the declaring package states of itself.
- *
- * @see {@link ExtraKit.make} for collecting declarations.
- * @see {@link ExtraRecord} for decoding their fields.
- * @stability stable
- * @category models
- */
-export class Extra<
+type Fields<
   Pkg extends string,
   Id extends string,
-  Prompt extends VersionedSchema.Any = never,
-  Response extends VersionedSchema.Any = never,
-  Session extends VersionedSchema.Any = never,
-> extends Data.Class<{
+  Prompt extends Schema.Top = never,
+  Response extends Schema.Top = never,
+  Session extends Schema.Top = never,
+> = {
   packageName: Pkg;
   id: Id;
   name?: string;
@@ -55,7 +39,33 @@ export class Extra<
   prompt?: Prompt;
   response?: Response;
   session?: Session;
-}> {
+};
+
+/**
+ * An extra declaration with a separate schema for each supported part kind.
+ *
+ * **Details**
+ *
+ * `tag` joins `packageName` and `id` with `/`.
+ * Extra records use this tag as the field name.
+ * An omitted schema leaves that part kind unsupported.
+ * Schemas built with `VersionedSchema.make` read historical data.
+ * `packageMetadata` is what the declaring package states of itself.
+ *
+ * @see {@link make} for building a declaration from its fields.
+ * @see {@link makeUnknown} for an extra named without its schemas.
+ * @see {@link ExtraKit.make} for collecting declarations.
+ * @see {@link ExtraRecord} for decoding their fields.
+ * @stability stable
+ * @category models
+ */
+export class Extra<
+  Pkg extends string,
+  Id extends string,
+  Prompt extends Schema.Top = never,
+  Response extends Schema.Top = never,
+  Session extends Schema.Top = never,
+> extends Data.Class<Fields<Pkg, Id, Prompt, Response, Session>> {
   get tag(): `${Pkg}/${Id}` {
     return `${this.packageName}/${this.id}`;
   }
@@ -67,21 +77,67 @@ export class Extra<
  * @stability stable
  * @category utility types
  */
-export type Any = Extra<
-  string,
-  string,
-  VersionedSchema.Any,
-  VersionedSchema.Any,
-  VersionedSchema.Any
->;
+export type Any = Extra<string, string, Schema.Top, Schema.Top, Schema.Top>;
+
+/**
+ * Creates an extra declaration from the fields it states.
+ *
+ * **Details**
+ *
+ * `name`, `description`, and `packageMetadata` are optional.
+ * A part kind the fields state no schema for stays unsupported.
+ *
+ * @see {@link makeUnknown} for an extra named without its schemas.
+ * @see {@link Extra} for the declaration those fields make.
+ * @stability stable
+ * @category constructors
+ */
+export const make = <
+  Pkg extends string,
+  Id extends string,
+  Prompt extends Schema.Top = never,
+  Response extends Schema.Top = never,
+  Session extends Schema.Top = never,
+>(
+  fields: Fields<Pkg, Id, Prompt, Response, Session>,
+): Extra<Pkg, Id, Prompt, Response, Session> => new Extra(fields);
+
+/**
+ * Declares an extra whose schemas accept any data on every part kind.
+ *
+ * **When to use**
+ *
+ * Use where a kit names an extra whose schemas the caller does not hold.
+ *
+ * **Details**
+ *
+ * Every part kind is supported, so no extra field is checked.
+ *
+ * @see {@link make} for a declaration with its schemas.
+ * @see {@link ExtraKit.make} for collecting declarations.
+ * @stability stable
+ * @category constructors
+ */
+export const makeUnknown = <Pkg extends string, Id extends string>(
+  packageName: Pkg,
+  id: Id,
+): Extra<Pkg, Id, typeof Schema.Unknown, typeof Schema.Unknown, typeof Schema.Unknown> =>
+  make({
+    packageName,
+    id,
+    prompt: Schema.Unknown,
+    response: Schema.Unknown,
+    session: Schema.Unknown,
+  });
 
 /**
  * Schema for a stored extra declaration.
  *
  * **Details**
  *
- * The declaration states its name, its description, and the package it is in.
- * The name and the description sit under `metadata`, as event and metric declarations state them.
+ * The declaration states the package it is in and the schemas it declares.
+ * The optional name and description sit under `metadata`, as event and metric declarations
+ * state them.
  * Each schema it declares becomes a draft-07 JSON Schema document of the versions it accepts.
  *
  * @see {@link encode} for serializing a kit.
@@ -90,10 +146,12 @@ export type Any = Extra<
  * @category schemas
  */
 export const ExtraSchema = Schema.Struct({
-  metadata: Schema.Struct({
-    name: Schema.optional(Schema.String),
-    description: Schema.optional(Schema.String),
-  }),
+  metadata: Schema.optional(
+    Schema.Struct({
+      name: Schema.optional(Schema.String),
+      description: Schema.optional(Schema.String),
+    }),
+  ),
   packageMetadata: Schema.optional(PackageMetadata),
   prompt: Schema.optional(JsonSchemaDocument),
   response: Schema.optional(JsonSchemaDocument),
@@ -137,6 +195,7 @@ export type ExtraKitSchema = Schema.Schema.Type<typeof ExtraKitSchema>;
  * **Details**
  *
  * Record keys are the tags of the kit.
+ * A declaration that states no name or description states no `metadata`.
  * A part kind the declaration states no schema for stays absent.
  * Each stated schema becomes a draft-07 JSON Schema document of the versions it accepts.
  *
@@ -154,7 +213,7 @@ export const encode = (kit: ExtraKit.Any): ExtraKitSchema =>
     Object.entries(kit.extra).map(([tag, extra]) => [
       tag,
       {
-        metadata: { name: extra.name, description: extra.description },
+        metadata: metadataOf(extra),
         packageMetadata: extra.packageMetadata,
         prompt: documentFor(extra, "prompt"),
         response: documentFor(extra, "response"),
@@ -163,9 +222,14 @@ export const encode = (kit: ExtraKit.Any): ExtraKitSchema =>
     ]),
   );
 
+const metadataOf = (item: Any): { name?: string; description?: string } | undefined =>
+  item.name === undefined && item.description === undefined
+    ? undefined
+    : { name: item.name, description: item.description };
+
 type Declared<X extends Any, P extends Part> = Exclude<X[P], undefined>;
 
-const declaredFor = (item: Any, part: Part): VersionedSchema.Any | undefined =>
+const declaredFor = (item: Any, part: Part): Schema.Top | undefined =>
   ({ prompt: item.prompt, response: item.response, session: item.session })[part];
 
 const documentFor = (item: Any, part: Part): JsonSchemaDocument | undefined => {

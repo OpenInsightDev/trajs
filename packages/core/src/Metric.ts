@@ -19,7 +19,6 @@ import { PackageMetadata } from "#/Package.ts";
 import { JsonSchemaDocument } from "#/Toolkit.ts";
 import type * as Trajectory from "#/Trajectory.ts";
 import type { TrajectoryError } from "#/TrajectoryError.ts";
-import * as VersionedSchema from "#/VersionedSchema.ts";
 
 /**
  * Optional display information for a {@link Metric}.
@@ -32,16 +31,33 @@ export class Metadata extends Schema.Class<Metadata>("Metadata")({
   description: Schema.optional(Schema.String),
 }) {}
 
+type Fields<
+  Pkg extends string,
+  Id extends string,
+  Output extends Schema.Top,
+  Failure extends Schema.Top,
+> = {
+  packageName: Pkg;
+  id: Id;
+  metadata?: Metadata;
+  packageMetadata?: PackageMetadata;
+  output: Output;
+  failure: Failure;
+};
+
 /**
- * A metric declaration with versioned output and failure schemas.
+ * A metric declaration with output and failure schemas.
  *
  * **Details**
  *
  * `tag` joins `packageName` and `id` with `/`.
  * Kits and metric parts use this tag as the metric's identity.
  * The declaration does not contain a producer.
+ * Result schemas built with `VersionedSchema.make` read historical results.
  * `packageMetadata` is what the declaring package states of itself.
  *
+ * @see {@link make} for building a declaration from its fields.
+ * @see {@link makeUnknown} for a metric named without its result schemas.
  * @see {@link MetricKit.toProducers} for associating producers with declarations.
  * @see {@link Output} for successful results.
  * @see {@link Failure} for failed results.
@@ -51,16 +67,9 @@ export class Metadata extends Schema.Class<Metadata>("Metadata")({
 export class Metric<
   Pkg extends string,
   Id extends string,
-  Output extends VersionedSchema.Any,
-  Failure extends VersionedSchema.Any,
-> extends Data.Class<{
-  packageName: Pkg;
-  id: Id;
-  metadata: Metadata;
-  packageMetadata?: PackageMetadata;
-  output: Output;
-  failure: Failure;
-}> {
+  Output extends Schema.Top,
+  Failure extends Schema.Top,
+> extends Data.Class<Fields<Pkg, Id, Output, Failure>> {
   get tag(): `${Pkg}/${Id}` {
     return `${this.packageName}/${this.id}`;
   }
@@ -72,14 +81,58 @@ export class Metric<
  * @stability stable
  * @category utility types
  */
-export type Any = Metric<string, string, VersionedSchema.Any, VersionedSchema.Any>;
+export type Any = Metric<string, string, Schema.Top, Schema.Top>;
+
+/**
+ * Creates a metric declaration from the fields it states.
+ *
+ * **Details**
+ *
+ * `metadata` and `packageMetadata` are optional.
+ *
+ * @see {@link makeUnknown} for a metric named without its result schemas.
+ * @see {@link Metric} for the declaration those fields make.
+ * @stability stable
+ * @category constructors
+ */
+export const make = <
+  Pkg extends string,
+  Id extends string,
+  Output extends Schema.Top,
+  Failure extends Schema.Top,
+>(
+  fields: Fields<Pkg, Id, Output, Failure>,
+): Metric<Pkg, Id, Output, Failure> => new Metric(fields);
+
+/**
+ * Declares a metric whose output and failure schemas accept any data.
+ *
+ * **When to use**
+ *
+ * Use where a kit names a metric whose result schemas the caller does not hold.
+ *
+ * **Details**
+ *
+ * Identity is all the declaration states, so no result field is checked.
+ *
+ * @see {@link make} for a declaration with its result schemas.
+ * @see {@link MetricKit.make} for collecting declarations.
+ * @stability stable
+ * @category constructors
+ */
+export const makeUnknown = <Pkg extends string, Id extends string>(
+  packageName: Pkg,
+  id: Id,
+): Metric<Pkg, Id, typeof Schema.Unknown, typeof Schema.Unknown> =>
+  make({ packageName, id, output: Schema.Unknown, failure: Schema.Unknown });
 
 /**
  * Schema for a stored metric declaration.
  *
  * **Details**
  *
- * The declaration states its `metadata`, the package it is in, and its result schemas.
+ * The declaration states the package it is in and its result schemas.
+ * `metadata` and `packageMetadata` are optional.
  * Output and failure schemas are draft-07 JSON Schema documents of the versions they accept.
  *
  * @see {@link encode} for serializing a kit.
@@ -88,7 +141,7 @@ export type Any = Metric<string, string, VersionedSchema.Any, VersionedSchema.An
  * @category schemas
  */
 export const MetricSchema = Schema.Struct({
-  metadata: Metadata,
+  metadata: Schema.optional(Metadata),
   packageMetadata: Schema.optional(PackageMetadata),
   output: JsonSchemaDocument,
   failure: JsonSchemaDocument,

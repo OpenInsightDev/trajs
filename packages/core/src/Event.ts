@@ -14,7 +14,6 @@ import type * as EventKit from "#/EventKit.ts";
 import { documentOf } from "#/internal/schema.ts";
 import { PackageMetadata } from "#/Package.ts";
 import { JsonSchemaDocument } from "#/Toolkit.ts";
-import * as VersionedSchema from "#/VersionedSchema.ts";
 
 /**
  * Optional display information for an {@link Event}.
@@ -27,31 +26,34 @@ export class Metadata extends Schema.Class<Metadata>("Metadata")({
   description: Schema.optional(Schema.String),
 }) {}
 
+type Fields<Pkg extends string, Id extends string, S extends Schema.Top> = {
+  packageName: Pkg;
+  id: Id;
+  metadata?: Metadata;
+  packageMetadata?: PackageMetadata;
+  schema: S;
+};
+
 /**
- * An event declaration with a versioned payload schema.
+ * An event declaration with a payload schema.
  *
  * **Details**
  *
  * `tag` joins `packageName` and `id` with `/`.
  * Kits and event parts use this tag as the event's identity.
+ * A payload schema built with `VersionedSchema.make` reads historical payloads.
  * `packageMetadata` is what the declaring package states of itself.
  *
+ * @see {@link make} for building a declaration from its fields.
+ * @see {@link makeUnknown} for an event named without its payload schema.
  * @see {@link EventKit.make} for collecting declarations.
  * @see {@link EventPart} for a tagged payload.
  * @stability stable
  * @category models
  */
-export class Event<
-  Pkg extends string,
-  Id extends string,
-  S extends VersionedSchema.Any,
-> extends Data.Class<{
-  packageName: Pkg;
-  id: Id;
-  metadata: Metadata;
-  packageMetadata?: PackageMetadata;
-  schema: S;
-}> {
+export class Event<Pkg extends string, Id extends string, S extends Schema.Top> extends Data.Class<
+  Fields<Pkg, Id, S>
+> {
   get tag(): `${Pkg}/${Id}` {
     return `${this.packageName}/${this.id}`;
   }
@@ -63,14 +65,52 @@ export class Event<
  * @stability stable
  * @category utility types
  */
-export type Any = Event<string, string, VersionedSchema.Any>;
+export type Any = Event<string, string, Schema.Top>;
+
+/**
+ * Creates an event declaration from the fields it states.
+ *
+ * **Details**
+ *
+ * `metadata` and `packageMetadata` are optional.
+ *
+ * @see {@link makeUnknown} for an event named without its payload schema.
+ * @see {@link Event} for the declaration those fields make.
+ * @stability stable
+ * @category constructors
+ */
+export const make = <Pkg extends string, Id extends string, S extends Schema.Top>(
+  fields: Fields<Pkg, Id, S>,
+): Event<Pkg, Id, S> => new Event(fields);
+
+/**
+ * Declares an event whose payload schema accepts any data.
+ *
+ * **When to use**
+ *
+ * Use where a kit names an event whose payload schema the caller does not hold.
+ *
+ * **Details**
+ *
+ * Identity is all the declaration states, so no payload field is checked.
+ *
+ * @see {@link make} for a declaration with its payload schema.
+ * @see {@link EventKit.make} for collecting declarations.
+ * @stability stable
+ * @category constructors
+ */
+export const makeUnknown = <Pkg extends string, Id extends string>(
+  packageName: Pkg,
+  id: Id,
+): Event<Pkg, Id, typeof Schema.Unknown> => make({ packageName, id, schema: Schema.Unknown });
 
 /**
  * Schema for a stored event declaration.
  *
  * **Details**
  *
- * The declaration states its `metadata`, the package it is in, and its payload schema.
+ * The declaration states the package it is in and its payload schema.
+ * `metadata` and `packageMetadata` are optional.
  * The payload schema is a draft-07 JSON Schema document of the versions it accepts.
  *
  * @see {@link encode} for serializing a kit.
@@ -79,7 +119,7 @@ export type Any = Event<string, string, VersionedSchema.Any>;
  * @category schemas
  */
 export const EventSchema = Schema.Struct({
-  metadata: Metadata,
+  metadata: Schema.optional(Metadata),
   packageMetadata: Schema.optional(PackageMetadata),
   schema: JsonSchemaDocument,
 });
