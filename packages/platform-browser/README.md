@@ -7,9 +7,12 @@ computing anywhere with WebAssembly runs with.
   `CompressionStream` writes and `DecompressionStream` reads, and a zstd frame
   carried by the WebAssembly codec
   [`@structured-world/structured-zstd`](https://npmjs.com/package/@structured-world/structured-zstd).
+- `BrowserByteStore` — the bytes a page keeps between readings, the chunks of a
+  sequence in the `sessionStorage` of the tab, kept under a prefix so the page
+  shares none of them.
 - `BrowserStreamHash` — the BLAKE3 digest the WebAssembly `blake3-wasm` carries,
   the SHA-256 WebCrypto reads, and the BLAKE2b the JavaScript hash of
   [`@trajs/utils`](../utils) computes.
-- `BrowserServices` — the three as one layer, provided with where a page keeps a
+- `BrowserServices` — the codecs as one layer, provided with where a page keeps a
   trajectory: the compression and the hash of this package, and the CRC-32 of
   [`@trajs/utils`](../utils), since a page states no CRC of its own.
