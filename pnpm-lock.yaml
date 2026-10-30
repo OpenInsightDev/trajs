@@ -212,6 +212,9 @@ catalogs:
     '@node-rs/xxhash':
       specifier: ^1.7.8
       version: 1.7.8
+    '@node-rs/xxhash-wasm32-wasi':
+      specifier: ^1.7.8
+      version: 1.7.8
     '@shadcn/react':
       specifier: ^0.3.1
       version: 0.3.1
@@ -500,6 +503,12 @@ importers:
 
   packages/platform-browser:
     dependencies:
+      '@noble/hashes':
+        specifier: 'catalog:'
+        version: 2.4.0
+      '@node-rs/xxhash-wasm32-wasi':
+        specifier: 'catalog:'
+        version: 1.7.8
       '@structured-world/structured-zstd':
         specifier: 'catalog:'
         version: 0.2.6
@@ -525,6 +534,9 @@ importers:
 
   packages/platform-bun:
     dependencies:
+      '@node-rs/xxhash':
+        specifier: 'catalog:'
+        version: 1.7.8
       '@trajs/utils':
         specifier: workspace:*
         version: link:../utils
@@ -578,9 +590,6 @@ importers:
       '@aws-sdk/client-s3':
         specifier: 'catalog:'
         version: 3.1159.0
-      '@noble/hashes':
-        specifier: 'catalog:'
-        version: 2.4.0
       effect:
         specifier: https://pkg.pr.new/Effect-TS/effect/effect@e2ea531d241cd848fa1434aedd18e496c6951a51
         version: https://pkg.pr.new/Effect-TS/effect/effect@e2ea531d241cd848fa1434aedd18e496c6951a51
@@ -1501,14 +1510,23 @@ packages:
   '@emnapi/core@1.11.1':
     resolution: {integrity: sha512-RSvbQmHzdKzNsLYa/wHrbc3KN4sYLKAdPZxqiM2HATqv/SBk2/ENSHpvXGaLOMcsAyz0poEGqkmmKYG3OWiJEQ==}
 
+  '@emnapi/core@2.0.0-alpha.5':
+    resolution: {integrity: sha512-DbeLFquQJyYGwM3LzPdjvb4IRmAAQuTzEmqUGtIAYxlAO4ArfUZ7WMytLWDSsCAYm6MZJNeojaawQQiFrFVehg==}
+
   '@emnapi/runtime@1.11.1':
     resolution: {integrity: sha512-vgj7R3y3Wgx24IQaGPA/R6YFXLHVMOZ0uVEyIQPaWs+rd1AzfEMXlAC22FYwO1XkKR6NPsq7mUandH8oIRdZFw==}
 
   '@emnapi/runtime@1.11.3':
     resolution: {integrity: sha512-Xz4Tpyki7XyrpbUK1jR1AhdAdaXyhhY4lZ3neLodmhpuWfy2PAQN5B46sAiU4liOXGLkHypn/qU+jvfWSCYYLA==}
 
+  '@emnapi/runtime@2.0.0-alpha.5':
+    resolution: {integrity: sha512-SS4jUXRklsrPKTEtW92WHdneh9QBrZGmRyeYEac2ktLN3ie1wd/BrkBbk4DqPWKhjSFfrR8NClXwMlfZ73m60A==}
+
   '@emnapi/wasi-threads@1.2.2':
     resolution: {integrity: sha512-c95qOXkHdydNKhscBTebqEC1CVAZpyqOfVfBzQ1qgzyl3gfeldUjIggDbIZgDKsHLgnsM+igH7TJ/eAasaVuMA==}
+
+  '@emnapi/wasi-threads@2.1.0':
+    resolution: {integrity: sha512-DM18NXgQ5coifswrwhFgrqeW/UiFRaLj0aLKU0cp0FoYjEfP/hj/yUeF+Hz754ViG+jQmG2HIeDCUeQsPnRwOA==}
 
   '@esbuild/aix-ppc64@0.28.2':
     resolution: {integrity: sha512-XExcO+dvLKvVtNTibSTBej1NCAbaGhWn9Ww1ZPx80qsahhPFe/8jgWP0IchNe0F3HwkU7n8ejhH8bjonqht8mQ==}
@@ -2045,6 +2063,10 @@ packages:
     cpu: [x64]
     os: [linux]
     libc: [musl]
+
+  '@node-rs/xxhash-wasm32-wasi@1.7.8':
+    resolution: {integrity: sha512-5kbhizmCEwIVSABxOo4/c0v5aWFcHQ+9RVvdQ/9JGuZjOxaK47TBiH2qTjVxfZsItsRWM+LZwnTW9UaVFeD7AA==}
+    engines: {node: ^20.19.0 || ^22.13.0 || >=23.5.0}
 
   '@node-rs/xxhash-win32-arm64-msvc@1.7.8':
     resolution: {integrity: sha512-3vf7hmj1LVOfrUXMfRZI67G9h6fNjWg39vmgbD/IQdC/CQ/39aAXvnNmOY0MJNEnVixml668CCiyRccll0ZiyQ==}
@@ -6827,6 +6849,11 @@ snapshots:
       tslib: 2.8.1
     optional: true
 
+  '@emnapi/core@2.0.0-alpha.5':
+    dependencies:
+      '@emnapi/wasi-threads': 2.1.0
+      tslib: 2.8.1
+
   '@emnapi/runtime@1.11.1':
     dependencies:
       tslib: 2.8.1
@@ -6837,10 +6864,18 @@ snapshots:
       tslib: 2.8.1
     optional: true
 
+  '@emnapi/runtime@2.0.0-alpha.5':
+    dependencies:
+      tslib: 2.8.1
+
   '@emnapi/wasi-threads@1.2.2':
     dependencies:
       tslib: 2.8.1
     optional: true
+
+  '@emnapi/wasi-threads@2.1.0':
+    dependencies:
+      tslib: 2.8.1
 
   '@esbuild/aix-ppc64@0.28.2':
     optional: true
@@ -7251,6 +7286,12 @@ snapshots:
       '@tybys/wasm-util': 0.10.4
     optional: true
 
+  '@napi-rs/wasm-runtime@1.2.5(@emnapi/core@2.0.0-alpha.5)(@emnapi/runtime@2.0.0-alpha.5)':
+    dependencies:
+      '@emnapi/core': 2.0.0-alpha.5
+      '@emnapi/runtime': 2.0.0-alpha.5
+      '@tybys/wasm-util': 0.10.4
+
   '@noble/hashes@2.4.0': {}
 
   '@node-rs/xxhash-android-arm-eabi@1.7.8':
@@ -7282,6 +7323,12 @@ snapshots:
 
   '@node-rs/xxhash-linux-x64-musl@1.7.8':
     optional: true
+
+  '@node-rs/xxhash-wasm32-wasi@1.7.8':
+    dependencies:
+      '@emnapi/core': 2.0.0-alpha.5
+      '@emnapi/runtime': 2.0.0-alpha.5
+      '@napi-rs/wasm-runtime': 1.2.5(@emnapi/core@2.0.0-alpha.5)(@emnapi/runtime@2.0.0-alpha.5)
 
   '@node-rs/xxhash-win32-arm64-msvc@1.7.8':
     optional: true
@@ -8017,7 +8064,6 @@ snapshots:
   '@tybys/wasm-util@0.10.4':
     dependencies:
       tslib: 2.8.1
-    optional: true
 
   '@types/aria-query@5.0.4': {}
 

@@ -36,6 +36,7 @@
     "prepublishOnly": "vp run build"
   },
   "dependencies": {
+    "@node-rs/xxhash": "catalog:",
     "@trajs/utils": "workspace:*",
     "effect": "catalog:"
   },

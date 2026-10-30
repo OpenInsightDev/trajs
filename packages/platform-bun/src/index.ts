@@ -1,8 +1,8 @@
 /**
  * The implementations of `@trajs/utils`'s services that a program on Bun runs with:
  * a zstd, gzip, deflate or none frame Bun writes and reads, the CRC-32 of a block
- * `Bun.hash.crc32` reads, and the SHA-256, BLAKE2b-512 or XXH32 digest
- * `Bun.CryptoHasher` and the hash of `@trajs/utils` compute.
+ * `Bun.hash.crc32` reads, and the SHA-256, BLAKE2b-512 or XXH64 digest
+ * `Bun.CryptoHasher` and the binding `@node-rs/xxhash` compute.
  *
  * Every module is re-exported as a namespace — `BunCompression.layer` — and each is
  * also available as a subpath import such as

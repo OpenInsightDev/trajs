@@ -42,7 +42,6 @@
   },
   "dependencies": {
     "@aws-sdk/client-s3": "catalog:",
-    "@noble/hashes": "catalog:",
     "effect": "catalog:"
   },
   "devDependencies": {

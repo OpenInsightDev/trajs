@@ -41,6 +41,8 @@
     "prepublishOnly": "vp run build"
   },
   "dependencies": {
+    "@noble/hashes": "catalog:",
+    "@node-rs/xxhash-wasm32-wasi": "catalog:",
     "@structured-world/structured-zstd": "catalog:",
     "@trajs/utils": "workspace:*",
     "effect": "catalog:"

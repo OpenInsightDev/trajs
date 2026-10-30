@@ -3,9 +3,10 @@
  *
  * {@link StreamHash.digest} reads the digest of one stream.
  * {@link StreamHash.start} reads one of a sequence fed to it over several writes.
- * A platform package supplies the codecs, and `@trajs/platform-node` and `@trajs/platform-bun`
- * use `@node-rs/xxhash` and `node:crypto`.
- * `@trajs/platform-browser` uses WebCrypto and the hash of this package.
+ * A platform package supplies the codecs.
+ * `@trajs/platform-node` and `@trajs/platform-bun` use `node:crypto` and the binding
+ * `@node-rs/xxhash`, and `@trajs/platform-browser` uses WebCrypto, `@noble/hashes` and the
+ * WebAssembly module of `@node-rs/xxhash-wasm32-wasi`.
  *
  * The algorithm is stated per call ({@link Options}).
  * One algorithm yields one digest on every platform, so a digest read on one platform reads back
@@ -14,12 +15,7 @@
  * @stability stable
  */
 
-import { blake2b } from "@noble/hashes/blake2.js";
-import { sha256 } from "@noble/hashes/sha2.js";
-import { bytesToHex } from "@noble/hashes/utils.js";
-import { Context, Layer, Schema, Sink } from "effect";
-
-import { create as createXxh32 } from "#/internal/xxh32.ts";
+import { Context, Schema, Sink } from "effect";
 
 /**
  * The digest algorithm of a trajectory's parts.
@@ -34,11 +30,11 @@ import { create as createXxh32 } from "#/internal/xxh32.ts";
  * - `Sha256` (0) is SHA-256, at 32 digest bytes.
  * - `Blake2b512` (1) is BLAKE2b at 64 digest bytes, the `blake2b512` of
  *   `node:crypto`.
- * - `Xxh32` (2) is XXH32, at 4 digest bytes. {@link defaultAlgorithm} is
- *   `Xxh32`.
+ * - `Xxh64` (2) is XXH64, at 8 digest bytes. {@link defaultAlgorithm} is
+ *   `Xxh64`.
  *
  * A digest has the bytes of its algorithm, which a trajectory records as
- * lowercase hex: 64 characters for SHA-256, 128 for BLAKE2b, and 8 for XXH32.
+ * lowercase hex: 64 characters for SHA-256, 128 for BLAKE2b, and 16 for XXH64.
  *
  * @see {@link Options} for the algorithm of one call.
  * @stability stable
@@ -47,7 +43,7 @@ import { create as createXxh32 } from "#/internal/xxh32.ts";
 export const Algorithm = Schema.Enum({
   Sha256: 0,
   Blake2b512: 1,
-  Xxh32: 2,
+  Xxh64: 2,
 } as const);
 
 export type Algorithm = Schema.Schema.Type<typeof Algorithm>;
@@ -77,7 +73,7 @@ export interface Options {
 }
 
 /**
- * The default algorithm: `Xxh32`.
+ * The default algorithm: `Xxh64`.
  *
  * **When to use**
  *
@@ -85,13 +81,13 @@ export interface Options {
  *
  * **Details**
  *
- * A call without an algorithm digests with XXH32, the cheapest of the three.
+ * A call without an algorithm digests with XXH64, the cheapest of the three.
  * The metadata records the algorithm of a digest, so a read states the one the
  * write did.
  *
  * **Gotchas**
  *
- * XXH32 is not a cryptographic digest, so two different sequences of parts can
+ * XXH64 is not a cryptographic digest, so two different sequences of parts can
  * share a digest. State `Sha256` or `Blake2b512` where a collision must not
  * occur.
  *
@@ -99,7 +95,7 @@ export interface Options {
  * @stability stable
  * @category constants
  */
-export const defaultAlgorithm: Algorithm = Algorithm.enums.Xxh32;
+export const defaultAlgorithm: Algorithm = Algorithm.enums.Xxh64;
 
 /**
  * A digest being computed: bytes fed to it, and the digest read once they end.
@@ -184,8 +180,7 @@ export interface StreamHash {
  *
  * **When to use**
  *
- * Use to require a hash. Provide {@link layer} or the layer of a platform
- * package.
+ * Use to require a hash. Provide the layer of a platform package.
  *
  * **Details**
  *
@@ -200,85 +195,3 @@ export const StreamHash: Context.Service<StreamHash, StreamHash> = Context.Servi
   StreamHash,
   StreamHash
 >()("trajs/utils/StreamHash");
-
-const running = (algorithm: Algorithm): Hashing => {
-  switch (algorithm) {
-    // An unconfigured BLAKE2b computes 64 bytes, which is `blake2b512`.
-    case Algorithm.enums.Blake2b512:
-      return digestOf(blake2b.create());
-    case Algorithm.enums.Sha256:
-      return digestOf(sha256.create());
-    case Algorithm.enums.Xxh32:
-      return digestOf(createXxh32());
-  }
-};
-
-const digestOf = (hashed: {
-  readonly update: (bytes: Uint8Array) => void;
-  readonly digest: () => Uint8Array;
-}): Hashing => ({
-  digest: () => hashed.digest(),
-  update: (bytes) => {
-    hashed.update(bytes);
-  },
-});
-
-const hashing = (algorithm: Algorithm): Sink.Sink<string, Uint8Array, never, never> =>
-  Sink.reduce(
-    () => running(algorithm),
-    (running: Hashing, chunk: Uint8Array) => {
-      running.update(chunk);
-
-      return running;
-    },
-  ).pipe(Sink.map((running) => bytesToHex(running.digest())));
-
-/**
- * The hash of this package as a service.
- *
- * **When to use**
- *
- * Use to state a layer over the hash of this package instead of a platform hash.
- * `@trajs/platform-browser` uses it for BLAKE2b and XXH32, because a browser
- * supplies neither codec. Use it as well to provide the service without a layer.
- *
- * **Details**
- *
- * {@link layer} provides this value. A `StreamHash` from here and one from the
- * layer read the same digest. {@link defaultAlgorithm} applies to a call without
- * an algorithm.
- *
- * @see {@link layer} for the same hash as a layer.
- * @stability stable
- * @category constructors
- */
-export const make = (): StreamHash => ({
-  digest: (options) => hashing(options?.algorithm ?? defaultAlgorithm),
-  start: (options) => running(options?.algorithm ?? defaultAlgorithm),
-});
-
-/**
- * The hash of this package: SHA-256, BLAKE2b-512 or XXH32, computed by
- * `@noble/hashes` and the XXH32 of this package.
- *
- * **When to use**
- *
- * Use to hash without a platform package, such as in a page, a worker or a
- * script. Use it as well when every run should hash with the same code. It needs
- * no native addon and no WebAssembly module, so it runs wherever JavaScript runs.
- *
- * **Details**
- *
- * `@noble/hashes` is JavaScript without dependencies, so a program bundle carries
- * it. The cost is bundle size and JavaScript speed against a native codec.
- *
- * Bytes arrive chunk by chunk, and the digest is read at the end. One algorithm
- * yields the same digest as the platform packages, so they read the same
- * trajectory.
- *
- * @see {@link StreamHash} for the service of this hash.
- * @see {@link make} for the same hash as a service.
- * @stability stable
- * @category layers
- */
-export const layer: Layer.Layer<StreamHash> = Layer.succeed(StreamHash, make());

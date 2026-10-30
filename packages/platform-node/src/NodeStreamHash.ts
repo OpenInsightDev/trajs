@@ -1,5 +1,5 @@
 /**
- * The digest of a trajectory's parts on Node: SHA-256, BLAKE2b-512 or XXH32.
+ * The digest of a trajectory's parts on Node: SHA-256, BLAKE2b-512 or XXH64.
  *
  * {@link layer} provides the {@link StreamHash} of this package. One algorithm
  * yields the same digest as every other platform package. This module imports the
@@ -10,7 +10,7 @@
 
 import { createHash } from "node:crypto";
 
-import { Xxh32 } from "@node-rs/xxhash";
+import { Xxh64 } from "@node-rs/xxhash";
 import {
   Algorithm,
   StreamHash,
@@ -22,7 +22,7 @@ import { Layer, Sink } from "effect";
 
 /**
  * The hasher of one algorithm: `node:crypto` for the cryptographic digests, and
- * the binding `@node-rs/xxhash` for XXH32.
+ * the binding `@node-rs/xxhash` for XXH64.
  */
 const hashers: Record<Algorithm, () => Hashing> = {
   [Algorithm.enums.Blake2b512]: () => {
@@ -45,16 +45,16 @@ const hashers: Record<Algorithm, () => Hashing> = {
       },
     };
   },
-  [Algorithm.enums.Xxh32]: () => {
-    const hashing = new Xxh32();
+  [Algorithm.enums.Xxh64]: () => {
+    const hashing = new Xxh64();
 
     return {
-      // The binding reads the digest as the 32-bit value it is, and the digest
-      // of XXH32 is that value big-endian.
+      // The binding reads the digest as the 64-bit value it is, and the digest
+      // of XXH64 is that value big-endian.
       digest: () => {
-        const digest = new Uint8Array(4);
+        const digest = new Uint8Array(8);
 
-        new DataView(digest.buffer).setUint32(0, hashing.digest());
+        new DataView(digest.buffer).setBigUint64(0, hashing.digest());
 
         return digest;
       },
@@ -78,12 +78,12 @@ const hashing = (algorithm: Algorithm): Sink.Sink<string, Uint8Array, never, nev
  * **When to use**
  *
  * Use in a Node program with a native addon. SHA-256 and BLAKE2b-512 come from
- * `node:crypto`, and XXH32 from the binding.
+ * `node:crypto`, and XXH64 from the binding.
  *
  * **Details**
  *
  * Every algorithm is available, and each call states its own ({@link Options}).
- * An omitted algorithm means XXH32, the cheapest of the three.
+ * An omitted algorithm means XXH64, the cheapest of the three.
  *
  * The binding is a native addon, so a bundle leaves it for the target machine to
  * resolve. A bundle with the binding carries one platform only.
