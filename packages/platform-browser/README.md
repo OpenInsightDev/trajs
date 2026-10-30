@@ -10,7 +10,7 @@ computing anywhere with WebAssembly runs with.
 - `BrowserByteStore` — the bytes a page keeps between readings, the chunks of a
   sequence in the `sessionStorage` of the tab, kept under a prefix so the page
   shares none of them.
-- `BrowserStreamHash` — the SHA-256 digest WebCrypto reads, the BLAKE2b-512
+- `BrowserStreamHash` — the SHA-256 and BLAKE2b-512 digest
   [`@noble/hashes`](https://npmjs.com/package/@noble/hashes) computes, and the
   XXH64 the WebAssembly module of
   [`@node-rs/xxhash-wasm32-wasi`](https://npmjs.com/package/@node-rs/xxhash-wasm32-wasi)

@@ -20,19 +20,23 @@ platform package can say what each is over.
   deflate, or the bytes as they are, stated at the call that writes or reads one
   (`Compression.Options`) and recorded with each chunk of a stored trajectory.
   What one chunk holds is one buffer, which `Compression.compressBytes` writes as
-  one frame and `Compression.decompressBytes` reads back. The same codec carries
-  the chunks of a stream (`Compression.compress`).
+  one frame and `Compression.decompressBytes` reads back. The same frame carries
+  the chunks of a stream (`Compression.compress`). A platform package states what
+  its runtime writes and reads each algorithm with, through `Compression.make`:
+  the options and the bytes passed through untouched are resolved here, so a
+  platform states one codec per algorithm and nothing else.
 - `Checksum` — what checks a block of a trajectory's parts: CRC-32, stated at
   the call that reads one (`Checksum.Options`) and read over one block at a time.
-  A platform package reads it with the codec of its runtime (`node:zlib`,
-  `Bun.hash.crc32`), and the tables here read the same number where a runtime
-  states none. A checksum catches a torn or misplaced block, and does not name
-  it: what names a trajectory is a digest.
+  A platform package states the checksum of its runtime through `Checksum.make`
+  (`node:zlib`, `Bun.hash.crc32`), and the tables here read the same number where
+  a runtime states none. A checksum catches a torn or misplaced block, and does
+  not name it: what names a trajectory is a digest.
 - `StreamHash` — what reads the digest of a trajectory's parts: SHA-256,
   BLAKE2b-512 or XXH64, stated at the call that reads one (`StreamHash.Options`)
   and recorded with a stored trajectory, read in one pass over a stream or fed to
-  a running digest (`StreamHash.start`), which reads it as the bytes of its
-  algorithm. A platform package supplies the codecs: the binding of
+  a running digest (`StreamHash.start`), which reads it as the digest bytes the
+  call states. A platform package supplies the running digests of its runtime
+  through `StreamHash.make`: the binding of
   [`@node-rs/xxhash`](https://npmjs.com/package/@node-rs/xxhash) on Node and Bun,
   and its WebAssembly module in a browser.
 

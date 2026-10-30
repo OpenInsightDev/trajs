@@ -228,6 +228,12 @@ export interface Loaded<Config extends Config.AnyConfig = Config.AnyConfig> {
  * {@link defaultHashAlgorithm}. A read needs no option, because the metadata
  * carries both algorithms.
  *
+ * **Gotchas**
+ *
+ * A trajectory records the algorithm of its digest, not its `length`, so a write
+ * reads the whole digest of `hash.algorithm` and a stated `hash.length` is
+ * ignored.
+ *
  * @see {@link Service.save} for the operation.
  * @stability stable
  * @category models

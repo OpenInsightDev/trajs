@@ -9,12 +9,22 @@
  * @stability experimental
  */
 
-import { Algorithm, Checksum, defaultAlgorithm, type Options, make } from "@trajs/utils/Checksum";
+import { Algorithm, Checksum, type Options, make } from "@trajs/utils/Checksum";
 import { hash } from "bun";
 import { Layer } from "effect";
 
-/** The checksum of the tables this package ships, for what a runtime does not read. */
-const portable = make();
+/**
+ * The CRC-32 of `Bun.hash.crc32`, where the runtime states one.
+ *
+ * `hash.crc32` is a method of `Bun.hash`, so it is called through the object
+ * rather than held as a function of its own.
+ */
+const native: ((bytes: Uint8Array) => number) | undefined =
+  hash.crc32 === undefined ? undefined : (bytes) => hash.crc32(bytes);
+
+const checksum: Checksum = make({
+  of: (algorithm) => (algorithm === Algorithm.enums.Crc32 ? native : undefined),
+});
 
 /**
  * Reads the checksum of a block with `Bun.hash.crc32`.
@@ -35,18 +45,7 @@ const portable = make();
  * @stability experimental
  * @category combinators
  */
-export const of = (options?: Options): ((bytes: Uint8Array) => number) => {
-  const algorithm = options?.algorithm ?? defaultAlgorithm;
-
-  // `hash.crc32` is a method of `Bun.hash`, so it is called through the object
-  // rather than held as a function of its own. A runtime without it reads the
-  // checksum through the tables of `@trajs/utils` rather than failing.
-  if (algorithm === Algorithm.enums.Crc32 && hash.crc32 !== undefined) {
-    return (bytes) => hash.crc32(bytes);
-  }
-
-  return portable.of({ algorithm });
-};
+export const of = (options?: Options): ((bytes: Uint8Array) => number) => checksum.of(options);
 
 /**
  * The checksum of a Bun program: CRC-32 read by `Bun.hash.crc32`.
@@ -62,11 +61,11 @@ export const of = (options?: Options): ((bytes: Uint8Array) => number) => {
  * tables of `@trajs/utils`, and it reads the same number, so a trajectory checked
  * on Bun is checked by a page as well.
  *
- * An omitted algorithm means CRC-32 ({@link defaultAlgorithm}). A runtime without
+ * An omitted algorithm means CRC-32 ({@link Algorithm}). A runtime without
  * `hash.crc32` reads the checksum through those tables.
  *
  * @see {@link Checksum} for the provided service.
  * @stability experimental
  * @category layers
  */
-export const layer: Layer.Layer<Checksum> = Layer.succeed(Checksum, { of });
+export const layer: Layer.Layer<Checksum> = Layer.succeed(Checksum, checksum);

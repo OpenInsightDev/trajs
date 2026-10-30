@@ -11,14 +11,8 @@
 import { createHash } from "node:crypto";
 
 import { Xxh64 } from "@node-rs/xxhash";
-import {
-  Algorithm,
-  StreamHash,
-  defaultAlgorithm,
-  type Hashing,
-  type Options,
-} from "@trajs/utils/StreamHash";
-import { Layer, Sink } from "effect";
+import { Algorithm, StreamHash, type Hashing, make } from "@trajs/utils/StreamHash";
+import { Layer } from "effect";
 
 /**
  * The hasher of one algorithm: `node:crypto` for the cryptographic digests, and
@@ -65,13 +59,6 @@ const hashers: Record<Algorithm, () => Hashing> = {
   },
 };
 
-const hashing = (algorithm: Algorithm): Sink.Sink<string, Uint8Array, never, never> =>
-  Sink.reduce(hashers[algorithm], (hashed, chunk: Uint8Array) => {
-    hashed.update(chunk);
-
-    return hashed;
-  }).pipe(Sink.map((hashed) => Buffer.from(hashed.digest()).toString("hex")));
-
 /**
  * The hash of a Node program: `node:crypto` and `@node-rs/xxhash`.
  *
@@ -82,8 +69,10 @@ const hashing = (algorithm: Algorithm): Sink.Sink<string, Uint8Array, never, nev
  *
  * **Details**
  *
- * Every algorithm is available, and each call states its own ({@link Options}).
- * An omitted algorithm means XXH64, the cheapest of the three.
+ * Every algorithm is available, and each call states its own algorithm and digest
+ * bytes (`StreamHash.Options`). An omitted algorithm means XXH64, the cheapest of
+ * the three. A call may state fewer digest bytes, which reads the leading bytes of
+ * the digest.
  *
  * The binding is a native addon, so a bundle leaves it for the target machine to
  * resolve. A bundle with the binding carries one platform only.
@@ -99,7 +88,7 @@ const hashing = (algorithm: Algorithm): Sink.Sink<string, Uint8Array, never, nev
  * @stability stable
  * @category layers
  */
-export const layer: Layer.Layer<StreamHash> = Layer.succeed(StreamHash, {
-  digest: (options?: Options) => hashing(options?.algorithm ?? defaultAlgorithm),
-  start: (options?: Options) => hashers[options?.algorithm ?? defaultAlgorithm](),
-});
+export const layer: Layer.Layer<StreamHash> = Layer.succeed(
+  StreamHash,
+  make({ start: (algorithm) => hashers[algorithm]() }),
+);

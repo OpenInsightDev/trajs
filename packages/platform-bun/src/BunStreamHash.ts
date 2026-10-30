@@ -10,15 +10,9 @@
  */
 
 import { Xxh64 } from "@node-rs/xxhash";
-import {
-  Algorithm,
-  StreamHash,
-  defaultAlgorithm,
-  type Hashing,
-  type Options,
-} from "@trajs/utils/StreamHash";
+import { Algorithm, StreamHash, type Hashing, make } from "@trajs/utils/StreamHash";
 import { CryptoHasher } from "bun";
-import { Layer, Sink } from "effect";
+import { Layer } from "effect";
 
 /** The running digest of one `Bun.CryptoHasher`, as {@link Hashing} takes it. */
 const digested = (hashing: CryptoHasher): Hashing => ({
@@ -57,16 +51,6 @@ const running = (algorithm: Algorithm): Hashing => {
   }
 };
 
-const hashing = (algorithm: Algorithm): Sink.Sink<string, Uint8Array, never, never> =>
-  Sink.reduce(
-    () => running(algorithm),
-    (running: Hashing, chunk: Uint8Array) => {
-      running.update(chunk);
-
-      return running;
-    },
-  ).pipe(Sink.map((running) => Buffer.from(running.digest()).toString("hex")));
-
 /**
  * The hash of a Bun program: `Bun.CryptoHasher` and the binding `@node-rs/xxhash`.
  *
@@ -76,8 +60,9 @@ const hashing = (algorithm: Algorithm): Sink.Sink<string, Uint8Array, never, nev
  *
  * **Details**
  *
- * Every algorithm is available, and each call states its own ({@link Options}).
- * An omitted algorithm means XXH64.
+ * Every algorithm is available, and each call states its own algorithm and digest
+ * bytes (`StreamHash.Options`). An omitted algorithm means XXH64. A call may state
+ * fewer digest bytes, which reads the leading bytes of the digest.
  *
  * SHA-256 and BLAKE2b-512 come from `Bun.CryptoHasher`, which digests a chunk at
  * a time. `Bun.hash.xxHash64` reads a whole input, so XXH64 comes from the binding,
@@ -90,7 +75,4 @@ const hashing = (algorithm: Algorithm): Sink.Sink<string, Uint8Array, never, nev
  * @stability stable
  * @category layers
  */
-export const layer: Layer.Layer<StreamHash> = Layer.succeed(StreamHash, {
-  digest: (options?: Options) => hashing(options?.algorithm ?? defaultAlgorithm),
-  start: (options?: Options) => running(options?.algorithm ?? defaultAlgorithm),
-});
+export const layer: Layer.Layer<StreamHash> = Layer.succeed(StreamHash, make({ start: running }));

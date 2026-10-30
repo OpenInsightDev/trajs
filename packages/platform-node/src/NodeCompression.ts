@@ -21,26 +21,22 @@ import {
 import { pipeThroughDuplex } from "@effect/platform-node/NodeStream";
 import {
   Algorithm,
+  type CodedAlgorithm,
   Compression,
   CompressionError,
-  defaultAlgorithm,
-  make as makeCompression,
+  type Frame,
   type Options,
+  make,
 } from "@trajs/utils/Compression";
-import { Layer, Stream } from "effect";
+import { Layer } from "effect";
 
-/**
- * The algorithms of the codecs: every algorithm except `None`.
- */
-type ZlibAlgorithm = Exclude<Algorithm, typeof Algorithm.enums.None>;
-
-const compressors: Record<ZlibAlgorithm, () => Transform> = {
+const compressors: Record<CodedAlgorithm, () => Transform> = {
   [Algorithm.enums.Deflate]: () => createDeflate(),
   [Algorithm.enums.Gzip]: () => createGzip(),
   [Algorithm.enums.Zstd]: () => createZstdCompress(),
 };
 
-const decompressors: Record<ZlibAlgorithm, () => Transform> = {
+const decompressors: Record<CodedAlgorithm, () => Transform> = {
   [Algorithm.enums.Deflate]: () => createInflate(),
   [Algorithm.enums.Gzip]: () => createGunzip(),
   [Algorithm.enums.Zstd]: () => createZstdDecompress(),
@@ -51,11 +47,16 @@ const decompressors: Record<ZlibAlgorithm, () => Transform> = {
  *
  * The stream belongs to the run. An early downstream stop destroys it.
  */
-const through = (open: () => Transform) =>
+const through = (open: () => Transform): Frame =>
   pipeThroughDuplex<Uint8Array, CompressionError>({
     evaluate: open,
     onError: (cause) => new CompressionError({ cause }),
   });
+
+const compression: Compression = make({
+  compress: (algorithm) => through(compressors[algorithm]),
+  decompress: (algorithm) => through(decompressors[algorithm]),
+});
 
 /**
  * Compresses a byte stream into one frame.
@@ -101,15 +102,7 @@ const through = (open: () => Transform) =>
  * @stability stable
  * @category combinators
  */
-export const compress =
-  (options?: Options) =>
-  <E, R>(
-    self: Stream.Stream<Uint8Array, E, R>,
-  ): Stream.Stream<Uint8Array, E | CompressionError, R> => {
-    const algorithm = options?.algorithm ?? defaultAlgorithm;
-
-    return algorithm === Algorithm.enums.None ? self : self.pipe(through(compressors[algorithm]));
-  };
+export const compress = (options?: Options): Frame => compression.compress(options);
 
 /**
  * Decompresses a byte stream written by {@link compress}.
@@ -150,15 +143,7 @@ export const compress =
  * @stability stable
  * @category combinators
  */
-export const decompress =
-  (options?: Options) =>
-  <E, R>(
-    self: Stream.Stream<Uint8Array, E, R>,
-  ): Stream.Stream<Uint8Array, E | CompressionError, R> => {
-    const algorithm = options?.algorithm ?? defaultAlgorithm;
-
-    return algorithm === Algorithm.enums.None ? self : self.pipe(through(decompressors[algorithm]));
-  };
+export const decompress = (options?: Options): Frame => compression.decompress(options);
 
 /**
  * The compression of a Node program: the streams of `node:zlib`.
@@ -184,7 +169,4 @@ export const decompress =
  * @stability stable
  * @category layers
  */
-export const layer: Layer.Layer<Compression> = Layer.succeed(
-  Compression,
-  makeCompression({ compress, decompress }),
-);
+export const layer: Layer.Layer<Compression> = Layer.succeed(Compression, compression);

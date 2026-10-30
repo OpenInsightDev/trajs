@@ -11,8 +11,8 @@
  * The algorithm is stated per call ({@link Options}).
  * One algorithm yields one number on every platform, so a checksum read on one platform agrees
  * with one read on another.
- * A platform package reads it with the codec its runtime states, and the tables of this package
- * read the same number where a runtime states none.
+ * A platform package reads it with the codec its runtime states ({@link make}), and the tables of
+ * this package read the same number where a runtime states none.
  *
  * @see {@link StreamHash} for the digest of a trajectory's parts.
  * @stability experimental
@@ -20,7 +20,7 @@
 
 import { Context, Layer, Schema } from "effect";
 
-import { crc32 } from "#/internal/checksum.ts";
+import { ofFrom } from "#/internal/checksum.ts";
 
 /**
  * The checksum algorithm of a trajectory's blocks.
@@ -148,15 +148,28 @@ export const Checksum: Context.Service<Checksum, Checksum> = Context.Service<Che
   "trajs/utils/Checksum",
 );
 
-const reading = (algorithm: Algorithm): ((bytes: Uint8Array) => number) => {
-  switch (algorithm) {
-    case Algorithm.enums.Crc32:
-      return crc32;
-  }
-};
+/**
+ * The checksums a platform reads, one per algorithm.
+ *
+ * **When to use**
+ *
+ * Use in a platform package, to state what its runtime reads a checksum with.
+ *
+ * **Details**
+ *
+ * `of` states the checksum of an algorithm, or `undefined` where the runtime states none. The
+ * tables of this package read that algorithm there, so a codec needs no table of its own.
+ *
+ * @see {@link make} for the service it builds.
+ * @stability experimental
+ * @category models
+ */
+export interface Codec {
+  readonly of: (algorithm: Algorithm) => ((bytes: Uint8Array) => number) | undefined;
+}
 
 /**
- * The checksum of this package as a service.
+ * The checksum of a platform's codecs as a service.
  *
  * **When to use**
  *
@@ -165,16 +178,21 @@ const reading = (algorithm: Algorithm): ((bytes: Uint8Array) => number) => {
  *
  * **Details**
  *
- * {@link layer} provides this value. A `Checksum` from here and one from the
- * layer read the same number. {@link defaultAlgorithm} applies to a call without
- * an algorithm.
+ * The options of a call are resolved here ({@link Options}), and {@link defaultAlgorithm} applies
+ * to a call without an algorithm. What a codec states of an algorithm ({@link Codec}) reads the
+ * number, and the tables of this package read it where the codec states none.
  *
+ * A call that states no codec reads every algorithm through those tables, which is what
+ * {@link layer} does. So a `Checksum` from here and one from a platform package read the same
+ * number.
+ *
+ * @see {@link Codec} for what a platform states.
  * @see {@link layer} for the same checksum as a layer.
  * @stability experimental
  * @category constructors
  */
-export const make = (): Checksum => ({
-  of: (options) => reading(options?.algorithm ?? defaultAlgorithm),
+export const make = (codec?: Codec): Checksum => ({
+  of: (options) => ofFrom(codec, options),
 });
 
 /**

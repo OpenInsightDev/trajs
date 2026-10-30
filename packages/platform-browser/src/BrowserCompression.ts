@@ -16,21 +16,16 @@ import {
 } from "@structured-world/structured-zstd";
 import {
   Algorithm,
+  type CodedAlgorithm,
   Compression,
   CompressionError,
-  defaultAlgorithm,
-  make as makeCompression,
-  type Options,
+  type Frame,
+  make,
 } from "@trajs/utils/Compression";
 import { Effect, Layer, Stream } from "effect";
 
 /** The WebAssembly handle of one frame direction. */
 type Handle = Pick<CompressStream, "push" | "finish" | "free">;
-
-/** One direction of a frame, from the chunks of a stream to the chunks of the frame. */
-type Frame = <E, R>(
-  bytes: Stream.Stream<Uint8Array, E, R>,
-) => Stream.Stream<Uint8Array, E | CompressionError, R>;
 
 /** A thrown codec value, as a {@link CompressionError}. */
 const refused = (cause: unknown): CompressionError => new CompressionError({ cause });
@@ -41,28 +36,30 @@ const refused = (cause: unknown): CompressionError => new CompressionError({ cau
  * The handle belongs to the run of the stream, so it is freed when the stream ends
  * or a downstream stops reading early.
  */
-const carried = <E, R>(
-  open: () => Promise<Handle>,
-  bytes: Stream.Stream<Uint8Array, E, R>,
-): Stream.Stream<Uint8Array, E | CompressionError, R> =>
-  Effect.acquireRelease(Effect.tryPromise({ try: open, catch: refused }), (handle) =>
-    Effect.sync(() => handle.free()),
-  ).pipe(
-    Effect.map((handle) =>
-      bytes.pipe(
-        // One frame is one stream the handle keeps across the chunks, so the
-        // chunks are fed to it one at a time and in the order they are read.
-        Stream.mapEffect((chunk) => Effect.try({ try: () => handle.push(chunk), catch: refused }), {
-          concurrency: 1,
-        }),
-        Stream.filter((piece) => piece.length > 0),
-        Stream.concat(
-          Effect.try({ try: () => handle.finish(), catch: refused }).pipe(Stream.fromEffect),
+const carried =
+  (open: () => Promise<Handle>): Frame =>
+  (bytes) =>
+    Effect.acquireRelease(Effect.tryPromise({ try: open, catch: refused }), (handle) =>
+      Effect.sync(() => handle.free()),
+    ).pipe(
+      Effect.map((handle) =>
+        bytes.pipe(
+          // One frame is one stream the handle keeps across the chunks, so the
+          // chunks are fed to it one at a time and in the order they are read.
+          Stream.mapEffect(
+            (chunk) => Effect.try({ try: () => handle.push(chunk), catch: refused }),
+            {
+              concurrency: 1,
+            },
+          ),
+          Stream.filter((piece) => piece.length > 0),
+          Stream.concat(
+            Effect.try({ try: () => handle.finish(), catch: refused }).pipe(Stream.fromEffect),
+          ),
         ),
       ),
-    ),
-    Stream.unwrap,
-  );
+      Stream.unwrap,
+    );
 
 /**
  * Carries a stream of chunks through one of the streams a browser states.
@@ -70,16 +67,15 @@ const carried = <E, R>(
  * A browser takes a whole `ReadableStream`, so the stream of chunks is handed to
  * it, and the back pressure travels between the two.
  */
-const piped = <E, R>(
-  open: (bytes: ReadableStream<Uint8Array>) => ReadableStream<Uint8Array>,
-  bytes: Stream.Stream<Uint8Array, E, R>,
-): Stream.Stream<Uint8Array, E | CompressionError, R> =>
-  Stream.toReadableStreamEffect(bytes).pipe(
-    Effect.map((source) =>
-      Stream.fromReadableStream({ evaluate: () => open(source), onError: refused }),
-    ),
-    Stream.unwrap,
-  );
+const piped =
+  (open: (bytes: ReadableStream<Uint8Array>) => ReadableStream<Uint8Array>): Frame =>
+  (bytes) =>
+    Stream.toReadableStreamEffect(bytes).pipe(
+      Effect.map((source) =>
+        Stream.fromReadableStream({ evaluate: () => open(source), onError: refused }),
+      ),
+      Stream.unwrap,
+    );
 
 /** A browser codec as a readable/writable pair of binary chunks. */
 type Pair = ReadableWritablePair<Uint8Array, Uint8Array>;
@@ -106,53 +102,26 @@ const asPair = (codec: CompressionStream | DecompressionStream): Pair => {
  * `CompressionStream` writes a gzip or deflate frame. `DecompressionStream` reads
  * one.
  */
-const web =
-  (format: "gzip" | "deflate", direction: "compress" | "decompress"): Frame =>
-  (bytes) =>
-    piped(
-      (source) =>
-        source.pipeThrough(
-          asPair(
-            direction === "compress"
-              ? new CompressionStream(format)
-              : new DecompressionStream(format),
-          ),
-        ),
-      bytes,
-    );
-
-/**
- * The algorithms of the codecs: every algorithm except `None`.
- */
-type CodedAlgorithm = Exclude<Algorithm, typeof Algorithm.enums.None>;
+const web = (format: "gzip" | "deflate", direction: "compress" | "decompress"): Frame =>
+  piped((source) =>
+    source.pipeThrough(
+      asPair(
+        direction === "compress" ? new CompressionStream(format) : new DecompressionStream(format),
+      ),
+    ),
+  );
 
 const compressors: Record<CodedAlgorithm, Frame> = {
   [Algorithm.enums.Deflate]: web("deflate", "compress"),
   [Algorithm.enums.Gzip]: web("gzip", "compress"),
-  [Algorithm.enums.Zstd]: (bytes) => carried(() => createCompressStream(), bytes),
+  [Algorithm.enums.Zstd]: carried(() => createCompressStream()),
 };
 
 const decompressors: Record<CodedAlgorithm, Frame> = {
   [Algorithm.enums.Deflate]: web("deflate", "decompress"),
   [Algorithm.enums.Gzip]: web("gzip", "decompress"),
-  [Algorithm.enums.Zstd]: (bytes) => carried(() => createDecompressStream(), bytes),
+  [Algorithm.enums.Zstd]: carried(() => createDecompressStream()),
 };
-
-/**
- * One direction of a frame as a browser states it.
- *
- * The call states the codec, and `None` reads or writes no frame.
- */
-const frame =
-  (frames: Record<CodedAlgorithm, Frame>) =>
-  (options?: Options) =>
-  <E, R>(
-    bytes: Stream.Stream<Uint8Array, E, R>,
-  ): Stream.Stream<Uint8Array, E | CompressionError, R> => {
-    const algorithm = options?.algorithm ?? defaultAlgorithm;
-
-    return algorithm === Algorithm.enums.None ? bytes : frames[algorithm](bytes);
-  };
 
 /**
  * The compression of a program without `node:zlib`.
@@ -168,7 +137,7 @@ const frame =
  * the WebAssembly codec, with a SIMD payload where the host has SIMD and a scalar
  * one otherwise.
  *
- * Every algorithm is available, and each call states its own ({@link Options}).
+ * Every algorithm is available, and each call states its own (`Compression.Options`).
  * An omitted algorithm means zstd, the historical frame. `None` stores the parts
  * unwrapped.
  *
@@ -182,5 +151,8 @@ const frame =
  */
 export const layer: Layer.Layer<Compression> = Layer.succeed(
   Compression,
-  makeCompression({ compress: frame(compressors), decompress: frame(decompressors) }),
+  make({
+    compress: (algorithm) => compressors[algorithm],
+    decompress: (algorithm) => decompressors[algorithm],
+  }),
 );

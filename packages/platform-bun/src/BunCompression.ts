@@ -11,32 +11,29 @@
 
 import {
   Algorithm,
+  type CodedAlgorithm,
   Compression,
   CompressionError,
-  defaultAlgorithm,
-  make as makeCompression,
-  type Options,
+  type Frame,
+  make,
 } from "@trajs/utils/Compression";
 import { deflateSync, gunzipSync, gzipSync, inflateSync, zstdCompress, zstdDecompress } from "bun";
 import { Effect, Layer, Stream } from "effect";
 
-/**
- * The algorithms of the codecs: every algorithm except `None`.
- */
-type BunAlgorithm = Exclude<Algorithm, typeof Algorithm.enums.None>;
+/** A Bun codec: one whole buffer in, one frame out. */
+type Whole = (bytes: Uint8Array) => Uint8Array | Promise<Uint8Array>;
 
-const compressors: Record<BunAlgorithm, (bytes: Uint8Array) => Uint8Array | Promise<Uint8Array>> = {
+const compressors: Record<CodedAlgorithm, Whole> = {
   [Algorithm.enums.Deflate]: deflateSync,
   [Algorithm.enums.Gzip]: gzipSync,
   [Algorithm.enums.Zstd]: zstdCompress,
 };
 
-const decompressors: Record<BunAlgorithm, (bytes: Uint8Array) => Uint8Array | Promise<Uint8Array>> =
-  {
-    [Algorithm.enums.Deflate]: inflateSync,
-    [Algorithm.enums.Gzip]: gunzipSync,
-    [Algorithm.enums.Zstd]: zstdDecompress,
-  };
+const decompressors: Record<CodedAlgorithm, Whole> = {
+  [Algorithm.enums.Deflate]: inflateSync,
+  [Algorithm.enums.Gzip]: gunzipSync,
+  [Algorithm.enums.Zstd]: zstdDecompress,
+};
 
 /** A thrown codec value, as a {@link CompressionError}. */
 const refused = (cause: unknown): CompressionError => new CompressionError({ cause });
@@ -60,35 +57,18 @@ const held = (chunks: ReadonlyArray<Uint8Array>): Uint8Array => {
  * Bun states its codecs as whole-buffer calls, so the chunks are held while the
  * frame is written or read.
  */
-const carried = <E, R>(
-  whole: (bytes: Uint8Array) => Uint8Array | Promise<Uint8Array>,
-  bytes: Stream.Stream<Uint8Array, E, R>,
-): Stream.Stream<Uint8Array, E | CompressionError, R> =>
-  bytes.pipe(
-    Stream.runCollect,
-    Effect.flatMap((chunks) =>
-      // A synchronous codec throws on a bad frame, so the result is awaited either
-      // way.
-      Effect.tryPromise({ try: async () => whole(held(chunks)), catch: refused }),
-    ),
-    Stream.fromEffect,
-  );
-
-/**
- * One direction of a frame as Bun states it.
- *
- * The call states the codec, and `None` reads or writes no frame.
- */
-const frame =
-  (codecs: Record<BunAlgorithm, (bytes: Uint8Array) => Uint8Array | Promise<Uint8Array>>) =>
-  (options?: Options) =>
-  <E, R>(
-    bytes: Stream.Stream<Uint8Array, E, R>,
-  ): Stream.Stream<Uint8Array, E | CompressionError, R> => {
-    const algorithm = options?.algorithm ?? defaultAlgorithm;
-
-    return algorithm === Algorithm.enums.None ? bytes : carried(codecs[algorithm], bytes);
-  };
+const carried =
+  (whole: Whole): Frame =>
+  (bytes) =>
+    bytes.pipe(
+      Stream.runCollect,
+      Effect.flatMap((chunks) =>
+        // A synchronous codec throws on a bad frame, so the result is awaited
+        // either way.
+        Effect.tryPromise({ try: async () => whole(held(chunks)), catch: refused }),
+      ),
+      Stream.fromEffect,
+    );
 
 /**
  * The compression of a Bun program: the codecs of Bun.
@@ -100,7 +80,7 @@ const frame =
  *
  * **Details**
  *
- * Every algorithm is available, and each call states its own ({@link Options}).
+ * Every algorithm is available, and each call states its own (`Compression.Options`).
  * An omitted algorithm means zstd, the historical frame. `None` stores the parts
  * unwrapped.
  *
@@ -117,5 +97,8 @@ const frame =
  */
 export const layer: Layer.Layer<Compression> = Layer.succeed(
   Compression,
-  makeCompression({ compress: frame(compressors), decompress: frame(decompressors) }),
+  make({
+    compress: (algorithm) => carried(compressors[algorithm]),
+    decompress: (algorithm) => carried(decompressors[algorithm]),
+  }),
 );

@@ -3,9 +3,10 @@
  *
  * {@link StreamHash.digest} reads the digest of one stream.
  * {@link StreamHash.start} reads one of a sequence fed to it over several writes.
- * A platform package supplies the codecs.
+ * A platform package supplies the running digests of its runtime through
+ * {@link make}.
  * `@trajs/platform-node` and `@trajs/platform-bun` use `node:crypto` and the binding
- * `@node-rs/xxhash`, and `@trajs/platform-browser` uses WebCrypto, `@noble/hashes` and the
+ * `@node-rs/xxhash`, and `@trajs/platform-browser` uses `@noble/hashes` and the
  * WebAssembly module of `@node-rs/xxhash-wasm32-wasi`.
  *
  * The algorithm is stated per call ({@link Options}).
@@ -16,6 +17,8 @@
  */
 
 import { Context, Schema, Sink } from "effect";
+
+import { digestOf, startOf } from "#/internal/stream-hash.ts";
 
 /**
  * The digest algorithm of a trajectory's parts.
@@ -53,16 +56,26 @@ export type Algorithm = Schema.Schema.Type<typeof Algorithm>;
  *
  * **When to use**
  *
- * Use to state the algorithm of {@link StreamHash.digest}.
+ * Use to state the algorithm and the digest bytes of {@link StreamHash.digest}.
  *
  * **Details**
  *
- * `algorithm` holds the algorithm ({@link Algorithm}). {@link defaultAlgorithm}
- * applies when `algorithm` is omitted.
+ * - `algorithm` holds the algorithm ({@link Algorithm}). {@link defaultAlgorithm}
+ *   applies when `algorithm` is omitted.
+ * - `length` holds the digest bytes to read, as a count from 1 to the bytes of
+ *   the algorithm. Every byte of the algorithm applies when `length` is omitted.
  *
  * One hash handles every algorithm of its platform. State `algorithm` per call to
  * digest different trajectories. The metadata records the algorithm of a
- * trajectory.
+ * trajectory, not the `length` of a call.
+ *
+ * **Gotchas**
+ *
+ * A `length` beyond the bytes of the algorithm raises a `RangeError` when the call
+ * is made, rather than reading a shorter digest.
+ *
+ * A digest shorter than its algorithm is the leading bytes of the whole digest.
+ * BLAKE2b reads shorter digests of its own, which differ from that.
  *
  * @see {@link Algorithm} for the available digests.
  * @stability stable
@@ -70,6 +83,7 @@ export type Algorithm = Schema.Schema.Type<typeof Algorithm>;
  */
 export interface Options {
   readonly algorithm?: Algorithm;
+  readonly length?: number;
 }
 
 /**
@@ -109,8 +123,8 @@ export const defaultAlgorithm: Algorithm = Algorithm.enums.Xxh64;
  * **Details**
  *
  * - `update` feeds bytes to the digest, and may be called as often as wanted.
- * - `digest` reads the digest of the bytes fed so far, as the bytes of its
- *   algorithm.
+ * - `digest` reads the digest of the bytes fed so far, as the digest bytes the
+ *   call states ({@link Options.length}).
  *
  * Each running digest keeps its own state, and bytes fed to one never reach
  * another. No running digest of a layer fails.
@@ -133,7 +147,7 @@ export interface Hashing {
   readonly update: (bytes: Uint8Array) => void;
 
   /**
-   * Reads the digest of the bytes fed so far, as the bytes of its algorithm.
+   * Reads the digest of the bytes fed so far, as the digest bytes the call states.
    *
    * {@link StreamHash.digest} states the same digest as the lowercase hex
    * characters a recorded digest is written with.
@@ -152,7 +166,8 @@ export interface Hashing {
  *   are fed to over several writes.
  *
  * {@link defaultAlgorithm} applies when no algorithm is given. Both forms read
- * the same digest of the same bytes, so what one writes the other reads.
+ * the same digest of the same bytes under the same options, so what one writes the
+ * other reads.
  *
  * The sink reads the format bytes, so every platform hashes the same part bytes.
  * Each run keeps its own state, and two runs share nothing. No hash of a layer
@@ -195,3 +210,54 @@ export const StreamHash: Context.Service<StreamHash, StreamHash> = Context.Servi
   StreamHash,
   StreamHash
 >()("trajs/utils/StreamHash");
+
+/**
+ * The digests a platform reads, one running digest per algorithm.
+ *
+ * **When to use**
+ *
+ * Use in a platform package, to state what its runtime reads a digest with.
+ *
+ * **Details**
+ *
+ * `start` begins the running digest of the algorithm it is given ({@link Hashing}).
+ * A codec states no options: what a call reads is resolved where {@link make}
+ * reads it.
+ *
+ * @see {@link make} for the service it builds.
+ * @stability stable
+ * @category models
+ */
+export interface Codec {
+  readonly start: (algorithm: Algorithm) => Hashing;
+}
+
+/**
+ * The hash of a platform's codecs as a service.
+ *
+ * **When to use**
+ *
+ * Use in a platform package to provide {@link StreamHash} over the digests its
+ * runtime reads.
+ *
+ * **Details**
+ *
+ * Both forms are derived here from the codec ({@link Codec}). The options of a
+ * call are resolved ({@link Options}), the digest is cut to the bytes the call
+ * states, and it is read as lowercase hex characters. A platform therefore states
+ * one running digest per algorithm, and nothing of the options.
+ *
+ * **Gotchas**
+ *
+ * The options are read where a call is made, so a `length` beyond the bytes of the
+ * algorithm raises a `RangeError` at the call, rather than through the sink.
+ *
+ * @see {@link Codec} for what a platform states.
+ * @see {@link StreamHash} for the service this builds.
+ * @stability stable
+ * @category constructors
+ */
+export const make = (codec: Codec): StreamHash => ({
+  digest: (options?: Options) => digestOf(codec, options),
+  start: (options?: Options) => startOf(codec, options),
+});

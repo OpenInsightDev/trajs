@@ -2,7 +2,7 @@
  * The frame of a trajectory's parts.
  *
  * A {@link Compression} writes and reads one frame. The exchange runs over a
- * compression, so a platform package supplies the codecs.
+ * compression, so a platform package supplies the codecs ({@link make}).
  * `@trajs/platform-node` uses `node:zlib` streams.
  * `@trajs/platform-browser` uses the browser codecs. A frame written on either
  * reads back on both, in every algorithm.
@@ -18,7 +18,7 @@
 
 import { Context, Data, Effect, Schema, Stream } from "effect";
 
-import { held } from "#/internal/compression.ts";
+import { compressionOf } from "#/internal/compression.ts";
 
 /**
  * A failure to write or read a frame.
@@ -223,30 +223,92 @@ export const Compression: Context.Service<Compression, Compression> = Context.Se
 >()("trajs/utils/Compression");
 
 /**
- * The compression of a platform's codec as a service.
+ * The algorithms a codec states: every algorithm except `None`.
  *
  * **When to use**
  *
- * Use in a platform package to provide {@link Compression} over the codecs that
- * platform states.
+ * Use in a platform package, to state the frame of each algorithm its runtime
+ * writes and reads.
  *
  * **Details**
  *
- * `compress` and `decompress` carry a frame over the chunks of a stream.
- * {@link Compression.compressBytes} and {@link Compression.decompressBytes} are
- * derived from them. A platform therefore states its codec once, as the stream
- * forms.
+ * `None` writes no frame, so it needs no codec and is not among these. Every
+ * other algorithm of {@link Algorithm} is.
  *
+ * @see {@link Codec} for where a codec states them.
+ * @stability stable
+ * @category models
+ */
+export type CodedAlgorithm = Exclude<Algorithm, typeof Algorithm.enums.None>;
+
+/**
+ * One direction of a frame, from the chunks of a stream to the chunks of the frame.
+ *
+ * **When to use**
+ *
+ * Use to state what a codec writes or reads an algorithm with ({@link Codec}), or to carry
+ * a stream through a codec of your own.
+ *
+ * **Details**
+ *
+ * A chunk of a frame is a `Uint8Array`.
+ * A codec may hold the chunks of a stream where its runtime states only whole-buffer calls.
+ *
+ * A codec failure is {@link CompressionError}, and a failed source passes through untouched.
+ *
+ * @see {@link Compression.compress} for the same direction with the options of a call.
+ * @stability stable
+ * @category models
+ */
+export type Frame = <E, R>(
+  bytes: Stream.Stream<Uint8Array, E, R>,
+) => Stream.Stream<Uint8Array, E | CompressionError, R>;
+
+/**
+ * The frames a platform writes and reads, one per algorithm.
+ *
+ * **When to use**
+ *
+ * Use in a platform package, to state what its runtime carries a frame with.
+ *
+ * **Details**
+ *
+ * - `compress` states the codec that writes the frame of an algorithm.
+ * - `decompress` states the codec that reads one.
+ *
+ * A codec states no options and no `None` ({@link CodedAlgorithm}). What a call states, and
+ * the bytes passed through untouched, are read where {@link make} resolves it.
+ *
+ * @see {@link make} for the service it builds.
+ * @see {@link Frame} for what a codec states of one algorithm.
+ * @stability stable
+ * @category models
+ */
+export interface Codec {
+  readonly compress: (algorithm: CodedAlgorithm) => Frame;
+  readonly decompress: (algorithm: CodedAlgorithm) => Frame;
+}
+
+/**
+ * The compression of a platform's codecs as a service.
+ *
+ * **When to use**
+ *
+ * Use in a platform package to provide {@link Compression} over the frames its runtime writes
+ * and reads.
+ *
+ * **Details**
+ *
+ * The options of a call are resolved here ({@link Options}), and `None` passes the chunks
+ * through untouched. {@link Compression.compressBytes} and
+ * {@link Compression.decompressBytes} carry one buffer through the same frame.
+ *
+ * A platform therefore states one codec per algorithm ({@link Codec}), and nothing of the
+ * options.
+ *
+ * @see {@link Codec} for what a platform states.
  * @see {@link Compression} for the service this builds.
  * @stability stable
  * @category constructors
  */
-export const make = (codec: {
-  readonly compress: Compression["compress"];
-  readonly decompress: Compression["decompress"];
-}): Compression => ({
-  compress: codec.compress,
-  compressBytes: held(codec.compress),
-  decompress: codec.decompress,
-  decompressBytes: held(codec.decompress),
-});
+export const make = (codec: Codec): Compression => compressionOf(codec);

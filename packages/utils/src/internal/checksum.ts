@@ -1,11 +1,14 @@
 /**
- * The CRC-32 of a byte sequence, read from tables a slice at a time, as
- * `Checksum.make` provides it.
+ * The CRC-32 of a byte sequence, read from tables a slice at a time, and the
+ * checksum of one call as `Checksum.make` derives it from the codec of a
+ * platform.
  *
  * `@noble/hashes` states no CRC, so this package carries the tables of the
  * algorithm. A slice covers eight bytes rather than one, so a block is checked
  * at a cost small enough to read it beside every block.
  */
+
+import { Algorithm, type Codec, type Options, defaultAlgorithm } from "#/Checksum.ts";
 
 /**
  * The polynomial of CRC-32, 0x04c11db7, reflected.
@@ -82,4 +85,25 @@ export const crc32 = (bytes: Uint8Array): number => {
   }
 
   return (crc ^ 0xffffffff) >>> 0;
+};
+
+/** The checksum of each algorithm, read from the tables this package carries. */
+const portable = (algorithm: Algorithm): ((bytes: Uint8Array) => number) => {
+  switch (algorithm) {
+    case Algorithm.enums.Crc32:
+      return crc32;
+  }
+};
+
+/**
+ * The checksum of one call, as `Checksum.make` derives it from the codec of a
+ * platform.
+ */
+export const ofFrom = (
+  codec: Codec | undefined,
+  options?: Options,
+): ((bytes: Uint8Array) => number) => {
+  const algorithm = options?.algorithm ?? defaultAlgorithm;
+
+  return codec?.of(algorithm) ?? portable(algorithm);
 };

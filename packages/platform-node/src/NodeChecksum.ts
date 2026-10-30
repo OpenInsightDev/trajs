@@ -11,7 +11,7 @@
 
 import * as zlib from "node:zlib";
 
-import { Algorithm, Checksum, defaultAlgorithm, type Options, make } from "@trajs/utils/Checksum";
+import { Algorithm, Checksum, type Options, make } from "@trajs/utils/Checksum";
 import { Layer } from "effect";
 
 /**
@@ -22,8 +22,9 @@ import { Layer } from "effect";
  */
 const native: ((bytes: Uint8Array) => number) | undefined = zlib.crc32;
 
-/** The checksum of the tables this package ships, for what a runtime does not read. */
-const portable = make();
+const checksum: Checksum = make({
+  of: (algorithm) => (algorithm === Algorithm.enums.Crc32 ? native : undefined),
+});
 
 /**
  * Reads the checksum of a block with `node:zlib`.
@@ -44,13 +45,7 @@ const portable = make();
  * @stability experimental
  * @category combinators
  */
-export const of = (options?: Options): ((bytes: Uint8Array) => number) => {
-  const algorithm = options?.algorithm ?? defaultAlgorithm;
-  const codec = algorithm === Algorithm.enums.Crc32 ? native : undefined;
-  const reading = portable.of({ algorithm });
-
-  return codec === undefined ? reading : (bytes) => codec(bytes);
-};
+export const of = (options?: Options): ((bytes: Uint8Array) => number) => checksum.of(options);
 
 /**
  * The checksum of a Node program: CRC-32 read by `node:zlib`.
@@ -66,11 +61,11 @@ export const of = (options?: Options): ((bytes: Uint8Array) => number) => {
  * tables of `@trajs/utils`, and it reads the same number, so a trajectory checked
  * on Node is checked by a page as well.
  *
- * An omitted algorithm means CRC-32 ({@link defaultAlgorithm}). A runtime without
+ * An omitted algorithm means CRC-32 ({@link Algorithm}). A runtime without
  * `zlib.crc32` reads the checksum through those tables.
  *
  * @see {@link Checksum} for the provided service.
  * @stability experimental
  * @category layers
  */
-export const layer: Layer.Layer<Checksum> = Layer.succeed(Checksum, { of });
+export const layer: Layer.Layer<Checksum> = Layer.succeed(Checksum, checksum);
