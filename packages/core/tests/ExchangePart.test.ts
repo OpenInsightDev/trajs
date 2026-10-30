@@ -1,8 +1,10 @@
 /**
- * The stored form of every part kind, as `internal/exchange/part.ts` states it.
- * Each schema, and all of them read as one union, must have a layout
- * `SchemaBinary` compiles, and a part read back must be the part written.
+ * The stored form of every kind, as `internal/exchange/part.ts` states it: the
+ * meta a reader reads with no config, the body a kit decodes, and the part the
+ * two compose. Every schema, and the metas as one union, must have a layout
+ * `SchemaBinary` compiles, and a value read back must be the value written.
  */
+
 import {
   Event,
   EventKit,
@@ -16,6 +18,7 @@ import {
   Trajectory,
 } from "@trajs/core";
 import * as Config from "@trajs/core/Config";
+import { StreamHash } from "@trajs/utils";
 import { DateTime, Effect, Schema, Stream } from "effect";
 import { SchemaBinary } from "effect/encoding";
 import * as uuid from "uuid";
@@ -23,10 +26,26 @@ import { expect, it } from "vite-plus/test";
 
 import {
   EventPart,
+  EventPartBody,
+  EventPartMeta,
+  FooterPartBody,
+  FooterPartMeta,
+  HeaderPartBody,
+  HeaderPartMeta,
+  headerPartBodyOf,
+  Meta,
   MetricPart,
+  MetricPartBody,
+  MetricPartMeta,
   PromptPart,
+  PromptPartBody,
+  PromptPartMeta,
   ResponsePart,
+  ResponsePartBody,
+  ResponsePartMeta,
   SessionPart,
+  SessionPartBody,
+  SessionPartMeta,
 } from "#/internal/exchange/part.ts";
 import { checkBinaryLayout } from "#/internal/schema.ts";
 
@@ -112,6 +131,41 @@ const stored = {
   metric: MetricPart(metrickit),
 };
 
+/** The meta a metric part states: the tag and the attach list its metric holds. */
+const metricMeta = MetricPartMeta.make({
+  metricTag: "test/tokens",
+  attach: [sessionId],
+  timestamp: at,
+});
+
+/** Every kind's meta, written from its part, and the identity it decodes to. */
+const metas = [
+  [session, SessionPartMeta.make({ uuid: sessionId, type: Trajectory.mainSession })],
+  [
+    subSession,
+    SessionPartMeta.make({
+      uuid: subSession.uuid,
+      type: Trajectory.subSession("child", { fork: sessionId }),
+    }),
+  ],
+  [prompt, PromptPartMeta.make({ uuid: prompt.uuid, timestamp: at })],
+  [response, ResponsePartMeta.make({ uuid: response.uuid, timestamp: at })],
+  [event, EventPartMeta.make({ uuid: event.uuid, timestamp: at })],
+  [metricMeta, metricMeta],
+  [HeaderPartMeta.make({}), HeaderPartMeta.make({})],
+  [FooterPartMeta.make({}), FooterPartMeta.make({})],
+] as const;
+
+/** Reads one region's value back from the bytes that hold it. */
+const region =
+  <A, E>(codec: Schema.Codec<A, E, never, never>) =>
+  (value: A): A => {
+    const binary = SchemaBinary.toCodec(codec);
+    const bytes = Schema.encodeSync(binary)(value);
+
+    return Schema.decodeSync(binary)(bytes);
+  };
+
 /** Every stored kind as one codec, which is what a frame reader derives. */
 const Part = Schema.Union([
   stored.prompt,
@@ -121,14 +175,73 @@ const Part = Schema.Union([
   stored.metric,
 ]);
 
-it("lays out the stored form of every part kind", async () => {
-  await Effect.forEach(Object.values(stored), (schema) => checkBinaryLayout(schema), {
-    discard: true,
-  }).pipe(Effect.runPromise);
+it("lays out every stored meta, body, and part", async () => {
+  await Effect.forEach(
+    [
+      PromptPartMeta,
+      SessionPartMeta,
+      ResponsePartMeta,
+      EventPartMeta,
+      MetricPartMeta,
+      HeaderPartMeta,
+      FooterPartMeta,
+      PromptPartBody(config.extrakit),
+      SessionPartBody(config.extrakit),
+      ResponsePartBody(config.toolkit, config.extrakit),
+      EventPartBody(config.eventkit),
+      MetricPartBody(metrickit),
+      HeaderPartBody,
+      FooterPartBody,
+      ...Object.values(stored),
+    ] satisfies ReadonlyArray<Schema.Constraint>,
+    (schema) => checkBinaryLayout(schema),
+    { discard: true },
+  ).pipe(Effect.runPromise);
 });
 
-it("lays out one union of every stored part kind", async () => {
-  await checkBinaryLayout(Part).pipe(Effect.runPromise);
+it("lays out one union of every stored meta", async () => {
+  await checkBinaryLayout(Meta).pipe(Effect.runPromise);
+});
+
+it("reads every meta as the identity of its part, with no config", () => {
+  const codec = SchemaBinary.toCodec(Meta);
+
+  for (const [written, expected] of metas) {
+    const bytes = Schema.encodeSync(codec)(written);
+
+    expect(Schema.decodeSync(codec)(bytes)).toEqual(expected);
+  }
+});
+
+it("reads every body as the value its kit decodes", () => {
+  expect(region(PromptPartBody(config.extrakit))(prompt)).toEqual({
+    messages: prompt.messages,
+    extra: prompt.extra,
+  });
+  expect(region(SessionPartBody(config.extrakit))(session)).toEqual({ extra: session.extra });
+  expect(region(ResponsePartBody(config.toolkit, config.extrakit))(response)).toEqual({
+    response: response.response,
+    extra: response.extra,
+  });
+  expect(region(EventPartBody(config.eventkit))(event)).toEqual({ event: event.event });
+
+  // The body states the result alone, without the attach list the part keeps in
+  // its metric: the body's schema reads the result and leaves the list out.
+  const body = region(MetricPartBody(metrickit))({ data: metric.metric.data });
+
+  expect(body.data).toHaveProperty("output", { count: 3 });
+  expect(body.data).not.toHaveProperty("attach");
+});
+
+it("reads the structural bodies of a file", () => {
+  // The kits a reader holds before it decodes a body survive the header's region.
+  const header = headerPartBodyOf(config, { version: "0.0.0", hash: StreamHash.defaultAlgorithm });
+
+  expect(region(HeaderPartBody)(header)).toEqual(header);
+
+  const chunks = [{ len: 64, metaLen: 9, count: 1 }];
+
+  expect(region(FooterPartBody)({ chunks })).toEqual({ chunks });
 });
 
 it("reads back every stored part as the part it was written from", () => {
@@ -141,18 +254,30 @@ it("reads back every stored part as the part it was written from", () => {
   }
 });
 
+it("splits a metric part into the meta and the body a frame holds", () => {
+  const encoded = Schema.encodeSync(stored.metric)(metric);
+
+  // The meta states the tag and the attach list the part keeps in its metric.
+  expect(encoded.metricTag).toBe("test/tokens");
+  expect(encoded.attach).toEqual([uuid.parse(sessionId)]);
+  expect(encoded.timestamp).toBe(DateTime.toEpochMillis(at));
+
+  // The body states the result without that list.
+  expect(encoded.data).toHaveProperty("output", { count: 3 });
+  expect(encoded.data).not.toHaveProperty("attach");
+});
+
 it("reads an extra as the schema its declaration states", () => {
   const written = part.prompt(Prompt.make("hello"), {
     timestamp: at,
     "test/blob": { bytes: new Uint8Array([1, 2]), at },
   });
 
-  const codec = SchemaBinary.toCodec(stored.prompt);
-  const read: typeof written = Schema.decodeSync(codec)(Schema.encodeSync(codec)(written));
+  const { extra } = region(PromptPartBody(config.extrakit))(written);
 
-  expect(read.extra["test/blob"]?.bytes).toBeInstanceOf(Uint8Array);
-  expect(DateTime.isDateTime(read.extra["test/blob"]?.at)).toBe(true);
-  expect(read).toEqual(written);
+  expect(extra["test/blob"]?.bytes).toBeInstanceOf(Uint8Array);
+  expect(DateTime.isDateTime(extra["test/blob"]?.at)).toBe(true);
+  expect(extra).toEqual(written.extra);
 });
 
 it("states each part in the spellings a chunk holds", () => {

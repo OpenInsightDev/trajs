@@ -1,5 +1,6 @@
 import { StreamHash } from "@trajs/utils";
 import { Effect, Match, Schema, SchemaGetter } from "effect";
+import type { DateTime } from "effect";
 import type { NonEmptyReadonlyArray } from "effect/Array";
 
 import type * as Config from "#/Config.ts";
@@ -16,10 +17,22 @@ import * as Response from "#/Response.ts";
 import * as Toolkit from "#/Toolkit.ts";
 import * as Trajectory from "#/Trajectory.ts";
 
-// One tagged struct per kind, in the spellings a chunk holds them.
+// Every frame holds a meta and a body. The meta is the tag and the identifiers a
+// reader reads with no config, in the spellings that keep a meta region small: a
+// uuid is its 16 bytes, and a moment its epoch. The body is what a kit decodes. A
+// kind states its fields once, as the two halves a chunk holds, and the part the
+// two compose.
 
-export interface HeaderPartEncoded {
+export interface HeaderPartMetaEncoded {
   _tag: "Header";
+}
+
+// The tag alone: the header is told from a part before either region is read.
+export const HeaderPartMeta: Schema.Codec<HeaderPartMetaEncoded> = Schema.Struct({
+  _tag: Schema.tag("Header"),
+}).annotate({ identifier: "HeaderPartMeta" });
+
+export interface HeaderPartBodyEncoded {
   version: string;
   hash: StreamHash.Algorithm;
   toolkit: Toolkit.ToolkitSchema;
@@ -29,37 +42,44 @@ export interface HeaderPartEncoded {
 }
 
 // The header is alone in the first chunk, so a reader holds the kits before it decodes a body.
-export const HeaderPart: Schema.Codec<HeaderPartEncoded> = Schema.TaggedStruct("Header", {
+export const HeaderPartBody: Schema.Codec<HeaderPartBodyEncoded> = Schema.Struct({
   version: Schema.String,
   hash: StreamHash.Algorithm,
   toolkit: Toolkit.ToolkitSchema,
   eventkit: EventKit.EventKitSchema,
   metrickit: MetricKit.MetricKitSchema,
   extrakit: ExtraKit.ExtraKitSchema,
-}).annotate({ identifier: "HeaderPart" });
+}).annotate({ identifier: "HeaderPartBody" });
 
-export const headerPartOf = (
+export const headerPartBodyOf = (
   config: Config.AnyConfig,
   { version, hash }: { readonly version: string; readonly hash: StreamHash.Algorithm },
-): HeaderPartEncoded =>
-  HeaderPart.make({
-    version,
-    hash,
-    toolkit: Toolkit.encode(config.toolkit),
-    eventkit: EventKit.encode(config.eventkit),
-    metrickit: MetricKit.encode(config.metrickit),
-    extrakit: ExtraKit.encode(config.extrakit),
-  });
+): HeaderPartBodyEncoded => ({
+  version,
+  hash,
+  toolkit: Toolkit.encode(config.toolkit),
+  eventkit: EventKit.encode(config.eventkit),
+  metrickit: MetricKit.encode(config.metrickit),
+  extrakit: ExtraKit.encode(config.extrakit),
+});
 
-export interface FooterPartEncoded {
+export interface FooterPartMetaEncoded {
   _tag: "Footer";
+}
+
+// The tag alone: a walk of a stream stops at the chunk whose meta states it.
+export const FooterPartMeta: Schema.Codec<FooterPartMetaEncoded> = Schema.Struct({
+  _tag: Schema.tag("Footer"),
+}).annotate({ identifier: "FooterPartMeta" });
+
+export interface FooterPartBodyEncoded {
   chunks: ReadonlyArray<ChunkTableEntryEncoded>;
 }
 
 // The footer is alone in the last chunk of a file, so its table locates every data chunk.
-export const FooterPart: Schema.Codec<FooterPartEncoded> = Schema.TaggedStruct("Footer", {
+export const FooterPartBody: Schema.Codec<FooterPartBodyEncoded> = Schema.Struct({
   chunks: Schema.Array(ChunkTableEntry),
-}).annotate({ identifier: "FooterPart" });
+}).annotate({ identifier: "FooterPartBody" });
 
 // An extra read as `Schema.Unknown` would store bytes and moments as JSON text.
 const extraField = <K extends ExtraKit.Any, P extends Extra.Part>(extrakit: K, part: P) =>
@@ -78,17 +98,33 @@ export interface PromptPartBodyEncoded {
   extra?: Extra.ExtraRecordEncoded<ExtraKit.Extras<ExtraKit.Any>, "prompt">;
 }
 
+const promptMetaFields = {
+  _tag: Schema.tag("Prompt"),
+  uuid: UuidFromByte,
+  sessionId: Schema.optional(Schema.String),
+  timestamp: Schema.optional(TimestampInt),
+  startTimestamp: Schema.optional(TimestampInt),
+};
+
+export const PromptPartMeta: Schema.Codec<Trajectory.PromptMeta, PromptPartMetaEncoded> =
+  Schema.Struct(promptMetaFields).annotate({ identifier: "PromptPartMeta" });
+
+const promptBodyFields = <K extends ExtraKit.Any>(extrakit: K) => ({
+  messages: Prompt.Message.pipe(Schema.Array, Schema.mutable),
+  extra: extraField(extrakit, "prompt"),
+});
+
+export const PromptPartBody = <K extends ExtraKit.Any>(
+  extrakit: K,
+): Schema.Codec<Trajectory.PromptBody<K>, PromptPartBodyEncoded> =>
+  Schema.Struct(promptBodyFields(extrakit)).annotate({ identifier: "PromptPartBody" });
+
 export const PromptPart = <K extends ExtraKit.Any>(
   extrakit: K,
 ): Schema.Codec<Trajectory.PromptPart<K>, PromptPartMetaEncoded & PromptPartBodyEncoded> =>
-  Schema.TaggedStruct("Prompt", {
-    uuid: UuidFromByte,
-    sessionId: Schema.optional(Schema.String),
-    timestamp: Schema.optional(TimestampInt),
-    startTimestamp: Schema.optional(TimestampInt),
-    messages: Prompt.Message.pipe(Schema.Array, Schema.mutable),
-    extra: extraField(extrakit, "prompt"),
-  }).annotate({ identifier: "PromptPart" });
+  Schema.Struct({ ...promptMetaFields, ...promptBodyFields(extrakit) }).annotate({
+    identifier: "PromptPart",
+  });
 
 export interface SessionPartMetaEncoded {
   _tag: "Session";
@@ -125,14 +161,31 @@ const SessionType = Schema.Union([MainSessionEncoded, SubSessionEncoded]).pipe(
   }),
 );
 
+// The declaration alone: a reader draws a session tree from what this states.
+const sessionMetaFields = {
+  _tag: Schema.tag("Session"),
+  uuid: UuidFromByte,
+  type: SessionType,
+};
+
+export const SessionPartMeta: Schema.Codec<Trajectory.SessionMeta, SessionPartMetaEncoded> =
+  Schema.Struct(sessionMetaFields).annotate({ identifier: "SessionPartMeta" });
+
+const sessionBodyFields = <K extends ExtraKit.Any>(extrakit: K) => ({
+  extra: extraField(extrakit, "session"),
+});
+
+export const SessionPartBody = <K extends ExtraKit.Any>(
+  extrakit: K,
+): Schema.Codec<Trajectory.SessionBody<K>, SessionPartBodyEncoded> =>
+  Schema.Struct(sessionBodyFields(extrakit)).annotate({ identifier: "SessionPartBody" });
+
 export const SessionPart = <K extends ExtraKit.Any>(
   extrakit: K,
 ): Schema.Codec<Trajectory.SessionPart<K>, SessionPartMetaEncoded & SessionPartBodyEncoded> =>
-  Schema.TaggedStruct("Session", {
-    uuid: UuidFromByte,
-    type: SessionType,
-    extra: extraField(extrakit, "session"),
-  }).annotate({ identifier: "SessionPart" });
+  Schema.Struct({ ...sessionMetaFields, ...sessionBodyFields(extrakit) }).annotate({
+    identifier: "SessionPart",
+  });
 
 export interface ResponsePartMetaEncoded {
   _tag: "Response";
@@ -154,6 +207,38 @@ const responsePartsOf = <T extends Toolkit.Any>(toolkit: T) =>
 
 type ResponsePartsOf<T extends Toolkit.Any> = ReturnType<typeof responsePartsOf<T>>;
 
+const responseMetaFields = {
+  _tag: Schema.tag("Response"),
+  uuid: UuidFromByte,
+  sessionId: Schema.optional(Schema.String),
+  timestamp: TimestampInt,
+  startTimestamp: Schema.optional(TimestampInt),
+};
+
+export const ResponsePartMeta: Schema.Codec<Trajectory.ResponseMeta, ResponsePartMetaEncoded> =
+  Schema.Struct(responseMetaFields).annotate({ identifier: "ResponsePartMeta" });
+
+const responseBodyFields = <T extends Toolkit.Any, K extends ExtraKit.Any>(
+  toolkit: T,
+  extrakit: K,
+) => ({
+  response: responsePartsOf(toolkit),
+  extra: extraField(extrakit, "response"),
+});
+
+export const ResponsePartBody = <T extends Toolkit.Any, K extends ExtraKit.Any>(
+  toolkit: T,
+  extrakit: K,
+): Schema.Codec<
+  Trajectory.ResponseBody<T, K>,
+  ResponsePartBodyEncoded,
+  Schema.Codec.DecodingServices<ResponsePartsOf<T>>,
+  Schema.Codec.EncodingServices<ResponsePartsOf<T>>
+> =>
+  Schema.Struct(responseBodyFields(toolkit, extrakit)).annotate({
+    identifier: "ResponsePartBody",
+  });
+
 export const ResponsePart = <T extends Toolkit.Any, K extends ExtraKit.Any>(
   toolkit: T,
   extrakit: K,
@@ -163,14 +248,9 @@ export const ResponsePart = <T extends Toolkit.Any, K extends ExtraKit.Any>(
   Schema.Codec.DecodingServices<ResponsePartsOf<T>>,
   Schema.Codec.EncodingServices<ResponsePartsOf<T>>
 > =>
-  Schema.TaggedStruct("Response", {
-    uuid: UuidFromByte,
-    sessionId: Schema.optional(Schema.String),
-    timestamp: TimestampInt,
-    startTimestamp: Schema.optional(TimestampInt),
-    response: responsePartsOf(toolkit),
-    extra: extraField(extrakit, "response"),
-  }).annotate({ identifier: "ResponsePart" });
+  Schema.Struct({ ...responseMetaFields, ...responseBodyFields(toolkit, extrakit) }).annotate({
+    identifier: "ResponsePart",
+  });
 
 export interface EventPartMetaEncoded {
   _tag: "Event";
@@ -185,6 +265,30 @@ export interface EventPartBodyEncoded {
   event: { _tag: string; data: unknown };
 }
 
+const eventMetaFields = {
+  _tag: Schema.tag("Event"),
+  uuid: UuidFromByte,
+  sessionId: Schema.optional(Schema.String),
+  timestamp: TimestampInt,
+  startTimestamp: Schema.optional(TimestampInt),
+};
+
+export const EventPartMeta: Schema.Codec<Trajectory.EventMeta, EventPartMetaEncoded> =
+  Schema.Struct(eventMetaFields).annotate({ identifier: "EventPartMeta" });
+
+const eventBodyFields = <K extends EventKit.Any>(eventkit: K) => ({
+  event: Event.EventParts(eventkit),
+});
+
+export const EventPartBody = <K extends EventKit.Any>(
+  eventkit: K,
+): Schema.Codec<
+  Trajectory.EventBody<K>,
+  EventPartBodyEncoded,
+  Schema.Codec.DecodingServices<ReturnType<typeof Event.EventParts<K>>>,
+  Schema.Codec.EncodingServices<ReturnType<typeof Event.EventParts<K>>>
+> => Schema.Struct(eventBodyFields(eventkit)).annotate({ identifier: "EventPartBody" });
+
 export const EventPart = <K extends EventKit.Any>(
   eventkit: K,
 ): Schema.Codec<
@@ -193,13 +297,9 @@ export const EventPart = <K extends EventKit.Any>(
   Schema.Codec.DecodingServices<ReturnType<typeof Event.EventParts<K>>>,
   Schema.Codec.EncodingServices<ReturnType<typeof Event.EventParts<K>>>
 > =>
-  Schema.TaggedStruct("Event", {
-    uuid: UuidFromByte,
-    sessionId: Schema.optional(Schema.String),
-    timestamp: TimestampInt,
-    startTimestamp: Schema.optional(TimestampInt),
-    event: Event.EventParts(eventkit),
-  }).annotate({ identifier: "EventPart" });
+  Schema.Struct({ ...eventMetaFields, ...eventBodyFields(eventkit) }).annotate({
+    identifier: "EventPart",
+  });
 
 export interface MetricPartMetaEncoded {
   _tag: "Metric";
@@ -208,6 +308,30 @@ export interface MetricPartMetaEncoded {
   timestamp?: number;
   startTimestamp?: number;
 }
+
+// The meta of a metric part, which is the one meta that is not a subset of its
+// part: the tag and the attach list are lifted out of the part's metric, so a
+// reader learns what a result attaches to without reading the body, and the part
+// keeps both where it holds them.
+export interface MetricPartMeta {
+  readonly _tag: "Metric";
+  readonly metricTag: string;
+  readonly attach?: NonEmptyReadonlyArray<string>;
+  readonly timestamp?: DateTime.Utc;
+  readonly startTimestamp?: DateTime.Utc;
+}
+
+const metricMetaFields = {
+  _tag: Schema.tag("Metric"),
+  metricTag: Schema.TemplateLiteral([Schema.String, "/", Schema.String]),
+  attach: Schema.optional(Schema.NonEmptyArray(UuidFromByte)),
+  timestamp: Schema.optional(TimestampInt),
+  startTimestamp: Schema.optional(TimestampInt),
+};
+
+export const MetricPartMeta: Schema.Codec<MetricPartMeta, MetricPartMetaEncoded> = Schema.Struct(
+  metricMetaFields,
+).annotate({ identifier: "MetricPartMeta" });
 
 // The results are read with the metric kit, so the field states no type.
 export interface MetricPartBodyEncoded {
@@ -225,17 +349,35 @@ const resultsOf = <K extends MetricKit.Any>(metrickit: K) =>
     ),
   );
 
-// The part's timestamps are stored as epochs, so `TimestampInt` replaces the
-// string schema `Trajectory.MetricMeta` states.
+const metricBodyFields = <K extends MetricKit.Any>(metrickit: K) => ({
+  data: resultsOf(metrickit),
+});
+
+export const MetricPartBody = <K extends MetricKit.Any>(
+  metrickit: K,
+): Schema.Codec<
+  MetricPartBodyEncoded,
+  MetricPartBodyEncoded,
+  Schema.Codec.DecodingServices<ReturnType<typeof Metric.MetricParts<K>>>,
+  Schema.Codec.EncodingServices<ReturnType<typeof Metric.MetricParts<K>>>
+> => Schema.Struct(metricBodyFields(metrickit)).annotate({ identifier: "MetricPartBody" });
+
+// The part's timestamps are moments by the time the transformation reads them, so
+// the epochs are the meta's business alone and this only states where the metric
+// nests.
 const partOf = <K extends MetricKit.Any>(metrickit: K) =>
   Trajectory.MetricPart(metrickit).mapFields((fields) => ({
     ...fields,
-    timestamp: Schema.optional(TimestampInt),
-    startTimestamp: Schema.optional(TimestampInt),
+    timestamp: Schema.optional(Schema.toType(TimestampInt)),
+    startTimestamp: Schema.optional(Schema.toType(TimestampInt)),
   }));
 
-// The tag and attach list nest inside the metric, so a transformation carries
-// the stored fields to it unchanged. `resultsOf` therefore states encoded fields.
+// The two halves are one struct in the stored form, so the split is a view of it.
+// The transformation states what the view cannot: the meta's tag and attach list
+// go into the part's metric, and the body's result comes back out without them.
+const metricPartStored = <K extends MetricKit.Any>(metrickit: K) =>
+  Schema.Struct({ ...metricMetaFields, ...metricBodyFields(metrickit) });
+
 export const MetricPart = <K extends MetricKit.Any>(
   metrickit: K,
 ): Schema.Codec<
@@ -244,13 +386,7 @@ export const MetricPart = <K extends MetricKit.Any>(
   Schema.Codec.DecodingServices<ReturnType<typeof Metric.MetricParts<K>>>,
   Schema.Codec.EncodingServices<ReturnType<typeof Metric.MetricParts<K>>>
 > =>
-  Schema.TaggedStruct("Metric", {
-    metricTag: Schema.TemplateLiteral([Schema.String, "/", Schema.String]),
-    attach: Schema.optional(Schema.NonEmptyArray(UuidFromByte)),
-    timestamp: Schema.optional(Schema.toEncoded(TimestampInt)),
-    startTimestamp: Schema.optional(Schema.toEncoded(TimestampInt)),
-    data: resultsOf(metrickit),
-  })
+  metricPartStored(metrickit)
     .annotate({ identifier: "MetricPart" })
     .pipe(
       Schema.decodeTo(partOf(metrickit), {
@@ -272,3 +408,17 @@ export const MetricPart = <K extends MetricKit.Any>(
         }),
       }),
     );
+
+// Every meta a frame may hold, read with no config: the five kinds a data chunk
+// holds, and the two structural frames a walk stops at.
+export const Meta = Schema.Union([
+  PromptPartMeta,
+  SessionPartMeta,
+  ResponsePartMeta,
+  EventPartMeta,
+  MetricPartMeta,
+  HeaderPartMeta,
+  FooterPartMeta,
+]).annotate({ identifier: "Meta" });
+
+export type Meta = Schema.Schema.Type<typeof Meta>;
