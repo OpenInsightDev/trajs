@@ -4,9 +4,10 @@ import { Schema } from "effect";
 import type * as Config from "#/Config.ts";
 import * as EventKit from "#/EventKit.ts";
 import * as ExtraKit from "#/ExtraKit.ts";
-import type { ExchangePart } from "#/internal/exchange/part.ts";
 import * as MetricKit from "#/MetricKit.ts";
 import * as Toolkit from "#/Toolkit.ts";
+
+export type ExchangePart<Meta, Body> = Readonly<{ meta: Meta; body: Body }>;
 
 // The header is alone in the first chunk.
 // Its meta states the tag alone, and its body names the kits a reader holds
