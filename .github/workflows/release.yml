@@ -1,5 +1,30 @@
 name: Release
 
+# Releases. Three triggers, one publish chain.
+#
+#   push to main            someone merged the Version Packages pull request by
+#                           hand: publish that commit, exactly as before.
+#   schedule                every day at 09:00 Asia/Shanghai the window asks
+#                           whether the newest release is two days old, gates the
+#                           pull request, merges it, and publishes the merge.
+#   workflow_dispatch       the same, on demand; `dry_run` stops before merging.
+#
+# They meet at one condition on `select-mode` and one ref:
+#
+#   if:  !cancelled() && (event == push || merge.sha != '')
+#   ref: merge.sha || github.sha
+#
+# An empty `merge.sha` means "the window was skipped" on a push — publish the
+# triggered commit — and "nothing is due" on a timer — publish nothing. That
+# distinction is why this needs no second workflow, no App token and no PAT.
+#
+# Two invariants must survive refactors:
+#   1. `publish` stays in this file, at the top level. npm trusted publishing
+#      matches the workflow filename recorded in each package's settings, and
+#      with `workflow_call` it validates the *caller's* name instead.
+#   2. The merge keeps using `GITHUB_TOKEN`. A `GITHUB_TOKEN` push starts no
+#      run, which is what stops an automatic merge from publishing twice.
+
 # Publishes the core libraries under `packages/` to npm. The release set comes
 # from `.changeset/config.json`: `fixed` names the six core packages, which share
 # one version, and `ignore` keeps the CLI, the extensions and the UI packages out
@@ -20,25 +45,174 @@ name: Release
 on:
   push:
     branches: [main]
+  # The window decides the date; the push path keeps deciding nothing, because
+  # a merge is a decision someone already made. Same file, so all three paths
+  # share one concurrency group and cannot publish at the same time.
+  schedule:
+    - cron: "0 9 * * *"
+      timezone: "Asia/Shanghai"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: Decide and gate, then stop before merging
+        type: boolean
+        default: false
 
 # Nothing is granted by default; each job asks for what it needs.
 permissions: {}
 
+# `cancel-in-progress` stays false, so a manual merge that just published makes
+# the next timer wait its turn instead of being cancelled: it then finds a
+# release younger than two days and stops at the window.
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
+  window:
+    name: Release window
+    # Only the timer paths decide anything; a push already carries the decision.
+    # The `main` check keeps a dispatch from a branch from merging into `main`:
+    # such a run is green and does nothing, so a `dry_run` is dispatched on
+    # `main` itself.
+    if: >-
+      github.ref == 'refs/heads/main' &&
+      (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      due: ${{ steps.window.outputs.due }}
+      number: ${{ steps.window.outputs.number }}
+      sha: ${{ steps.window.outputs.sha }}
+    steps:
+      - name: Is a release due?
+        id: window
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+
+          pr="$(gh pr list --repo "$GITHUB_REPOSITORY" \
+            --base main --head changeset-release/main --state open \
+            --json number,headRefOid,isDraft \
+            --jq 'map(select(.isDraft | not)) | first // empty')"
+          if [ -z "$pr" ]; then
+            echo "no open Version Packages pull request; nothing to release"
+            echo "due=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          number="$(jq -r .number <<<"$pr")"
+          sha="$(jq -r .headRefOid <<<"$pr")"
+
+          # Newest release across the `fixed` group: they stamp one version and
+          # the API lists them newest first. A publish that failed wrote no
+          # release, so the window retries tomorrow.
+          last="$(gh release list --repo "$GITHUB_REPOSITORY" --limit 1 \
+            --json publishedAt --jq '.[0].publishedAt // empty')"
+          if [ -n "$last" ]; then
+            age_days=$(( ( $(date -u +%s) - $(date -u -d "$last" +%s) ) / 86400 ))
+          else
+            age_days=9999
+          fi
+
+          echo "pull request #$number at $sha; last release ${last:-never} (${age_days}d ago)"
+          if [ "$age_days" -lt 2 ]; then
+            echo "due=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          {
+            echo "due=true"
+            echo "number=$number"
+            echo "sha=$sha"
+          } >> "$GITHUB_OUTPUT"
+
+  gate:
+    name: Pre-merge gate
+    needs: window
+    if: needs.window.outputs.due == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.window.outputs.sha }}
+          persist-credentials: false
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 12.10.1
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 26.11.1
+          package-manager-cache: false
+      - run: pnpm install --frozen-lockfile
+      # The same gate `pack` runs. It stays here because `main` has no branch
+      # protection and no pull_request workflow: without it a broken version
+      # commit would land and stall the publish.
+      - run: pnpm exec vp check
+      - run: pnpm exec vp run -r test --passWithNoTests
+      - run: pnpm exec vp run -r build
+
+  merge:
+    name: Merge Version Packages
+    needs: [window, gate]
+    if: needs.window.outputs.due == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # merging is a contents write
+      pull-requests: read
+    outputs:
+      sha: ${{ steps.merge.outputs.sha }}
+    steps:
+      # `--match-head-commit` refuses if the pull request moved while the gate
+      # ran, so exactly what was tested is what gets merged.
+      - name: Merge the Version Packages pull request
+        id: merge
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ needs.window.outputs.number }}
+          SHA: ${{ needs.window.outputs.sha }}
+          DRY_RUN: ${{ inputs.dry_run }}
+        run: |
+          set -euo pipefail
+          if [ "$DRY_RUN" = "true" ]; then
+            echo "dry run: would merge #$PR at $SHA and publish"
+            exit 0
+          fi
+          gh pr merge "$PR" --repo "$GITHUB_REPOSITORY" \
+            --squash --match-head-commit "$SHA"
+          sha="$(gh pr view "$PR" --repo "$GITHUB_REPOSITORY" \
+            --json mergeCommit --jq '.mergeCommit.oid')"
+          test -n "$sha"
+          echo "merged #$PR as $sha"
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+
   select-mode:
+    # Where the three paths meet. On `push`, `merge` was skipped, so the commit
+    # to release is `github.sha` — the merge someone made by hand. On the timer
+    # paths an empty `merge` output means "nothing to release", never "release
+    # the commit the schedule fired on" (which predates the merge).
+    needs: [merge]
+    if: ${{ !cancelled() && (github.event_name == 'push' || needs.merge.outputs.sha != '') }}
     runs-on: ubuntu-latest
     outputs:
       mode: ${{ steps.select-mode.outputs.mode }}
       tagged-publish-plan-artifact-id: ${{ steps.tagged-publish-plan.outputs.artifact-id }}
+      ref: ${{ steps.commit.outputs.sha }}
     permissions:
       contents: read # check out the repository
     steps:
+      - id: commit
+        run: echo "sha=${{ needs.merge.outputs.sha || github.sha }}" >> "$GITHUB_OUTPUT"
       - uses: actions/checkout@v7
         with:
           persist-credentials: false
+          ref: ${{ steps.commit.outputs.sha }}
       - uses: pnpm/action-setup@v4
         with:
           version: 12.10.1
@@ -89,6 +263,7 @@ jobs:
       - uses: actions/checkout@v7
         with:
           persist-credentials: false
+          ref: ${{ needs.select-mode.outputs.ref }}
       - uses: pnpm/action-setup@v4
         with:
           version: 12.10.1
@@ -112,6 +287,7 @@ jobs:
       - uses: actions/checkout@v7
         with:
           persist-credentials: false
+          ref: ${{ needs.select-mode.outputs.ref }}
       - uses: pnpm/action-setup@v4
         with:
           version: 12.10.1
@@ -129,7 +305,9 @@ jobs:
           publish-plan-artifact-id: ${{ needs.select-mode.outputs.tagged-publish-plan-artifact-id }}
 
   publish:
-    needs: pack
+    # `select-mode` is in `needs` for the commit to check out: `pack` passes
+    # along artifacts, not the ref.
+    needs: [select-mode, pack]
     runs-on: ubuntu-latest
     permissions:
       contents: write # create the release tags and GitHub releases
@@ -138,6 +316,7 @@ jobs:
       - uses: actions/checkout@v7
         with:
           persist-credentials: false
+          ref: ${{ needs.select-mode.outputs.ref }}
       - uses: pnpm/action-setup@v4
         with:
           version: 12.10.1
