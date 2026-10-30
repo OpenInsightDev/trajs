@@ -53,6 +53,10 @@ catalog:
   wrangler: ^4.155.0
 overrides:
   vite@*: "catalog:"
+  # Temporary: `effect` 4.1.0 cannot derive a `SchemaBinary` codec for the AI part
+  # schemas that hold a file (Effect-TS/effect#10186). Drop this and bump the
+  # `effect` catalog entry once a release carries the fix.
+  effect: "https://pkg.pr.new/Effect-TS/effect/effect@e2ea531d241cd848fa1434aedd18e496c6951a51"
 peerDependencyRules:
   allowAny:
     - vite

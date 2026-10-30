@@ -15,7 +15,7 @@ import * as Event from "#/Event.ts";
 import * as EventKit from "#/EventKit.ts";
 import * as Extra from "#/Extra.ts";
 import * as ExtraKit from "#/ExtraKit.ts";
-import { Timestamp, Uuid } from "#/internal/schema.ts";
+import { TimestampString, Uuid } from "#/internal/schema.ts";
 import { attach, uuid } from "#/internal/trajectory.ts";
 import * as Metric from "#/Metric.ts";
 import * as MetricKit from "#/MetricKit.ts";
@@ -48,8 +48,8 @@ const extraField = <K extends ExtraKit.Any, P extends Extra.Part>(extrakit: K, p
 export const PromptMeta = Schema.TaggedStruct("Prompt", {
   sessionId: Schema.optional(Schema.String),
   uuid: Uuid,
-  timestamp: Schema.optional(Timestamp),
-  startTimestamp: Schema.optional(Timestamp),
+  timestamp: Schema.optional(TimestampString),
+  startTimestamp: Schema.optional(TimestampString),
 });
 
 /**
@@ -315,8 +315,8 @@ export type SessionPartEncoded = Schema.Codec.Encoded<ReturnType<typeof SessionP
  * @category schemas
  */
 export const ResponseMeta = Schema.TaggedStruct("Response", {
-  timestamp: Timestamp,
-  startTimestamp: Schema.optional(Timestamp),
+  timestamp: TimestampString,
+  startTimestamp: Schema.optional(TimestampString),
   sessionId: Schema.optional(Schema.String),
   uuid: Uuid,
 });
@@ -466,8 +466,8 @@ export type ResponsePartEncoded = Schema.Codec.Encoded<
  * @category schemas
  */
 export const EventMeta = Schema.TaggedStruct("Event", {
-  timestamp: Timestamp,
-  startTimestamp: Schema.optional(Timestamp),
+  timestamp: TimestampString,
+  startTimestamp: Schema.optional(TimestampString),
   sessionId: Schema.optional(Schema.String),
   uuid: Uuid,
 });
@@ -588,8 +588,8 @@ export type EventPartEncoded = Schema.Codec.Encoded<ReturnType<typeof EventPart<
  * @category schemas
  */
 export const MetricMeta = Schema.TaggedStruct("Metric", {
-  timestamp: Schema.optional(Timestamp),
-  startTimestamp: Schema.optional(Timestamp),
+  timestamp: Schema.optional(TimestampString),
+  startTimestamp: Schema.optional(TimestampString),
 });
 
 /**

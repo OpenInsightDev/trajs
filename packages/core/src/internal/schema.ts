@@ -23,11 +23,11 @@ export const UuidFromByte = UuidByte.pipe(
   ),
 );
 
-export const Timestamp = Schema.DateTimeUtcFromString.pipe(
+export const TimestampString = Schema.DateTimeUtcFromString.pipe(
   Schema.withConstructorDefault(DateTime.now),
 );
 
-export const TimestampEpoch = Schema.DateTimeUtcFromMillis.pipe(
+export const TimestampInt = Schema.DateTimeUtcFromMillis.pipe(
   Schema.withConstructorDefault(DateTime.now),
 );
 
