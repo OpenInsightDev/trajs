@@ -11,7 +11,7 @@
 import { Data, Schema } from "effect";
 
 import type * as ExtraKit from "#/ExtraKit.ts";
-import { documentOf } from "#/internal/schema.ts";
+import { documentOf, requireBinaryLayout } from "#/internal/schema.ts";
 import { PackageMetadata } from "#/Package.ts";
 import { SchemaDocument } from "#/SchemaDocument.ts";
 
@@ -52,6 +52,10 @@ type Fields<
  * Schemas built with `VersionedSchema.make` read historical data.
  * `packageMetadata` is what the declaring package states of itself.
  *
+ * **Gotchas**
+ *
+ * Construction throws a `TrajectoryError` for a schema `SchemaBinary` cannot lay out.
+ *
  * @see {@link make} for building a declaration from its fields.
  * @see {@link makeUnknown} for an extra named without its schemas.
  * @see {@link ExtraKit.make} for collecting declarations.
@@ -66,6 +70,16 @@ export class Extra<
   Response extends Schema.Top = never,
   Session extends Schema.Top = never,
 > extends Data.Class<Fields<Pkg, Id, Prompt, Response, Session>> {
+  constructor(fields: Fields<Pkg, Id, Prompt, Response, Session>) {
+    super(fields);
+
+    for (const schema of [fields.prompt, fields.response, fields.session]) {
+      if (schema !== undefined) {
+        requireBinaryLayout(schema);
+      }
+    }
+  }
+
   get tag(): `${Pkg}/${Id}` {
     return `${this.packageName}/${this.id}`;
   }

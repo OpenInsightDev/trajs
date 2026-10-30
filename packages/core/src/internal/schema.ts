@@ -1,5 +1,8 @@
 import { DateTime, Effect, Schema, SchemaRepresentation, SchemaTransformation } from "effect";
+import { SchemaBinary } from "effect/encoding";
 import * as uuid from "uuid";
+
+import { TrajectoryError } from "#/TrajectoryError.ts";
 
 const bytesOf = (length: number) => Schema.Uint8Array.check(Schema.isBetweenLength(length, length));
 
@@ -37,3 +40,19 @@ export const Chain = bytesOf(32);
 
 export const documentOf = (schema: Schema.Top): Schema.Json =>
   schema.pipe(Schema.toRepresentation, SchemaRepresentation.toJson);
+
+// Every part is written as binary frames, so a schema `SchemaBinary` cannot lay out
+// states no part.
+export const checkBinaryLayout = (
+  schema: Schema.Constraint,
+): Effect.Effect<void, TrajectoryError> =>
+  Effect.try({
+    try: () => SchemaBinary.toCodec(schema),
+    catch: TrajectoryError.binaryLayout,
+  }).pipe(Effect.asVoid);
+
+// A declaration is a value, so the check runs where the declaration is made rather
+// than where a part first writes one.
+export const requireBinaryLayout = (schema: Schema.Constraint): void => {
+  checkBinaryLayout(schema).pipe(Effect.runSync);
+};

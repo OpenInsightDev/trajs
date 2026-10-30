@@ -13,7 +13,7 @@ import type { NonEmptyArray } from "effect/Array";
 
 import type * as Config from "#/Config.ts";
 import { runProducers } from "#/internal/metric.ts";
-import { documentOf } from "#/internal/schema.ts";
+import { documentOf, requireBinaryLayout } from "#/internal/schema.ts";
 import type * as MetricKit from "#/MetricKit.ts";
 import { PackageMetadata } from "#/Package.ts";
 import { SchemaDocument } from "#/SchemaDocument.ts";
@@ -56,6 +56,10 @@ type Fields<
  * Result schemas built with `VersionedSchema.make` read historical results.
  * `packageMetadata` is what the declaring package states of itself.
  *
+ * **Gotchas**
+ *
+ * Construction throws a `TrajectoryError` for a schema `SchemaBinary` cannot lay out.
+ *
  * @see {@link make} for building a declaration from its fields.
  * @see {@link makeUnknown} for a metric named without its result schemas.
  * @see {@link MetricKit.toProducers} for associating producers with declarations.
@@ -70,6 +74,13 @@ export class Metric<
   Output extends Schema.Top,
   Failure extends Schema.Top,
 > extends Data.Class<Fields<Pkg, Id, Output, Failure>> {
+  constructor(fields: Fields<Pkg, Id, Output, Failure>) {
+    super(fields);
+
+    requireBinaryLayout(fields.output);
+    requireBinaryLayout(fields.failure);
+  }
+
   get tag(): `${Pkg}/${Id}` {
     return `${this.packageName}/${this.id}`;
   }

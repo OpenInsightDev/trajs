@@ -11,7 +11,7 @@
 import { Data, Schema } from "effect";
 
 import type * as EventKit from "#/EventKit.ts";
-import { documentOf } from "#/internal/schema.ts";
+import { documentOf, requireBinaryLayout } from "#/internal/schema.ts";
 import { PackageMetadata } from "#/Package.ts";
 import { SchemaDocument } from "#/SchemaDocument.ts";
 
@@ -44,6 +44,10 @@ type Fields<Pkg extends string, Id extends string, S extends Schema.Top> = {
  * A payload schema built with `VersionedSchema.make` reads historical payloads.
  * `packageMetadata` is what the declaring package states of itself.
  *
+ * **Gotchas**
+ *
+ * Construction throws a `TrajectoryError` for a schema `SchemaBinary` cannot lay out.
+ *
  * @see {@link make} for building a declaration from its fields.
  * @see {@link makeUnknown} for an event named without its payload schema.
  * @see {@link EventKit.make} for collecting declarations.
@@ -54,6 +58,12 @@ type Fields<Pkg extends string, Id extends string, S extends Schema.Top> = {
 export class Event<Pkg extends string, Id extends string, S extends Schema.Top> extends Data.Class<
   Fields<Pkg, Id, S>
 > {
+  constructor(fields: Fields<Pkg, Id, S>) {
+    super(fields);
+
+    requireBinaryLayout(fields.schema);
+  }
+
   get tag(): `${Pkg}/${Id}` {
     return `${this.packageName}/${this.id}`;
   }

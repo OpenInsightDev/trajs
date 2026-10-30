@@ -106,16 +106,41 @@ export class ParseError extends Data.TaggedError("ParseError")<{
 }
 
 /**
+ * A schema that `SchemaBinary` cannot lay out, retaining the layout error.
+ *
+ * **Details**
+ *
+ * `cause` is what the binary layer raised while compiling the layout.
+ *
+ * @see {@link TrajectoryError.binaryLayout} for wrapping the reason.
+ * @stability stable
+ * @category errors
+ */
+export class BinaryLayoutError extends Data.TaggedError("BinaryLayoutError")<{
+  cause: unknown;
+}> {
+  override get message(): string {
+    return `Failed to lay out a schema with SchemaBinary: ${Formatter.format(this.cause)}`;
+  }
+}
+
+/**
  * The specific failure wrapped by a {@link TrajectoryError}.
  *
  * @see {@link ToolEncodeError} for response encoding failures.
  * @see {@link ToolDecodeError} for response decoding failures.
  * @see {@link SessionError} for invalid sessions.
  * @see {@link ParseError} for parsing and serialization failures.
+ * @see {@link BinaryLayoutError} for schemas `SchemaBinary` cannot lay out.
  * @stability stable
  * @category errors
  */
-export type TrajectoryErrorReason = ToolEncodeError | ToolDecodeError | SessionError | ParseError;
+export type TrajectoryErrorReason =
+  | ToolEncodeError
+  | ToolDecodeError
+  | SessionError
+  | ParseError
+  | BinaryLayoutError;
 
 /**
  * A trajectory failure carrying a structured reason.
@@ -168,4 +193,12 @@ export class TrajectoryError extends Data.TaggedError("TrajectoryError")<{
    * @see {@link ParseError} for the retained reason.
    */
   static parse = (cause: unknown) => new TrajectoryError({ reason: new ParseError({ cause }) });
+
+  /**
+   * Wraps a binary layout failure without discarding its cause.
+   *
+   * @see {@link BinaryLayoutError} for the retained reason.
+   */
+  static binaryLayout = (cause: unknown) =>
+    new TrajectoryError({ reason: new BinaryLayoutError({ cause }) });
 }
