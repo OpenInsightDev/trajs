@@ -11,7 +11,6 @@ import { JsonSchema, pipe, Schema, SchemaRepresentation } from "effect";
 import { Tool } from "effect/ai";
 
 import { documentOf } from "#/internal/schema.ts";
-import { SchemaDocument } from "#/SchemaDocument.ts";
 
 /**
  * Re-exports Effect's tool APIs without modification.
@@ -26,7 +25,7 @@ export * from "effect/ai/Tool";
  *
  * **Details**
  *
- * Parameter, success, and failure schemas are stored as {@link SchemaDocument}s.
+ * Parameter, success, and failure schemas are stored as JSON, as `Schema.Json` accepts.
  * An absent description stays absent.
  *
  * @see {@link encode} for storing a declaration.
@@ -37,9 +36,9 @@ export const ToolSchema = Schema.Struct({
   id: Schema.String,
   name: Schema.String,
   description: Schema.optional(Schema.String),
-  parameters: SchemaDocument,
-  success: SchemaDocument,
-  failure: SchemaDocument,
+  parameters: Schema.Json,
+  success: Schema.Json,
+  failure: Schema.Json,
 });
 
 /**
@@ -60,7 +59,7 @@ export type ToolSchema = Schema.Schema.Type<typeof ToolSchema>;
  *
  * **Details**
  *
- * Parameter, success, and failure schemas become {@link SchemaDocument}s.
+ * Parameter, success, and failure schemas become JSON, as `Schema.Json` accepts.
  *
  * **Gotchas**
  *
@@ -81,7 +80,7 @@ export const encode = (tool: Tool.Any): ToolSchema => ({
   failure: documentOf(tool.failureSchema),
 });
 
-const parametersOf = (tool: Tool.Any): SchemaDocument =>
+const parametersOf = (tool: Tool.Any): Schema.Json =>
   Tool.isDynamic(tool) && tool.jsonSchema !== undefined
     ? pipe(
         JsonSchema.fromSchemaDraft2020_12(tool.jsonSchema),

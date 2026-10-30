@@ -13,7 +13,6 @@ import { Data, Schema } from "effect";
 import type * as ExtraKit from "#/ExtraKit.ts";
 import { documentOf, requireBinaryLayout } from "#/internal/schema.ts";
 import { PackageMetadata } from "#/Package.ts";
-import { SchemaDocument } from "#/SchemaDocument.ts";
 
 /**
  * The trajectory part kinds supporting extras.
@@ -152,7 +151,7 @@ export const makeUnknown = <Pkg extends string, Id extends string>(
  * The declaration states the package it is in and the schemas it declares.
  * The optional name and description sit under `metadata`, as event and metric declarations
  * state them.
- * Each schema it declares is stored as a {@link SchemaDocument} of the versions it accepts.
+ * Each schema it declares is stored as JSON, as `Schema.Json` accepts.
  *
  * @see {@link encode} for storing a declaration.
  * @see {@link ExtraKit.ExtraKitSchema} for the record a stored header holds.
@@ -167,9 +166,9 @@ export const ExtraSchema = Schema.Struct({
     }),
   ),
   packageMetadata: Schema.optional(PackageMetadata),
-  prompt: Schema.optional(SchemaDocument),
-  response: Schema.optional(SchemaDocument),
-  session: Schema.optional(SchemaDocument),
+  prompt: Schema.optional(Schema.Json),
+  response: Schema.optional(Schema.Json),
+  session: Schema.optional(Schema.Json),
 });
 
 /**
@@ -192,7 +191,7 @@ export type ExtraSchema = Schema.Schema.Type<typeof ExtraSchema>;
  *
  * A declaration that states no name or description states no `metadata`.
  * A part kind the declaration states no schema for stays absent.
- * Each stated schema becomes a {@link SchemaDocument} of the versions it accepts.
+ * Each stated schema becomes JSON, as `Schema.Json` accepts.
  *
  * **Gotchas**
  *
@@ -222,7 +221,7 @@ type Declared<X extends Any, P extends Part> = Exclude<X[P], undefined>;
 const declaredFor = (item: Any, part: Part): Schema.Top | undefined =>
   ({ prompt: item.prompt, response: item.response, session: item.session })[part];
 
-const documentFor = (item: Any, part: Part): SchemaDocument | undefined => {
+const documentFor = (item: Any, part: Part): Schema.Json | undefined => {
   const schema = declaredFor(item, part);
 
   return schema === undefined ? undefined : documentOf(schema);

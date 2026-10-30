@@ -16,7 +16,6 @@ import { runProducers } from "#/internal/metric.ts";
 import { documentOf, requireBinaryLayout } from "#/internal/schema.ts";
 import type * as MetricKit from "#/MetricKit.ts";
 import { PackageMetadata } from "#/Package.ts";
-import { SchemaDocument } from "#/SchemaDocument.ts";
 import type * as Trajectory from "#/Trajectory.ts";
 import type { TrajectoryError } from "#/TrajectoryError.ts";
 
@@ -144,7 +143,7 @@ export const makeUnknown = <Pkg extends string, Id extends string>(
  *
  * The declaration states the package it is in and its result schemas.
  * `metadata` and `packageMetadata` are optional.
- * Output and failure schemas are stored as {@link SchemaDocument}s of the versions they accept.
+ * Output and failure schemas are stored as JSON, as `Schema.Json` accepts.
  *
  * @see {@link encode} for storing a declaration.
  * @see {@link MetricKit.MetricKitSchema} for the record a stored header holds.
@@ -154,8 +153,8 @@ export const makeUnknown = <Pkg extends string, Id extends string>(
 export const MetricSchema = Schema.Struct({
   metadata: Schema.optional(Metadata),
   packageMetadata: Schema.optional(PackageMetadata),
-  output: SchemaDocument,
-  failure: SchemaDocument,
+  output: Schema.Json,
+  failure: Schema.Json,
 });
 
 /**
@@ -176,7 +175,7 @@ export type MetricSchema = Schema.Schema.Type<typeof MetricSchema>;
  *
  * **Details**
  *
- * Output and failure schemas become {@link SchemaDocument}s of the versions they accept.
+ * Output and failure schemas become JSON, as `Schema.Json` accepts.
  *
  * **Gotchas**
  *

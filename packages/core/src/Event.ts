@@ -13,7 +13,6 @@ import { Data, Schema } from "effect";
 import type * as EventKit from "#/EventKit.ts";
 import { documentOf, requireBinaryLayout } from "#/internal/schema.ts";
 import { PackageMetadata } from "#/Package.ts";
-import { SchemaDocument } from "#/SchemaDocument.ts";
 
 /**
  * Optional display information for an {@link Event}.
@@ -121,7 +120,7 @@ export const makeUnknown = <Pkg extends string, Id extends string>(
  *
  * The declaration states the package it is in and its payload schema.
  * `metadata` and `packageMetadata` are optional.
- * The payload schema is a {@link SchemaDocument} of the versions it accepts.
+ * The payload schema is stored as JSON, as `Schema.Json` accepts.
  *
  * @see {@link encode} for storing a declaration.
  * @see {@link EventKit.EventKitSchema} for the record a stored header holds.
@@ -131,7 +130,7 @@ export const makeUnknown = <Pkg extends string, Id extends string>(
 export const EventSchema = Schema.Struct({
   metadata: Schema.optional(Metadata),
   packageMetadata: Schema.optional(PackageMetadata),
-  schema: SchemaDocument,
+  schema: Schema.Json,
 });
 
 /**
@@ -152,7 +151,7 @@ export type EventSchema = Schema.Schema.Type<typeof EventSchema>;
  *
  * **Details**
  *
- * The payload schema becomes a {@link SchemaDocument} of the versions it accepts.
+ * The payload schema becomes JSON, as `Schema.Json` accepts.
  *
  * **Gotchas**
  *

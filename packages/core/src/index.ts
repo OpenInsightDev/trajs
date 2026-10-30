@@ -120,14 +120,6 @@ export * as Prompt from "#/Prompt.ts";
 export * as Response from "#/Response.ts";
 
 /**
- * The stored form of a schema, as a `SchemaRepresentation` document in JSON.
- *
- * @stability stable
- * @category re-exports
- */
-export { SchemaDocument } from "#/SchemaDocument.ts";
-
-/**
  * Session discovery, fork trees, and inherited streams.
  *
  * @stability stable
