@@ -36,7 +36,9 @@ export const TimestampInt = Schema.DateTimeUtcFromMillis.pipe(
 
 // A chunk's chain, a frontier, and a file's digest are one value: 32 bytes,
 // whatever algorithm the header names.
-export const Chain = bytesOf(32);
+export const ChainBytes = 32;
+
+export const Chain = bytesOf(ChainBytes);
 
 export const documentOf = (schema: Schema.Top): Schema.Json =>
   schema.pipe(Schema.toRepresentation, SchemaRepresentation.toJson);

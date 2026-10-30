@@ -1,20 +1,65 @@
+import { StreamHash } from "@trajs/utils";
 import { Effect, Match, Schema, SchemaGetter } from "effect";
 import type { NonEmptyReadonlyArray } from "effect/Array";
 
+import type * as Config from "#/Config.ts";
 import * as Event from "#/Event.ts";
-import type * as EventKit from "#/EventKit.ts";
+import * as EventKit from "#/EventKit.ts";
 import * as Extra from "#/Extra.ts";
-import type * as ExtraKit from "#/ExtraKit.ts";
+import * as ExtraKit from "#/ExtraKit.ts";
+import { ChunkTableEntry, type ChunkTableEntryEncoded } from "#/internal/exchange/chunk.ts";
 import { TimestampInt, UuidFromByte } from "#/internal/schema.ts";
 import * as Metric from "#/Metric.ts";
-import type * as MetricKit from "#/MetricKit.ts";
+import * as MetricKit from "#/MetricKit.ts";
 import * as Prompt from "#/Prompt.ts";
 import * as Response from "#/Response.ts";
-import type * as Toolkit from "#/Toolkit.ts";
+import * as Toolkit from "#/Toolkit.ts";
 import * as Trajectory from "#/Trajectory.ts";
 
-// One tagged struct per kind, in the spellings a chunk holds them. Keeping the
-// tag lets one union codec read every kind.
+// One tagged struct per kind, in the spellings a chunk holds them.
+
+export interface HeaderPartEncoded {
+  _tag: "Header";
+  version: string;
+  hash: StreamHash.Algorithm;
+  toolkit: Toolkit.ToolkitSchema;
+  eventkit: EventKit.EventKitSchema;
+  metrickit: MetricKit.MetricKitSchema;
+  extrakit: ExtraKit.ExtraKitSchema;
+}
+
+// The header is alone in the first chunk, so a reader holds the kits before it decodes a body.
+export const HeaderPart: Schema.Codec<HeaderPartEncoded> = Schema.TaggedStruct("Header", {
+  version: Schema.String,
+  hash: StreamHash.Algorithm,
+  toolkit: Toolkit.ToolkitSchema,
+  eventkit: EventKit.EventKitSchema,
+  metrickit: MetricKit.MetricKitSchema,
+  extrakit: ExtraKit.ExtraKitSchema,
+}).annotate({ identifier: "HeaderPart" });
+
+export const headerPartOf = (
+  config: Config.AnyConfig,
+  { version, hash }: { readonly version: string; readonly hash: StreamHash.Algorithm },
+): HeaderPartEncoded =>
+  HeaderPart.make({
+    version,
+    hash,
+    toolkit: Toolkit.encode(config.toolkit),
+    eventkit: EventKit.encode(config.eventkit),
+    metrickit: MetricKit.encode(config.metrickit),
+    extrakit: ExtraKit.encode(config.extrakit),
+  });
+
+export interface FooterPartEncoded {
+  _tag: "Footer";
+  chunks: ReadonlyArray<ChunkTableEntryEncoded>;
+}
+
+// The footer is alone in the last chunk of a file, so its table locates every data chunk.
+export const FooterPart: Schema.Codec<FooterPartEncoded> = Schema.TaggedStruct("Footer", {
+  chunks: Schema.Array(ChunkTableEntry),
+}).annotate({ identifier: "FooterPart" });
 
 // An extra read as `Schema.Unknown` would store bytes and moments as JSON text.
 const extraField = <K extends ExtraKit.Any, P extends Extra.Part>(extrakit: K, part: P) =>
