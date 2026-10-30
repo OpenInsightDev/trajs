@@ -8,8 +8,9 @@ computing anywhere with WebAssembly runs with.
   carried by the WebAssembly codec
   [`@structured-world/structured-zstd`](https://npmjs.com/package/@structured-world/structured-zstd).
 - `BrowserByteStore` — the bytes a page keeps between readings, the chunks of a
-  sequence in the `sessionStorage` of the tab, kept under a prefix so the page
-  shares none of them.
+  sequence in a web storage of the page, kept under a prefix so the page shares
+  none of them. `layer` states the `sessionStorage` of the tab and
+  `layerWebStorage` the storage a program hands it, such as `localStorage`.
 - `BrowserStreamHash` — the SHA-256 and BLAKE2b-512 digest
   [`@noble/hashes`](https://npmjs.com/package/@noble/hashes) computes, and the
   XXH64 the WebAssembly module of

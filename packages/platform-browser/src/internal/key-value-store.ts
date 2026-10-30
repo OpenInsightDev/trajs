@@ -1,6 +1,6 @@
 /**
- * A key/value store over the session storage of a page, as `BrowserByteStore.layer`
- * provides it.
+ * A key/value store over a web storage of a page, as
+ * `BrowserByteStore.layerWebStorage` provides it.
  *
  * The entries are kept under a prefix, so a page that writes entries of its own into
  * the same storage shares none of them.
@@ -74,5 +74,8 @@ export const make = (storage: Storage, prefix = defaultPrefix): KeyValueStore.Ke
     ),
   });
 
-export const layer = (prefix = defaultPrefix): Layer.Layer<KeyValueStore.KeyValueStore> =>
-  Layer.sync(KeyValueStore.KeyValueStore)(() => make(sessionStorage, prefix));
+export const layer = (
+  storage: Storage,
+  prefix = defaultPrefix,
+): Layer.Layer<KeyValueStore.KeyValueStore> =>
+  Layer.sync(KeyValueStore.KeyValueStore)(() => make(storage, prefix));
