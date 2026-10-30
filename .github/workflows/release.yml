@@ -18,12 +18,18 @@ name: Release
 # triggered commit — and "nothing is due" on a timer — publish nothing. That
 # distinction is why this needs no second workflow, no App token and no PAT.
 #
-# Two invariants must survive refactors:
+# Three invariants must survive refactors:
 #   1. `publish` stays in this file, at the top level. npm trusted publishing
 #      matches the workflow filename recorded in each package's settings, and
 #      with `workflow_call` it validates the *caller's* name instead.
 #   2. The merge keeps using `GITHUB_TOKEN`. A `GITHUB_TOKEN` push starts no
 #      run, which is what stops an automatic merge from publishing twice.
+#   3. Every job that must survive a skipped ancestor names a status function
+#      in its own `if` — `select-mode`, and `version`, `pack` and `publish`
+#      downstream of it. A skip propagates down the whole `needs` chain, and a
+#      status function is the only thing that lets a job run anyway. Without it
+#      the push path, where `merge` skips, reaches `select-mode` and then stops,
+#      which is how the first cut of this file published nothing at all.
 
 # Publishes the core libraries under `packages/` to npm. The release set comes
 # from `.changeset/config.json`: `fixed` names the six core packages, which share
@@ -251,7 +257,10 @@ jobs:
           if-no-files-found: error
 
   version:
-    if: needs.select-mode.outputs.mode == 'version'
+    # `!cancelled()` is what keeps this reachable on the push path, where
+    # `merge` was skipped: a skip propagates down the whole `needs` chain, and a
+    # job only escapes it by naming a status function in its own `if`.
+    if: ${{ !cancelled() && needs.select-mode.outputs.mode == 'version' }}
     needs: select-mode
     runs-on: ubuntu-latest
     outputs:
@@ -276,7 +285,7 @@ jobs:
         uses: changesets/action/version@v2
 
   pack:
-    if: needs.select-mode.outputs.mode == 'publish'
+    if: ${{ !cancelled() && needs.select-mode.outputs.mode == 'publish' }}
     needs: select-mode
     runs-on: ubuntu-latest
     outputs:
@@ -306,8 +315,12 @@ jobs:
 
   publish:
     # `select-mode` is in `needs` for the commit to check out: `pack` passes
-    # along artifacts, not the ref.
+    # along artifacts, not the ref. The status function is what lets a publish
+    # follow a skipped `merge`, and the two `result` checks keep it from running
+    # when the plan or the tarballs were never built — on a push that only
+    # updates the version pull request, `pack` is skipped.
     needs: [select-mode, pack]
+    if: ${{ !cancelled() && needs.select-mode.result == 'success' && needs.pack.result == 'success' }}
     runs-on: ubuntu-latest
     permissions:
       contents: write # create the release tags and GitHub releases
