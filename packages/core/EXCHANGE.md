@@ -35,7 +35,7 @@ records what was rejected to keep them.
    decompressing anything.
 3. **Compression in large units.** The compressed unit MUST be far larger than a
    part, because most parts of a recorded run are a few hundred bytes and a
-   per-part codec frame costs more than it saves.
+   per-part compression frame costs more than it saves.
 4. **Locating without a scan.** A sealed file MUST state the extent of every chunk
    and the length of every meta region, so that locating a frame is arithmetic
    over a table and a scan issues its reads at once.
@@ -57,17 +57,18 @@ recomputes every value behind the changed bytes.
 
 ## 3. Terms
 
-| Term         | Meaning                                                                                                                           |
-| ------------ | --------------------------------------------------------------------------------------------------------------------------------- |
-| **chunk**    | One compressed unit: frames' identities, their contents compressed as one piece, its checksums, and the chain value it ends with. |
-| **meta**     | What a reader reads without decompressing: the tag, the identifiers, the timestamps.                                              |
-| **body**     | The part of a frame that is not meta, compressed together with the bodies of its chunk.                                           |
-| **frame**    | One meta segment paired with one body segment. A frame has no byte range of its own.                                              |
-| **chain**    | The integrity of everything stored before a chunk ends, in that chunk's last 32 bytes (section 5.2).                              |
-| **frontier** | The chain value an append or a seal continues from: the 32 bytes immediately before the point it appends at.                      |
-| **stream**   | A trajectory written so far, ending wherever the writer stopped.                                                                  |
-| **file**     | A stream that was sealed: the same bytes, followed by a footer chunk.                                                             |
-| **segment**  | One encoded value of a region: a length prefix followed by that many bytes.                                                       |
+| Term                  | Meaning                                                                                                                                  |
+| --------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| **chunk**             | One compressed unit: frames' identities, their contents compressed as one piece, its checksums, and the chain value it ends with.        |
+| **meta**              | What a reader reads without decompressing: the tag, the identifiers, the timestamps.                                                     |
+| **body**              | The part of a frame that is not meta, compressed together with the bodies of its chunk.                                                  |
+| **frame**             | One meta segment paired with one body segment. A frame has no byte range of its own.                                                     |
+| **chain**             | The integrity of everything stored before a chunk ends, in that chunk's last 32 bytes (section 5.2).                                     |
+| **frontier**          | The chain value an append or a seal continues from: the 32 bytes immediately before the point it appends at.                             |
+| **stream**            | A trajectory written so far, ending wherever the writer stopped.                                                                         |
+| **file**              | A stream that was sealed: the same bytes, followed by a footer chunk.                                                                    |
+| **segment**           | One encoded value of a region, as the schema codec writes it (section 6): a varint length, an envelope byte, and the payload.            |
+| **compression frame** | The one frame a chunk's body region is stored as: one value of the `compression` codec, holding every body of that chunk in frame order. |
 
 ## 4. Layout
 
@@ -99,7 +100,7 @@ holds the `Footer` frame and nothing else.
 Reading the last 9 bytes is not enough, because any 4 bytes can precede a `TRAJS`
 marker by accident. A reader MUST treat them as a candidate and confirm it:
 
-1. `footerLen` MUST be at least 49, the smallest possible chunk.
+1. `footerLen` MUST be at least 49, the bytes a chunk takes before its two regions.
 2. `footerStart = length − 9 − footerLen` MUST lie after the header chunk: the
    chunk header at offset 5 MUST state an extent that ends at or before
    `footerStart`.
@@ -146,27 +147,28 @@ checksum over a file.
 Both precede the regions they cover, so a region never written reads as invalid: an
 unwritten `metaCrc` is zero, and the CRC-32 of the bytes that follow is not.
 
-A chunk MUST hold at least one frame, and every frame's meta segment is at least its
-tag. A trajectory MUST hold at least its header chunk: `Magic` alone is not a
-trajectory, and neither is one whose first chunk is not a header chunk. A reader
-MUST check the extent before using `metaLen` or `bodyLen` for anything, because
-those fields are not trusted until `metaCrc` verifies.
+A chunk MUST hold at least one frame, and every frame's meta segment states its
+tag (section 7), so the codec's own frame bytes sit on top of the 49 above rather
+than inside them. A trajectory MUST hold at least its header chunk: `Magic` alone is
+not a trajectory, and neither is one whose first chunk is not a header chunk. A
+reader MUST check the extent before using `metaLen` or `bodyLen` for anything,
+because those fields are not trusted until `metaCrc` verifies.
 
 ### 5.1 Compression
 
 `compression` applies to the body region only and is one value for the chunk: the
-body region is a single codec frame holding the bodies in frame order. The meta
-region MUST NOT be compressed — that is the reason a reader can list parts with no
-codec provided at all.
+body region is a single compression frame holding the bodies in frame order. The
+meta region MUST NOT be compressed — that is the reason a reader can list parts with
+no compression codec provided at all.
 
 A writer MUST store the body region uncompressed when compressing it does not make
 it smaller.
 
-A body region MUST be exactly one codec frame, and a reader MUST NOT feed the codec
-more than one. This is not stylistic: measured on the platforms this repository
-targets, at the versions it pins, `node:zlib` decodes only the first frame of a
-concatenation and reports success, `Bun.zstdDecompress` decodes all of them, and the
-browser codec rejects anything that is not one frame.
+A body region MUST be exactly one compression frame, and a reader MUST NOT feed the
+codec more than one. This is not stylistic: measured on the platforms this
+repository targets, at the versions it pins, `node:zlib` decodes only the first frame
+of a concatenation and reports success, `Bun.zstdDecompress` decodes all of them, and
+the browser codec rejects anything that is not one frame.
 
 ### 5.2 Chain
 
@@ -209,10 +211,25 @@ trajectory as written.
 A chunk holds `n` frames: its meta region is the concatenation of their metas, its
 body region (decompressed) the concatenation of their bodies, in the same order.
 
-Each segment is a varint length followed by that many bytes, so it is
-self-delimiting. A reader MUST split both regions by that length, require each
-region to be consumed exactly, require the two regions to hold the same number of
-segments, and pair segment `i` of one region with segment `i` of the other.
+A segment is one value as the schema codec (`SchemaBinary`) writes it: a varint
+length, an envelope byte, and the payload that length covers. The container states no
+framing of its own — it writes no length, no envelope and no trailer — so a region is
+a region only because the codec's frames tile it. A writer joins a region by taking
+the bytes the codec wrote for each value, and a reader MUST split both regions by
+walking those lengths, require each region to be consumed exactly, require the two
+regions to hold the same number of segments, and pair segment `i` of one region with
+segment `i` of the other. The walk is the only part of the framing the container owns,
+and it owns it because the codec decodes one frame at a time and states no offsets: a
+region that does not tile exactly with whole frames is `MalformedChunk` (section 13),
+not a value read short.
+
+A frame stands alone, and the codec's wire mode is what makes that true: a value
+decodes from the bytes of its own segment and from nothing before it. The container
+therefore fixes the codec's default mode, which evolves by field, and MUST NOT use the
+codec's shared dictionary or its fingerprint mode — the first makes a frame decode
+only through the frames written before it, and the second requires both ends to state
+an identical layout. Either would take away what section 7 reads without a body,
+section 12 ranges over, and section 11 appends after.
 
 A frame is therefore not a byte range but a position, and nothing about a frame is
 stored twice.
@@ -227,6 +244,17 @@ chunk loses every frame it holds, and a frame MUST NOT span two chunks.
 `Meta` is the union of every frame's meta. The tag is the frame's identity: for a
 part it is the part's `_tag`, and it decides both the shape of the meta and the
 schema of the body.
+
+The tag is not stored as the name it has. The codec states a union member's tag as
+the member selector of its frame — four bytes, derived from the fields the member
+pins to a literal — so the tag costs four bytes and reads only with the schema that
+states it, and the `_tag` string is a name the decoder puts back. A meta is therefore
+read as one union of every tag, never with a single member's own codec, whose frame
+is different bytes: a union's member frame selects, a member's own frame carries its
+`_tag` as a field. A release may add a tag to `Meta` and MUST NOT rename one, for the
+same reason no field name of a meta or a body may change: the codec derives each
+field's wire id from the field's name, so a rename is a layout change and reads as a
+field no reader states.
 
 | Tag        | Meta                                                    | Body                                                              |
 | ---------- | ------------------------------------------------------- | ----------------------------------------------------------------- |
@@ -258,17 +286,18 @@ schema of the body.
   two of them would be the largest field of a small part's meta.
 - Every body is the part schema without the meta fields. The part schema stays the
   one source of truth for what a part holds; the split into meta and body is a view
-  of it, not a second description.
+  of it, not a second description. The two halves are written as their own frames, so
+  a reader holds two layouts rather than one, and neither reads the other's bytes.
 
 A field belongs in the meta when, and only when, it is needed by one of: skipping a
 frame without decompressing it, choosing the body's schema, reading a structure with
 no config, or placing a frame on a timeline. Anything else is body.
 
-A meta decodes with no config, and one that does not decode is stepped over: an
-undefined tag, or bytes that do not decode, leave the frame in place — it keeps its
-index and its regions are consumed by their own lengths. A body the reader's kits
-cannot decode is stepped over for the same kind of reason: what a body holds is the
-kits' business. Failing the read instead would make one new variant unreadable to
+A meta decodes with no config, and one that does not decode is stepped over: a tag
+no member of `Meta` states, or bytes that do not decode, leave the frame in place —
+it keeps its index and its regions are consumed by their own lengths. A body the
+reader's kits cannot decode is stepped over for the same kind of reason: what a body
+holds is the kits' business. Failing the read instead would make one new variant unreadable to
 every older reader for a whole trajectory, rather than for the frames it does not
 know.
 
@@ -332,10 +361,11 @@ avoid.
 
 A writer decides chunk membership as frames arrive: it adds each frame while the
 chunk's raw size — the sum of every meta segment's bytes and every body's bytes,
-before compression — stays within `chunkSize`, and closes the chunk before the frame
-that would exceed it. `chunkSize` defaults to 2 MiB and is not a limit on the stored
-size: an incompressible chunk is a little larger than raw, and a text-heavy one is
-several times smaller.
+before compression, where a segment's bytes are the codec's frame for that value
+rather than an estimate of it — stays within `chunkSize`, and closes the chunk
+before the frame that would exceed it. `chunkSize` defaults to 2 MiB and is not a
+limit on the stored size: an incompressible chunk is a little larger than raw, and a
+text-heavy one is several times smaller.
 
 - The unit is raw because membership must be decided before the bodies are
   compressed, and because decompression cost follows raw bytes rather than stored
@@ -366,6 +396,12 @@ prefix of the chunk it was writing, and nothing else can be left behind.
 The chain value of a chunk is computed while it is assembled, from the chunk's own
 bytes and the value before it, so a writer holds one chunk and one 32-byte value
 rather than state over the file.
+
+The segments of a region are encoded in one pass where the writer can: the codec's
+batch encoder joins the frames of the values it is given in a single buffer, so a
+chunk costs one allocation per region rather than one per frame. A frame the codec
+hands back for a single value is a view of a buffer it reuses, so a writer that keeps
+frames from separate calls MUST copy them before it joins them.
 
 **Writing a new trajectory.** Write `Magic`, the header chunk, the data chunks,
 close the last chunk, then the footer chunk and `u32 footerLen ‖ Magic`.
@@ -432,10 +468,10 @@ A reader chooses how much to read, and each choice touches nothing else:
   bytes are the file's digest and whose table locates everything else. No data chunk
   is read, no part is decoded, no chain value is checked.
 - **The identities.** Per chunk, its chunk header and its meta region as one read,
-  whose offset and length the table states: no decompression, no codec, no `bodyLen`
-  bytes read. This is what a session tree is built on — declarations, forks, session
-  membership, attachment lists and timestamps all live in metas, so a tree is drawn
-  before a single body is decoded.
+  whose offset and length the table states: no decompression, no compression codec,
+  no `bodyLen` bytes read. This is what a session tree is built on — declarations,
+  forks, session membership, attachment lists and timestamps all live in metas, so a
+  tree is drawn before a single body is decoded.
 - **The frames of a chunk.** Read it whole, verify both checksums, decompress the body
   region, split both regions, and decode each pair, stepping over a frame whose meta
   or body does not decode (section 7). Memory holds one chunk at a time.
@@ -528,8 +564,8 @@ re-litigated later.
   that did not record it — with no compression unit, no chunk, no index and no append.
   They are produced from a trajectory, or read into one, rather than stored in place of
   one.
-- **One codec frame per part** (the format this replaces). A part is a few hundred
-  bytes; a codec frame header, a rebuilt entropy table and a reset window cost more
+- **One compression frame per part** (the format this replaces). A part is a few
+  hundred bytes; a frame header, a rebuilt entropy table and a reset window cost more
   than the redundancy a per-part unit finds. It also makes a full read the slowest
   path, which is the path every consumer takes.
 - **Bodies inline in each frame, one chunk spanning scattered fragments.** Skipping a
@@ -538,9 +574,9 @@ re-litigated later.
   window the change exists to share.
 - **A whole-file digest recomputed at every append** (the tail this replaces). Append
   would read the file it appends to, and one digest at the tail localises nothing.
-- **Several codec frames per chunk, so an append can continue one.** Platform decoders
-  disagree about concatenated frames (section 5.1); resumability at a frame level is
-  not worth a file that reads short on one platform.
+- **Several compression frames per chunk, so an append can continue one.** Platform
+  decoders disagree about concatenated frames (section 5.1); resumability at a frame
+  level is not worth a file that reads short on one platform.
 - **Compressing the meta region.** It would make scanning need a codec, which is the
   property the whole split exists to keep.
 - **A version byte in the container, a frame count in each chunk header, or a
@@ -552,6 +588,21 @@ re-litigated later.
   need. What remains of that family — a digest chained from unit to unit — is kept
   (section 5.2), because it is integrity rather than availability, and it is what makes
   an append cost the tail instead of the file.
+- **A length prefix of the container's own.** Writing one would produce the bytes the
+  schema codec's frame already states, and leave a second encoder to keep in step with
+  the codec for nothing: the prefix, the envelope byte and the tag's selector are the
+  codec's, and section 6 states what the container checks over them instead.
+- **One schema codec frame per region — an array of metas and an array of bodies.**
+  The codec's array form is the smallest of the options: it states a row's shape once
+  and back-references strings a later row repeats. It is dropped because a frame
+  decodes wholly or not at all, and section 7 requires one unknown tag to cost the
+  frame it is in rather than the chunk around it.
+- **The codec's shared dictionary.** It turns a frame into a value that decodes only
+  through the frames written before it, which is the opposite of reading one frame by
+  its own bytes (section 7) and of ranging over frames a table locates (section 12).
+- **The codec's fingerprint mode.** Smaller frames, at the price of an identical
+  encoded layout on both ends — which no release boundary can promise, and which
+  section 8's version gate and section 7's stepped-over frames both exist to avoid.
 
 ## 16. Open
 
@@ -561,3 +612,8 @@ re-litigated later.
   and it is not specified here.
 - **Sizes.** `chunkSize` (2 MiB), the default compression level, and the share of a
   file its meta regions take are reasoned, not measured over a real recording.
+- **The codec's envelope version.** Every frame states the codec's wire mode in its
+  envelope byte, and a reader decodes with the mode of its own release. A codec release
+  that moved that byte would make a trajectory every release could otherwise read
+  unreadable, which section 8's version gate does not cover: that gate compares the
+  writer's release, and this is the codec's.
