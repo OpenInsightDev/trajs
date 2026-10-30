@@ -17,10 +17,10 @@ A trajectory is written by one process on one machine, read by any number of
 processes, and never modified in place except at its tail. Every rule below is
 stated against that one fact.
 
-Offsets are byte offsets from the start of the file. `H` is the digest algorithm
-the trajectory's `Header` names (section 8), and every value it produces is 32
-bytes. The chain value of a chunk (section 5.2) is the only value in the file
-computed from bytes outside its own chunk.
+Offsets are byte offsets from the start of the file. `H` is the digest algorithm the
+trajectory's `Header` names (section 8), and every chain value is 8 bytes: the leading
+8 of its digest, whichever algorithm it is. The chain value of a chunk (section 5.2)
+is the only value in the file computed from bytes outside its own chunk.
 
 ## 2. Goals
 
@@ -63,8 +63,8 @@ recomputes every value behind the changed bytes.
 | **meta**              | What a reader reads without decompressing: the tag, the identifiers, the timestamps.                                                     |
 | **body**              | The part of a frame that is not meta, compressed together with the bodies of its chunk.                                                  |
 | **frame**             | One meta segment paired with one body segment. A frame has no byte range of its own.                                                     |
-| **chain**             | The integrity of everything stored before a chunk ends, in that chunk's last 32 bytes (section 5.2).                                     |
-| **frontier**          | The chain value an append or a seal continues from: the 32 bytes immediately before the point it appends at.                             |
+| **chain**             | The integrity of everything stored before a chunk ends, in that chunk's last 8 bytes (section 5.2).                                      |
+| **frontier**          | The chain value an append or a seal continues from: the 8 bytes immediately before the point it appends at.                              |
 | **stream**            | A trajectory written so far, ending wherever the writer stopped.                                                                         |
 | **file**              | A stream that was sealed: the same bytes, followed by a footer chunk.                                                                    |
 | **segment**           | One encoded value of a region, as the schema codec writes it (section 6): a varint length, an envelope byte, and the payload.            |
@@ -100,7 +100,7 @@ holds the `Footer` frame and nothing else.
 Reading the last 9 bytes is not enough, because any 4 bytes can precede a `TRAJS`
 marker by accident. A reader MUST treat them as a candidate and confirm it:
 
-1. `footerLen` MUST be at least 49, the bytes a chunk takes before its two regions.
+1. `footerLen` MUST be at least 25, the bytes a chunk takes before its two regions.
 2. `footerStart = length − 9 − footerLen` MUST lie after the header chunk: the
    chunk header at offset 5 MUST state an extent that ends at or before
    `footerStart`.
@@ -128,10 +128,10 @@ off  size      field
 16    1        compression   0 none / 1 zstd / 2 gzip / 3 deflate
 17   metaLen   meta region
 ..   bodyLen   body region
-..   32        chain
+..    8        chain
 ```
 
-`chunkLen = 49 + metaLen + bodyLen`, so a chunk is self-delimiting.
+`chunkLen = 25 + metaLen + bodyLen`, so a chunk is self-delimiting.
 
 - `metaCrc` covers bytes `[8, 17 + metaLen)`: `bodyLen`, `metaLen`, `compression`,
   and the meta region. A scan reads exactly those bytes, so it verifies every byte
@@ -148,7 +148,7 @@ Both precede the regions they cover, so a region never written reads as invalid:
 unwritten `metaCrc` is zero, and the CRC-32 of the bytes that follow is not.
 
 A chunk MUST hold at least one frame, and every frame's meta segment states its
-tag (section 7), so the codec's own frame bytes sit on top of the 49 above rather
+tag (section 7), so the codec's own frame bytes sit on top of the 25 above rather
 than inside them. A trajectory MUST hold at least its header chunk: `Magic` alone is
 not a trajectory, and neither is one whose first chunk is not a header chunk. A
 reader MUST check the extent before using `metaLen` or `bodyLen` for anything,
@@ -172,12 +172,12 @@ the browser codec rejects anything that is not one frame.
 
 ### 5.2 Chain
 
-Every chunk ends with a 32-byte chain value, which extends the digest over the chunk
+Every chunk ends with an 8-byte chain value, which extends the digest over the chunk
 before it:
 
 ```
 chain(−1)      = H(Magic)
-chain(chunk i) = H(chain(chunk i − 1) ‖ bytes(chunk i)[0, chunkLen − 32))
+chain(chunk i) = H(chain(chunk i − 1) ‖ bytes(chunk i)[0, chunkLen − 8))
 ```
 
 `chain(c)` is the integrity of every stored byte up to the end of chunk `c`, folded
@@ -186,9 +186,8 @@ be extended without re-reading that prefix. The digest of a file is the chain va
 of its footer chunk (section 9).
 
 - **A chunk is verified against its predecessor, not against the file.** A chunk and
-  the 32 bytes before it are enough to check that the two were written in that
-  order.
-- **An append reads 32 bytes.** The frontier is the 32 bytes immediately before the
+  the 8 bytes before it are enough to check that the two were written in that order.
+- **An append reads 8 bytes.** The frontier is the 8 bytes immediately before the
   append point, so continuing a trajectory costs the tail (goal 7).
 - **A break has a location.** The chunk whose value does not extend the one before it
   is the chunk a reader reports (section 13).
@@ -196,11 +195,16 @@ of its footer chunk (section 9).
   recorded `chain(k)` checks what was appended after it without re-reading what it
   already verified.
 
-The value is 32 bytes because every algorithm `Header.hash` can name produces 32
-bytes. It is not covered by `bodyCrc`: a corrupted chain value is a `ChainMismatch`,
-which is the check it is, rather than a checksum failure; and because the next chunk
-extends it, tampering is caught one chunk later. The last chunk of a stream is
-therefore the one chunk nothing checks until a seal extends it.
+The value is 8 bytes: the leading 8 of `H`'s digest, whatever algorithm the header
+names. A chunk check needs no more, because the chain is what finds an accidental break
+or a chunk out of place, not what resists a writer who recomputes it (section 2), and
+64 bits of it do not agree by accident between chunks that differ. A frontier this
+small is what keeps an append to the tail (goal 7). The width is the format's, not the
+algorithm's: `H` states only whose digest those 8 bytes are the head of. The value is
+not covered by `bodyCrc`: a corrupted chain value is a `ChainMismatch`, which is the
+check it is, rather than a checksum failure; and because the next chunk extends it,
+tampering is caught one chunk later. The last chunk of a stream is therefore the one
+chunk nothing checks until a seal extends it.
 
 The chain is a prefix, not a tree: any change to a chunk changes every value after
 it, and no reader can distinguish a rewrite that recomputes them all from the
@@ -313,7 +317,9 @@ Its body states:
 | `toolkit`, `eventkit`, `metrickit`, `extrakit` | the stored kit descriptions, by name and by stored schema |
 
 `hash` is the algorithm the chain values are computed with (section 5.2), so a reader
-takes no algorithm from outside the file.
+takes no algorithm from outside the file. It names any `StreamHash.Algorithm`, and the
+chain is the leading 8 bytes of that digest: the header states no length of its own. A
+reader without a codec for the named algorithm can check no chain value.
 
 `version` is the release that wrote the trajectory, and the format revision is
 whatever that release states. Releases compare as semver, a pre-release before its
@@ -340,7 +346,7 @@ holds the chunk table:
 
 - The **digest of the file** is the chain value of the footer chunk, which covers
   `Magic`, the header chunk, and every data chunk. It is not stored a second time: a
-  reader that reads the footer chunk has already read its last 32 bytes.
+  reader that reads the footer chunk has already read its last 8 bytes.
 - `chunks` MUST list data chunks only, MUST be in file order, MUST restate each
   chunk's `metaLen` as that chunk's header states it, and MUST satisfy
   `5 + headerChunkLen + Σ len = footerStart` and `Σ count = frames`.
@@ -388,13 +394,13 @@ text-heavy one is several times smaller.
 ## 11. Writing
 
 A write is a sequence of whole chunks: a chunk is assembled in memory (at most
-`chunkSize` of raw frames, plus its 49 bytes of header and chain) and written as one
+`chunkSize` of raw frames, plus its 25 bytes of header and chain) and written as one
 contiguous run of bytes. A write that returns leaves the trajectory ending on a chunk
 boundary, so no chunk is half written; a sink that fails or is interrupted leaves a
 prefix of the chunk it was writing, and nothing else can be left behind.
 
 The chain value of a chunk is computed while it is assembled, from the chunk's own
-bytes and the value before it, so a writer holds one chunk and one 32-byte value
+bytes and the value before it, so a writer holds one chunk and one 8-byte value
 rather than state over the file.
 
 The segments of a region are encoded in one pass where the writer can: the codec's
@@ -417,11 +423,11 @@ close the last chunk, then the footer chunk and `u32 footerLen ‖ Magic`.
    locates in one read: the trajectory MUST be truncated there, dropping the footer
    chunk, `footerLen` and the trailing `Magic`, and data chunks and a new footer MUST
    be written in their place.
-5. The **frontier** is the 32 bytes immediately before the append point, and it is
+5. The **frontier** is the 8 bytes immediately before the append point, and it is
    the only state the append carries over. It MUST read it, MUST NOT read any data
    chunk's body region, and MUST NOT fold the bytes before it into a digest. It
    MAY verify the frontier by reading the chunk that ends at the append point and the
-   32 bytes before that chunk, and it MUST fail rather than continue the chain if the
+   8 bytes before that chunk, and it MUST fail rather than continue the chain if the
    value it computes differs.
 6. No digest is recomputed by reading anything: the chain continues from the frontier,
    chunk by chunk, and a file is left ending in a footer whose chain value is the
@@ -438,7 +444,7 @@ chain value extends the frontier, so it is computed from that value and the foot
 chunk alone.
 
 **Torn tails.** A chunk is torn when the bytes from its offset do not hold a whole
-one: the tail is shorter than the 49 bytes the smallest chunk takes, or the chunk it
+one: the tail is shorter than the 25 bytes the smallest chunk takes, or the chunk it
 starts declares an extent that runs past the end of the file. Both are the writer
 stopping inside a write. A reader stops before it and a writer truncates it before
 appending; truncation MUST be reported, because parts recorded there are lost. A torn
@@ -464,7 +470,7 @@ A reader chooses how much to read, and each choice touches nothing else:
 
 - **The header.** `Magic` and the header chunk: one small chunk holding the kits and
   the version, which is what lets a reader hold them before it decodes any body.
-- **The footer.** After confirming it (section 4.1), the footer chunk, whose last 32
+- **The footer.** After confirming it (section 4.1), the footer chunk, whose last 8
   bytes are the file's digest and whose table locates everything else. No data chunk
   is read, no part is decoded, no chain value is checked.
 - **The identities.** Per chunk, its chunk header and its meta region as one read,

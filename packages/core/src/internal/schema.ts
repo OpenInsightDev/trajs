@@ -34,9 +34,11 @@ export const TimestampInt = Schema.DateTimeUtcFromMillis.pipe(
   Schema.withConstructorDefault(DateTime.now),
 );
 
-// A chunk's chain, a frontier, and a file's digest are one value: 32 bytes,
-// whatever algorithm the header names.
-export const ChainBytes = 32;
+// A chunk's chain, a frontier, and a file's digest are one value: the leading 8 bytes
+// of the digest the header names, whatever algorithm that is. Eight is what locates a
+// broken or reordered chunk, and a frontier this small is what keeps an append to the
+// tail (EXCHANGE.md, sections 2 and 5.2).
+export const ChainBytes = 8;
 
 export const Chain = bytesOf(ChainBytes);
 
