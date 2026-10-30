@@ -4,7 +4,6 @@ import { Schema } from "effect";
 import { decodeU32, U32Bytes } from "#/internal/bytes.ts";
 import { ChainBytes } from "#/internal/schema.ts";
 
-// Four `u32`s, one compression code, then the regions and the chain value.
 export interface ChunkHeader {
   readonly metaCrc: number;
   readonly bodyCrc: number;
@@ -15,17 +14,14 @@ export interface ChunkHeader {
 
 export const ChunkHeaderBytes = 4 * U32Bytes + 1;
 
-// The least a chunk takes: its header and the chain value that ends it.
 export const ChunkOverheadBytes = ChunkHeaderBytes + ChainBytes;
 
 // A chunk states its own extent, so a scan reads it before trusting its lengths.
 export const chunkLen = (header: ChunkHeader): number =>
   ChunkOverheadBytes + header.metaLen + header.bodyLen;
 
-// One chunk as it is stored: the header that states its extent, the bytes its
-// `metaCrc` covers, the meta region, the body region its codec still wraps, and
-// the chain value that extends the one before it. `bodyCrc` covers the body
-// region alone.
+// One chunk as it is stored. `bodyCrc` covers the body region alone, so the chain value
+// sits outside it.
 export interface Chunk {
   readonly header: ChunkHeader;
   readonly metaCovered: Uint8Array;
@@ -77,7 +73,6 @@ export const chunkOf = (
     return undefined;
   }
 
-  // The meta region follows the header, and the chain value ends the chunk.
   const metaEnd = ChunkHeaderBytes + header.metaLen;
 
   return {

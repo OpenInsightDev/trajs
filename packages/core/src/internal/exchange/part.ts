@@ -18,24 +18,23 @@ import * as Response from "#/Response.ts";
 import * as Toolkit from "#/Toolkit.ts";
 import * as Trajectory from "#/Trajectory.ts";
 
-// Every frame holds a meta and a body. The meta is the tag and the identifiers a
-// reader reads with no config, in the spellings that keep a meta region small: a
-// uuid is its 16 bytes, and a moment its epoch. The body is what a kit decodes. A
-// kind states its fields once, as the two halves a chunk holds, and the part the
-// two compose.
+// A frame holds a meta and a body.
+// The meta is the tag and the identifiers a reader reads with no config.
+// A uuid is stored as 16 bytes and a moment as its epoch, so a meta region stays small.
+// The body is what a kit decodes.
+// A kind states its fields once, as the two halves a chunk holds, and the part they compose.
 
 export interface HeaderPartMetaEncoded {
   _tag: "Header";
 }
 
-// The tag alone: the header is told from a part before either region is read.
+// The tag alone, so the header is told from a part before either region is read.
 export const HeaderPartMeta: Schema.Codec<HeaderPartMetaEncoded> = Schema.Struct({
   _tag: Schema.tag("Header"),
 }).annotate({ identifier: "HeaderPartMeta" });
 
-// A chain value is 8 bytes (section 5.2): the leading 8 of the digest the header
-// names, whatever algorithm that is. So the header states no digest length, and this is
-// the one place the 8 is read off `ChainBytes`.
+// A chain value is the leading 8 bytes of the digest the header names.
+// The header states no digest length, so the cut is applied here.
 export const chainHashOptions = (hash: StreamHash.Algorithm): StreamHashOptions => ({
   algorithm: hash,
   length: ChainBytes,
