@@ -1,5 +1,4 @@
 import { StreamHash } from "@trajs/utils";
-import type { Options as StreamHashOptions } from "@trajs/utils/StreamHash";
 import { Effect, Match, Schema, SchemaGetter } from "effect";
 import type { DateTime } from "effect";
 import type { NonEmptyReadonlyArray } from "effect/Array";
@@ -10,7 +9,7 @@ import * as EventKit from "#/EventKit.ts";
 import * as Extra from "#/Extra.ts";
 import * as ExtraKit from "#/ExtraKit.ts";
 import { ChunkTableEntry, type ChunkTableEntryEncoded } from "#/internal/exchange/chunk.ts";
-import { ChainBytes, TimestampInt, UuidFromByte } from "#/internal/schema.ts";
+import { TimestampInt, UuidFromByte } from "#/internal/schema.ts";
 import * as Metric from "#/Metric.ts";
 import * as MetricKit from "#/MetricKit.ts";
 import * as Prompt from "#/Prompt.ts";
@@ -32,13 +31,6 @@ export interface HeaderPartMetaEncoded {
 export const HeaderPartMeta: Schema.Codec<HeaderPartMetaEncoded> = Schema.Struct({
   _tag: Schema.tag("Header"),
 }).annotate({ identifier: "HeaderPartMeta" });
-
-// A chain value is the leading 8 bytes of the digest the header names.
-// The header states no digest length, so the cut is applied here.
-export const chainHashOptions = (hash: StreamHash.Algorithm): StreamHashOptions => ({
-  algorithm: hash,
-  length: ChainBytes,
-});
 
 export interface HeaderPartBodyEncoded {
   version: string;

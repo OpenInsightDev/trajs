@@ -38,6 +38,7 @@ import {
   metadataOf,
   trajectoryOf,
 } from "#/internal/exchange.ts";
+import { Magic as ContainerMagic } from "#/internal/exchange/chunk.ts";
 import { configOf } from "#/internal/trajectory.ts";
 import * as MetricKit from "#/MetricKit.ts";
 import * as Toolkit from "#/Toolkit.ts";
@@ -53,7 +54,7 @@ import pkg from "../package.json" with { type: "json" };
  * @stability stable
  * @category constants
  */
-export const Magic = new TextEncoder().encode("TRAJS");
+export const Magic = ContainerMagic;
 
 /**
  * The core package version written into {@link Metadata}.
