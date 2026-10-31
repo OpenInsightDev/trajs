@@ -8,7 +8,6 @@ import * as Event from "#/Event.ts";
 import * as EventKit from "#/EventKit.ts";
 import * as Extra from "#/Extra.ts";
 import * as ExtraKit from "#/ExtraKit.ts";
-import { ChunkTableEntry, type ChunkTableEntryEncoded } from "#/internal/exchange/chunk.ts";
 import { TimestampInt, UuidFromByte } from "#/internal/schema.ts";
 import * as Metric from "#/Metric.ts";
 import * as MetricKit from "#/MetricKit.ts";
@@ -62,24 +61,6 @@ export const headerPartBodyOf = (
   metrickit: MetricKit.encode(config.metrickit),
   extrakit: ExtraKit.encode(config.extrakit),
 });
-
-export interface FooterPartMetaEncoded {
-  _tag: "Footer";
-}
-
-// The tag alone: a walk of a stream stops at the chunk whose meta states it.
-export const FooterPartMeta: Schema.Codec<FooterPartMetaEncoded> = Schema.Struct({
-  _tag: Schema.tag("Footer"),
-}).annotate({ identifier: "FooterPartMeta" });
-
-export interface FooterPartBodyEncoded {
-  chunks: ReadonlyArray<ChunkTableEntryEncoded>;
-}
-
-// The footer is alone in the last chunk of a file, so its table locates every data chunk.
-export const FooterPartBody: Schema.Codec<FooterPartBodyEncoded> = Schema.Struct({
-  chunks: Schema.Array(ChunkTableEntry),
-}).annotate({ identifier: "FooterPartBody" });
 
 // An extra read as `Schema.Unknown` would store bytes and moments as JSON text.
 const extraField = <K extends ExtraKit.Any, P extends Extra.Part>(extrakit: K, part: P) =>
@@ -410,7 +391,8 @@ export const MetricPart = <K extends MetricKit.Any>(
     );
 
 // Every meta a frame may hold, read with no config: the five kinds a data chunk
-// holds, and the two structural frames a walk stops at.
+// holds, and the header a file begins with.
+// The footer states no meta: it is a message of its own, located by its tail.
 export const Meta = Schema.Union([
   PromptPartMeta,
   SessionPartMeta,
@@ -418,7 +400,6 @@ export const Meta = Schema.Union([
   EventPartMeta,
   MetricPartMeta,
   HeaderPartMeta,
-  FooterPartMeta,
 ]).annotate({ identifier: "Meta" });
 
 export type Meta = Schema.Schema.Type<typeof Meta>;

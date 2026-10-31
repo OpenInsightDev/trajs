@@ -24,12 +24,11 @@ import { SchemaBinary } from "effect/encoding";
 import * as uuid from "uuid";
 import { expect, it } from "vite-plus/test";
 
+import { ChunkTable } from "#/internal/exchange/chunk.ts";
 import {
   EventPart,
   EventPartBody,
   EventPartMeta,
-  FooterPartBody,
-  FooterPartMeta,
   HeaderPartBody,
   HeaderPartMeta,
   headerPartBodyOf,
@@ -153,7 +152,6 @@ const metas = [
   [event, EventPartMeta.make({ uuid: event.uuid, timestamp: at })],
   [metricMeta, metricMeta],
   [HeaderPartMeta.make({}), HeaderPartMeta.make({})],
-  [FooterPartMeta.make({}), FooterPartMeta.make({})],
 ] as const;
 
 /** Reads one region's value back from the bytes that hold it. */
@@ -184,14 +182,13 @@ it("lays out every stored meta, body, and part", async () => {
       EventPartMeta,
       MetricPartMeta,
       HeaderPartMeta,
-      FooterPartMeta,
       PromptPartBody(config.extrakit),
       SessionPartBody(config.extrakit),
       ResponsePartBody(config.toolkit, config.extrakit),
       EventPartBody(config.eventkit),
       MetricPartBody(metrickit),
       HeaderPartBody,
-      FooterPartBody,
+      ChunkTable,
       ...Object.values(stored),
     ] satisfies ReadonlyArray<Schema.Constraint>,
     (schema) => checkBinaryLayout(schema),
@@ -241,7 +238,7 @@ it("reads the structural bodies of a file", () => {
 
   const chunks = [{ len: 64, metaLen: 9, count: 1 }];
 
-  expect(region(FooterPartBody)({ chunks })).toEqual({ chunks });
+  expect(region(ChunkTable)({ chunks })).toEqual({ chunks });
 });
 
 it("reads back every stored part as the part it was written from", () => {

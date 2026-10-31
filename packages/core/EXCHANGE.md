@@ -64,7 +64,7 @@ recomputes every value behind the changed bytes.
 | **frame**             | One meta segment paired with one body segment. A frame has no byte range of its own.                                                     |
 | **chain**             | The integrity of everything stored before a chunk ends, in that chunk's last 8 bytes (section 5.2).                                      |
 | **stream**            | A trajectory written so far, ending wherever the writer stopped.                                                                         |
-| **file**              | A stream that was sealed: the same bytes, followed by a footer chunk.                                                                    |
+| **file**              | A stream that was sealed: the same bytes, followed by a footer.                                                                          |
 | **segment**           | One encoded value of a region, as the schema codec writes it (section 6): a varint length, an envelope byte, and the payload.            |
 | **compression frame** | The one frame a chunk's body region is stored as: one value of the `compression` codec, holding every body of that chunk in frame order. |
 
@@ -72,17 +72,15 @@ recomputes every value behind the changed bytes.
 
 ```
 stream := Magic ‖ header chunk ‖ data chunk*
-file   := Magic ‖ header chunk ‖ data chunk* ‖ footer chunk ‖ u32 footerLen ‖ Magic
+file   := stream ‖ footer
 ```
 
-| Part             | Size     | Meaning                            |
-| ---------------- | -------- | ---------------------------------- |
-| `Magic`          | 5        | UTF-8 `TRAJS`                      |
-| header chunk     | variable | exactly one frame, tagged `Header` |
-| data chunk       | variable | one or more frames, each a part    |
-| footer chunk     | variable | exactly one frame, tagged `Footer` |
-| `footerLen`      | 4        | size of the footer chunk in bytes  |
-| trailing `Magic` | 5        | UTF-8 `TRAJS`                      |
+| Part         | Size     | Meaning                                                                                         |
+| ------------ | -------- | ----------------------------------------------------------------------------------------------- |
+| `Magic`      | 5        | UTF-8 `TRAJS`                                                                                   |
+| header chunk | variable | exactly one frame, tagged `Header`                                                              |
+| data chunk   | variable | one or more frames, each a part                                                                 |
+| footer       | variable | the chunk table, its checksum, the digest of the file, and the bytes that locate it (section 9) |
 
 A reader MUST verify the leading `Magic` and MUST NOT read anything else if it
 does not match. Chunks are contiguous: the header chunk starts at offset 5, and
@@ -94,22 +92,24 @@ gap.
 Reading the last 9 bytes is not enough, because any 4 bytes can precede a `TRAJS`
 marker by accident. A reader MUST treat them as a candidate and confirm it:
 
-1. `footerLen` MUST be at least 25, the bytes a chunk takes before its two regions.
+1. `footerLen` MUST be at least 12, the checksum and the digest a footer takes
+   besides its body.
 2. `footerStart = length − 9 − footerLen` MUST lie after the header chunk: the
    chunk header at offset 5 MUST state an extent that ends at or before
    `footerStart`.
-3. The bytes at `footerStart` MUST parse as a chunk whose extent ends exactly at
-   `length − 9`, whose two checksums verify, and whose regions each hold exactly
-   one segment — the meta one tagged `Footer`.
+3. The bytes at `footerStart` MUST parse as a footer (section 9) that ends at
+   `length`, whose `bodyCrc` verifies, and whose body holds exactly one table
+   frame.
 
 Confirmation reads no data chunk and checks no chain value. Validation (section 12)
-compares the table with the chunks on disk and the footer chunk's chain value with
-the bytes it covers.
+compares the table with the chunks on disk and the footer's chain value with the
+bytes it covers.
 
-If any step fails, the trajectory is a **stream**: a walk from offset 5 (section 12)
-stops at the chunk holding the `Footer` frame, which carries no part and whose
-trailing bytes belong to no chunk. A file whose tail is damaged therefore reads as
-the parts before its footer, never as a forged index.
+If any step fails, the trajectory is a **stream**: a walk from offset 5 of it
+(section 12) reads data chunks and stops where the bytes no longer parse as one,
+which is where a footer begins. Nothing marks those bytes as a footer, so a walk
+that reaches them reports what they fail rather than reading a part or an index
+from them.
 
 ## 5. Chunk
 
@@ -177,7 +177,7 @@ chain(chunk i) = H(chain(chunk i − 1) ‖ bytes(chunk i)[0, chunkLen − 8))
 `chain(c)` is the integrity of every stored byte up to the end of chunk `c`, folded
 chunk by chunk rather than hashed once over the whole prefix, which is what lets it
 be extended without re-reading that prefix. The digest of a file is the chain value
-of its footer chunk (section 9).
+of its footer (section 9).
 
 - **A chunk is verified against its predecessor, not against the file.** A chunk and
   the 8 bytes before it are enough to check that the two were written in that order.
@@ -259,7 +259,6 @@ field no reader states.
 | `Event`    | `uuid`, `sessionId?`, `timestamp`, `startTimestamp?`    | `event`                                                           |
 | `Metric`   | `metricTag`, `attach?`, `timestamp?`, `startTimestamp?` | `data`                                                            |
 | `Header`   | the tag only                                            | `version`, `hash`, `toolkit`, `eventkit`, `metrickit`, `extrakit` |
-| `Footer`   | the tag only                                            | `chunks`                                                          |
 
 - A uuid is stored as its 16 bytes rather than its 36-character string: the part's
   `uuid`, the `fork` of a sub session's `type`, and each `attach` entry. A
@@ -321,18 +320,39 @@ it is newer, because a later release may write a variant this one does not know.
 The body is written once and never changes. Moving one forward is a migration, not an
 append (section 16).
 
-## 9. Footer frame
+## 9. Footer
 
-A file ends with a chunk that holds exactly one frame, tagged `Footer`. Its body
-holds the chunk table:
+A file ends with a footer that holds the chunk table. It is not a chunk: it states
+no frame, no tag and no compression code, so a reader that has its tail reads the
+whole footer as one message. It states one region and no meta, so nothing pairs with
+it and it holds one codec frame rather than a region of them.
+
+```
+off        size      field
+0          n         body        the chunk table, as one codec frame
+n          4         bodyCrc     CRC-32 of the body region
+n + 4      8         chain       the digest of everything before the footer
+n + 12     4         footerLen   size of the footer in bytes, n + 12
+n + 16     5         Magic       UTF-8 TRAJS
+```
+
+The fields are read from the last byte: `Magic` and `footerLen` are what a locate
+reads (section 4.1), and `footerLen` sizes the body in front of them, so one
+message spans the footer from either end. `footerStart = length − 9 − footerLen`.
+
+The body holds the chunk table, as one codec frame:
 
 | Field    | Meaning                                                                                                                     |
 | -------- | --------------------------------------------------------------------------------------------------------------------------- |
 | `chunks` | one entry per data chunk, in file order: `len` (chunk size in bytes), `metaLen` (its meta region), and `count` (its frames) |
 
-- The **digest of the file** is the chain value of the footer chunk, which covers
-  `Magic`, the header chunk, and every data chunk. It is not stored a second time: a
-  reader that reads the footer chunk has already read its last 8 bytes.
+- The **digest of the file** is the footer's chain value, which covers `Magic`,
+  the header chunk, and every data chunk. It is not stored a second time: a reader
+  that reads the footer has already read those 8 bytes.
+- `bodyCrc` is CRC-32, fixed by this format like a chunk's checksums, and covers
+  the body region alone. The chain value sits outside it for the reason section
+  5.2 gives. The body is stored uncompressed: a codec costs a byte for every
+  region, and a table of a few bytes per chunk does not repay it.
 - `chunks` MUST list data chunks only, MUST be in file order, MUST restate each
   chunk's `metaLen` as that chunk's header states it, and MUST satisfy
   `5 + headerChunkLen + Σ len = footerStart` and `Σ count = frames`. A table that
@@ -340,14 +360,14 @@ holds the chunk table:
 - `chunks` is a derived cache: every number in it can be recovered by walking the
   chunks, which is exactly what a stream reader does.
 
-`count` makes frame index → chunk a prefix sum in memory, `len` makes chunk → offset
-one too, and `metaLen` is what lets a scan read a chunk's header and meta region as
-one read instead of asking the header how long the meta region is.
+`count` makes frame index → chunk a prefix sum in memory, `len` makes chunk →
+offset one too, and `metaLen` is what lets a scan read a chunk's header and meta
+region as one read instead of asking the header how long the meta region is.
 
-Each structural frame is alone in its chunk so that one length locates it:
-`footerLen` for the footer, the fixed offset 5 for the header. A footer sharing a
-chunk with parts could only be found by scanning, which is what a file exists to
-avoid.
+The header frame is alone in its first chunk, so the fixed offset 5 locates it, and
+the footer is a message of its own, so `footerLen` locates it in one read. Either
+sharing bytes with parts could only be found by scanning, which is what a file
+exists to avoid.
 
 ## 10. Chunking policy
 
@@ -394,7 +414,7 @@ hands back for a single value is a view of a buffer it reuses, so a writer that 
 frames from separate calls MUST copy them before it joins them.
 
 **Writing a new trajectory.** Write `Magic`, the header chunk, the data chunks,
-close the last chunk, then the footer chunk and `u32 footerLen ‖ Magic`.
+close the last chunk, then the footer, which ends with `u32 footerLen ‖ Magic`.
 
 **Appending.** A trajectory is continued without changing its form:
 
@@ -404,9 +424,8 @@ close the last chunk, then the footer chunk and `u32 footerLen ‖ Magic`.
 3. A torn tail chunk (below) MUST be truncated first.
 4. The append point is the end of the last whole chunk of a stream, which a walk of
    chunk headers and metas locates. For a file it is `footerStart`, which `footerLen`
-   locates in one read: the trajectory MUST be truncated there, dropping the footer
-   chunk, `footerLen` and the trailing `Magic`, and data chunks and a new footer MUST
-   be written in their place.
+   locates in one read: the trajectory MUST be truncated there, dropping the footer,
+   and data chunks and a new footer MUST be written in their place.
 5. The 8 bytes immediately before the append point are the only state the append
    carries over. It MUST read them, MUST NOT read any data chunk's body region, and
    MUST NOT fold the bytes before it into a digest. It MAY verify them by reading
@@ -420,11 +439,11 @@ Steps 3 and 4 rewrite nothing: they drop bytes from the tail. Appending at all n
 storage that continues a trajectory rather than replacing it, and a storage that
 cannot MUST fail the append rather than write the trajectory whole.
 
-**Sealing.** A file is produced from a stream by appending the footer chunk and
-`u32 footerLen ‖ Magic` at the trajectory's current length. Sealing a file MUST fail,
-so no byte of a written footer is ever replaced by a second one. The footer chunk's
-chain value extends the last data chunk's, so it is computed from that value and
-the footer chunk alone.
+**Sealing.** A file is produced from a stream by appending the footer, which states
+`footerLen` and ends with `Magic`, at the trajectory's current length. Sealing a
+file MUST fail, so no byte of a written footer is ever replaced by a second one. The
+footer's chain value extends the last data chunk's, so it is computed from that
+value and the footer alone.
 
 **Torn tails.** A chunk is torn when the bytes from its offset do not hold a whole
 one: the tail is shorter than the 25 bytes the smallest chunk takes, or the chunk it
@@ -452,9 +471,8 @@ A reader chooses how much to read, and each choice touches nothing else:
 
 - **The header.** `Magic` and the header chunk: one small chunk holding the kits and
   the version, which is what lets a reader hold them before it decodes any body.
-- **The footer.** After confirming it (section 4.1), the footer chunk, whose last 8
-  bytes are the file's digest and whose table locates everything else. No part is
-  decoded.
+- **The footer.** After confirming it (section 4.1), the footer, whose chain value
+  is the file's digest and whose table locates everything else. No part is decoded.
 - **The metas.** Per chunk, its chunk header and its meta region as one read,
   whose offset and length the table states: no decompression, no compression codec,
   no `bodyLen` bytes read. This is what a session tree is built on — declarations,
@@ -477,8 +495,9 @@ round trip per chunk.
 
 In a stream there is no table: a walk reads chunk headers and meta regions, stops
 silently at a torn chunk — the normal shape of a trajectory whose writer is still
-running or was killed — and stops at the `Footer` frame. In a file the table says how
-much there should be, so a short file or a failed checksum is an error.
+running or was killed — and stops at the bytes a footer begins with. In a file the
+table says how much there should be, so a short file or a failed checksum is an
+error.
 
 Reading one part costs one chunk, not one part: that is the price of a compression
 unit that shares its window across thousands of parts, and it is the right trade for
@@ -495,7 +514,7 @@ Five situations are distinguished by what a reader can prove:
 | wrong bytes  | a checksum mismatch inside a complete chunk      | `ChecksumMismatch`, stop                               | `ChecksumMismatch`, and the table locates the next chunk                 |
 | malformed    | regions do not split evenly, or leave bytes over | `MalformedChunk`, stop                                 | `MalformedChunk`                                                         |
 | out of order | a chain value does not extend the one before it  | `ChainMismatch`; the extents still locate what follows | `ChainMismatch` at every chunk whose value fails                         |
-| broken table | the table does not account for its chunks        | cannot occur: a stream has no table                    | `MalformedChunk` at the footer chunk                                     |
+| broken table | the table does not account for its chunks        | cannot occur: a stream has no table                    | `MalformedChunk` at the footer                                           |
 
 The distinction between torn and corrupt is structural: a torn chunk is one the file
 ends inside — its extent does not fit, or its header does not even fit — not one whose
@@ -548,7 +567,7 @@ re-litigated later.
   there is no index without a sidecar (goal 5).
 - **The zstd seekable format.** Its index must be the last thing in the file and its
   offsets start at byte zero, so it cannot wrap a file that also carries a header chunk
-  and a footer chunk.
+  and a footer.
 - **ATIF and OpenTelemetry.** Both are interchange — what a run means, to a program
   that did not record it — with no compression unit, no chunk, no index and no append.
   They are produced from a trajectory, or read into one, rather than stored in place of
