@@ -12,7 +12,7 @@ const headerFields = {
   bodyCrc: BinaryProtocol.u32,
   bodyLen: BinaryProtocol.u32,
   metaLen: BinaryProtocol.u32,
-  compression: BinaryProtocol.u8.pipe(BinaryProtocol.as(Compression.Algorithm)),
+  compression: BinaryProtocol.u8.pipe(BinaryProtocol.decodeTo(Compression.Algorithm)),
 };
 
 // The two regions a header sizes.
@@ -24,11 +24,11 @@ const regionFields = {
 // The chunk through its body: the bytes both checksums and the chain value cover.
 const coveredFields = { ...headerFields, ...regionFields };
 
-const ChunkCovered = BinaryProtocol.message(coveredFields);
+const ChunkCovered = BinaryProtocol.toCodec(coveredFields);
 
 // One chunk as it is stored. `bodyCrc` covers the body region alone, so the chain value
 // sits outside it.
-export const Chunk = BinaryProtocol.message({
+export const Chunk = BinaryProtocol.toCodec({
   ...coveredFields,
   chain: BinaryProtocol.bytes(ChainBytes),
 });
@@ -36,12 +36,12 @@ export const Chunk = BinaryProtocol.message({
 export type Chunk = Schema.Schema.Type<typeof Chunk>;
 
 // What a scan reads alone, before it knows a chunk's extent.
-export const ChunkHeader = BinaryProtocol.message(headerFields);
+export const ChunkHeader = BinaryProtocol.toCodec(headerFields);
 
 export type ChunkHeader = Schema.Schema.Type<typeof ChunkHeader>;
 
 // What `metaCrc` covers: the header less its two checksums, and the meta region.
-const MetaCovered = BinaryProtocol.message({
+const MetaCovered = BinaryProtocol.toCodec({
   bodyLen: headerFields.bodyLen,
   metaLen: headerFields.metaLen,
   compression: headerFields.compression,
@@ -256,13 +256,13 @@ const tailFields = {
   magic: BinaryProtocol.bytes(Magic.length),
 };
 
-const FileTail = BinaryProtocol.message(tailFields);
+const FileTail = BinaryProtocol.toCodec(tailFields);
 
 // A footer is not a chunk: it pairs no meta region, states no compression code, and holds
 // no frame of the format, so these fields are its whole layout.
 // They are read from its last byte, so `footerLen` sizes the body in front of it and one
 // message spans the whole footer.
-export const Footer = BinaryProtocol.message(
+export const Footer = BinaryProtocol.toCodec(
   {
     // The body is the only region, so it takes every byte `footerLen` leaves.
     body: BinaryProtocol.bytes(),

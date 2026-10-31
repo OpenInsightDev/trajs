@@ -6,8 +6,8 @@
  * declaration both reads and writes a message.
  *
  * Fields are laid out in the order they are declared, and read from the start of
- * the message or from its end. A field states its length, its count, or its
- * branch by a raw value an earlier field read.
+ * the message or from its end. A field states its length, its count, or its case
+ * by a raw value an earlier field read.
  */
 
 import { Effect, Pipeable, Schema, SchemaIssue } from "effect";
@@ -508,8 +508,8 @@ export const frameField = <A>(schema: Schema.Codec<A, Raw>): FieldCodec<A> =>
       }),
   );
 
-/** The fields of one entry, read as many times as `count` states. */
-export const repeatField = <A>(
+/** The values of one field, read as many times as `count` states. */
+export const arrayField = <A>(
   field: Field<A>,
   count: Count,
   schema: Schema.Codec<ReadonlyArray<A>, ReadonlyArray<Raw>>,
@@ -532,7 +532,7 @@ export const repeatField = <A>(
     (raw, at, around) =>
       Effect.gen(function* () {
         if (!isEntries(raw)) {
-          return yield* Effect.fail(issue("a repetition holds entries", raw));
+          return yield* Effect.fail(issue("an array holds elements", raw));
         }
 
         const size = yield* count.resolve(around);
@@ -540,7 +540,7 @@ export const repeatField = <A>(
         if (size !== undefined && raw.length !== size) {
           return yield* Effect.fail(
             issue(
-              `the repetition holds ${raw.length} entries, and ${sourceOf(count)} states ${size}`,
+              `the array holds ${raw.length} elements, and ${sourceOf(count)} states ${size}`,
               raw,
             ),
           );
@@ -552,7 +552,7 @@ export const repeatField = <A>(
       }),
   );
 
-/** The field one of the cases of a branch states, or why none is stated. */
+/** The field one of the cases of a union states, or why none is stated. */
 const caseOf = (
   cases: Readonly<Record<string, Field<unknown>>>,
   on: string,
@@ -570,15 +570,15 @@ const caseOf = (
 
     if (chosen === undefined) {
       return yield* Effect.fail(
-        issue(`\`${on}\` states ${key}, which names no case of the branch`, raw),
+        issue(`\`${on}\` states ${key}, which names no case of the union`, raw),
       );
     }
 
     return chosen;
   });
 
-/** One of the cases of a branch, read and written where the code states it. */
-export const branchField = <A>(
+/** One of the cases of a union, read and written where the code states it. */
+export const unionField = <A>(
   on: string,
   cases: Readonly<Record<string, Field<unknown>>>,
   schema: Schema.Codec<A, Raw>,

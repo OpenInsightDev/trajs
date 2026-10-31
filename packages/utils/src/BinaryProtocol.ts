@@ -3,26 +3,26 @@
  *
  * A message is read one field at a time, in the order the fields are declared,
  * and each field states the bytes it spans. A field states its length, its
- * count, or its branch by the raw value an earlier field read, so one message
+ * count, or its case by the raw value an earlier field read, so one message
  * describes a protocol whose layout the bytes carry.
  *
- * {@link message} states a whole message and {@link struct} a message nested in
+ * {@link toCodec} states a whole message and {@link struct} a message nested in
  * another. The numbers are {@link u8} through {@link f64}, the byte regions
- * {@link bytes} and {@link bytesOf}, and the repetitions {@link repeat} and
- * {@link repeatOf}. {@link branch} reads one of several layouts by a code an
+ * {@link bytes} and {@link bytesOf}, and the arrays {@link array} and
+ * {@link arrayOf}. {@link union} reads one of several layouts by a code an
  * earlier field read.
  *
  * A field reads its bytes into a raw value, and the schema of the field states
- * what that raw holds. {@link as} states that schema, so the values a message
- * holds are checked, branded, and converted by Effect schemas.
+ * what that raw holds. {@link decodeTo} states that schema, so the values a
+ * message holds are checked, branded, and converted by Effect schemas.
  *
  * {@link frame} reads a value any schema states, as `SchemaBinary` lays it out.
  *
  * **Gotchas**
  *
  * A field spans whole bytes. The bits of one byte are not stated apart, so a
- * code split across flags is read as the byte it is, and {@link as} names the
- * value it holds.
+ * code split across flags is read as the byte it is, and {@link decodeTo} names
+ * the value it holds.
  *
  * @stability experimental
  */
@@ -31,8 +31,8 @@ import { type Pipeable, Schema, SchemaGetter } from "effect";
 import { SchemaBinary } from "effect/encoding";
 
 import {
+  arrayField,
   BigNumbers,
-  branchField,
   FieldCodec,
   frameField,
   nestField,
@@ -40,9 +40,9 @@ import {
   numberField,
   readMessage,
   regionField,
-  repeatField,
   stated,
   statedBy,
+  unionField,
   writeMessage,
 } from "#/internal/binary-protocol.ts";
 import type { Raw, Read, Write } from "#/internal/binary-protocol.ts";
@@ -83,7 +83,7 @@ export type Direction = "forward" | "backward";
  *
  * **When to use**
  *
- * Use as the second argument of {@link message}.
+ * Use as the second argument of {@link toCodec}.
  *
  * **Details**
  *
@@ -95,7 +95,7 @@ export type Direction = "forward" | "backward";
  * A nested message ({@link struct}) takes the order and the direction of the
  * message it is read in, so both are stated once for a whole message.
  *
- * @see {@link message} for the message these are given to.
+ * @see {@link toCodec} for the message these are given to.
  * @stability experimental
  * @category models
  */
@@ -115,24 +115,24 @@ export interface Options {
  * **Details**
  *
  * A field is declared before the message it belongs to, so it states no byte
- * order and no position of its own. {@link message} reads the fields in the
+ * order and no position of its own. {@link toCodec} reads the fields in the
  * order they are given or in the reverse of it.
  *
  * `schema` is the schema of the value. The bytes are read and written by the
  * field itself, so a field is not an Effect schema and is not read by
- * `Schema.decode`. Use {@link message} to obtain the schema of a whole message.
+ * `Schema.decode`. Use {@link toCodec} to obtain the schema of a whole message.
  *
- * @see {@link as} to state the value of a field.
+ * @see {@link decodeTo} to state the value of a field.
  * @stability experimental
  * @category models
  */
 export interface Field<out A = unknown> extends Pipeable.Pipeable {
   readonly schema: Schema.Codec<A, Raw>;
 
-  /** The read of the bytes this field spans, which {@link message} runs. */
+  /** The read of the bytes this field spans, which {@link toCodec} runs. */
   readonly read: Read;
 
-  /** The write of the bytes this field spans, which {@link message} runs. */
+  /** The write of the bytes this field spans, which {@link toCodec} runs. */
   readonly write: Write;
 }
 
@@ -141,7 +141,7 @@ export interface Field<out A = unknown> extends Pipeable.Pipeable {
  *
  * **Details**
  *
- * A field stated by {@link as} holds the value that schema names.
+ * A field stated by {@link decodeTo} holds the value that schema names.
  *
  * @stability experimental
  * @category models
@@ -151,9 +151,9 @@ export type Value<Fields extends Record<string, Field<unknown>>> = {
 };
 
 /**
- * The values the cases of a branch hold, as one union.
+ * The union of the values the cases hold.
  *
- * @see {@link branch} for the field these are the cases of.
+ * @see {@link union} for the field these are the cases of.
  * @stability experimental
  * @category models
  */
@@ -214,17 +214,17 @@ const betweenBig = (minimum: bigint, maximum: bigint): Schema.Codec<bigint, bigi
   Schema.BigInt.pipe(Schema.check(Schema.isBetweenBigInt({ minimum, maximum })));
 
 /**
- * The bytes of one message, as the schema of the values its fields hold.
+ * Derives the codec of one message from the fields it states.
  *
  * **When to use**
  *
- * Use to read and write a message, stated as the fields it holds.
+ * Use to read and write a whole message, stated as the fields it holds.
  *
  * **Details**
  *
  * The fields are laid out in the order they are given, and read from the start
  * of the message unless {@link Options} states another {@link Direction}. So a
- * field states its length, its count, or its branch by a field read before it.
+ * field states its length, its count, or its case by a field read before it.
  * A field spans exactly the bytes it states, so the message spans the bytes its
  * fields do. Bytes left over are an issue of the decode, since the message
  * states no field for them.
@@ -248,12 +248,12 @@ const betweenBig = (minimum: bigint, maximum: bigint): Schema.Codec<bigint, bigi
  *
  * const Compression = Schema.Enum({ None: 0, Zstd: 1 })
  *
- * const ChunkHeader = BinaryProtocol.message({
+ * const ChunkHeader = BinaryProtocol.toCodec({
  *   metaCrc: BinaryProtocol.u32,
  *   bodyCrc: BinaryProtocol.u32,
  *   bodyLen: BinaryProtocol.u32,
  *   metaLen: BinaryProtocol.u32,
- *   compression: BinaryProtocol.u8.pipe(BinaryProtocol.as(Compression))
+ *   compression: BinaryProtocol.u8.pipe(BinaryProtocol.decodeTo(Compression))
  * })
  *
  * const header = {
@@ -278,7 +278,7 @@ const betweenBig = (minimum: bigint, maximum: bigint): Schema.Codec<bigint, bigi
  * import { Effect, Schema } from "effect"
  * import * as BinaryProtocol from "@trajs/utils/BinaryProtocol"
  *
- * const Pack = BinaryProtocol.message(
+ * const Pack = BinaryProtocol.toCodec(
  *   { data: BinaryProtocol.bytesOf("len"), len: BinaryProtocol.u32 },
  *   { direction: "backward" }
  * )
@@ -296,7 +296,7 @@ const betweenBig = (minimum: bigint, maximum: bigint): Schema.Codec<bigint, bigi
  * @stability experimental
  * @category constructors
  */
-export const message = <Fields extends Record<string, Field<unknown>>>(
+export const toCodec = <Fields extends Record<string, Field<unknown>>>(
   fields: Fields,
   options?: Options,
 ): Schema.Codec<Value<Fields>, Uint8Array> => {
@@ -325,14 +325,14 @@ export const message = <Fields extends Record<string, Field<unknown>>>(
  * **Details**
  *
  * A nested message is read where its field is declared, and it spans the bytes
- * its own fields do. Its fields state their lengths and branches by the fields
+ * its own fields do. Its fields state their lengths and cases by the fields
  * around them as well as their own, so a length stated before the nested
  * message still sizes a region inside it. It takes the {@link Direction} of the
  * message it is read in.
  *
  * The value is an object of the values of the nested fields.
  *
- * @see {@link message} for the message these fields are nested in.
+ * @see {@link toCodec} for the message these fields are nested in.
  * @stability experimental
  * @category constructors
  */
@@ -348,7 +348,7 @@ export const struct = <Fields extends Record<string, Field<unknown>>>(
  * The value is an integer from `0` to `0xff`, and a value outside that range is
  * refused rather than written truncated.
  *
- * @see {@link as} to state the value the byte holds.
+ * @see {@link decodeTo} to state the value the byte holds.
  * @stability experimental
  * @category constructors
  */
@@ -515,7 +515,7 @@ export const bytes = (size?: number): Field<Uint8Array> =>
  * import { Effect, Schema } from "effect"
  * import * as BinaryProtocol from "@trajs/utils/BinaryProtocol"
  *
- * const Message = BinaryProtocol.message({
+ * const Message = BinaryProtocol.toCodec({
  *   bodyLen: BinaryProtocol.u32,
  *   body: BinaryProtocol.bytesOf("bodyLen")
  * })
@@ -568,7 +568,7 @@ export const bytesOf = (name: string): Field<Uint8Array> =>
  *
  * const Meta = Schema.Struct({ name: Schema.String, tags: Schema.Array(Schema.String) })
  *
- * const Document = BinaryProtocol.message({
+ * const Document = BinaryProtocol.toCodec({
  *   count: BinaryProtocol.u16,
  *   meta: BinaryProtocol.frame(Meta)
  * })
@@ -581,7 +581,7 @@ export const bytesOf = (name: string): Field<Uint8Array> =>
  * ```
  *
  * @see {@link struct} for fields whose bytes the message states.
- * @see {@link as} for the value the bytes of a field already hold.
+ * @see {@link decodeTo} for the value the bytes of a field already hold.
  * @stability experimental
  * @category constructors
  */
@@ -589,29 +589,29 @@ export const frame = <A>(schema: Schema.Codec<A, unknown, never, never>): Field<
   frameField(SchemaBinary.toCodec(schema));
 
 /**
- * The fields of one entry, read as many times as stated.
+ * An array of the values of one field, read as many times as stated.
  *
  * **When to use**
  *
- * Use for a repetition whose count the message states as a literal, or that
- * runs to the end of the message. Use {@link repeatOf} for a count an earlier
+ * Use for a run of elements whose count the message states as a literal, or that
+ * runs to the end of the message. Use {@link arrayOf} for a count an earlier
  * field states.
  *
  * **Details**
  *
- * Without a count, entries are read until the bytes of the message end, so the
- * repetition ends the message.
- * The value is an array of the values of the entry.
- * An array of fewer or more entries than stated is refused where it is written.
+ * Without a count, elements are read until the bytes of the message end, so the
+ * array ends the message.
+ * The value is a `ReadonlyArray` of the values of the field.
+ * An array of fewer or more elements than stated is refused where it is written.
  *
- * **Example** (Entries to the end of the message)
+ * **Example** (Elements to the end of the message)
  *
  * ```ts import.meta.vitest
  * import { Effect, Schema } from "effect"
  * import * as BinaryProtocol from "@trajs/utils/BinaryProtocol"
  *
- * const Tail = BinaryProtocol.message({
- *   rest: BinaryProtocol.repeat(BinaryProtocol.u16)
+ * const Tail = BinaryProtocol.toCodec({
+ *   rest: BinaryProtocol.array(BinaryProtocol.u16)
  * })
  *
  * const bytes = new Uint8Array([1, 0, 2, 0])
@@ -619,15 +619,16 @@ export const frame = <A>(schema: Schema.Codec<A, unknown, never, never>): Field<
  * read.rest // => [1, 2]
  * ```
  *
- * @see {@link repeatOf} for a repetition an earlier field counts.
+ * @see {@link arrayOf} for an array an earlier field counts.
  * @stability experimental
  * @category constructors
  */
-export const repeat = <A>(field: Field<A>, count?: number): Field<ReadonlyArray<A>> =>
-  repeatField(field, stated(count), Schema.Array(field.schema));
+export const array = <A>(field: Field<A>, count?: number): Field<ReadonlyArray<A>> =>
+  arrayField(field, stated(count), Schema.Array(field.schema));
 
 /**
- * The fields of one entry, read as many times as an earlier field states.
+ * An array of the values of one field, read as many times as an earlier field
+ * states.
  *
  * **When to use**
  *
@@ -635,12 +636,12 @@ export const repeat = <A>(field: Field<A>, count?: number): Field<ReadonlyArray<
  *
  * **Details**
  *
- * The field named holds the count of the entries, so it is declared before the
- * repetition and its value is a number of entries.
- * An array of fewer or more entries than the field states is refused where it is
- * written.
+ * The field named holds the count of the elements, so it is declared before the
+ * array and its value is a number of elements.
+ * An array of fewer or more elements than the field states is refused where it
+ * is written.
  *
- * **Example** (A table of counted entries)
+ * **Example** (A table of counted elements)
  *
  * ```ts import.meta.vitest
  * import { Effect, Schema } from "effect"
@@ -651,9 +652,9 @@ export const repeat = <A>(field: Field<A>, count?: number): Field<ReadonlyArray<
  *   body: BinaryProtocol.bytesOf("len")
  * })
  *
- * const Table = BinaryProtocol.message({
+ * const Table = BinaryProtocol.toCodec({
  *   count: BinaryProtocol.u32,
- *   entries: BinaryProtocol.repeatOf(Entry, "count")
+ *   entries: BinaryProtocol.arrayOf(Entry, "count")
  * })
  *
  * const bytes = await Effect.runPromise(
@@ -668,12 +669,12 @@ export const repeat = <A>(field: Field<A>, count?: number): Field<ReadonlyArray<
  * read.entries.length // => 1
  * ```
  *
- * @see {@link repeat} for a repetition of a stated count.
+ * @see {@link array} for an array of a stated count.
  * @stability experimental
  * @category constructors
  */
-export const repeatOf = <A>(field: Field<A>, name: string): Field<ReadonlyArray<A>> =>
-  repeatField(field, statedBy(name), Schema.Array(field.schema));
+export const arrayOf = <A>(field: Field<A>, name: string): Field<ReadonlyArray<A>> =>
+  arrayField(field, statedBy(name), Schema.Array(field.schema));
 
 /**
  * One of several layouts, chosen by a code an earlier field read.
@@ -696,9 +697,9 @@ export const repeatOf = <A>(field: Field<A>, name: string): Field<ReadonlyArray<
  * import { Effect, Schema } from "effect"
  * import * as BinaryProtocol from "@trajs/utils/BinaryProtocol"
  *
- * const Message = BinaryProtocol.message({
+ * const Message = BinaryProtocol.toCodec({
  *   code: BinaryProtocol.u8,
- *   body: BinaryProtocol.branch("code", {
+ *   body: BinaryProtocol.union("code", {
  *     0: BinaryProtocol.struct({ size: BinaryProtocol.u32 }),
  *     1: BinaryProtocol.struct({ at: BinaryProtocol.f64 })
  *   })
@@ -710,17 +711,17 @@ export const repeatOf = <A>(field: Field<A>, name: string): Field<ReadonlyArray<
  * read.body // => { at: 4 }
  * ```
  *
- * @see {@link CaseValue} for the value the cases hold.
+ * @see {@link CaseValue} for the value these cases hold.
  * @stability experimental
  * @category constructors
  */
-export const branch = <Cases extends Record<string, Field<unknown>>>(
+export const union = <Cases extends Record<string, Field<unknown>>>(
   on: string,
   cases: Cases,
-): Field<CaseValue<Cases>> => branchField<CaseValue<Cases>>(on, cases, unionOf(cases));
+): Field<CaseValue<Cases>> => unionField<CaseValue<Cases>>(on, cases, unionOf(cases));
 
 /**
- * States the value a field's bytes hold.
+ * States the value of a field's bytes as a schema states it.
  *
  * **When to use**
  *
@@ -732,6 +733,7 @@ export const branch = <Cases extends Record<string, Field<unknown>>>(
  * The schema decodes the raw value the field read and encodes the value back to
  * it, so a byte that states no value of the schema is an issue of the decode.
  * The bytes the field spans do not change.
+ * The pair of schemas is what `Schema.decodeTo` composes.
  *
  * **Example** (A code byte of a closed set)
  *
@@ -741,8 +743,8 @@ export const branch = <Cases extends Record<string, Field<unknown>>>(
  *
  * const Compression = Schema.Enum({ None: 0, Zstd: 1 })
  *
- * const Codec = BinaryProtocol.message({
- *   compression: BinaryProtocol.u8.pipe(BinaryProtocol.as(Compression))
+ * const Codec = BinaryProtocol.toCodec({
+ *   compression: BinaryProtocol.u8.pipe(BinaryProtocol.decodeTo(Compression))
  * })
  *
  * const read = await Effect.runPromise(Schema.decodeEffect(Codec)(new Uint8Array([1])))
@@ -753,7 +755,7 @@ export const branch = <Cases extends Record<string, Field<unknown>>>(
  * @stability experimental
  * @category combining
  */
-export const as =
+export const decodeTo =
   <A, E extends Raw>(schema: Schema.Codec<A, E>) =>
   (field: Field<unknown>): Field<A> =>
     new FieldCodec(schema, field.read, field.write);
