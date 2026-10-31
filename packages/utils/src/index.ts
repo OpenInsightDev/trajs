@@ -7,6 +7,8 @@
  * {@link Byte} is the bytes of a trajectory, read at random.
  * {@link Storage} is where a program keeps its trajectories.
  * {@link ByteStore} keeps bytes between readings.
+ * {@link BinaryProtocol} reads and writes the bytes of one message of a binary
+ * protocol, and is not stable yet.
  *
  * A module is also a subpath import, such as `@trajs/utils/Byte`.
  * The layers stated here work over any platform, such as {@link Storage.layerFileSystem} and
@@ -18,6 +20,8 @@
  *
  * @stability stable
  */
+
+export * as BinaryProtocol from "#/BinaryProtocol.ts";
 
 export * as Byte from "#/Byte.ts";
 
