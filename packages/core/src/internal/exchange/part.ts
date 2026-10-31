@@ -1,12 +1,14 @@
+import { StreamHash } from "@trajs/utils";
 import { Effect, Match, Schema, SchemaGetter } from "effect";
 import type { DateTime } from "effect";
 import type { NonEmptyReadonlyArray } from "effect/Array";
 
+import type * as Config from "#/Config.ts";
 import * as Event from "#/Event.ts";
 import * as EventKit from "#/EventKit.ts";
 import * as Extra from "#/Extra.ts";
 import * as ExtraKit from "#/ExtraKit.ts";
-import { TimestampInt, UuidFromByte } from "#/internal/schema.ts";
+import { TimestampInt, Uuid, UuidFromByte } from "#/internal/schema.ts";
 import * as Metric from "#/Metric.ts";
 import * as MetricKit from "#/MetricKit.ts";
 import * as Prompt from "#/Prompt.ts";
@@ -360,3 +362,66 @@ export const Meta = Schema.Union([
 ]).annotate({ identifier: "Meta" });
 
 export type Meta = Schema.Schema.Type<typeof Meta>;
+
+export interface Header {
+  id: string;
+  version: string;
+  hash: StreamHash.Algorithm;
+  toolkit: Toolkit.ToolkitSchema;
+  eventkit: EventKit.EventKitSchema;
+  metrickit: MetricKit.MetricKitSchema;
+  extrakit: ExtraKit.ExtraKitSchema;
+}
+
+export const Header: Schema.Codec<Header> = Schema.Struct({
+  id: Uuid,
+  version: Schema.String,
+  hash: StreamHash.Algorithm,
+  toolkit: Toolkit.ToolkitSchema,
+  eventkit: EventKit.EventKitSchema,
+  metrickit: MetricKit.MetricKitSchema,
+  extrakit: ExtraKit.ExtraKitSchema,
+}).annotate({ identifier: "Header" });
+
+export const headerOf = (
+  config: Config.AnyConfig,
+  {
+    id,
+    version,
+    hash,
+  }: {
+    readonly id: string;
+    readonly version: string;
+    readonly hash: StreamHash.Algorithm;
+  },
+): Header => ({
+  id,
+  version,
+  hash,
+  toolkit: Toolkit.encode(config.toolkit),
+  eventkit: EventKit.encode(config.eventkit),
+  metrickit: MetricKit.encode(config.metrickit),
+  extrakit: ExtraKit.encode(config.extrakit),
+});
+
+export interface ChunkEntry {
+  len: number;
+  metaLen: number;
+  count: number;
+}
+
+export const ChunkEntry: Schema.Codec<ChunkEntry> = Schema.Struct({
+  len: Schema.Int,
+  metaLen: Schema.Int,
+  count: Schema.Int,
+}).annotate({ identifier: "ChunkEntry" });
+
+export interface Footer {
+  chunks: ChunkEntry[];
+  digest: string;
+}
+
+export const Footer: Schema.Codec<Footer> = Schema.Struct({
+  chunks: ChunkEntry.pipe(Schema.Array, Schema.mutable),
+  digest: Schema.String,
+}).annotate({ identifier: "Footer" });

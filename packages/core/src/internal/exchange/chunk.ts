@@ -3,16 +3,11 @@ import * as BinaryProtocol from "@trajs/utils/BinaryProtocol";
 import type { CompressionError } from "@trajs/utils/Compression";
 import { Effect, Option, Schema, Stream } from "effect";
 
-import type * as Config from "#/Config.ts";
-import * as EventKit from "#/EventKit.ts";
-import * as ExtraKit from "#/ExtraKit.ts";
-import { joined } from "#/internal/frames.ts";
-import { ChainBytes, UuidFromByte } from "#/internal/schema.ts";
-import * as MetricKit from "#/MetricKit.ts";
-import * as Toolkit from "#/Toolkit.ts";
+import * as part from "#/internal/exchange/part.ts";
+import { ChainBytes } from "#/internal/schema.ts";
 
 // What a chunk states before its two regions.
-const headerFields = {
+const chunkHeaderFields = {
   metaCrc: BinaryProtocol.u32,
   bodyCrc: BinaryProtocol.u32,
   bodyLen: BinaryProtocol.u32,
@@ -23,7 +18,7 @@ const headerFields = {
 // One chunk as it is stored: the header, the two regions it sizes, and the chain value.
 // `bodyCrc` covers the body region alone, so the chain value sits outside it.
 export const Chunk = BinaryProtocol.toCodec({
-  ...headerFields,
+  ...chunkHeaderFields,
   meta: BinaryProtocol.bytesOf("metaLen"),
   body: BinaryProtocol.bytesOf("bodyLen"),
   chain: BinaryProtocol.bytes(ChainBytes),
@@ -36,7 +31,7 @@ export type Chunk = Schema.Schema.Type<typeof Chunk>;
 export type Frame = Pick<Chunk, "meta" | "body">;
 
 // What a scan reads alone, before it knows a chunk's extent.
-export const ChunkHeader = BinaryProtocol.toCodec(headerFields);
+export const ChunkHeader = BinaryProtocol.toCodec(chunkHeaderFields);
 
 export type ChunkHeader = Schema.Schema.Type<typeof ChunkHeader>;
 
@@ -99,6 +94,24 @@ export const chainOf = (
 
     return hashing.digest();
   });
+
+// The bytes of every frame a chunk holds, in frame order: one region of a chunk.
+const joined = (rest: Uint8Array, chunks: ReadonlyArray<Uint8Array>): Uint8Array => {
+  const bytes = new Uint8Array(
+    rest.length + chunks.reduce((size, chunk) => size + chunk.length, 0),
+  );
+
+  bytes.set(rest);
+
+  let at = rest.length;
+
+  for (const chunk of chunks) {
+    bytes.set(chunk, at);
+    at += chunk.length;
+  }
+
+  return bytes;
+};
 
 // One chunk as a writer stores it, with a chain value that extends `prev`.
 export const encodeChunk = (
@@ -206,88 +219,42 @@ export const chunkFramesOf =
       );
     });
 
-// One data chunk, in file order: its stored size, its meta region, its frames.
-export interface ChunkTableEntryEncoded {
-  len: number;
-  metaLen: number;
-  count: number;
-}
-
-export const ChunkTableEntry: Schema.Codec<ChunkTableEntryEncoded> = Schema.Struct({
-  len: Schema.Int,
-  metaLen: Schema.Int,
-  count: Schema.Int,
-}).annotate({ identifier: "ChunkTableEntry" });
-
-// The table a footer holds: every data chunk, in file order, as a derived cache of what
-// walking the chunks yields (section 9).
-export interface ChunkTableEncoded {
-  chunks: ReadonlyArray<ChunkTableEntryEncoded>;
-}
-
-export const ChunkTable: Schema.Codec<ChunkTableEncoded> = Schema.Struct({
-  chunks: Schema.Array(ChunkTableEntry),
-}).annotate({ identifier: "ChunkTable" });
-
 // The marker begins every trajectory and ends every file, so it states no place
 // of its own.
 export const Magic = new TextEncoder().encode("TRAJS");
 
-// The declarations a reader holds before it decodes a body: which trajectory the file
-// holds, the release that wrote it, the algorithm every chain value uses, and the kits by
-// name and by stored schema.
-// One frame of these bytes is what a header states.
-export const Declarations = Schema.Struct({
-  id: UuidFromByte,
-  version: Schema.String,
-  hash: StreamHash.Algorithm,
-  toolkit: Toolkit.ToolkitSchema,
-  eventkit: EventKit.EventKitSchema,
-  metrickit: MetricKit.MetricKitSchema,
-  extrakit: ExtraKit.ExtraKitSchema,
-}).annotate({ identifier: "Declarations" });
-
-export type Declarations = Schema.Schema.Type<typeof Declarations>;
-
-export const declarationsOf = (
-  config: Config.AnyConfig,
-  {
-    id,
-    version,
-    hash,
-  }: { readonly id: string; readonly version: string; readonly hash: StreamHash.Algorithm },
-): Declarations => ({
-  id,
-  version,
-  hash,
-  toolkit: Toolkit.encode(config.toolkit),
-  eventkit: EventKit.encode(config.eventkit),
-  metrickit: MetricKit.encode(config.metrickit),
-  extrakit: ExtraKit.encode(config.extrakit),
-});
-
 // A header is not a chunk: nothing pairs what it states, so nothing of it is a body. It states
-// its declarations, and before them the checksum over them and their size.
+// the trajectory's id, release, digest algorithm and kits, which are one `SchemaBinary` frame,
+// and before them the checksum over them.
 // The chain value ends it, extending the value `Magic` starts, so a reader checks the header
 // with no chunk before it.
 export const Header = BinaryProtocol.toCodec({
   crc: BinaryProtocol.u32,
-  len: BinaryProtocol.u32,
-  declarations: BinaryProtocol.bytesOf("len"),
+  header: BinaryProtocol.frame(part.Header),
   chain: BinaryProtocol.bytes(ChainBytes),
 });
 
 export type Header = Schema.Schema.Type<typeof Header>;
 
+// One data chunk, in file order: the size of the chunk in bytes, the size of its meta region, and
+// how many frames it holds.
+const chunkEntry = BinaryProtocol.struct({
+  len: BinaryProtocol.u32,
+  metaLen: BinaryProtocol.u32,
+  count: BinaryProtocol.u32,
+});
+
 // A footer is not a chunk: nothing pairs what it states, so nothing of it is a body. It states
-// the chunk table, and after it the checksum over it and the digest of the file, and last the
-// two fields that locate it.
-// The fields are read from its last byte, so `footerLen` sizes the table in front of it and
-// one message spans the whole footer.
+// the chunks in file order, and after them the checksum over them and the chain value that is the
+// file's digest, and last the two fields that locate it.
+// The fields are read from its last byte, so `footerLen` sizes the chunks in front of it and one
+// message spans the whole footer. The chunks are a run of entries the bytes state, not one
+// `SchemaBinary` frame: a frame states its length before its bytes, which a backward read cannot
+// place.
 export const Footer = BinaryProtocol.toCodec(
   {
-    // The table is the only field, so it takes every byte `footerLen` leaves.
-    table: BinaryProtocol.bytes(),
+    // The chunks are the only field in front, so they take every byte `footerLen` leaves.
+    chunks: BinaryProtocol.array(chunkEntry),
     crc: BinaryProtocol.u32,
     chain: BinaryProtocol.bytes(ChainBytes),
     footerLen: BinaryProtocol.u32,
