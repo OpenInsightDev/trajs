@@ -24,14 +24,11 @@ import { SchemaBinary } from "effect/encoding";
 import * as uuid from "uuid";
 import { expect, it } from "vite-plus/test";
 
-import { ChunkTable } from "#/internal/exchange/chunk.ts";
+import { ChunkTable, Declarations, declarationsOf } from "#/internal/exchange/chunk.ts";
 import {
   EventPart,
   EventPartBody,
   EventPartMeta,
-  HeaderPartBody,
-  HeaderPartMeta,
-  headerPartBodyOf,
   Meta,
   MetricPart,
   MetricPartBody,
@@ -50,6 +47,9 @@ import { checkBinaryLayout } from "#/internal/schema.ts";
 
 /** The uuid the session below states, which a metric attaches its result to. */
 const sessionId = "01890a5d-ac96-774b-bcce-b302099a8058";
+
+/** The uuid the header states, which names the trajectory a save and a load hand over. */
+const trajectoryId = "01890a5d-ac96-774b-bcce-b302099a805a";
 
 /** The moment the parts below were produced, which each stored epoch states. */
 const at = DateTime.makeUnsafe("2026-01-01T00:00:00.000Z");
@@ -151,7 +151,6 @@ const metas = [
   [response, ResponsePartMeta.make({ uuid: response.uuid, timestamp: at })],
   [event, EventPartMeta.make({ uuid: event.uuid, timestamp: at })],
   [metricMeta, metricMeta],
-  [HeaderPartMeta.make({}), HeaderPartMeta.make({})],
 ] as const;
 
 /** Reads one region's value back from the bytes that hold it. */
@@ -181,13 +180,12 @@ it("lays out every stored meta, body, and part", async () => {
       ResponsePartMeta,
       EventPartMeta,
       MetricPartMeta,
-      HeaderPartMeta,
       PromptPartBody(config.extrakit),
       SessionPartBody(config.extrakit),
       ResponsePartBody(config.toolkit, config.extrakit),
       EventPartBody(config.eventkit),
       MetricPartBody(metrickit),
-      HeaderPartBody,
+      Declarations,
       ChunkTable,
       ...Object.values(stored),
     ] satisfies ReadonlyArray<Schema.Constraint>,
@@ -230,11 +228,15 @@ it("reads every body as the value its kit decodes", () => {
   expect(body.data).not.toHaveProperty("attach");
 });
 
-it("reads the structural bodies of a file", () => {
-  // The kits a reader holds before it decodes a body survive the header's region.
-  const header = headerPartBodyOf(config, { version: "0.0.0", hash: StreamHash.defaultAlgorithm });
+it("reads the structural values of a file", () => {
+  // The kits a reader holds before it decodes a body survive the header's declarations.
+  const declarations = declarationsOf(config, {
+    id: trajectoryId,
+    version: "0.0.0",
+    hash: StreamHash.defaultAlgorithm,
+  });
 
-  expect(region(HeaderPartBody)(header)).toEqual(header);
+  expect(region(Declarations)(declarations)).toEqual(declarations);
 
   const chunks = [{ len: 64, metaLen: 9, count: 1 }];
 

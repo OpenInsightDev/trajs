@@ -1,9 +1,7 @@
-import { StreamHash } from "@trajs/utils";
 import { Effect, Match, Schema, SchemaGetter } from "effect";
 import type { DateTime } from "effect";
 import type { NonEmptyReadonlyArray } from "effect/Array";
 
-import type * as Config from "#/Config.ts";
 import * as Event from "#/Event.ts";
 import * as EventKit from "#/EventKit.ts";
 import * as Extra from "#/Extra.ts";
@@ -21,46 +19,6 @@ import * as Trajectory from "#/Trajectory.ts";
 // A uuid is stored as 16 bytes and a moment as its epoch, so a meta region stays small.
 // The body is what a kit decodes.
 // A kind states its fields once, as the two halves a chunk holds, and the part they compose.
-
-export interface HeaderPartMetaEncoded {
-  _tag: "Header";
-}
-
-// The tag alone, so the header is told from a part before either region is read.
-export const HeaderPartMeta: Schema.Codec<HeaderPartMetaEncoded> = Schema.Struct({
-  _tag: Schema.tag("Header"),
-}).annotate({ identifier: "HeaderPartMeta" });
-
-export interface HeaderPartBodyEncoded {
-  version: string;
-  hash: StreamHash.Algorithm;
-  toolkit: Toolkit.ToolkitSchema;
-  eventkit: EventKit.EventKitSchema;
-  metrickit: MetricKit.MetricKitSchema;
-  extrakit: ExtraKit.ExtraKitSchema;
-}
-
-// The header is alone in the first chunk, so a reader holds the kits before it decodes a body.
-export const HeaderPartBody: Schema.Codec<HeaderPartBodyEncoded> = Schema.Struct({
-  version: Schema.String,
-  hash: StreamHash.Algorithm,
-  toolkit: Toolkit.ToolkitSchema,
-  eventkit: EventKit.EventKitSchema,
-  metrickit: MetricKit.MetricKitSchema,
-  extrakit: ExtraKit.ExtraKitSchema,
-}).annotate({ identifier: "HeaderPartBody" });
-
-export const headerPartBodyOf = (
-  config: Config.AnyConfig,
-  { version, hash }: { readonly version: string; readonly hash: StreamHash.Algorithm },
-): HeaderPartBodyEncoded => ({
-  version,
-  hash,
-  toolkit: Toolkit.encode(config.toolkit),
-  eventkit: EventKit.encode(config.eventkit),
-  metrickit: MetricKit.encode(config.metrickit),
-  extrakit: ExtraKit.encode(config.extrakit),
-});
 
 // An extra read as `Schema.Unknown` would store bytes and moments as JSON text.
 const extraField = <K extends ExtraKit.Any, P extends Extra.Part>(extrakit: K, part: P) =>
@@ -390,16 +348,15 @@ export const MetricPart = <K extends MetricKit.Any>(
       }),
     );
 
-// Every meta a frame may hold, read with no config: the five kinds a data chunk
-// holds, and the header a file begins with.
-// The footer states no meta: it is a message of its own, located by its tail.
+// Every meta a frame may hold, read with no config: the five kinds a data chunk holds.
+// The header and the footer state no meta: each is a message of its own, located without a
+// frame.
 export const Meta = Schema.Union([
   PromptPartMeta,
   SessionPartMeta,
   ResponsePartMeta,
   EventPartMeta,
   MetricPartMeta,
-  HeaderPartMeta,
 ]).annotate({ identifier: "Meta" });
 
 export type Meta = Schema.Schema.Type<typeof Meta>;

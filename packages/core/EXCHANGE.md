@@ -18,7 +18,7 @@ processes, and never modified in place except at its tail. Every rule below is
 stated against that one fact.
 
 Offsets are byte offsets from the start of the file. `H` is the digest algorithm the
-trajectory's `Header` names (section 8). The chain value of a chunk (section 5.2) is
+trajectory's header names (section 8). The chain value of a chunk (section 5.2) is
 the only value in the file computed from bytes outside its own chunk.
 
 ## 2. Goals
@@ -44,8 +44,7 @@ records what was rejected to keep them.
    other one, over the codecs those packages already provide.
 7. **Append is local.** Continuing a trajectory MUST cost the tail, not the file:
    the state an append continues from sits at the point it appends to, and an
-   append reads only that tail, whatever locates the append point, and the header
-   chunk.
+   append reads only that tail, whatever locates the append point, and the header.
 
 Non-goals: several writers to one file, resynchronisation after a corrupt block,
 rotation, eviction, compaction, semantic locality inside a compression unit,
@@ -71,21 +70,21 @@ recomputes every value behind the changed bytes.
 ## 4. Layout
 
 ```
-stream := Magic ‖ header chunk ‖ data chunk*
+stream := Magic ‖ header ‖ data chunk*
 file   := stream ‖ footer
 ```
 
-| Part         | Size     | Meaning                                                                                         |
-| ------------ | -------- | ----------------------------------------------------------------------------------------------- |
-| `Magic`      | 5        | UTF-8 `TRAJS`                                                                                   |
-| header chunk | variable | exactly one frame, tagged `Header`                                                              |
-| data chunk   | variable | one or more frames, each a part                                                                 |
-| footer       | variable | the chunk table, its checksum, the digest of the file, and the bytes that locate it (section 9) |
+| Part       | Size     | Meaning                                                                                               |
+| ---------- | -------- | ----------------------------------------------------------------------------------------------------- |
+| `Magic`    | 5        | UTF-8 `TRAJS`                                                                                         |
+| header     | variable | the id, the version, the digest algorithm and the kits, with the chain value that ends it (section 8) |
+| data chunk | variable | one or more frames, each a part                                                                       |
+| footer     | variable | the chunk table, its checksum, the digest of the file, and the bytes that locate it (section 9)       |
 
 A reader MUST verify the leading `Magic` and MUST NOT read anything else if it
-does not match. Chunks are contiguous: the header chunk starts at offset 5, and
-each following chunk starts where the previous one ends. There is no padding and no
-gap.
+does not match. The header starts at offset 5, the first data chunk starts where the
+header ends, and each following chunk starts where the previous one ends. There is no
+padding and no gap.
 
 ### 4.1 Telling a file from a stream
 
@@ -93,13 +92,11 @@ Reading the last 9 bytes is not enough, because any 4 bytes can precede a `TRAJS
 marker by accident. A reader MUST treat them as a candidate and confirm it:
 
 1. `footerLen` MUST be at least 12, the checksum and the digest a footer takes
-   besides its body.
-2. `footerStart = length − 9 − footerLen` MUST lie after the header chunk: the
-   chunk header at offset 5 MUST state an extent that ends at or before
-   `footerStart`.
+   besides its table.
+2. `footerStart = length − 9 − footerLen` MUST lie after the header: the header at
+   offset 5 MUST end at or before `footerStart`.
 3. The bytes at `footerStart` MUST parse as a footer (section 9) that ends at
-   `length`, whose `bodyCrc` verifies, and whose body holds exactly one table
-   frame.
+   `length`, whose `crc` verifies, and whose table is exactly one frame.
 
 Confirmation reads no data chunk and checks no chain value. Validation (section 12)
 compares the table with the chunks on disk and the footer's chain value with the
@@ -143,9 +140,9 @@ unwritten `metaCrc` is zero, and the CRC-32 of the bytes that follow is not.
 
 A chunk MUST hold at least one frame, and every frame's meta segment states its
 tag (section 7), so the codec's own frame bytes sit on top of the 25 above rather
-than inside them. A trajectory MUST hold at least its header chunk: `Magic` alone is
-not a trajectory, and neither is one whose first chunk is not a header chunk. A
-reader MUST check the extent before using `metaLen` or `bodyLen` for anything,
+than inside them. A trajectory MUST hold at least its header: `Magic` alone is
+not a trajectory, and neither is one whose bytes at offset 5 do not hold a header
+(section 8). A reader MUST check the extent before using `metaLen` or `bodyLen` for anything,
 because those fields are not trusted until `metaCrc` verifies.
 
 ### 5.1 Compression
@@ -179,6 +176,8 @@ chunk by chunk rather than hashed once over the whole prefix, which is what lets
 be extended without re-reading that prefix. The digest of a file is the chain value
 of its footer (section 9).
 
+- **The header is the first link.** A trajectory begins with a header (section 8), whose
+  value extends `chain(−1) = H(Magic)`, so the first data chunk extends the header's.
 - **A chunk is verified against its predecessor, not against the file.** A chunk and
   the 8 bytes before it are enough to check that the two were written in that order.
 - **An append reads 8 bytes.** The chain value immediately before the append point
@@ -251,14 +250,13 @@ same reason no field name of a meta or a body may change: the codec derives each
 field's wire id from the field's name, so a rename is a layout change and reads as a
 field no reader states.
 
-| Tag        | Meta                                                    | Body                                                              |
-| ---------- | ------------------------------------------------------- | ----------------------------------------------------------------- |
-| `Session`  | `uuid`, `type`                                          | `extra`                                                           |
-| `Prompt`   | `uuid`, `sessionId?`, `timestamp?`, `startTimestamp?`   | `messages`, `extra`                                               |
-| `Response` | `uuid`, `sessionId?`, `timestamp`, `startTimestamp?`    | `response`, `extra`                                               |
-| `Event`    | `uuid`, `sessionId?`, `timestamp`, `startTimestamp?`    | `event`                                                           |
-| `Metric`   | `metricTag`, `attach?`, `timestamp?`, `startTimestamp?` | `data`                                                            |
-| `Header`   | the tag only                                            | `version`, `hash`, `toolkit`, `eventkit`, `metrickit`, `extrakit` |
+| Tag        | Meta                                                    | Body                |
+| ---------- | ------------------------------------------------------- | ------------------- |
+| `Session`  | `uuid`, `type`                                          | `extra`             |
+| `Prompt`   | `uuid`, `sessionId?`, `timestamp?`, `startTimestamp?`   | `messages`, `extra` |
+| `Response` | `uuid`, `sessionId?`, `timestamp`, `startTimestamp?`    | `response`, `extra` |
+| `Event`    | `uuid`, `sessionId?`, `timestamp`, `startTimestamp?`    | `event`             |
+| `Metric`   | `metricTag`, `attach?`, `timestamp?`, `startTimestamp?` | `data`              |
 
 - A uuid is stored as its 16 bytes rather than its 36-character string: the part's
   `uuid`, the `fork` of a sub session's `type`, and each `attach` entry. A
@@ -295,21 +293,48 @@ holds is the kits' business. Failing the read instead would make one new variant
 every older reader for a whole trajectory, rather than for the frames it does not
 know.
 
-## 8. Header frame
+## 8. Header
 
-Every trajectory begins with a chunk that holds exactly one frame, tagged `Header`.
-Its body states:
+Every trajectory begins with a header at offset 5. It is not a chunk: it states no
+frame, no tag and no compression code, so a reader reads the whole header as one
+message. Nothing pairs what it states, so nothing of it is a body, and it holds one
+codec frame rather than a region of them.
 
-| Field                                          | Meaning                                                   |
-| ---------------------------------------------- | --------------------------------------------------------- |
-| `version`                                      | the `@trajs/core` release that wrote the trajectory       |
-| `hash`                                         | digest algorithm of every chain value                     |
-| `toolkit`, `eventkit`, `metrickit`, `extrakit` | the stored kit descriptions, by name and by stored schema |
+```
+off          size      field
+0            4         crc           CRC-32 of the declarations
+4            4         len           size of the declarations in bytes
+8            len       declarations  the declarations, as one codec frame
+8 + len      8         chain         the chain value the first data chunk extends
+```
+
+`headerLen = 16 + len`, so a header states its own extent and the first data chunk
+starts where it ends.
+
+The declarations state:
+
+| Field                                          | Meaning                                                          |
+| ---------------------------------------------- | ---------------------------------------------------------------- |
+| `id`                                           | the trajectory's uuid, the identity it is saved and loaded under |
+| `version`                                      | the `@trajs/core` release that wrote the trajectory              |
+| `hash`                                         | digest algorithm of every chain value                            |
+| `toolkit`, `eventkit`, `metrickit`, `extrakit` | the stored kit descriptions, by name and by stored schema        |
+
+- The **chain** value is the first link of the fold (section 5.2): it extends
+  `chain(−1) = H(Magic)`, so a reader checks the header with no chunk before it, and the
+  first data chunk extends it in turn.
+- `crc` is CRC-32, fixed by this format like a chunk's checksums, and covers the
+  declarations alone. It is what a reader holding no codec for the algorithm they name can
+  still check: the bytes that name it.
+- `id` is a uuid, stored as its 16 bytes like every uuid of a meta (section 7), and it is
+  what a save and a load hand over: a trajectory read back is the trajectory that was
+  written, rather than a new one over the same parts.
 
 `hash` is the algorithm the chain values are computed with (section 5.2), so a reader
 takes no algorithm from outside the file. It names any `StreamHash.Algorithm`, and the
-chain is the leading 8 bytes of that digest: the header states no length of its own. A
-reader without a codec for the named algorithm can check no chain value.
+chain is the leading 8 bytes of that digest: the header states no digest length of its
+own. A reader without a codec for the named algorithm can check no chain value, and
+holds `crc` alone.
 
 `version` is the release that wrote the trajectory, and the format revision is
 whatever that release states. Releases compare as semver, a pre-release before its
@@ -317,45 +342,45 @@ release, and reading only ever goes one way: a reader MUST read a trajectory who
 `version` is its own or any earlier one, and MUST fail as `UnsupportedVersion` when
 it is newer, because a later release may write a variant this one does not know.
 
-The body is written once and never changes. Moving one forward is a migration, not an
+The header is written once and never changes. Moving one forward is a migration, not an
 append (section 16).
 
 ## 9. Footer
 
 A file ends with a footer that holds the chunk table. It is not a chunk: it states
 no frame, no tag and no compression code, so a reader that has its tail reads the
-whole footer as one message. It states one region and no meta, so nothing pairs with
-it and it holds one codec frame rather than a region of them.
+whole footer as one message. Nothing pairs what it states, so nothing of it is a
+body, and it holds one codec frame rather than a region of them.
 
 ```
 off        size      field
-0          n         body        the chunk table, as one codec frame
-n          4         bodyCrc     CRC-32 of the body region
+0          n         table       the chunk table, as one codec frame
+n          4         crc         CRC-32 of the table
 n + 4      8         chain       the digest of everything before the footer
 n + 12     4         footerLen   size of the footer in bytes, n + 12
 n + 16     5         Magic       UTF-8 TRAJS
 ```
 
 The fields are read from the last byte: `Magic` and `footerLen` are what a locate
-reads (section 4.1), and `footerLen` sizes the body in front of them, so one
+reads (section 4.1), and `footerLen` sizes the table in front of them, so one
 message spans the footer from either end. `footerStart = length − 9 − footerLen`.
 
-The body holds the chunk table, as one codec frame:
+The table is the chunk table, as one codec frame:
 
 | Field    | Meaning                                                                                                                     |
 | -------- | --------------------------------------------------------------------------------------------------------------------------- |
 | `chunks` | one entry per data chunk, in file order: `len` (chunk size in bytes), `metaLen` (its meta region), and `count` (its frames) |
 
 - The **digest of the file** is the footer's chain value, which covers `Magic`,
-  the header chunk, and every data chunk. It is not stored a second time: a reader
+  the header, and every data chunk. It is not stored a second time: a reader
   that reads the footer has already read those 8 bytes.
-- `bodyCrc` is CRC-32, fixed by this format like a chunk's checksums, and covers
-  the body region alone. The chain value sits outside it for the reason section
-  5.2 gives. The body is stored uncompressed: a codec costs a byte for every
+- `crc` is CRC-32, fixed by this format like a chunk's checksums, and covers
+  the table alone. The chain value sits outside it for the reason section
+  5.2 gives. The table is stored uncompressed: a codec costs a byte for every
   region, and a table of a few bytes per chunk does not repay it.
 - `chunks` MUST list data chunks only, MUST be in file order, MUST restate each
   chunk's `metaLen` as that chunk's header states it, and MUST satisfy
-  `5 + headerChunkLen + Σ len = footerStart` and `Σ count = frames`. A table that
+  `5 + headerLen + Σ len = footerStart` and `Σ count = frames`. A table that
   does not is a broken table (section 13).
 - `chunks` is a derived cache: every number in it can be recovered by walking the
   chunks, which is exactly what a stream reader does.
@@ -364,10 +389,9 @@ The body holds the chunk table, as one codec frame:
 offset one too, and `metaLen` is what lets a scan read a chunk's header and meta
 region as one read instead of asking the header how long the meta region is.
 
-The header frame is alone in its first chunk, so the fixed offset 5 locates it, and
-the footer is a message of its own, so `footerLen` locates it in one read. Either
-sharing bytes with parts could only be found by scanning, which is what a file
-exists to avoid.
+The header is the first message of a file, so the fixed offset 5 locates it, and the
+footer is the last, so `footerLen` locates it in one read. Either sharing bytes with
+parts could only be found by scanning, which is what a file exists to avoid.
 
 ## 10. Chunking policy
 
@@ -413,14 +437,15 @@ chunk costs one allocation per region rather than one per frame. A frame the cod
 hands back for a single value is a view of a buffer it reuses, so a writer that keeps
 frames from separate calls MUST copy them before it joins them.
 
-**Writing a new trajectory.** Write `Magic`, the header chunk, the data chunks,
+**Writing a new trajectory.** Write `Magic`, the header, the data chunks,
 close the last chunk, then the footer, which ends with `u32 footerLen ‖ Magic`.
 
 **Appending.** A trajectory is continued without changing its form:
 
 1. The target MUST exist. Creating is writing a new trajectory.
-2. The stored `Header` MUST encode to the same bytes the append would write;
-   otherwise it MUST fail. A trajectory holds one set of kits and one release.
+2. The stored header MUST encode to the same bytes the append would write;
+   otherwise it MUST fail. A trajectory holds one id, one set of kits and one
+   release.
 3. A torn tail chunk (below) MUST be truncated first.
 4. The append point is the end of the last whole chunk of a stream, which a walk of
    chunk headers and metas locates. For a file it is `footerStart`, which `footerLen`
@@ -469,8 +494,9 @@ taken, so writing the trajectory again replaces what it holds.
 
 A reader chooses how much to read, and each choice touches nothing else:
 
-- **The header.** `Magic` and the header chunk: one small chunk holding the kits and
-  the version, which is what lets a reader hold them before it decodes any body.
+- **The header.** `Magic` and the header: one small message holding the id, the
+  release, the digest algorithm and the kits, which is what lets a reader hold them
+  before it decodes any body.
 - **The footer.** After confirming it (section 4.1), the footer, whose chain value
   is the file's digest and whose table locates everything else. No part is decoded.
 - **The metas.** Per chunk, its chunk header and its meta region as one read,
@@ -566,7 +592,7 @@ re-litigated later.
   nothing compresses (goal 2 against goal 3); compressed, identity needs the codec and
   there is no index without a sidecar (goal 5).
 - **The zstd seekable format.** Its index must be the last thing in the file and its
-  offsets start at byte zero, so it cannot wrap a file that also carries a header chunk
+  offsets start at byte zero, so it cannot wrap a file that also carries a header
   and a footer.
 - **ATIF and OpenTelemetry.** Both are interchange — what a run means, to a program
   that did not record it — with no compression unit, no chunk, no index and no append.

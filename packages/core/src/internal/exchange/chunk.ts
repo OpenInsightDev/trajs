@@ -3,8 +3,13 @@ import * as BinaryProtocol from "@trajs/utils/BinaryProtocol";
 import type { CompressionError } from "@trajs/utils/Compression";
 import { Effect, Option, Schema, Stream } from "effect";
 
+import type * as Config from "#/Config.ts";
+import * as EventKit from "#/EventKit.ts";
+import * as ExtraKit from "#/ExtraKit.ts";
 import { joined } from "#/internal/frames.ts";
-import { ChainBytes } from "#/internal/schema.ts";
+import { ChainBytes, UuidFromByte } from "#/internal/schema.ts";
+import * as MetricKit from "#/MetricKit.ts";
+import * as Toolkit from "#/Toolkit.ts";
 
 // What a chunk states before its two regions.
 const headerFields = {
@@ -15,38 +20,29 @@ const headerFields = {
   compression: BinaryProtocol.u8.pipe(BinaryProtocol.decodeTo(Compression.Algorithm)),
 };
 
-// The two regions a header sizes.
-const regionFields = {
+// One chunk as it is stored: the header, the two regions it sizes, and the chain value.
+// `bodyCrc` covers the body region alone, so the chain value sits outside it.
+export const Chunk = BinaryProtocol.toCodec({
+  ...headerFields,
   meta: BinaryProtocol.bytesOf("metaLen"),
   body: BinaryProtocol.bytesOf("bodyLen"),
-};
-
-// The chunk through its body: the bytes both checksums and the chain value cover.
-const coveredFields = { ...headerFields, ...regionFields };
-
-const ChunkCovered = BinaryProtocol.toCodec(coveredFields);
-
-// One chunk as it is stored. `bodyCrc` covers the body region alone, so the chain value
-// sits outside it.
-export const Chunk = BinaryProtocol.toCodec({
-  ...coveredFields,
   chain: BinaryProtocol.bytes(ChainBytes),
 });
 
 export type Chunk = Schema.Schema.Type<typeof Chunk>;
+
+// One frame as a chunk holds it: the meta segment of one part and the body segment it pairs.
+// It is a chunk without what the container states for it: no sizes, no checksums, no chain.
+export type Frame = Pick<Chunk, "meta" | "body">;
 
 // What a scan reads alone, before it knows a chunk's extent.
 export const ChunkHeader = BinaryProtocol.toCodec(headerFields);
 
 export type ChunkHeader = Schema.Schema.Type<typeof ChunkHeader>;
 
-// What `metaCrc` covers: the header less its two checksums, and the meta region.
-const MetaCovered = BinaryProtocol.toCodec({
-  bodyLen: headerFields.bodyLen,
-  metaLen: headerFields.metaLen,
-  compression: headerFields.compression,
-  meta: regionFields.meta,
-});
+// The two `u32` checksums a header states first, so the bytes `metaCrc` covers begin after
+// them (section 5).
+const ChecksumBytes = 8;
 
 // Four `u32`s and the codec: what a header takes before the two regions.
 const ChunkHeaderBytes = 17;
@@ -80,9 +76,6 @@ export const chunkOf = (
   return Option.isNone(chunk) ? undefined : { chunk: chunk.value, rest: bytes.subarray(len) };
 };
 
-export const chunkBytesOf = (chunk: Omit<Chunk, "chain">): Uint8Array =>
-  Schema.encodeSync(ChunkCovered)(chunk);
-
 // The chain value that extends `prev` over `bytes` (section 5.2), or the value
 // the first chunk extends when `bytes` is omitted.
 // A trajectory starts from `Magic`, so that value is `chainOf(hash, Magic)`.
@@ -107,17 +100,15 @@ export const chainOf = (
     return hashing.digest();
   });
 
-// A chunk as a writer stores it, with a chain value that extends `prev`.
+// One chunk as a writer stores it, with a chain value that extends `prev`.
 export const encodeChunk = (
   hash: StreamHash.Algorithm,
   prev: Uint8Array,
   {
-    meta,
-    bodies,
+    frames,
     compression,
   }: {
-    readonly meta: Uint8Array;
-    readonly bodies: Uint8Array;
+    readonly frames: ReadonlyArray<Frame>;
     readonly compression: Compression.Algorithm;
   },
 ): Effect.Effect<
@@ -129,6 +120,16 @@ export const encodeChunk = (
     const checksum = yield* Checksum.Checksum;
     const codecs = yield* Compression.Compression;
 
+    const meta = joined(
+      new Uint8Array(),
+      frames.map((frame) => frame.meta),
+    );
+
+    const bodies = joined(
+      new Uint8Array(),
+      frames.map((frame) => frame.body),
+    );
+
     const packed = yield* codecs.compressBytes({ algorithm: compression })(bodies);
 
     // A region the codec does not make smaller is stored unwrapped (section 5.1).
@@ -136,75 +137,59 @@ export const encodeChunk = (
 
     const body = smaller ? packed : bodies;
     const code = smaller ? compression : Compression.Algorithm.enums.None;
+    const bodyLen = body.length;
 
     // A length beyond a `u32` is refused where a part is accepted (section 14).
     const metaLen = meta.length;
-    const bodyLen = body.length;
-    const crc = checksum.of();
+    const crc = checksum.of({ algorithm: Checksum.Algorithm.enums.Crc32 });
 
-    const metaCrc = crc(
-      Schema.encodeSync(MetaCovered)({ bodyLen, metaLen, compression: code, meta }),
-    );
+    // A checksum sits before the bytes it covers, so the header is laid out with both left
+    // zero, and laid out again once they are read.
+    const header = { metaCrc: 0, bodyCrc: 0, bodyLen, metaLen, compression: code };
+    const headerBytes = Schema.encodeSync(ChunkHeader)(header);
+
+    // `metaCrc` covers the header past its two checksums, and the meta region (section 5).
+    const afterChecksums = headerBytes.subarray(ChecksumBytes);
+    const metaCrc = crc(joined(afterChecksums, [meta]));
 
     const bodyCrc = crc(body);
 
-    const chunk = { metaCrc, bodyCrc, bodyLen, metaLen, compression: code, meta, body };
+    // The chunk through its body: the bytes the chain value extends over (section 5.2).
+    const unchained = joined(new Uint8Array(), [
+      Schema.encodeSync(ChunkHeader)({ ...header, metaCrc, bodyCrc }),
+      meta,
+      body,
+    ]);
 
-    const chain = yield* chainOf(hash, prev, chunkBytesOf(chunk));
+    const chain = yield* chainOf(hash, prev, unchained);
 
-    return Schema.encodeSync(Chunk)({ ...chunk, chain });
+    return joined(unchained, [chain]);
   });
-
-// A meta segment and the body segment it is paired with, not a range of bytes.
-export interface ChunkFrame {
-  readonly meta: Uint8Array;
-  readonly body: Uint8Array;
-}
-
-// One chunk as the chunker makes it: the two regions its frames join, and how many
-// frames they hold.
-export interface ChunkRegions {
-  readonly meta: Uint8Array;
-  readonly bodies: Uint8Array;
-  readonly count: number;
-}
 
 // Membership is decided on the raw size of frames, before they are compressed.
 export const DefaultChunkSize = 2 * 1024 * 1024;
 
-// The frames of each chunk, joined as the two regions a chunk states (section 10).
-// A frame is added while the raw size stays within `chunkSize`, and closes the
-// chunk before the frame that would exceed it.
+// The frames of each chunk (section 10): a frame is the two segments a chunk holds for one
+// part. A frame is added while the raw size stays within `chunkSize`, and closes the chunk
+// before the frame that would exceed it.
 export const chunkFramesOf =
   (chunkSize: number = DefaultChunkSize) =>
-  <E, R>(frames: Stream.Stream<ChunkFrame, E, R>): Stream.Stream<ChunkRegions, E, R> =>
+  <E, R>(frames: Stream.Stream<Frame, E, R>): Stream.Stream<ReadonlyArray<Frame>, E, R> =>
     Stream.suspend(() => {
-      let held: Array<ChunkFrame> = [];
+      let held: Array<Frame> = [];
       let size = 0;
-
-      const regionsOf = (group: ReadonlyArray<ChunkFrame>): ChunkRegions => ({
-        meta: joined(
-          new Uint8Array(),
-          group.map((frame) => frame.meta),
-        ),
-        bodies: joined(
-          new Uint8Array(),
-          group.map((frame) => frame.body),
-        ),
-        count: group.length,
-      });
 
       return frames.pipe(
         Stream.mapAccumArray(
           () => undefined,
           (_state, batch) => {
-            const out: Array<ChunkRegions> = [];
+            const out: Array<ReadonlyArray<Frame>> = [];
 
             for (const frame of batch) {
               const raw = frame.meta.length + frame.body.length;
 
               if (held.length > 0 && size + raw > chunkSize) {
-                out.push(regionsOf(held));
+                out.push(held);
 
                 held = [];
                 size = 0;
@@ -217,9 +202,7 @@ export const chunkFramesOf =
             return [undefined, out] as const;
           },
         ),
-        Stream.concat(
-          Stream.suspend(() => (held.length === 0 ? Stream.empty : Stream.make(regionsOf(held)))),
-        ),
+        Stream.concat(Stream.suspend(() => (held.length === 0 ? Stream.empty : Stream.make(held)))),
       );
     });
 
@@ -250,50 +233,98 @@ export const ChunkTable: Schema.Codec<ChunkTableEncoded> = Schema.Struct({
 // of its own.
 export const Magic = new TextEncoder().encode("TRAJS");
 
-// The last bytes of a file, which a locate reads alone.
-const tailFields = {
-  footerLen: BinaryProtocol.u32,
-  magic: BinaryProtocol.bytes(Magic.length),
-};
+// The declarations a reader holds before it decodes a body: which trajectory the file
+// holds, the release that wrote it, the algorithm every chain value uses, and the kits by
+// name and by stored schema.
+// One frame of these bytes is what a header states.
+export const Declarations = Schema.Struct({
+  id: UuidFromByte,
+  version: Schema.String,
+  hash: StreamHash.Algorithm,
+  toolkit: Toolkit.ToolkitSchema,
+  eventkit: EventKit.EventKitSchema,
+  metrickit: MetricKit.MetricKitSchema,
+  extrakit: ExtraKit.ExtraKitSchema,
+}).annotate({ identifier: "Declarations" });
 
-const FileTail = BinaryProtocol.toCodec(tailFields);
+export type Declarations = Schema.Schema.Type<typeof Declarations>;
 
-// A footer is not a chunk: it pairs no meta region, states no compression code, and holds
-// no frame of the format, so these fields are its whole layout.
-// They are read from its last byte, so `footerLen` sizes the body in front of it and one
-// message spans the whole footer.
+export const declarationsOf = (
+  config: Config.AnyConfig,
+  {
+    id,
+    version,
+    hash,
+  }: { readonly id: string; readonly version: string; readonly hash: StreamHash.Algorithm },
+): Declarations => ({
+  id,
+  version,
+  hash,
+  toolkit: Toolkit.encode(config.toolkit),
+  eventkit: EventKit.encode(config.eventkit),
+  metrickit: MetricKit.encode(config.metrickit),
+  extrakit: ExtraKit.encode(config.extrakit),
+});
+
+// A header is not a chunk: nothing pairs what it states, so nothing of it is a body. It states
+// its declarations, and before them the checksum over them and their size.
+// The chain value ends it, extending the value `Magic` starts, so a reader checks the header
+// with no chunk before it.
+export const Header = BinaryProtocol.toCodec({
+  crc: BinaryProtocol.u32,
+  len: BinaryProtocol.u32,
+  declarations: BinaryProtocol.bytesOf("len"),
+  chain: BinaryProtocol.bytes(ChainBytes),
+});
+
+export type Header = Schema.Schema.Type<typeof Header>;
+
+// A footer is not a chunk: nothing pairs what it states, so nothing of it is a body. It states
+// the chunk table, and after it the checksum over it and the digest of the file, and last the
+// two fields that locate it.
+// The fields are read from its last byte, so `footerLen` sizes the table in front of it and
+// one message spans the whole footer.
 export const Footer = BinaryProtocol.toCodec(
   {
-    // The body is the only region, so it takes every byte `footerLen` leaves.
-    body: BinaryProtocol.bytes(),
-    bodyCrc: BinaryProtocol.u32,
+    // The table is the only field, so it takes every byte `footerLen` leaves.
+    table: BinaryProtocol.bytes(),
+    crc: BinaryProtocol.u32,
     chain: BinaryProtocol.bytes(ChainBytes),
-    ...tailFields,
+    footerLen: BinaryProtocol.u32,
+    magic: BinaryProtocol.bytes(Magic.length),
   },
   { direction: "backward" },
 );
 
 export type Footer = Schema.Schema.Type<typeof Footer>;
 
+// `footerLen` and the marker, which end every file and are what a locate reads alone.
+const FooterLenBytes = 4;
+
+const FooterTailBytes = FooterLenBytes + Magic.length;
+
 // Where the footer begins in a trajectory of `length` bytes, or `undefined` when
 // the last nine bytes cannot end a file.
-// A reader confirms the place against the header chunk and the footer.
+// A reader confirms the place against the header and the footer.
 export const footerStartOf = (length: bigint, tail: Uint8Array): bigint | undefined => {
-  const fileTail = Schema.decodeUnknownOption(FileTail)(tail);
-
-  if (Option.isNone(fileTail)) {
+  if (tail.length < FooterTailBytes) {
     return undefined;
   }
 
-  const { footerLen, magic } = fileTail.value;
+  // The two fields end the file, so they are read from the end of whatever the tail holds.
+  const at = tail.length - FooterTailBytes;
+  const magic = tail.subarray(at + FooterLenBytes);
 
   // Any four bytes can precede the marker by accident, so a tail holding another marker
   // ends no file (section 4.1).
-  if (!Magic.every((byte, at) => magic[at] === byte)) {
+  if (!Magic.every((byte, index) => magic[index] === byte)) {
     return undefined;
   }
 
-  const end = BigInt(tail.length + footerLen);
+  // A fixed-width integer is unsigned and little-endian (section 1).
+  const footerLen = new DataView(tail.buffer, tail.byteOffset, tail.byteLength).getUint32(at, true);
+
+  const end = BigInt(FooterTailBytes + footerLen);
 
   return length < end ? undefined : length - end;
 };
