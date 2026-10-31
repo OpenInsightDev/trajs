@@ -26,7 +26,7 @@ without a conversion step.
   memory and spilling the rest to a `ByteStore`; `Cache.layer` is the in-memory
   layer and `Cache.layerFsTemp` spills to a temporary directory.
 - `Exchange` — the stored form: a JSON header, a compressed and hashed binary part
-  frame, and a JSON metadata tail, inspected, loaded, and saved through `Storage`.
+  frame, and a JSON metadata tail, read and written by id.
   `Loaded.validate` checks that frame and digest before the parts are read.
 - `ExchangeIssue` — why a stored trajectory fails `Loaded.validate`: a frame that
   does not decompress or decode, a frame that ends early, or a digest that does

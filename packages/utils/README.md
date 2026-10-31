@@ -5,12 +5,6 @@ platform package can say what each is over.
 
 - `Byte` — a byte sequence read at random, and the sequence built from the reads
   a source serves.
-- `Storage` — where a trajectory is kept, what a place that could not serve one
-  failed with (`StorageError`), and the storages this package ships: a directory of
-  files (`Storage.layerFileSystem`) and a bucket reached with a client of the AWS
-  SDK (`Storage.layerS3`). A write begins a trajectory or continues one from an
-  offset (`Storage.WriteOptions.mode`), which a file holds and a bucket does not
-  (`Storage.Capabilities`).
 - `ByteStore` — the bytes a program keeps between readings, held in chunks in the
   key/value store of `effect/persistence` (`ByteStore.layerKVStore`), in memory
   (`ByteStore.layer`), in a temporary directory of the file system that goes with

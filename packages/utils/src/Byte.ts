@@ -18,7 +18,6 @@ import { Effect, Stream } from "effect";
  * **When to use**
  *
  * Use to state where {@link Byte.read} and {@link Byte.readAlloc} begin and how much they take.
- * Use as well to type the `options` of {@link Storage.read}.
  *
  * **Details**
  *
@@ -40,12 +39,12 @@ export interface ReadOptions {
 }
 
 /**
- * A sequence of bytes read at random, as a storage serves a trajectory.
+ * A sequence of bytes read at random, as a store serves one.
  *
  * **When to use**
  *
  * Use to read part of a trajectory without holding it whole, such as its head or its tail.
- * Use as well to type what a storage serves ({@link Storage.read}).
+ * Use as well to type what a store serves ({@link ByteStore.read}).
  *
  * **Details**
  *
@@ -57,7 +56,7 @@ export interface ReadOptions {
  * A read fails as `E` where what the sequence is of fails, such as a disk.
  * It requires what reading it takes as `R`.
  * A sequence over memory fails with `never`.
- * A storage serves one that fails as a {@link StorageError}.
+ * A store serves one that fails as a {@link ByteStore.ByteStoreError}.
  *
  * **Example** (A sequence of bytes read at random)
  *
@@ -85,7 +84,7 @@ export interface ReadOptions {
  * ```
  *
  * @see {@link makeByte} for building one from the reads it takes.
- * @see {@link Storage} for what serves one.
+ * @see {@link ByteStore} for what serves one.
  * @stability stable
  * @category models
  */
@@ -132,8 +131,8 @@ const Chunk = 64 * 1024;
  *
  * **When to use**
  *
- * Use to serve the bytes a storage holds ({@link Storage.read}).
- * Use as well to read bytes that are somewhere a storage is not, such as a buffer in memory.
+ * Use to serve the bytes a store holds ({@link ByteStore.read}).
+ * Use as well to read bytes that are somewhere a store is not, such as a buffer in memory.
  *
  * **Details**
  *
@@ -144,7 +143,7 @@ const Chunk = 64 * 1024;
  * A read that takes nothing ends that stream, since the sequence ended there.
  * The bytes a sequence holds are what its reads serve from `0n` on.
  *
- * **Example** (Building the sequence a storage serves)
+ * **Example** (Building the sequence a store serves)
  *
  * ```ts import.meta.vitest
  * import { Effect } from "effect"

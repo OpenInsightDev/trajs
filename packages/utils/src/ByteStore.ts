@@ -409,11 +409,9 @@ export interface S3Options extends Options {
  *
  * The whole bucket is the store's, and an id names the prefix of the keys its sequence is kept
  * under.
- * Sharing a bucket with trajectories ({@link Storage.layerS3}) writes one over where its key is a
- * key of a sequence.
+ * Two stores sharing a bucket write one over where an id of one is an id of the other.
  *
  * @see {@link ByteStore} for the store this provides.
- * @see {@link Storage.layerS3} for the storage of a trajectory in a bucket.
  * @stability stable
  * @category layers
  */
