@@ -2,6 +2,7 @@ import { StreamHash } from "@trajs/utils";
 import { Effect, Match, Schema, SchemaGetter } from "effect";
 import type { DateTime } from "effect";
 import type { NonEmptyReadonlyArray } from "effect/Array";
+import { SchemaBinary } from "effect/encoding";
 
 import type * as Config from "#/Config.ts";
 import * as Event from "#/Event.ts";
@@ -15,6 +16,7 @@ import * as Prompt from "#/Prompt.ts";
 import * as Response from "#/Response.ts";
 import * as Toolkit from "#/Toolkit.ts";
 import * as Trajectory from "#/Trajectory.ts";
+import { TrajectoryError } from "#/TrajectoryError.ts";
 
 // A frame holds a meta and a body.
 // The meta is the tag and the identifiers a reader reads with no config.
@@ -362,6 +364,63 @@ export const Meta = Schema.Union([
 ]).annotate({ identifier: "Meta" });
 
 export type Meta = Schema.Schema.Type<typeof Meta>;
+
+// The five kinds read with the kits a config states, so each body is read, not
+// only located.
+const exchangePart = <C extends Config.AnyConfig>(config: C) =>
+  Schema.Union([
+    PromptPart(config.extrakit),
+    SessionPart(config.extrakit),
+    ResponsePart(config.toolkit, config.extrakit),
+    EventPart(config.eventkit),
+    MetricPart(config.metrickit),
+  ]);
+
+type ExchangePart<C extends Config.AnyConfig> = ReturnType<typeof exchangePart<C>>;
+
+// One part of a config, whichever kind it is.
+export const Part = <C extends Config.AnyConfig>(
+  config: C,
+): Schema.Codec<
+  Trajectory.Part<C>,
+  Schema.Codec.Encoded<ExchangePart<C>>,
+  Config.DecodingServices<C>,
+  Config.EncodingServices<C>
+> =>
+  // SAFETY: every member reads one kind with the config's own kits, so the
+  // config's services cover them.
+  // Effect omits tool parameter services from response part types; see
+  // https://github.com/Effect-TS/effect/issues/9867.
+  exchangePart(config) as Schema.Codec<
+    Trajectory.Part<C>,
+    Schema.Codec.Encoded<ExchangePart<C>>,
+    Config.DecodingServices<C>,
+    Config.EncodingServices<C>
+  >;
+
+// One part as the bytes a store keeps: the part's encoded side, laid out alone.
+export const encodePart = <C extends Config.AnyConfig>(config: C) => {
+  const encode = Part(config).pipe(SchemaBinary.toCodec, Schema.encodeEffect);
+
+  return (
+    part: Trajectory.Part<C>,
+  ): Effect.Effect<Uint8Array, TrajectoryError, Config.EncodingServices<C>> =>
+    encode(part).pipe(
+      Effect.mapError(TrajectoryError.parse),
+      // The codec writes into an arena it shares, so the store takes its own copy.
+      Effect.map((bytes) => bytes.slice()),
+    );
+};
+
+// The part the bytes of `encodePart` state.
+export const decodePart = <C extends Config.AnyConfig>(config: C) => {
+  const decode = Part(config).pipe(SchemaBinary.toCodec, Schema.decodeUnknownEffect);
+
+  return (
+    bytes: Uint8Array,
+  ): Effect.Effect<Trajectory.Part<C>, TrajectoryError, Config.DecodingServices<C>> =>
+    decode(bytes).pipe(Effect.mapError(TrajectoryError.parse));
+};
 
 export interface Header {
   id: string;

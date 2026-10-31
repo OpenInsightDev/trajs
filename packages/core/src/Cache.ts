@@ -12,7 +12,7 @@ import * as EffectCache from "effect/Cache";
 import { KeyValueStore } from "effect/persistence";
 
 import type * as Config from "#/Config.ts";
-import { decodePart, encodePart } from "#/internal/exchange.ts";
+import { decodePart, encodePart } from "#/internal/exchange/part.ts";
 import { configOf } from "#/internal/trajectory.ts";
 import type * as Trajectory from "#/Trajectory.ts";
 import type { TrajectoryError } from "#/TrajectoryError.ts";
