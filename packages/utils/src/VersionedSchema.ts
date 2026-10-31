@@ -104,8 +104,8 @@ export const make = <
  * **Example** (Migrating a renamed field)
  *
  * ```ts import.meta.vitest
- * import { VersionedSchema } from "@trajs/core"
  * import { Effect, Schema, SchemaGetter } from "effect"
+ * import * as VersionedSchema from "@trajs/utils/VersionedSchema"
  *
  * const first = Schema.Struct({ version: Schema.Literal("1"), name: Schema.String }).pipe(VersionedSchema.make)
  * const second = first.pipe(VersionedSchema.upgrade(

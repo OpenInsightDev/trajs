@@ -55,7 +55,7 @@ const Repository = Schema.Union([
  *
  * ```ts import.meta.vitest
  * import pkg from "../package.json" with { type: "json" }
- * import { PackageMetadata } from "@trajs/core"
+ * import { PackageMetadata } from "@trajs/utils/Package"
  * import { Schema } from "effect"
  *
  * const stated = Schema.decodeUnknownSync(PackageMetadata)(pkg)

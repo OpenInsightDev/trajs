@@ -7,12 +7,12 @@
  * @stability stable
  */
 
+import * as VersionedSchema from "@trajs/utils/VersionedSchema";
 import { Schema } from "effect";
 
 import * as Event from "#/Event.ts";
 import * as EventKit from "#/EventKit.ts";
 import { packageMetadata, packageName } from "#/unstable/atif/internal/package.ts";
-import * as VersionedSchema from "#/VersionedSchema.ts";
 
 /** The kinds of context transformation ATIF names for a `type`. */
 const types = ["compaction", "pruning", "injection"] as const;

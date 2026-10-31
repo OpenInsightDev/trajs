@@ -2,7 +2,7 @@
  * What this package states of itself, which every declaration it makes states again.
  */
 
-import type { PackageMetadata } from "#/Package.ts";
+import type { PackageMetadata } from "@trajs/utils/Package";
 
 import packageJson from "../../../../package.json" with { type: "json" };
 

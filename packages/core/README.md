@@ -35,15 +35,16 @@ without a conversion step.
   the kits a trajectory declares.
 - `Tool` and `Toolkit` — tool declarations, handlers, and the toolkit a trajectory
   names.
-- `PackageMetadata` — what a `package.json` states about the package itself,
+- `Package` — the fields a `package.json` states about the package itself,
   which event, metric, and extra declarations state as their `packageMetadata`.
 - `Event` and `EventKit` — versioned event declarations and their collections.
 - `Metric` and `MetricKit` — metric results, producers over trajectory parts, and
   their collections.
 - `Extra` and `ExtraKit` — versioned extra fields for prompt, response, and session
   parts.
-- `VersionedSchema` and `TrajectoryError` — versioned payload encoding and the
-  structured failures reads raise.
+- `VersionedSchema` — historical decoding and current-version encoding of the
+  payload schemas a declaration states.
+- `TrajectoryError` — the structured failures trajectory reads raise.
 - `@trajs/core/codec` — a trajectory read as the conversations the Anthropic
   Messages API and OpenAI-compatible chat APIs take.
 - `@trajs/core/unstable/atif` — an ATIF document read as a trajectory, and a
@@ -54,8 +55,9 @@ without a conversion step.
   configured trajectory parts.
 
 The byte, storage, compression, and hashing services `Exchange` is built over are
-re-exported from [`@trajs/utils`](../utils), so a program reads them from this
-package.
+re-exported from [`@trajs/utils`](../utils), with the `Package` and
+`VersionedSchema` schemas its declarations are written over, so a program reads
+them from this package.
 
 ## Usage
 

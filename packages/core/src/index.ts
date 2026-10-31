@@ -88,14 +88,6 @@ export * as Metric from "#/Metric.ts";
 export * as MetricKit from "#/MetricKit.ts";
 
 /**
- * The fields a `package.json` states about the package itself.
- *
- * @stability stable
- * @category re-exports
- */
-export { PackageMetadata } from "#/Package.ts";
-
-/**
  * Live trajectory writers and metric enrichment.
  *
  * @stability stable
@@ -160,14 +152,6 @@ export * as Trajectory from "#/Trajectory.ts";
 export * as TrajectoryError from "#/TrajectoryError.ts";
 
 /**
- * Historical decoding and current-version encoding for payload schemas.
- *
- * @stability stable
- * @category re-exports
- */
-export * as VersionedSchema from "#/VersionedSchema.ts";
-
-/**
  * Conversation steps, tool turns, and attached metric views.
  *
  * @stability stable
@@ -176,7 +160,7 @@ export * as VersionedSchema from "#/VersionedSchema.ts";
 export * as View from "#/view/index.ts";
 
 /**
- * Re-exports shared byte storage, compression, hashing, and utility APIs.
+ * Re-exports the shared schemas, byte storage, compression, and hashing APIs.
  *
  * @stability stable
  * @category re-exports

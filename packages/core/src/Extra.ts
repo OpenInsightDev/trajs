@@ -8,11 +8,11 @@
  * @stability stable
  */
 
+import { PackageMetadata } from "@trajs/utils/Package";
 import { Data, Schema } from "effect";
 
 import type * as ExtraKit from "#/ExtraKit.ts";
 import { documentOf, requireBinaryLayout } from "#/internal/schema.ts";
-import { PackageMetadata } from "#/Package.ts";
 
 /**
  * The trajectory part kinds supporting extras.

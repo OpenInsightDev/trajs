@@ -1,11 +1,15 @@
 /**
- * The generic services a trajectory is carried and kept through.
+ * The generic services a trajectory is carried and kept through, and the schemas
+ * a trajectory's declarations are stated with.
  *
  * {@link Compression} writes and reads the frame of a trajectory's parts.
  * {@link StreamHash} reads the digest a trajectory is named by.
  * {@link Checksum} checks a block of those parts.
  * {@link Byte} is the bytes of a trajectory, read at random.
  * {@link ByteStore} keeps bytes between readings.
+ * {@link Package} states the fields a `package.json` holds about its package.
+ * {@link VersionedSchema} reads historical payloads and writes the current
+ * version.
  * {@link BinaryProtocol} reads and writes the bytes of one message of a binary
  * protocol, and is not stable yet.
  *
@@ -29,4 +33,8 @@ export * as Checksum from "#/Checksum.ts";
 
 export * as Compression from "#/Compression.ts";
 
+export * as Package from "#/Package.ts";
+
 export * as StreamHash from "#/StreamHash.ts";
+
+export * as VersionedSchema from "#/VersionedSchema.ts";

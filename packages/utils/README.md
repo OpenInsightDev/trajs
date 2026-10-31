@@ -35,6 +35,14 @@ platform package can say what each is over.
   [`@node-rs/xxhash`](https://npmjs.com/package/@node-rs/xxhash) on Node and Bun,
   and its WebAssembly module in a browser.
 
+- `VersionedSchema` — payload schemas read at the version they state. `make`
+  starts a version history from a struct with a literal `version`, `upgrade` adds
+  a current schema and the migration from the previous one, and `TaggedUnion`
+  groups those histories under a `_tag`.
+- `Package` — `PackageMetadata`, the fields a `package.json` holds about the
+  package itself, which an event, metric, or extra declaration states as its
+  `packageMetadata`.
+
 `@trajs/platform-node` and `@trajs/platform-browser` provide the layers these
 services are read through, and the exchange layer of [`@trajs/core`](../core) is built
 over them. A `ByteStore` is provided by a program instead — in memory with
@@ -44,5 +52,5 @@ in a bucket with `ByteStore.layerS3` — and a trajectory read with its bytes ke
 requires one.
 
 Every module here is re-exported by [`@trajs/core`](../core): a program reads the
-services a trajectory is carried through from the core package rather than from this
-one.
+services a trajectory is carried through, and the schemas its declarations are
+written over, from the core package rather than from this one.

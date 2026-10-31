@@ -8,11 +8,11 @@
  * @stability stable
  */
 
+import { PackageMetadata } from "@trajs/utils/Package";
 import { Data, Schema } from "effect";
 
 import type * as EventKit from "#/EventKit.ts";
 import { documentOf, requireBinaryLayout } from "#/internal/schema.ts";
-import { PackageMetadata } from "#/Package.ts";
 
 /**
  * Optional display information for an {@link Event}.

@@ -8,6 +8,7 @@
  * @stability stable
  */
 
+import { PackageMetadata } from "@trajs/utils/Package";
 import { Data, DateTime, Schema, Stream } from "effect";
 import type { NonEmptyArray } from "effect/Array";
 
@@ -15,7 +16,6 @@ import type * as Config from "#/Config.ts";
 import { runProducers } from "#/internal/metric.ts";
 import { documentOf, requireBinaryLayout } from "#/internal/schema.ts";
 import type * as MetricKit from "#/MetricKit.ts";
-import { PackageMetadata } from "#/Package.ts";
 import type * as Trajectory from "#/Trajectory.ts";
 import type { TrajectoryError } from "#/TrajectoryError.ts";
 
