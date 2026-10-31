@@ -61,6 +61,24 @@ import type { Raw, Read, Write } from "#/internal/binary-protocol.ts";
 export type Endianness = "le" | "be";
 
 /**
+ * The end of one message the fields are read from.
+ *
+ * **Details**
+ *
+ * The fields are laid out in the order they are declared.
+ * `"forward"` reads them from the first byte, so a field states its length by a
+ * field declared before it.
+ * `"backward"` reads them from the last byte, so a field states its length by a
+ * field declared after it.
+ * A field spans the bytes it states in either order, so a message is written the
+ * same way whichever end it is read from.
+ *
+ * @stability experimental
+ * @category models
+ */
+export type Direction = "forward" | "backward";
+
+/**
  * The options one message is read and written with.
  *
  * **When to use**
@@ -71,9 +89,11 @@ export type Endianness = "le" | "be";
  *
  * - `endianness` is the order of every number of the message, and defaults to
  *   `"le"`.
+ * - `direction` is the end of the message the fields are read from, and defaults
+ *   to `"forward"`.
  *
- * A nested message ({@link struct}) takes the order of the message it is read
- * in, so the order is stated once for a whole message.
+ * A nested message ({@link struct}) takes the order and the direction of the
+ * message it is read in, so both are stated once for a whole message.
  *
  * @see {@link message} for the message these are given to.
  * @stability experimental
@@ -81,6 +101,7 @@ export type Endianness = "le" | "be";
  */
 export interface Options {
   readonly endianness?: Endianness;
+  readonly direction?: Direction;
 }
 
 /**
@@ -95,7 +116,7 @@ export interface Options {
  *
  * A field is declared before the message it belongs to, so it states no byte
  * order and no position of its own. {@link message} reads the fields in the
- * order they are given.
+ * order they are given or in the reverse of it.
  *
  * `schema` is the schema of the value. The bytes are read and written by the
  * field itself, so a field is not an Effect schema and is not read by
@@ -141,6 +162,8 @@ export type CaseValue<Cases extends Record<string, Field<unknown>>> = {
 }[keyof Cases];
 
 const endiannessOf = (options?: Options): Endianness => options?.endianness ?? "le";
+
+const directionOf = (options?: Options): Direction => options?.direction ?? "forward";
 
 const schemasOf = (fields: Readonly<Record<string, Field<unknown>>>) => {
   const schemas: Record<string, Schema.Codec<unknown, Raw>> = {};
@@ -199,8 +222,9 @@ const betweenBig = (minimum: bigint, maximum: bigint): Schema.Codec<bigint, bigi
  *
  * **Details**
  *
- * The fields are read in the order they are given, so a field states its
- * length, its count, or its branch by a field declared before it.
+ * The fields are laid out in the order they are given, and read from the start
+ * of the message unless {@link Options} states another {@link Direction}. So a
+ * field states its length, its count, or its branch by a field read before it.
  * A field spans exactly the bytes it states, so the message spans the bytes its
  * fields do. Bytes left over are an issue of the decode, since the message
  * states no field for them.
@@ -208,6 +232,13 @@ const betweenBig = (minimum: bigint, maximum: bigint): Schema.Codec<bigint, bigi
  * A value the bytes cannot state is refused rather than written truncated. A
  * number out of the range of its field, or a region of another size than the
  * field states, is an issue of the encode.
+ *
+ * **Gotchas**
+ *
+ * - {@link frame} is not a field of a backward message, since it states its
+ *   length before its bytes.
+ * - A field that states no size takes every byte left, so it is the last field
+ *   read.
  *
  * **Example** (A chunk header, written and read back)
  *
@@ -241,6 +272,26 @@ const betweenBig = (minimum: bigint, maximum: bigint): Schema.Codec<bigint, bigi
  * read.compression // => 1
  * ```
  *
+ * **Example** (A length declared after the data it sizes)
+ *
+ * ```ts import.meta.vitest
+ * import { Effect, Schema } from "effect"
+ * import * as BinaryProtocol from "@trajs/utils/BinaryProtocol"
+ *
+ * const Pack = BinaryProtocol.message(
+ *   { data: BinaryProtocol.bytesOf("len"), len: BinaryProtocol.u32 },
+ *   { direction: "backward" }
+ * )
+ *
+ * const bytes = await Effect.runPromise(
+ *   Schema.encodeEffect(Pack)({ data: new Uint8Array([1, 2, 3]), len: 3 })
+ * )
+ * bytes.length // => 7
+ *
+ * const read = await Effect.runPromise(Schema.decodeEffect(Pack)(bytes))
+ * Array.from(read.data) // => [1, 2, 3]
+ * ```
+ *
  * @see {@link struct} for the fields of a message nested in another.
  * @stability experimental
  * @category constructors
@@ -251,11 +302,12 @@ export const message = <Fields extends Record<string, Field<unknown>>>(
 ): Schema.Codec<Value<Fields>, Uint8Array> => {
   const nest = nestField(fields, schemaOf(fields));
   const endianness = endiannessOf(options);
+  const direction = directionOf(options);
 
   return Schema.Uint8Array.pipe(
     Schema.decodeTo(nest.schema, {
       decode: SchemaGetter.transformEffect((bytes: Uint8Array) =>
-        readMessage(nest, bytes, endianness),
+        readMessage(nest, bytes, endianness, direction),
       ),
       encode: SchemaGetter.transformEffect((raw: Raw) => writeMessage(nest, raw, endianness)),
     }),
@@ -275,7 +327,8 @@ export const message = <Fields extends Record<string, Field<unknown>>>(
  * A nested message is read where its field is declared, and it spans the bytes
  * its own fields do. Its fields state their lengths and branches by the fields
  * around them as well as their own, so a length stated before the nested
- * message still sizes a region inside it.
+ * message still sizes a region inside it. It takes the {@link Direction} of the
+ * message it is read in.
  *
  * The value is an object of the values of the nested fields.
  *
@@ -504,6 +557,8 @@ export const bytesOf = (name: string): Field<Uint8Array> =>
  *
  * The schema is decoded and encoded without services, so a schema that states
  * services is not a field.
+ * A frame states its length before its bytes, so it is not a field of a backward
+ * message.
  *
  * **Example** (A name and its tags embedded beside a count)
  *

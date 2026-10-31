@@ -5,13 +5,14 @@
  * as those bytes. The schema of a field states the value its raw holds, so one
  * declaration both reads and writes a message.
  *
- * Fields are read in the order they are declared, so a field states its length,
- * its count, or its branch by a raw value an earlier field read.
+ * Fields are laid out in the order they are declared, and read from the start of
+ * the message or from its end. A field states its length, its count, or its
+ * branch by a raw value an earlier field read.
  */
 
 import { Effect, Pipeable, Schema, SchemaIssue } from "effect";
 
-import type { Endianness, Field } from "#/BinaryProtocol.ts";
+import type { Direction, Endianness, Field } from "#/BinaryProtocol.ts";
 
 /**
  * The raw value a field's bytes state, before its schema names the value.
@@ -41,7 +42,13 @@ export interface Bindings {
 export interface Reading {
   readonly bytes: Uint8Array;
   readonly view: DataView;
-  offset: number;
+
+  /** The next byte read forwards, or the start of the region read backwards. */
+  position: number;
+
+  /** Whether the read takes the bytes before the region it has, not after. */
+  readonly backward: boolean;
+
   readonly endianness: Endianness;
 }
 
@@ -89,14 +96,19 @@ export class FieldCodec<A> extends Pipeable.Class implements Field<A> {
   }
 }
 
-const reading = (bytes: Uint8Array, endianness: Endianness): Reading => ({
-  bytes,
-  // The view is taken over the bytes given, not over the buffer behind them, so
-  // a region beginning inside a larger buffer reads from where it begins.
-  view: new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength),
-  offset: 0,
-  endianness,
-});
+const reading = (bytes: Uint8Array, endianness: Endianness, direction: Direction): Reading => {
+  const backward = direction === "backward";
+
+  return {
+    bytes,
+    // The view is taken over the bytes given, not over the buffer behind them, so
+    // a region beginning inside a larger buffer reads from where it begins.
+    view: new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength),
+    position: backward ? bytes.length : 0,
+    backward,
+    endianness,
+  };
+};
 
 const writing = (endianness: Endianness): Writing => ({ chunks: [], endianness });
 
@@ -126,7 +138,7 @@ const written = (chunks: ReadonlyArray<Uint8Array>): Uint8Array => {
 const Root: Bindings = { own: {}, around: undefined };
 
 /** How many bytes the read can still take. */
-const left = (at: Reading): number => at.bytes.length - at.offset;
+const left = (at: Reading): number => (at.backward ? at.position : at.bytes.length - at.position);
 
 const isNumber = Schema.is(Schema.Number);
 
@@ -147,6 +159,35 @@ const isNest = (raw: Raw): raw is { readonly [name: string]: Raw } =>
 /** The issue of bytes that end before the bytes a field asks for. */
 const short = (at: Reading, bytes: number, what: string): SchemaIssue.Issue =>
   issue(`the bytes hold ${left(at)} of the ${bytes} bytes of ${what}`);
+
+/**
+ * The offset of the next `length` bytes, which the read moves over.
+ *
+ * A forward read takes the bytes after the region it has, and a backward read the
+ * ones before, so a field spans the same bytes in either direction.
+ */
+const advance = (
+  at: Reading,
+  length: number,
+  what: string,
+): Effect.Effect<number, SchemaIssue.Issue> =>
+  Effect.gen(function* () {
+    if (left(at) < length) {
+      return yield* Effect.fail(short(at, length, what));
+    }
+
+    if (at.backward) {
+      at.position -= length;
+
+      return at.position;
+    }
+
+    const start = at.position;
+
+    at.position += length;
+
+    return start;
+  });
 
 /** A number's width, and how its bytes are read and written. */
 interface Kind<A extends Raw> {
@@ -288,15 +329,9 @@ export const numberField = <A extends Raw>(
     schema,
     (at) =>
       Effect.gen(function* () {
-        if (left(at) < kind.bytes) {
-          return yield* Effect.fail(short(at, kind.bytes, `a ${kind.what}`));
-        }
+        const start = yield* advance(at, kind.bytes, `a ${kind.what}`);
 
-        const value = kind.read(at.view, at.offset, at.endianness === "le");
-
-        at.offset += kind.bytes;
-
-        return value;
+        return kind.read(at.view, start, at.endianness === "le");
       }),
     (raw, at) => writeNumber(kind, raw, at),
   );
@@ -379,16 +414,9 @@ export const regionField = (
     (at, around) =>
       Effect.gen(function* () {
         const length = (yield* count.resolve(around)) ?? left(at);
+        const start = yield* advance(at, length, regionOf(count));
 
-        if (left(at) < length) {
-          return yield* Effect.fail(short(at, length, regionOf(count)));
-        }
-
-        const value = at.bytes.subarray(at.offset, at.offset + length);
-
-        at.offset += length;
-
-        return value;
+        return at.bytes.subarray(start, start + length);
       }),
     (raw, at, around) =>
       Effect.gen(function* () {
@@ -448,17 +476,21 @@ export const frameField = <A>(schema: Schema.Codec<A, Raw>): FieldCodec<A> =>
     schema,
     (at) =>
       Effect.gen(function* () {
-        const size = frameSize(at.bytes, at.offset);
+        if (at.backward) {
+          return yield* Effect.fail(
+            issue("a frame states its length before its bytes, so a backward read cannot place it"),
+          );
+        }
+
+        const size = frameSize(at.bytes, at.position);
 
         if (size === undefined) {
           return yield* Effect.fail(issue("the bytes hold no whole frame"));
         }
 
-        const value = at.bytes.subarray(at.offset, at.offset + size);
+        const start = yield* advance(at, size, "a frame");
 
-        at.offset += size;
-
-        return value;
+        return at.bytes.subarray(start, start + size);
       }),
     (raw, at) =>
       Effect.gen(function* () {
@@ -493,7 +525,9 @@ export const repeatField = <A>(
           values.push(yield* field.read(at, around));
         }
 
-        return values;
+        // A backward read takes the entries from the last one, so the value keeps
+        // the order the bytes state.
+        return at.backward ? values.reverse() : values;
       }),
     (raw, at, around) =>
       Effect.gen(function* () {
@@ -576,8 +610,11 @@ export const nestField = <A>(
       Effect.gen(function* () {
         const own: Record<string, Raw> = {};
         const inner: Bindings = { own, around };
+        // A backward read states a length after the bytes it sizes, so it reads
+        // the fields in the reverse of the order they are declared.
+        const entries = Object.entries(fields);
 
-        for (const [name, field] of Object.entries(fields)) {
+        for (const [name, field] of at.backward ? entries.reverse() : entries) {
           own[name] = yield* field.read(at, inner).pipe(Effect.mapError(inField(name)));
         }
 
@@ -591,8 +628,11 @@ export const nestField = <A>(
 
         const own: Record<string, Raw> = {};
         const inner: Bindings = { own, around };
+        const entries = Object.entries(fields);
 
-        for (const [name, field] of Object.entries(fields)) {
+        // Every value is known before any byte is written, so a field states its
+        // size by a field declared after it as well.
+        for (const [name] of entries) {
           const value = raw[name];
 
           if (value === undefined) {
@@ -601,9 +641,11 @@ export const nestField = <A>(
             );
           }
 
-          yield* field.write(value, at, inner).pipe(Effect.mapError(inField(name)));
-
           own[name] = value;
+        }
+
+        for (const [name, field] of entries) {
+          yield* field.write(own[name], at, inner).pipe(Effect.mapError(inField(name)));
         }
       }),
   );
@@ -613,16 +655,17 @@ export const readMessage = (
   nest: Field<unknown>,
   bytes: Uint8Array,
   endianness: Endianness,
+  direction: Direction,
 ): Effect.Effect<Raw, SchemaIssue.Issue> =>
   Effect.gen(function* () {
-    const at = reading(bytes, endianness);
+    const at = reading(bytes, endianness, direction);
     const raw = yield* nest.read(at, Root);
 
     // The message ends where its fields do, so bytes left over are bytes it does
-    // not state.
-    if (at.offset !== bytes.length) {
+    // not state. A backward read leaves them before the fields.
+    if (left(at) !== 0) {
       return yield* Effect.fail(
-        issue(`the bytes are ${bytes.length - at.offset} longer than the fields of the message`),
+        issue(`the bytes hold ${left(at)} more than the fields of the message`),
       );
     }
 
