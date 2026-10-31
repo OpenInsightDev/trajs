@@ -1,6 +1,6 @@
 {
   "name": "@trajs/platform-browser",
-  "version": "0.0.0-alpha.4",
+  "version": "0.0.0-alpha.5",
   "description": "The browser implementations of the trajs platform services.",
   "homepage": "https://github.com/trajs-ai/trajs",
   "license": "MIT",
