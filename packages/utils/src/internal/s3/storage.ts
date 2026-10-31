@@ -7,10 +7,8 @@ import type { CompletedPart, S3Client } from "@aws-sdk/client-s3";
 import { Effect, Sink } from "effect";
 
 import { type Byte, makeByte } from "#/Byte.ts";
+import { type Bucket, NotFound, statusOf } from "#/internal/s3/bucket.ts";
 import { type Storage, StorageError, UnsupportedWrite, type WriteOptions } from "#/Storage.ts";
-
-/** What a bucket answered where the id holds no object. */
-const NotFound = 404;
 
 /**
  * What a bucket answered where a range begins at or past the end of the object.
@@ -27,34 +25,6 @@ const NotSatisfiable = 416;
  * bytes that arrived rather than a size stated here.
  */
 const PartSize = 8 * 1024 * 1024;
-
-/**
- * What one bucket is reached through: the client that sends to it, the name the
- * bucket is held under, and the commands of the AWS SDK read to reach it.
- */
-interface Bucket {
-  readonly sdk: typeof import("@aws-sdk/client-s3");
-  readonly client: S3Client;
-  readonly name: string;
-}
-
-/**
- * The status a bucket answered a request with, where the SDK reports the request as failed.
- *
- * It tells a bucket that holds nothing from one that could not serve.
- * A request the SDK could not make at all carries no answer, such as an endpoint that does not
- * resolve, so it is reported by the failure alone.
- */
-const statusOf = (cause: unknown): number | undefined => {
-  // SAFETY: every error the SDK reports is an object carrying the answer it reported
-  // it from under `$metadata`; what carries none is not such an error, and nothing is
-  // read of it rather than a status read from the wrong place.
-  const answered = cause as
-    | { readonly $metadata?: { readonly httpStatusCode?: number } }
-    | undefined;
-
-  return answered?.$metadata?.httpStatusCode;
-};
 
 /**
  * A request the SDK makes for a bucket, failed as this storage.

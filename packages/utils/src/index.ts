@@ -13,7 +13,8 @@
  * {@link Storage.layerS3}.
  * A platform package states the codec a frame is carried with, such as `@trajs/platform-node`.
  * The bytes kept between readings are kept over the key/value store of `effect/persistence`
- * ({@link ByteStore.layerKVStore}) or over the one in memory ({@link ByteStore.layer}).
+ * ({@link ByteStore.layerKVStore}), over the one in memory ({@link ByteStore.layer}), or in a
+ * bucket ({@link ByteStore.layerS3}).
  *
  * @stability stable
  */

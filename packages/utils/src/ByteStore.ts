@@ -8,17 +8,20 @@
  * read.
  *
  * This package states a store in memory ({@link layer}), one in a temporary directory
- * ({@link layerFsTemp}), and one over a key/value store a program holds ({@link layerKVStore}).
+ * ({@link layerFsTemp}), one in a bucket ({@link layerS3}), and one over a key/value store a
+ * program holds ({@link layerKVStore}).
  *
  * @stability stable
  */
 
+import type { S3Client } from "@aws-sdk/client-s3";
 import { Context, Data, Effect, FileSystem, Formatter, Layer, Path, Sink } from "effect";
 import { KeyValueStore } from "effect/persistence";
 import type { PlatformError } from "effect/PlatformError";
 
 import { type Byte } from "#/Byte.ts";
 import { keyValueStoreBytes } from "#/internal/byte-store.ts";
+import { s3KeyValueStore } from "#/internal/s3/key-value-store.ts";
 
 /**
  * What a sequence is written into a store with.
@@ -53,8 +56,8 @@ export interface WriteOptions {
  *
  * **When to use**
  *
- * Use where a store is built ({@link layer}, {@link layerKVStore}) and how it cuts a sequence
- * matters, such as the quota of a store of a limited size.
+ * Use where a store is built ({@link layer}, {@link layerKVStore}, {@link layerS3}) and how it
+ * cuts a sequence matters, such as the quota of a store of a limited size.
  *
  * **Details**
  *
@@ -351,3 +354,75 @@ export const layerFsTemp = (
 
     return layerKVStore().pipe(Layer.provide(KeyValueStore.layerFileSystem(directory)));
   }).pipe(Layer.unwrap);
+
+/**
+ * What a bucket states about the values a store keeps in it.
+ *
+ * **When to use**
+ *
+ * Use where the store is built ({@link layerS3}) to state which bucket keeps the bytes.
+ * Where the bucket is and how a request to it is signed is stated of the client rather than here.
+ *
+ * **Details**
+ *
+ * - `bucket` is the bucket a value is kept in.
+ *
+ * A sequence is kept in the bucket as one object per chunk, and its record as one more.
+ * An id is read as the prefix of the keys a sequence is kept under, and as nothing else.
+ * How a sequence is cut is stated as it is for every store ({@link Options}).
+ *
+ * @see {@link layerS3} for the layer this is given to.
+ * @stability stable
+ * @category models
+ */
+export interface S3Options extends Options {
+  readonly bucket: string;
+}
+
+/**
+ * The store in a bucket.
+ *
+ * **When to use**
+ *
+ * Use when the bytes a program keeps are reached from more than one place, such as the frames of
+ * trajectories read again from a bucket the program shares.
+ * Use with a client of the AWS SDK, which states where the bucket is and how a request to it is
+ * signed.
+ *
+ * **Details**
+ *
+ * It is {@link layerKVStore} over the key/value store of a bucket, stated with {@link S3Options}.
+ * A sequence is kept as one object per chunk, and each chunk is written once it has arrived
+ * whole.
+ * A sequence is therefore kept as it is produced, not once it has ended.
+ *
+ * What the id held is dropped before the first chunk is written, so a sequence is written over
+ * where the id is taken.
+ * A write given `overwrite: false` fails where the id is taken, before anything is written
+ * ({@link WriteOptions}).
+ *
+ * The client is the program's rather than this layer's, which neither builds one nor closes it.
+ * The commands of the AWS SDK are read when the layer is built rather than when this module is
+ * imported.
+ *
+ * **Gotchas**
+ *
+ * The whole bucket is the store's, and an id names the prefix of the keys its sequence is kept
+ * under.
+ * Sharing a bucket with trajectories ({@link Storage.layerS3}) writes one over where its key is a
+ * key of a sequence.
+ *
+ * @see {@link ByteStore} for the store this provides.
+ * @see {@link Storage.layerS3} for the storage of a trajectory in a bucket.
+ * @stability stable
+ * @category layers
+ */
+export const layerS3 = (client: S3Client, options: S3Options): Layer.Layer<ByteStore> =>
+  Layer.effect(
+    ByteStore,
+    Effect.gen(function* () {
+      const sdk = yield* Effect.promise(() => import("@aws-sdk/client-s3"));
+
+      return keyValueStoreBytes(s3KeyValueStore(sdk, client, options.bucket), options);
+    }),
+  );

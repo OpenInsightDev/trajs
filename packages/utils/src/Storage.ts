@@ -18,7 +18,7 @@ import { Context, Data, Effect, FileSystem, Formatter, Layer, type Scope, Sink }
 
 import { type Byte, type ReadOptions } from "#/Byte.ts";
 import { fileSystemStorage } from "#/internal/file-system.ts";
-import { s3Storage } from "#/internal/s3.ts";
+import { s3Storage } from "#/internal/s3/storage.ts";
 
 /**
  * How a trajectory is written into an id.
