@@ -8,7 +8,7 @@
  * @stability stable
  */
 
-import { DateTime, Effect, Schema, Stream } from "effect";
+import { DateTime, Effect, Option, Result, Schema, Stream } from "effect";
 
 import * as Config from "#/Config.ts";
 import * as Event from "#/Event.ts";
@@ -936,6 +936,55 @@ export type TrajectoryStream<Config extends Config.AnyConfig, E = never, R = nev
 >;
 
 /**
+ * The parts of a trajectory held by index, read with `Config`.
+ *
+ * **When to use**
+ *
+ * Use when the parts are already read and a caller needs their count, one part
+ * by index, and the parts as a stream.
+ *
+ * **Details**
+ *
+ * `length` counts the parts held.
+ * `at` reads the part at a zero-based index.
+ * A negative index and an index past the end hold nothing, so `at` returns `none`.
+ * `E` and `R` are the error and the requirements of one read.
+ *
+ * @see {@link asStream} for reading those parts as a stream.
+ * @see {@link TrajectoryFile} for a buffer that names its id and config.
+ * @stability stable
+ * @category models
+ */
+export interface TrajectoryBuffer<Config extends Config.AnyConfig, E = never, R = never> {
+  readonly length: number;
+  readonly at: (index: number) => Effect.Effect<Option.Option<Part<Config>>, E, R>;
+}
+
+/**
+ * Reads the parts of a {@link TrajectoryBuffer} as a {@link TrajectoryStream}.
+ *
+ * **Details**
+ *
+ * The stream reads `at(0)` through `at(length - 1)` in order, one part at a time.
+ * An index that holds nothing is skipped.
+ * The length is read where the stream runs, not where it is built.
+ *
+ * @see {@link TrajectoryBuffer} for the parts the stream reads.
+ * @see {@link make} for naming the stream with an id and its config.
+ * @stability stable
+ * @category constructors
+ */
+export const asStream = <Config extends Config.AnyConfig, E = never, R = never>(
+  buffer: TrajectoryBuffer<Config, E, R>,
+): TrajectoryStream<Config, E, R> =>
+  Stream.suspend(() => Stream.range(0, buffer.length - 1)).pipe(
+    Stream.mapEffect((index) => buffer.at(index)),
+    Stream.filterMap((part) =>
+      Option.isSome(part) ? Result.succeed(part.value) : Result.failVoid,
+    ),
+  );
+
+/**
  * A stream of {@link Part} named by `Id` and read with `Config`.
  *
  * **Details**
@@ -955,11 +1004,29 @@ export type Trajectory<
   Config extends Config.AnyConfig = Config.AnyConfig,
   E = never,
   R = never,
-> = TrajectoryStream<Config, E, R> &
-  Readonly<{
-    id: Id;
-  }> &
-  Readonly<Config>;
+> = TrajectoryStream<Config, E, R> & Readonly<{ id: Id }> & Readonly<Config>;
+
+/**
+ * A {@link TrajectoryBuffer} that names its id and its config.
+ *
+ * **When to use**
+ *
+ * Use when a buffer is the whole trajectory in hand, with no source to replay.
+ *
+ * **Details**
+ *
+ * `asStream` reads its parts, and `id` names it.
+ * The other fields repeat the config its parts are read with.
+ *
+ * @see {@link TrajectoryBuffer} for the parts alone.
+ * @see {@link Trajectory} for the same id and config over a stream.
+ * @stability stable
+ * @category models
+ */
+export type TrajectoryFile<
+  Id extends string = string,
+  Config extends Config.AnyConfig = Config.AnyConfig,
+> = TrajectoryBuffer<Config> & Readonly<{ id: Id }> & Readonly<Config>;
 
 /**
  * Returns a function from an id and `config` to a bound part stream.

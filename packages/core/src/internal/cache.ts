@@ -5,7 +5,7 @@ import * as Cache from "#/Cache.ts";
 import type * as Config from "#/Config.ts";
 import { decodePart, encodePart } from "#/internal/exchange.ts";
 import { attach, configOf } from "#/internal/trajectory.ts";
-import type * as Trajectory from "#/Trajectory.ts";
+import * as Trajectory from "#/Trajectory.ts";
 import type { TrajectoryError } from "#/TrajectoryError.ts";
 
 const compactAt = 1024;
@@ -96,22 +96,25 @@ const keep = Effect.fn(function* <Id extends string, Config extends Config.AnyCo
 
   const window = head === 0 ? parts : parts.slice(head);
 
-  const stream = Stream.concat(
-    Stream.range(0, stored - 1).pipe(Stream.mapEffect(readAt)),
-    Stream.fromIterable(window),
-  );
-
-  const cached = attach<Id, Config>(trajectory.id, configOf<Config>(trajectory))(stream);
-
-  return Object.assign(cached, {
+  const buffer: Trajectory.TrajectoryBuffer<
+    Config,
+    TrajectoryError | Cache.CacheError,
+    Config.DecodingServices<Config>
+  > = {
     length: next,
-    at: (index: number) =>
+    at: (index) =>
       index < 0 || index >= next
         ? Effect.succeed(Option.none<Trajectory.Part<Config>>())
         : index < stored
           ? readAt(index).pipe(Effect.map(Option.some))
           : Effect.succeed(Option.some(window[index - stored])),
-  });
+  };
+
+  const stream = Trajectory.asStream(buffer);
+
+  const cached = attach<Id, Config>(trajectory.id, configOf<Config>(trajectory))(stream);
+
+  return Object.assign(cached, buffer);
 });
 
 export const make = (store: ByteStore.ByteStore, options?: Cache.Options): Cache.Service => {

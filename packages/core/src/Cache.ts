@@ -9,7 +9,7 @@
 
 import { ByteStore } from "@trajs/utils";
 import { Context, Data, Effect, Formatter, Layer } from "effect";
-import type { FileSystem, Option, Path } from "effect";
+import type { FileSystem, Path } from "effect";
 import type { PlatformError } from "effect/PlatformError";
 
 import type * as Config from "#/Config.ts";
@@ -67,16 +67,15 @@ export class CacheError extends Data.TaggedError("CacheError")<{
  *
  * **Details**
  *
- * `length` counts all parts after the source completes.
- * `at` reads a zero-based index from memory or the store.
- * Negative indices and indices beyond the end return none.
- * Replaying stored parts decodes them with the trajectory's config.
+ * The value is a {@link Trajectory.Trajectory} and a
+ * {@link Trajectory.TrajectoryBuffer} over the same parts.
+ * Every reading replays those parts, and the source runs once.
  *
  * **Gotchas**
  *
  * Reads require the backing store to remain available.
- * Pass integer indices to `at`.
  *
+ * @see {@link Trajectory.TrajectoryBuffer} for `length` and `at`.
  * @see {@link Service.cache} for creating the cached trajectory.
  * @see {@link CacheError} for store failures.
  * @stability stable
@@ -88,16 +87,11 @@ export type Cached<Id extends string, Config extends Config.AnyConfig> = Traject
   TrajectoryError | CacheError,
   Config.DecodingServices<Config>
 > &
-  Readonly<{
-    readonly length: number;
-    readonly at: (
-      index: number,
-    ) => Effect.Effect<
-      Option.Option<Trajectory.Part<Config>>,
-      TrajectoryError | CacheError,
-      Config.DecodingServices<Config>
-    >;
-  }>;
+  Trajectory.TrajectoryBuffer<
+    Config,
+    TrajectoryError | CacheError,
+    Config.DecodingServices<Config>
+  >;
 
 /**
  * Service for caching trajectories by id.
