@@ -6,11 +6,18 @@ import { Effect, Option, Predicate, Result, Stream } from "effect";
 
 import type * as Cache from "#/Cache.ts";
 import type * as Config from "#/Config.ts";
-import type * as Trajectory from "#/Trajectory.ts";
+import * as Trajectory from "#/Trajectory.ts";
 import type { TrajectoryError } from "#/TrajectoryError.ts";
 import type * as MetricView from "#/view/MetricView.ts";
 
 type Part<Config extends Config.AnyConfig> = Trajectory.Part<Config>;
+
+/** The cached parts of a trajectory, read by index or as a stream. */
+type Parts<Config extends Config.AnyConfig> = Trajectory.TrajectoryBuffer<
+  Config,
+  TrajectoryError | Cache.CacheError,
+  Config.DecodingServices<Config>
+>;
 
 /** A reading of a cached trajectory, which fails wherever the cache does. */
 type Reading<Config extends Config.AnyConfig, A> = Effect.Effect<
@@ -52,13 +59,13 @@ const attachPart = <Config extends Config.AnyConfig>(
 };
 
 const record = <Config extends Config.AnyConfig>(
-  cached: Cache.Cached<string, Config>,
+  cached: Parts<Config>,
 ): Reading<Config, Attachment> =>
   Effect.gen(function* () {
     // One index per reading, so reading the view again starts from no entries.
     const attached: Attachment = new Map();
 
-    yield* cached.pipe(
+    yield* Trajectory.asStream(cached).pipe(
       Stream.zipWithIndex,
       Stream.runForEach(([part, index]) => Effect.sync(() => attachPart(attached, part, index))),
     );
@@ -67,7 +74,7 @@ const record = <Config extends Config.AnyConfig>(
   });
 
 const metricAt = <Config extends Config.AnyConfig>(
-  cached: Cache.Cached<string, Config>,
+  cached: Parts<Config>,
   index: number,
 ): Reading<Config, Trajectory.MetricPartOf<Config>> =>
   cached.at(index).pipe(
@@ -101,7 +108,7 @@ const byTag = <Config extends Config.AnyConfig>(
 };
 
 const metricsOf = <Config extends Config.AnyConfig>(
-  cached: Cache.Cached<string, Config>,
+  cached: Parts<Config>,
   attached: Attachment,
   uuid: string,
 ): Reading<Config, MetricView.AttachedMetrics<Config>> =>
@@ -111,7 +118,7 @@ const metricsOf = <Config extends Config.AnyConfig>(
 
 /** Keeps a result that names no target, and hands every other part its results. */
 const emit = <Config extends Config.AnyConfig>(
-  cached: Cache.Cached<string, Config>,
+  cached: Parts<Config>,
   attached: Attachment,
   part: Part<Config>,
 ): Reading<Config, Result.Result<MetricView.MetricTrajectoryPart<Config>, void>> => {
@@ -129,8 +136,10 @@ const emit = <Config extends Config.AnyConfig>(
 
 /** Reads the parts of a cached trajectory with the results attached to each of them. */
 export const metricStream = <Config extends Config.AnyConfig>(
-  cached: Cache.Cached<string, Config>,
+  cached: Parts<Config>,
 ): Reading<Config, MetricStream<Config>> =>
   Effect.map(record(cached), (attached) =>
-    cached.pipe(Stream.filterMapEffect((part) => emit(cached, attached, part))),
+    Trajectory.asStream(cached).pipe(
+      Stream.filterMapEffect((part) => emit(cached, attached, part)),
+    ),
   );

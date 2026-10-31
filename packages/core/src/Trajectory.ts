@@ -1026,7 +1026,9 @@ export type Trajectory<
 export type TrajectoryFile<
   Id extends string = string,
   Config extends Config.AnyConfig = Config.AnyConfig,
-> = TrajectoryBuffer<Config> & Readonly<{ id: Id }> & Readonly<Config>;
+  E = never,
+  R = never,
+> = TrajectoryBuffer<Config, E, R> & Readonly<{ id: Id }> & Readonly<Config>;
 
 /**
  * Returns a function from an id and `config` to a bound part stream.

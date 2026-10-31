@@ -1,53 +1,31 @@
 /**
- * Replayable trajectories backed by memory and a byte store.
+ * Replayable trajectories backed by memory and a key/value store.
  *
- * {@link Service.cache} reads a source once and returns a {@link Cached} trajectory.
- * {@link layer}, {@link layerFsTemp}, and {@link layerKVStore} choose the backing store.
+ * {@link Cache.cache} reads a source once and returns a {@link Trajectory.TrajectoryFile}.
+ * {@link layerMemory} and {@link layerKVStore} choose the backing store.
  *
  * @stability stable
  */
 
-import { ByteStore } from "@trajs/utils";
-import { Context, Data, Effect, Formatter, Layer } from "effect";
-import type { FileSystem, Path } from "effect";
-import type { PlatformError } from "effect/PlatformError";
+import { Context, Data, Effect, Formatter, Layer, Option, Stream } from "effect";
+import * as EffectCache from "effect/Cache";
+import { KeyValueStore } from "effect/persistence";
 
 import type * as Config from "#/Config.ts";
-import { make as serviceOf } from "#/internal/cache.ts";
+import { decodePart, encodePart } from "#/internal/exchange.ts";
+import { configOf } from "#/internal/trajectory.ts";
 import type * as Trajectory from "#/Trajectory.ts";
 import type { TrajectoryError } from "#/TrajectoryError.ts";
 
 /**
- * The in-memory window for each cached trajectory.
- *
- * **Details**
- *
- * `capacity` counts the newest parts kept in memory, not bytes.
- * Omission or `"unbounded"` keeps every part in memory.
- * Numeric capacities are rounded down and clamped to zero.
- * `NaN` also selects unbounded capacity.
- *
- * @see {@link make} for applying the window to a byte store.
- * @stability stable
- * @category configuration
- */
-export interface Options {
-  readonly capacity?: number | "unbounded";
-}
-
-/**
  * A backing-store failure while reading or writing a cached part.
  *
- * **When to use**
- *
- * Use to distinguish store failures from source errors and {@link TrajectoryError} decoding failures.
- *
  * **Details**
  *
- * `id` names the trajectory and `index` is the zero-based part index.
- * `cause` retains the store's original failure.
+ * `id` names the trajectory and `index` is the zero-based index of the part.
+ * `cause` retains the failure of the store.
  *
- * @see {@link Cached} for replay and indexed access.
+ * @see {@link layerKVStore} for the store these failures come from.
  * @stability stable
  * @category errors
  */
@@ -63,159 +41,189 @@ export class CacheError extends Data.TaggedError("CacheError")<{
 }
 
 /**
- * A replayable trajectory with a known length and indexed access.
- *
- * **Details**
- *
- * The value is a {@link Trajectory.Trajectory} and a
- * {@link Trajectory.TrajectoryBuffer} over the same parts.
- * Every reading replays those parts, and the source runs once.
- *
- * **Gotchas**
- *
- * Reads require the backing store to remain available.
- *
- * @see {@link Trajectory.TrajectoryBuffer} for `length` and `at`.
- * @see {@link Service.cache} for creating the cached trajectory.
- * @see {@link CacheError} for store failures.
- * @stability stable
- * @category models
- */
-export type Cached<Id extends string, Config extends Config.AnyConfig> = Trajectory.Trajectory<
-  Id,
-  Config,
-  TrajectoryError | CacheError,
-  Config.DecodingServices<Config>
-> &
-  Trajectory.TrajectoryBuffer<
-    Config,
-    TrajectoryError | CacheError,
-    Config.DecodingServices<Config>
-  >;
-
-/**
- * Service for caching trajectories by id.
+ * A cache reading a trajectory once and keeping its parts for replay.
  *
  * **When to use**
  *
- * Use when source streams cannot be rerun but their parts need repeated reads.
+ * Use when a source stream cannot be rerun, and its parts are read again.
  *
- * @see {@link Cache} for the service tag.
- * @see {@link make} for construction without a layer.
+ * @see {@link layerMemory} for a cache holding every part in memory.
+ * @see {@link layerKVStore} for a cache holding its parts in a store.
  * @stability stable
  * @category services
  */
-export interface Service {
-  /**
-   * Reads a trajectory to completion and retains its parts for replay.
-   *
-   * **Details**
-   *
-   * The newest parts stay in memory within the configured capacity.
-   * Earlier parts are encoded into the backing store.
-   * Repeated calls for an id reuse its cached reading.
-   * A failed reading is removed, so a later call can retry.
-   *
-   * **Gotchas**
-   *
-   * An id must always identify the same parts and config.
-   * Reusing an id for different input returns the earlier cached trajectory.
-   * An infinite source never returns a cached result.
-   *
-   * @see {@link Cached} for replay and indexed access.
-   */
+export interface Cache {
   readonly cache: <Id extends string, Config extends Config.AnyConfig, E, R>(
     trajectory: Trajectory.Trajectory<Id, Config, E, R>,
   ) => Effect.Effect<
-    Cached<Id, Config>,
+    Trajectory.TrajectoryFile<
+      Id,
+      Config,
+      TrajectoryError | CacheError,
+      Config.DecodingServices<Config>
+    >,
     E | TrajectoryError | CacheError,
     R | Config.EncodingServices<Config>
   >;
 }
 
 /**
- * Creates a cache over an existing byte store.
+ * The service a cache is provided through.
  *
- * **When to use**
- *
- * Use when the caller manages the store's lifetime directly.
- *
- * @see {@link layerKVStore} for obtaining the store from context.
- * @see {@link Options} for the in-memory window.
- * @stability stable
- * @category constructors
- */
-export const make = (store: ByteStore.ByteStore, options?: Options): Service =>
-  serviceOf(store, options);
-
-/**
- * Service tag for trajectory caching.
- *
- * @see {@link Service} for the caching contract.
- * @see {@link layer} for an in-memory provider.
+ * @see {@link Cache} for what the service gives.
  * @stability stable
  * @category tags
  */
-export class Cache extends Context.Service<Cache, Service>()("trajs/core/Cache") {}
+export const Cache = Context.Service<Cache, Cache>()("trajs/core/Cache");
 
 /**
- * Creates a layer using the byte store from context.
+ * Creates a cache keeping its least recently read parts in memory.
  *
  * **When to use**
  *
- * Use when the application supplies its own storage backend.
- *
- * @see {@link layer} for an in-memory backend.
- * @see {@link layerFsTemp} for a temporary filesystem backend.
- * @see {@link Options} for the in-memory window.
- * @stability stable
- * @category layers
- */
-export const layerKVStore = (options?: Options): Layer.Layer<Cache, never, ByteStore.ByteStore> =>
-  Layer.effect(Cache, ByteStore.ByteStore.pipe(Effect.map((store) => make(store, options))));
-
-/**
- * Creates a cache layer with an in-memory byte store.
- *
- * **When to use**
- *
- * Use when cached trajectories fit in memory.
- *
- * **Gotchas**
- *
- * A finite capacity moves older parts into another in-memory representation, not onto disk.
- *
- * @see {@link layerFsTemp} for spilling parts to disk.
- * @see {@link layerKVStore} for a caller-supplied backend.
- * @stability stable
- * @category layers
- */
-export const layer = (options?: Options): Layer.Layer<Cache> =>
-  layerKVStore(options).pipe(Layer.provide(ByteStore.layer()));
-
-/**
- * Creates a cache layer backed by a scoped temporary directory.
- *
- * **When to use**
- *
- * Use when older parts should spill to disk without persistent storage.
+ * Use when cached parts must outlive the program, or are too many to hold.
  *
  * **Details**
  *
- * The directory uses `prefix`, defaulting to `"trajs-"`, and is removed when the layer's scope closes.
+ * `capacity` is the size of the memory, counted in parts rather than bytes.
+ * A part read again is the last to be dropped, and omission or `"unbounded"`
+ * holds every part.
+ * Reading the source runs to its end, and every part is encoded and kept under
+ * `<id>/<index>`.
+ * `at` decodes a part from the store, and keeps it from then on.
  *
  * **Gotchas**
  *
- * Set a finite `capacity` to spill parts.
- * The default capacity keeps every part in memory, even with a filesystem backend.
+ * An id names the keys of its parts, so reading one trajectory over another's id
+ * reads that one's parts.
+ * A part kept again is written over the one the store held.
  *
- * @see {@link layer} for an in-memory backend.
- * @see {@link Options} for the in-memory window.
+ * @see {@link layerMemory} for a cache holding every part in memory.
  * @stability stable
  * @category layers
  */
-export const layerFsTemp = (
-  prefix = "trajs-",
-  options?: Options,
-): Layer.Layer<Cache, PlatformError, FileSystem.FileSystem | Path.Path> =>
-  layerKVStore(options).pipe(Layer.provide(ByteStore.layerFsTemp(prefix)));
+export const layerKVStore = (options?: {
+  readonly capacity?: number | "unbounded";
+}): Layer.Layer<Cache, never, KeyValueStore.KeyValueStore> => {
+  const stated = options?.capacity;
+
+  const capacity =
+    stated === undefined || stated === "unbounded" ? Infinity : Math.max(0, Math.floor(stated));
+
+  return Layer.effect(
+    Cache,
+    Effect.gen(function* () {
+      const store = yield* KeyValueStore.KeyValueStore;
+
+      return {
+        cache: <Id extends string, Config extends Config.AnyConfig, E, R>(
+          trajectory: Trajectory.Trajectory<Id, Config, E, R>,
+        ) =>
+          Effect.gen(function* () {
+            const config = configOf<Config>(trajectory);
+            const encode = encodePart<Config>(config);
+            const decode = decodePart<Config>(config);
+
+            const parts = yield* EffectCache.make({
+              capacity,
+              requireServicesAt: "lookup",
+              lookup: (index: number) =>
+                Effect.gen(function* () {
+                  const bytes = yield* store.getUint8Array(`${trajectory.id}/${index}`).pipe(
+                    Effect.mapError(
+                      (cause) =>
+                        new CacheError({
+                          id: trajectory.id,
+                          index,
+                          operation: "read",
+                          cause,
+                        }),
+                    ),
+                  );
+
+                  if (bytes === undefined) {
+                    return yield* Effect.fail(
+                      new CacheError({
+                        id: trajectory.id,
+                        index,
+                        operation: "read",
+                        cause: "the store holds no part at this index",
+                      }),
+                    );
+                  }
+
+                  return yield* decode(bytes);
+                }),
+            });
+
+            let length = 0;
+
+            yield* trajectory.pipe(
+              Stream.mapEffect((part) => {
+                const index = length;
+
+                length += 1;
+
+                return encode(part).pipe(
+                  Effect.flatMap((bytes) =>
+                    store.set(`${trajectory.id}/${index}`, bytes).pipe(
+                      Effect.mapError(
+                        (cause) =>
+                          new CacheError({
+                            id: trajectory.id,
+                            index,
+                            operation: "write",
+                            cause,
+                          }),
+                      ),
+                    ),
+                  ),
+                );
+              }),
+              Stream.runDrain,
+            );
+
+            return {
+              ...config,
+              id: trajectory.id,
+              length,
+              at: (index: number) =>
+                index < 0 || index >= length
+                  ? Effect.succeed(Option.none<Trajectory.Part<Config>>())
+                  : EffectCache.get(parts, index).pipe(Effect.map(Option.some)),
+            };
+          }),
+      };
+    }),
+  );
+};
+
+/**
+ * Reads a trajectory into a buffer of its parts, kept in memory.
+ *
+ * **Details**
+ *
+ * Reading the source runs through to its end before the buffer is returned.
+ * `length` counts the parts held, and `at` reads one by a zero-based index.
+ *
+ * @see {@link Trajectory.TrajectoryFile} for the buffer.
+ * @stability stable
+ * @category layers
+ */
+export const layerMemory: Layer.Layer<Cache> = Layer.effect(
+  Cache,
+  Effect.succeed({
+    cache: <Id extends string, Config extends Config.AnyConfig, E, R>(
+      trajectory: Trajectory.Trajectory<Id, Config, E, R>,
+    ) =>
+      trajectory.pipe(
+        Stream.runCollect,
+        Effect.map((parts): Trajectory.TrajectoryFile<Id, Config, never, never> => ({
+          ...configOf<Config>(trajectory),
+          id: trajectory.id,
+          length: parts.length,
+          at: (index) => Effect.succeed(Option.fromUndefinedOr(parts[index])),
+        })),
+      ),
+  }),
+);

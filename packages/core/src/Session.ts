@@ -12,7 +12,8 @@ import { Effect, type Option, type Stream } from "effect";
 import * as Cache from "#/Cache.ts";
 import type * as Config from "#/Config.ts";
 import { allSessions, findSession, read, sessionParts } from "#/internal/session.ts";
-import type * as Trajectory from "#/Trajectory.ts";
+import { configOf } from "#/internal/trajectory.ts";
+import * as Trajectory from "#/Trajectory.ts";
 import type { TrajectoryError } from "#/TrajectoryError.ts";
 
 /**
@@ -134,7 +135,11 @@ export const main = Effect.fn(function* <Config extends Config.AnyConfig, E, R>(
   const cache = yield* Cache.Cache;
   const cached = yield* cache.cache(trajectory);
 
-  return yield* read(cached);
+  const replay = Trajectory.asStream(cached).pipe(
+    Trajectory.make(cached.id, configOf<Config>(trajectory)),
+  );
+
+  return yield* read(replay);
 });
 
 /**
